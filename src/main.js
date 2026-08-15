@@ -33,6 +33,12 @@ let latestView = null; // last view received from host, join only
 let sessionEnded = false;
 let selectedPreset = null; // US-15: applied to cards-per-player once host-share is shown
 
+function describeDeckConfig({ numDecks, jokers }) {
+  const deckWord = numDecks === 1 ? 'deck' : 'decks';
+  const jokerWord = jokers === 1 ? 'joker' : 'jokers';
+  return `${numDecks} ${deckWord}, ${jokers} ${jokerWord}`;
+}
+
 // --- Rules reference (US-18): a toggleable overlay, not a showScreen()
 // swap, so opening it never loses table state (Smith Gate 1 AC). ---
 renderRulesPanel(document.getElementById('rules-content'), RULES_REFERENCE);
@@ -61,7 +67,8 @@ presetSelect.addEventListener('change', () => {
   }
   document.getElementById('host-num-decks').value = String(preset.numDecks);
   document.getElementById('host-jokers').value = String(preset.jokers);
-  previewEl.textContent = `${preset.numDecks} deck(s), ${preset.jokers} joker(s), ${preset.cardsPerPlayer} cards/player`;
+  const cardsWord = preset.cardsPerPlayer === 1 ? 'card' : 'cards';
+  previewEl.textContent = `${describeDeckConfig(preset)}, ${preset.cardsPerPlayer} ${cardsWord}/player`;
   previewEl.hidden = false;
 });
 
@@ -103,8 +110,7 @@ document.getElementById('create-table').addEventListener('click', async () => {
   const shareContainer = document.getElementById('share-code-container');
   renderShareCode(shareContainer, { code: myId, joinUrl: buildJoinUrl(myId) });
   document.getElementById('host-share').hidden = false;
-  document.getElementById('host-deck-config').textContent =
-    `Deck: ${deckConfig.numDecks} deck(s), ${deckConfig.jokers} joker(s)`;
+  document.getElementById('host-deck-config').textContent = `Deck: ${describeDeckConfig(deckConfig)}`;
   if (selectedPreset) {
     document.getElementById('cards-per-player').value = String(selectedPreset.cardsPerPlayer);
   }

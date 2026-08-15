@@ -147,6 +147,30 @@ None yet
       card from earlier in the flow) - fixed, not implementation bugs.
       41/41 unit + e2e 3/3 stable runs, zero v1 regressions.
 
+### Post-launch UX overhaul (2026-08-15, user: "the ux is dog shit")
+Smith ran a full audit (agents/smith.docs/uat-report-ux-audit.md), 5
+findings. Fixed all 5, UI-only (no state/protocol changes):
+- Design system: replaced the single flat blue-everywhere button with a
+  real hierarchy (`.btn-primary` solid blue, default = neutral secondary,
+  `.btn-danger` red-outlined for Reshuffle/Reset Scores).
+- `.panel`/`.panel-felt` wrap every logical section (Table/Players/Your
+  hand, host-share, forms) instead of a flat unstructured stack - Table
+  gets a subtle green felt tint as a nod to a real card table.
+- Cards redesigned as proper corner-index playing cards (rank+suit
+  top-left, big centered suit pip, rounded corners, shadow) instead of a
+  bare concatenated string - restructured `cardEl()` in ui.js into
+  corner/pip child spans; no test depended on the old flat textContent,
+  confirmed via grep before changing it.
+- `#screen-game` gets a wider max-width (760px) than form-style screens
+  (480px) so cards/roster/hand actually use desktop space instead of
+  sitting in a narrow column in a sea of black.
+- Fixed "1 deck(s), 0 joker(s)" grammar via a small `describeDeckConfig()`
+  pluralization helper, reused in both places it was duplicated.
+Verified via fresh screenshots at both 390px and 1280px - genuinely
+different, not just "technically changed." 41/41 unit + e2e green
+throughout (zero functional regressions, this was pure CSS/markup/one
+small ui.js restructure).
+
 ### Sprint 2 status: ALL 6 PHASES COMPLETE + Smith sprint-close bug round.
 Smith's `*user test` found 2 real bugs (agents/smith.docs/uat-report-
 sprint2.md) - both fixed:

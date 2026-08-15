@@ -76,11 +76,13 @@ Waiting on the fix + re-test loop for the 2 bugs found in Sprint 2's
 sprint-close test, then re-approve and move to retro.
 
 ### Waiting On
-Nothing — re-tested both fixes (44px+ confirmed on real measurements,
-confirm-gate verified via e2e). Report closed. Approved for retro.
+Nothing — re-tested all 5 fixes via fresh screenshots at 390px and
+1280px. Real, visible improvement (not just "it compiles"): button
+hierarchy is now legible at a glance, sections are clearly grouped,
+cards look like cards, desktop uses its space. Report closed.
 
 ### Planned Work
-- [ ] None pending for Sprint 2.
+- [ ] None pending.
 
 ---
 *Last updated: 2026-08-15 15:31*

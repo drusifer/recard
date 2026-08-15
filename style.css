@@ -1,14 +1,21 @@
 :root {
-  color-scheme: light dark;
-  --bg: #1b1f24;
-  --surface: #262b33;
-  --text: #eef1f5;
-  --muted: #9aa4b2;
+  color-scheme: dark;
+  --bg: #10131a;
+  --surface: #1a1e27;
+  --surface-2: #232936;
+  --border: #2b3241;
+  --text: #f1f4f8;
+  --muted: #8d97ab;
   --accent: #4f9dff;
+  --accent-text: #061120;
   --danger: #e5533d;
-  --card-bg: #f7f7f2;
+  --felt: #142720;
+  --card-bg: #f8f7f2;
   --card-text: #1b1f24;
   --card-red: #c0392b;
+  --radius-sm: 0.45rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1.1rem;
 }
 
 * { box-sizing: border-box; }
@@ -19,44 +26,97 @@ body {
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
+  line-height: 1.4;
 }
 
 .screen {
-  max-width: 640px;
+  max-width: 480px;
   margin: 0 auto;
-  padding: 1.5rem 1rem 3rem;
+  padding: 2rem 1.25rem 4rem;
 }
 
-h1, h2 { font-weight: 600; }
+/* The game screen benefits from more room (cards, roster, hand) on
+   anything wider than a phone - Smith UX audit finding #4. */
+#screen-game { max-width: 760px; }
+
+h1 {
+  font-weight: 700;
+  font-size: 1.7rem;
+  margin: 0 0 0.5rem;
+}
+
+h2 {
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* Groups related content visually instead of leaving screens as a flat
+   stack of same-background elements - Smith UX audit finding #2. */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.panel-felt { background: var(--felt); }
 
 label {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.9rem;
   font-size: 0.9rem;
   color: var(--muted);
 }
 
-input, select, button {
+input, select {
   font-size: 1rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.5rem;
-  border: 1px solid #3a4048;
-  background: var(--surface);
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
   color: var(--text);
 }
 
+/* --- Buttons: a real hierarchy instead of one identical blue everywhere
+   (Smith UX audit finding #1). Default = neutral/secondary. --- */
 button {
   cursor: pointer;
-  border-color: var(--accent);
-  background: var(--accent);
-  color: #061021;
+  font-size: 0.95rem;
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
   font-weight: 600;
-  margin-right: 0.5rem;
 }
 
-button:disabled { opacity: 0.5; cursor: not-allowed; }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.btn-danger {
+  background: transparent;
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
 
 .banner {
   background: var(--danger);
@@ -67,32 +127,59 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
 .share-code {
-  font-size: 1.75rem;
-  letter-spacing: 0.05em;
+  font-size: 1.9rem;
+  letter-spacing: 0.08em;
   font-weight: 700;
-  background: var(--surface);
-  padding: 0.75rem 1rem;
-  border-radius: 0.5rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-md);
   word-break: break-all;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
+  text-align: center;
 }
 
 .card-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  min-height: 4rem;
+  gap: 0.6rem;
+  min-height: 4.5rem;
 }
 
+/* Corner-index playing card, closer to a real card's layout than a bare
+   concatenated string (Smith UX audit finding #3). */
 .card {
+  position: relative;
   background: var(--card-bg);
   color: var(--card-text);
-  border: 1px solid #ccc;
-  border-radius: 0.4rem;
-  padding: 0.6rem 0.5rem;
-  min-width: 2.75rem;
+  border: 1px solid #d9d9d3;
+  border-radius: var(--radius-sm);
+  width: 3.1rem;
+  height: 4.3rem;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
+}
+
+/* Display-only cards (table/other players) are informational, not
+   unavailable - don't dim them like a disabled action button. */
+.card:disabled { opacity: 1; cursor: default; }
+
+.card-corner {
+  position: absolute;
+  top: 0.2rem;
+  left: 0.3rem;
+  font-size: 0.65rem;
   font-weight: 700;
-  font-size: 1rem;
+  line-height: 1.05;
+  text-align: center;
+}
+
+.card-pip {
+  font-size: 1.6rem;
+  font-weight: 700;
 }
 
 .card-red { color: var(--card-red); }
@@ -101,16 +188,18 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #2f3a52;
-  color: #6f7ea3;
-  border: 1px solid #445071;
+  background: var(--surface-2);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  font-size: 1.4rem;
+  opacity: 1;
 }
 
 .hand-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.15rem;
+  gap: 0.3rem;
 }
 
 .hand-card-fd-row {
@@ -126,9 +215,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   min-height: 2.75rem;
   padding: 0.3rem;
   font-size: 1rem;
-  background: var(--surface);
+  background: var(--surface-2);
   color: var(--muted);
-  border-color: #3a4048;
   font-weight: 400;
 }
 
@@ -136,7 +224,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.2rem;
+  gap: 0.3rem;
 }
 
 .owner-tag {
@@ -155,14 +243,14 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
 .deck-config { color: var(--muted); font-size: 0.9rem; }
-.error-text { color: var(--danger); font-size: 0.9rem; }
+.error-text { color: var(--danger); font-size: 0.9rem; margin-top: 0.5rem; }
 
 .rules-toggle {
   position: fixed;
   top: 0.75rem;
   right: 0.75rem;
   z-index: 10;
-  padding: 0.4rem 0.75rem;
+  padding: 0.45rem 0.85rem;
   font-size: 0.85rem;
 }
 
@@ -172,7 +260,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   z-index: 20;
   background: var(--bg);
   overflow-y: auto;
-  padding: 1.5rem 1rem 3rem;
+  padding: 1.5rem 1.25rem 3rem;
 }
 
 .overlay-close {
@@ -182,22 +270,29 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
 .rules-entry {
-  margin-bottom: 1.5rem;
+  max-width: 480px;
+  margin: 0 auto 1.75rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
 }
 
+.rules-entry:last-child { border-bottom: none; }
+
 .rules-entry h3 {
-  margin-bottom: 0.25rem;
+  margin: 0 0 0.35rem;
+  font-size: 1.1rem;
 }
 
 .rules-entry dt {
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
-  margin-top: 0.5rem;
+  letter-spacing: 0.03em;
+  margin-top: 0.6rem;
 }
 
 .rules-entry dd {
-  margin: 0;
+  margin: 0.15rem 0 0;
 }
 
 .score-row {
@@ -213,21 +308,23 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   min-height: 2.75rem;
   padding: 0.3rem 0.5rem;
   font-size: 1rem;
+  background: var(--surface-2);
 }
 
 .roster {
   list-style: none;
   padding: 0;
-  margin: 0.5rem 0;
+  margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.4rem;
 }
 
 .roster li {
-  padding: 0.4rem 0.6rem;
-  background: var(--surface);
-  border-radius: 0.4rem;
+  padding: 0.55rem 0.7rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   font-size: 0.9rem;
 }
 

@@ -54,11 +54,12 @@ Stage 3 close (Oracle groom -> Smith end-to-end test -> retro -> Cypher
 launch).
 
 ### Waiting On
-Nothing — re-verified both of Smith's sprint-close bug fixes, handing to
-Smith for re-test.
+Nothing — re-verified Neo's 5 UX overhaul fixes (41/41 unit + e2e green,
+confirmed the ui.js `cardEl()` restructure broke nothing by re-grepping
+test usage myself), handing to Smith for final re-test.
 
 ### Planned Work
 - [ ] None pending.
 
 ---
-*Last updated: 2026-08-15 15:26*
+*Last updated: 2026-08-15 16:15*

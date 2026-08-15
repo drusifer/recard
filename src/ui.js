@@ -10,8 +10,25 @@ function cardEl(card, { onClick, disabled } = {}) {
   const el = document.createElement('button');
   el.type = 'button';
   el.className = 'card' + (RED_SUITS.has(card.suit) ? ' card-red' : '');
-  el.textContent = cardLabel(card);
   el.dataset.cardId = card.id;
+
+  if (card.rank === 'JOKER') {
+    const pip = document.createElement('span');
+    pip.className = 'card-pip';
+    pip.textContent = 'JOKER';
+    pip.style.fontSize = '0.65rem';
+    el.appendChild(pip);
+  } else {
+    const symbol = SUIT_SYMBOL[card.suit];
+    const corner = document.createElement('span');
+    corner.className = 'card-corner';
+    corner.textContent = `${card.rank} ${symbol}`;
+    const pip = document.createElement('span');
+    pip.className = 'card-pip';
+    pip.textContent = symbol;
+    el.append(corner, pip);
+  }
+
   if (onClick && !disabled) el.addEventListener('click', () => onClick(card));
   else el.disabled = true;
   return el;

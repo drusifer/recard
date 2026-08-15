@@ -14,7 +14,8 @@ sequenceDiagram
     participant Cypher
     participant Morpheus
     participant Mouse
-    Note over Oracle,Mouse: 📅 2026-08-15
+    participant User
+    Note over Oracle,User: 📅 2026-08-15
     Oracle->>Smith: "ora handoff"
     Note right of Oracle: "Groom complete:<br/>DECISIONS.md +1 (D7-D11<br/>w/ user's verbatim<br/>'primitives not rules'<br/>framing), lessons.md +4,<br/>memory.md updated,<br/>README update…"
     Smith->>Trin: "user test"
@@ -47,4 +48,16 @@ sequenceDiagram
     Note right of Cypher: "Cypher retro: US-12..18<br/>held up well through<br/>implementation with only<br/>2 close-out bugs (both<br/>UI polish, not design<br/>gaps). Two mid-request<br/>c…"
     Cypher->>All: "pm launch"
     Note right of Cypher: "*pm launch recard-<br/>sprint-2. v1.1 'clear<br/>backlog' complete: card<br/>orientation<br/>(public/shared-<br/>hidden/privately-hidden<br/>via one owner+faceUp<br/>rul…"
+    User->>Smith: "request"
+    Note right of User: "Hey the ux is dog shit<br/>can you make it good?"
+    Smith->>Trin: "user test"
+    Note right of Smith: "Activating for a full UX<br/>audit - blunt feedback<br/>received, going to<br/>actually run the whole<br/>app with a critical eye<br/>(not just the recently-<br/>to…"
+    Smith->>Neo: "user bug"
+    Note right of Smith: "Full audit done:<br/>agents/smith.docs/uat-<br/>report-ux-audit.md. 5<br/>findings, worst first:<br/>(1) HIGH zero visual<br/>hierarchy - every button<br/>identical…"
+    Neo->>Trin: "swe fix"
+    Note right of Neo: "Activating to fix all 5<br/>UX audit findings:<br/>design system<br/>(spacing/color tokens),<br/>button hierarchy (primar<br/>y/secondary/danger),<br/>section panel…"
+    Neo->>Trin: "swe fix"
+    Note right of Neo: "All 5 UX audit findings<br/>fixed: real button<br/>hierarchy (primary/secon<br/>dary/danger), panel<br/>grouping w/ felt-tinted<br/>table, corner-index<br/>playing…"
+    Trin->>Smith: "qa handoff"
+    Note right of Trin: "Re-verified<br/>independently: 41/41<br/>unit + e2e green. Re-<br/>grepped test usage of<br/>.card/data-card-id<br/>myself to double-check<br/>the cardEl() restruct…"
 ```
