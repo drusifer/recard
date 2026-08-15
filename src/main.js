@@ -2,7 +2,9 @@ import { Session } from './session.js';
 import { createInitialState, reduce, viewFor } from './state.js';
 import { makeStateMessage, makeMotionMessage, createMotionThrottler } from './protocol.js';
 import { buildJoinUrl, renderShareCode } from './qrcode.js';
-import { renderHand, renderTable, renderRoster, renderBanner, showScreen } from './ui.js';
+import { renderHand, renderTable, renderRoster, renderRulesPanel, renderBanner, showScreen } from './ui.js';
+import { PRESETS } from './presets.js';
+import { RULES_REFERENCE } from './rulesReference.js';
 
 const MOTION_FLUSH_MS = 50;
 const MOTION_TTL_MS = 2000; // auto-clear a stale "organizing hand" cue if the end-event is dropped
@@ -20,6 +22,7 @@ const tableAreaEl = document.getElementById('table-area');
 const gameRosterEl = document.getElementById('game-roster');
 const drawBtn = document.getElementById('draw-btn');
 const resetBtn = document.getElementById('reset-btn');
+const resetScoresBtn = document.getElementById('reset-scores-btn');
 
 let role = null; // 'host' | 'join'
 let session = null;
@@ -28,6 +31,39 @@ let myName = '';
 let gameState = null; // authoritative, host only
 let latestView = null; // last view received from host, join only
 let sessionEnded = false;
+let selectedPreset = null; // US-15: applied to cards-per-player once host-share is shown
+
+// --- Rules reference (US-18): a toggleable overlay, not a showScreen()
+// swap, so opening it never loses table state (Smith Gate 1 AC). ---
+renderRulesPanel(document.getElementById('rules-content'), RULES_REFERENCE);
+document.getElementById('rules-toggle').addEventListener('click', () => {
+  document.getElementById('rules-panel').hidden = false;
+});
+document.getElementById('rules-close').addEventListener('click', () => {
+  document.getElementById('rules-panel').hidden = true;
+});
+
+// --- Presets (US-15) ---
+const presetSelect = document.getElementById('host-preset');
+for (const preset of PRESETS) {
+  const opt = document.createElement('option');
+  opt.value = preset.name;
+  opt.textContent = preset.name;
+  presetSelect.appendChild(opt);
+}
+presetSelect.addEventListener('change', () => {
+  const preset = PRESETS.find((p) => p.name === presetSelect.value);
+  const previewEl = document.getElementById('host-preset-preview');
+  selectedPreset = preset ?? null;
+  if (!preset) {
+    previewEl.hidden = true;
+    return;
+  }
+  document.getElementById('host-num-decks').value = String(preset.numDecks);
+  document.getElementById('host-jokers').value = String(preset.jokers);
+  previewEl.textContent = `${preset.numDecks} deck(s), ${preset.jokers} joker(s), ${preset.cardsPerPlayer} cards/player`;
+  previewEl.hidden = false;
+});
 
 const motionThrottler = createMotionThrottler();
 const movingIds = new Set();
@@ -69,6 +105,9 @@ document.getElementById('create-table').addEventListener('click', async () => {
   document.getElementById('host-share').hidden = false;
   document.getElementById('host-deck-config').textContent =
     `Deck: ${deckConfig.numDecks} deck(s), ${deckConfig.jokers} joker(s)`;
+  if (selectedPreset) {
+    document.getElementById('cards-per-player').value = String(selectedPreset.cardsPerPlayer);
+  }
   renderRosterOnly();
 
   session.on('roster', (transportRoster) => {
@@ -105,6 +144,22 @@ document.getElementById('deal-btn').addEventListener('click', () => {
 resetBtn.addEventListener('click', () => {
   dispatch({ type: 'RESET' });
 });
+
+resetScoresBtn.addEventListener('click', () => {
+  // Confirm-gated, consistent with revealing a private card - both are
+  // irreversible and lose state a player can't easily reconstruct
+  // (Smith Gate-close finding: this precedent already existed for
+  // Reveal, Reset Scores just hadn't followed it).
+  if (window.confirm('Reset everyone\'s score to 0? This cannot be undone.')) {
+    dispatch({ type: 'RESET_SCORES' });
+  }
+});
+
+function adjustScore(targetPlayerId, delta) {
+  if (sessionEnded) return;
+  if (role === 'host') dispatch({ type: 'ADJUST_SCORE', targetPlayerId, delta });
+  else session.send({ type: 'action', action: { type: 'ADJUST_SCORE', targetPlayerId, delta } });
+}
 
 function rosterWithCounts(view) {
   return view.players.map((p) => ({
@@ -164,10 +219,19 @@ document.getElementById('join-btn').addEventListener('click', () => {
     renderBanner(bannerEl, 'Host disconnected — session ended.');
     sessionEnded = true;
     drawBtn.disabled = true;
-    // Re-render with no onPlay handler so cardEl disables every card too,
-    // and force the roster to reflect reality instead of the last-known
-    // (now stale) connection states (Smith Gate-close finding #1).
-    if (latestView) renderHand(handAreaEl, latestView.myHand, {});
+    resetScoresBtn.disabled = true;
+    // Re-render with no action handlers so every control (hand cards,
+    // reveal/pickup buttons) is inert, and force the roster to reflect
+    // reality instead of the last-known (now stale) connection states
+    // (Smith Gate-close finding #1 — don't leave any control looking
+    // live once the session is actually over).
+    if (latestView) {
+      renderHand(handAreaEl, latestView.myHand, {});
+      const nameById = new Map(latestView.players.map((p) => [p.id, p.id === myId ? 'You' : p.name]));
+      renderTable(tableAreaEl, latestView.table, {
+        resolveOwnerName: (ownerId) => nameById.get(ownerId) ?? ownerId,
+      });
+    }
     renderRosterOnly();
   });
 });
@@ -183,26 +247,51 @@ function renderRosterOnly() {
   if (!view) return;
   let players = rosterWithCounts(view);
   if (sessionEnded) players = players.map((p) => ({ ...p, connection: 'disconnected' }));
-  const opts = { deckCount: view.deckCount, movingIds };
+  const opts = {
+    deckCount: view.deckCount,
+    movingIds,
+    scores: view.scores,
+    onAdjustScore: sessionEnded ? null : adjustScore,
+  };
   const hostRosterEl = document.getElementById('host-roster');
   if (hostRosterEl) renderRoster(hostRosterEl, players, opts);
   renderRoster(gameRosterEl, players, opts);
 }
 
 function renderGameFromView(view) {
+  const nameById = new Map(view.players.map((p) => [p.id, p.id === myId ? 'You' : p.name]));
+
   renderHand(handAreaEl, view.myHand, {
-    onPlay: (card) => playCard(card.id),
+    onPlay: (card) => playCard(card.id, 'public'),
+    onPlayFacedown: (card, visibility) => playCard(card.id, visibility),
     onHandMotion: (active) => motionThrottler.schedule('hand', { active }),
   });
-  renderTable(tableAreaEl, view.table);
+  renderTable(tableAreaEl, view.table, {
+    resolveOwnerName: (ownerId) => nameById.get(ownerId) ?? ownerId,
+    onReveal: (cardId) => revealCard(cardId),
+    onPickup: (cardId) => pickupCard(cardId),
+  });
   resetBtn.hidden = role !== 'host';
+  resetScoresBtn.hidden = role !== 'host';
   renderRosterOnly();
 }
 
-function playCard(cardId) {
+function playCard(cardId, visibility) {
   if (sessionEnded) return;
-  if (role === 'host') dispatch({ type: 'PLAY', playerId: myId, cardId });
-  else session.send({ type: 'action', action: { type: 'PLAY', cardId } });
+  if (role === 'host') dispatch({ type: 'PLAY', playerId: myId, cardId, visibility });
+  else session.send({ type: 'action', action: { type: 'PLAY', cardId, visibility } });
+}
+
+function revealCard(cardId) {
+  if (sessionEnded) return;
+  if (role === 'host') dispatch({ type: 'REVEAL', playerId: myId, cardId });
+  else session.send({ type: 'action', action: { type: 'REVEAL', cardId } });
+}
+
+function pickupCard(cardId) {
+  if (sessionEnded) return;
+  if (role === 'host') dispatch({ type: 'PICKUP', playerId: myId, cardId });
+  else session.send({ type: 'action', action: { type: 'PICKUP', cardId } });
 }
 
 drawBtn.addEventListener('click', () => {

@@ -9,6 +9,12 @@
 </head>
 <body>
   <div id="banner" class="banner" hidden></div>
+  <button id="rules-toggle" type="button" class="rules-toggle">Rules</button>
+  <div id="rules-panel" class="overlay" hidden>
+    <button id="rules-close" type="button" class="overlay-close">Close</button>
+    <h2>How to play</h2>
+    <div id="rules-content"></div>
+  </div>
 
   <main id="screen-landing" class="screen">
     <h1>Recard</h1>
@@ -21,6 +27,12 @@
     <h1>Host a table</h1>
     <div id="host-form">
       <label>Your name <input id="host-name" type="text" maxlength="20" /></label>
+      <label>Quick-start
+        <select id="host-preset">
+          <option value="">Custom (set up manually below)</option>
+        </select>
+      </label>
+      <p id="host-preset-preview" class="deck-config" hidden></p>
       <label>Decks <select id="host-num-decks"><option value="1">1</option><option value="2">2</option></select></label>
       <label>Jokers <select id="host-jokers"><option value="0">0</option><option value="2">2</option><option value="4">4</option></select></label>
       <button id="create-table" type="button">Create Table</button>
@@ -61,6 +73,7 @@
       <div id="hand-area" class="card-row"></div>
       <button id="draw-btn" type="button">Draw</button>
       <button id="reset-btn" type="button" hidden>Reshuffle &amp; Reset</button>
+      <button id="reset-scores-btn" type="button" hidden>Reset Scores</button>
     </section>
   </main>
 

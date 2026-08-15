@@ -5,7 +5,15 @@
 - Sprint 1 ("v1 playable deck") broken into 5 phases in `task.md`, 2-3
   tasks each, following Morpheus's module layout from
   `docs/ARCHITECTURE.md`: (1) deck engine, (2) state engine, (3) P2P
-  session wiring, (4) UI + wiring, (5) motion sync + polish.
+  session wiring, (4) UI + wiring, (5) motion sync + polish. Shipped.
+- Sprint 2 ("clear backlog," v1.1, US-12..18) broken into 6 phases
+  (numbered 6-11 to keep task.md history linear): (6) middle-zone data
+  model, (7) score tracking, (8) solo regression + static content
+  modules (presets/rules-reference), (9) middle-zone UI, (10) score+
+  presets+rules-reference UI, (11) e2e verification. Split data-layer
+  phases (6-8) from UI phases (9-10) since they're independently
+  verifiable and data-layer work has no DOM/network dependency (same
+  pattern that worked well in Sprint 1).
 
 ### Key Findings
 - Phases 1-2 are pure logic (unit-testable, no DOM/network) and can move
@@ -26,10 +34,12 @@
 Break the Recard sprint into small phases and get Morpheus's sign-off
 before kicking off the Phase Bloop (Neo → Trin → Morpheus per phase).
 
-### Progress
-- [x] Wrote `task.md` with 5 phases, 2-3 tasks each
+### Progress — Sprint 1: DONE (5/5 phases shipped)
+
+### Progress — Sprint 2 (v1.1)
+- [x] Wrote `task.md` Sprint 2 section, 6 phases (6-11), 2-3 tasks each
 - [ ] Morpheus review of phase plan
-- [ ] Phase Bloop x5
+- [ ] Phase Bloop x6
 
 ### Blockers
 None

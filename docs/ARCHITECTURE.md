@@ -1,7 +1,8 @@
 # Architecture — Recard
 
 **Owner:** Morpheus (Tech Lead)
-**Status:** v1 — binding for this sprint
+**Status:** v1 shipped; v1.1 decisions below (D7-D11) are binding for the
+current sprint (US-12..18, "clear backlog").
 **Last updated:** 2026-08-15
 
 ## Decisions (resolves PRD Feasibility Flags 1 & 2)
@@ -68,6 +69,69 @@ v1 limitation (PRD Open Question 4), not silently swept under the rug.
 "Host disconnected — session ended" message on host loss, never a silent
 freeze (PeerJS connection's `close`/`error` event on the host DataConnection).
 
+## v1.1 Decisions (resolves PRD Feasibility Flag 3)
+
+### D7. Middle cards generalize hand-style per-viewer redaction
+Resolves Flag 3. Extend `Card` to `MiddleCard = Card & { owner: string |
+null, faceUp: boolean }` for every entry in `state.table`. **Same
+redaction mechanism as D3 (per-viewer privacy for hands), applied to a
+second zone** — not a new mechanism:
+```
+canSee(viewer, middleCard) = middleCard.faceUp || middleCard.owner === viewer
+```
+`viewFor(state, viewerId)` maps each table entry through this rule: full
+card data if visible, else `{ id, owner, faceDown: true }` (owner is
+still exposed when hidden — per Smith's UX requirement, players can see
+*whose* face-down card it is, just not its rank/suit, matching how a
+physical hole card's position is visible even face-down). This covers all
+four cases from the PRD proposal (public, shared-hidden, owned-hidden,
+owned-revealed) with one rule and no new state-sync mechanism — reuses
+the existing reliable-state-message model (D4) unchanged.
+
+### D8. Three new reducer actions
+- `PLAY` (extended): now takes `visibility: 'public' | 'shared-facedown'
+  | 'private-facedown'`, computing `owner`/`faceUp` per D7 instead of
+  always `{owner: null, faceUp: true}`.
+- `REVEAL {playerId, cardId}`: sets `faceUp: true` on a table card.
+  Authorization per Smith's Gate 1 AC: if `owner === null` (shared), any
+  player may call it; if `owner !== null` (private), only that owner may
+  — host-side reducer throws on an unauthorized attempt (same pattern as
+  today's `PLAY` throwing on a card not in the caller's hand). No-op
+  (not an error) if already `faceUp`.
+- `PICKUP {playerId, cardId}`: moves a table card into the calling
+  player's hand. Throws if the card isn't `faceUp` (can't pick up what
+  you can't identify — protects hidden information, per US-14 AC).
+
+### D9. Score is a flat map, untouched by RESET
+`state.scores: { [playerId]: number }`, initialized to 0 on `JOIN`.
+`ADJUST_SCORE {targetPlayerId, delta}` (delta is `+1`/`-1` — matches
+Smith's "just +/- buttons" AC, no arbitrary `SET_SCORE`). `RESET` (US-9)
+must NOT touch `scores` — scores intentionally outlive a reshuffle, per
+US-16 AC. A separate `RESET_SCORES` action zeros it explicitly. Public to
+all viewers unconditionally in `viewFor()` (no redaction — scores were
+never meant to be private).
+
+### D10. Presets and rules reference are static client-side data, not new state
+US-15 (presets) and US-18 (rules reference) need **no `state.js` or
+protocol changes** — they're both pure lookup tables consumed entirely
+client-side before/alongside existing actions:
+- `src/presets.js`: exports a list of `{ name, numDecks, jokers,
+  cardsPerPlayer, usesMiddle }`. The host-setup UI reads from this list
+  to prefill the existing US-3/US-4 form fields; "Custom" is just "don't
+  apply a preset." `usesMiddle` gates presets that depend on D7/D8 landing.
+- `src/rulesReference.js`: exports `{ [gameName]: { goal, setup, turns }
+  }` (or similar consistent shape — Smith's Gate 1 AC requires uniform
+  format across entries). Rendered by `ui.js` in an overlay that does
+  **not** go through `showScreen()` — per Smith's Gate 1 requirement that
+  opening it must not lose table state, it needs its own show/hide
+  toggle layered on top of whichever screen is active, not a screen swap.
+
+### D11. Solo play needs no architecture change
+Confirmed during PRD drafting (Cypher grepped `src/` — no player-count
+gate exists anywhere): US-17 is a **regression-test-only** item for this
+sprint. Neo should add a dedicated `npm test`/e2e case with exactly one
+player dealt/played/drawn through a full round, not new implementation.
+
 ## Module Layout
 ```
 index.html              entry page, host/join screens, game screen
@@ -78,9 +142,12 @@ src/session.js              PeerJS wiring: create/join, connection roster, send/
 src/protocol.js              message envelope helpers: state vs. motion, throttling/coalescing
 src/ui.js                     DOM rendering: hand, table, roster, connection status
 src/qrcode.js                  small vendored QR renderer (no external network call at runtime)
-src/main.js                    wires session + state + ui together
-tests/deck.test.js              node:test unit tests for deck.js
-tests/state.test.js              node:test unit tests for state.js reducer
+src/presets.js                  v1.1: static game-preset lookup (US-15)
+src/rulesReference.js            v1.1: static rules-reference content (US-18)
+src/main.js                       wires session + state + ui together
+tests/deck.test.js                 node:test unit tests for deck.js
+tests/state.test.js                 node:test unit tests for state.js reducer (incl. D7-D9: middle
+                                     redaction, REVEAL authorization, PICKUP, scores, solo/1-player)
 ```
 
 ## Testing Strategy
@@ -95,6 +162,14 @@ banner. Playwright is a devDependency only — no runtime/build-step impact
 on the shipped static site (D1 still holds). Smith/Trin can still do
 additional manual two-tab testing for anything the smoke test doesn't
 cover (visual/UX judgment calls, not just functional correctness).
+
+## UI Conventions
+- **Interactive elements are ≥44×44px** (iOS HIG / Material minimum),
+  including secondary/small buttons. Added 2026-08-15 after Smith's
+  Sprint 2 close-out test measured `.fd-btn`/`.score-btn` at ~25×20px
+  and ~19×17px — a real touch-accuracy defect, not a style nit — see
+  `docs/DECISIONS.md`. State this once here instead of rediscovering it
+  per phase.
 
 ## Open Items Carried Forward (not blocking v1)
 - Reconnect-after-refresh (PRD Open Question 4) — deferred.

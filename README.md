@@ -2,9 +2,17 @@
 
 A shared virtual deck of cards for people playing a card game **in the
 same room**, each on their own phone/laptop, with no server to run and no
-accounts. Peer-to-peer over WebRTC. Recard doesn't referee any specific
-game — it's a deck-and-table simulator you use alongside whatever game's
-rules you already know.
+accounts. Peer-to-peer over WebRTC. Recard ships a small set of composable
+primitives — deal, a private hand, play a card public/hidden-from-everyone/
+hidden-but-mine, reveal, draw or pick up, a manual score — rather than any
+one game's rules, so you use it alongside whatever game you already know
+how to play.
+
+**Features:** private hands · a shared "middle" that supports public,
+face-down, and privately-owned face-down cards (community cards *and*
+hole cards) · quick-start presets for common games · simple +/- score
+tracking · an in-app rules reference · works solo for solitaire-type
+games too.
 
 See `docs/PRD.md` for the product vision and `docs/ARCHITECTURE.md` for
 the technical design.
@@ -33,7 +41,7 @@ run `npx playwright install chromium` once, or have a system Chromium/
 Chrome installed (the test falls back to `/usr/bin/chromium`,
 `/usr/bin/chromium-browser`, or `/usr/bin/google-chrome`).
 
-## Known v1 limitations
+## Known limitations
 
 - **No reconnect.** If the host's tab closes, the session ends for
   everyone (you'll see an explicit "Host disconnected" message, not a
@@ -42,7 +50,10 @@ Chrome installed (the test falls back to `/usr/bin/chromium`,
   scannable QR was descoped for v1 (see `docs/USER_STORIES.md` Deferred/
   Stretch) rather than ship an unverifiable hand-rolled encoder.
 - **No persistence.** Nothing survives past the browser tab being open.
-- Soft cap of ~8 players; not enforced, just not tested past that.
+- Soft cap of ~8 players; not enforced, just not tested past that. 1
+  player (solo/solitaire) is explicitly supported at the other end.
+- Hand-drag reordering is cosmetic only — it doesn't persist across the
+  next state update (known tech debt, tracked in the backlog).
 
 ## How it works, briefly
 
@@ -51,6 +62,10 @@ Chrome installed (the test falls back to `/usr/bin/chromium`,
   the host, never to each other.
 - A player's hand is only ever sent to that player's own connection —
   never broadcast — so privacy holds at the data layer, not just the UI.
+  The same rule extends to the shared "middle": a face-down card's
+  rank/suit only ever reaches clients allowed to see it (nobody, for a
+  shared face-down card; just its owner, for a private one) — never sent
+  and hidden in the UI, actually never sent.
 - Card movement (organizing your hand) shows up on other screens as a
   best-effort, throttled "organizing hand" cue — motion only, never card
   identity, and safe to drop frames of.

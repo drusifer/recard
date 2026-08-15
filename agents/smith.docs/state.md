@@ -45,6 +45,24 @@ Sprint review gates for the Recard P2P card game sprint.
       bob-protocol skill docs claim `make judge-trace` is wired via a
       Makefile target; checked 6 projects total, none actually have that
       target. Routed to Bob (doc/skill fix, not a code bug).
+- [x] Sprint 2 (v1.1 backlog, US-12..18) Gate 1: **Approved with
+      substantial UX requirements added** to docs/USER_STORIES.md:
+      - Per-story AC: error-prevention on non-revealable private cards
+        (US-13), don't punish the common one-tap-play path for the rare
+        face-down case (US-12), resolved the score-edit-permission open
+        call as "everyone can adjust everyone's" (US-16).
+      - New cross-cutting "Smith UX requirements" block covering all of
+        US-12/13/14: ownership must stay visible on public middle cards,
+        revealing a *private* card needs a confirm step (irreversible,
+        gives away info) while revealing a *shared* card doesn't (normal
+        flow), reuse existing tap/drag patterns rather than inventing new
+        gestures, zero-signal anonymity for face-down cards (no timing/
+        layout leaks).
+      - US-15: preset selection must show what it actually configures
+        before commit (recognition, not recall).
+      - US-18: consistent format across rules-reference entries, and
+        opening the reference must not lose table state (same bug class
+        as the sprint-1 session-ended-but-controls-still-live bug).
 
 ### Blockers
 None
@@ -54,18 +72,15 @@ None yet
 
 ## Next Steps
 ### Immediate Next Action
-Wait for Morpheus's architecture doc, then run Gate 2 review focused on:
-connection-status UX, join flow simplicity, and whether the P2P/signaling
-choice creates any user-visible friction (e.g. requiring users to manually
-paste connection codes).
+Waiting on the fix + re-test loop for the 2 bugs found in Sprint 2's
+sprint-close test, then re-approve and move to retro.
 
 ### Waiting On
-@Morpheus: architecture doc for Gate 2.
+Nothing — re-tested both fixes (44px+ confirmed on real measurements,
+confirm-gate verified via e2e). Report closed. Approved for retro.
 
 ### Planned Work
-- [ ] Gate 2 review
-- [ ] Mid-phase usability passes during Neo's phase Bloop
-- [ ] Sprint-close end-to-end user test
+- [ ] None pending for Sprint 2.
 
 ---
-*Last updated: 2026-08-15 12:41*
+*Last updated: 2026-08-15 15:31*

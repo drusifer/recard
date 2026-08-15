@@ -65,3 +65,47 @@ updated to reflect this. Playwright is a devDependency only (no runtime
 impact, D1 still holds). This is now the strongest verification tool in
 the project — every phase gate from Phase 4 onward cited real e2e output,
 not just code review.
+
+## 2026-08-15 — v1.1 architecture (D7-D11): card orientation, score, presets
+
+**Context:** Post-launch, the user asked for card orientation (face-up/
+face-down play, turning a card over), a shared "middle" for multi-player
+interaction (poker/gin rummy style), quick-start game presets, simple
+score tracking, an in-app rules reference, and confirmed solo play. The
+user explicitly reframed the product's own vision mid-request: "the goal
+is not to capture every rule of every game but rather to allow any game
+to be played by supporting basic operations... just enough structure to
+support common card game mechanics" — recorded verbatim in
+`docs/PRD.md`'s Vision section as the standing test for future scope.
+
+**Decision:** Morpheus recorded five more binding decisions:
+- D7: middle-zone cards get `owner`/`faceUp` fields, redacted via one
+  rule (`faceUp || owner === viewer`) — the same per-viewer redaction
+  mechanism D3 already used for hands, generalized to a second zone
+  rather than inventing a new mechanism. This single rule covers all
+  four visibility cases the user asked for (public, shared-hidden,
+  privately-owned-hidden, privately-owned-revealed) — including the
+  hole-card case the user confirmed was wanted alongside the community-
+  card case, after Cypher had flagged rather than assumed which one(s).
+- D8: three reducer actions — `PLAY` (now takes `visibility`), `REVEAL`
+  (authorization: shared → anyone, private → owner only), `PICKUP`
+  (face-up only).
+- D9: `scores` is a flat map, `ADJUST_SCORE` accepts only ±1 (matches the
+  user's "just a simple set of buttons" framing), untouched by `RESET`.
+- D10: presets (`src/presets.js`) and the rules reference
+  (`src/rulesReference.js`) are pure static client-side data — zero
+  `state.js`/protocol surface, since none of it varies at runtime or
+  needs to sync between clients.
+- D11: solo play (1 player) needed no architecture change — Cypher had
+  already grepped `src/` before writing the story and found no
+  player-count gate anywhere; Sprint 2 added a regression test, not new
+  implementation, to make that guarantee explicit and durable.
+
+**Consequences:** Every new privacy/visibility requirement fit the
+existing D3 pattern instead of requiring a new one, which kept the
+sprint's actual code changes small relative to its product scope (6
+phases, mostly additive). Smith's Gate 1 added several UX requirements
+(ownership visibility even when face-down, a confirm-step specifically
+for revealing *private* cards, reused tap/drag gestures) that the e2e
+suite (Phase 11) now directly verifies, including the confirm-cancel path
+Neo's own ad-hoc check hadn't covered but Trin's independent UAT did.

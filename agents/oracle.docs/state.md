@@ -2,20 +2,26 @@
 
 ## Context
 ### Recent Decisions
-- Sprint-close groom for Recard Sprint 1 complete: created `docs/DECISIONS.md`
-  (3 entries: v1 architecture D1-D6, QR descope, P2P e2e-automatable
-  finding), added a Sprint 1 section to `agents/oracle.docs/lessons.md`
-  (4 lessons: node --test glob quirk, don't hand-roll unverifiable
-  algorithms, re-check "not automatable" assumptions, Playwright
-  page.close() vs. real unload lifecycle), updated `memory.md` (Project
-  Context, Major Decisions table, Repository Structure), added a
-  Documentation index section to `README.md`.
+- Sprint 2 (v1.1) groom complete: `docs/DECISIONS.md` +1 entry (v1.1
+  architecture D7-D11, with the user's own "primitives not rules"
+  framing preserved verbatim), `agents/oracle.docs/lessons.md` +4 lessons
+  (generalize-before-inventing, flag-don't-guess ambiguity, self-check
+  vs. independent-check, count-from-current-state in e2e assertions),
+  `agents/oracle.docs/memory.md` updated (Project Context sharpened,
+  Major Decisions +1 row, Repository Structure updated for new files),
+  `README.md` updated (features list, "Known v1 limitations" →  "Known
+  limitations" since it's not v1-only anymore, privacy section extended
+  to cover the middle zone).
+- CHAT.md archived: was at 109 messages (over the 50-100 threshold),
+  archived to `agents/chat_archive/CHAT_SPRINT_1_2.md` /
+  `CHAT_SPRINT_1_2.diagram.md` via `bobp chat-report --moniker
+  SPRINT_1_2`, CHAT.md reset for the next stretch of work.
 
 ### Key Findings
-- CHAT.md was at 39 messages, well under the 50-100 archive threshold —
-  no archive needed this sprint.
-- `agents/DOCUMENTATION_INDEX.md` is generic Bob Protocol framework
-  documentation (not product-specific) — out of scope for this groom.
+None new this groom — Sprint 1's groom already established the pattern
+(continuous decision/lesson capture during the sprint via
+Cypher/Morpheus/Trin posting to CHAT.md as they went, not just invented
+at close-out), and Sprint 2 followed it.
 
 ### Important Notes
 None yet
@@ -26,14 +32,15 @@ None yet
 **Started:** 2026-08-15
 
 ### Task Description
-Sprint-close documentation grooming for Recard Sprint 1, per sprint.md
-Stage 3 Step 7.
+Sprint-close documentation grooming for Sprint 2 ("clear backlog", v1.1),
+per sprint.md Stage 3 Step 7.
 
 ### Progress
-- [x] docs/DECISIONS.md created
+- [x] docs/DECISIONS.md updated
 - [x] agents/oracle.docs/lessons.md updated
 - [x] agents/oracle.docs/memory.md updated
-- [x] README.md documentation index added
+- [x] README.md updated
+- [x] CHAT.md archived (109 msgs, over threshold) and reset
 - [ ] Hand to Smith for end-to-end user testing
 
 ### Blockers
@@ -44,15 +51,16 @@ N/A (this is Oracle's own task)
 
 ## Next Steps
 ### Immediate Next Action
-Hand to Smith for Stage 3 Step 8 (`*user test` + `*user feedback`).
+Hand to Smith for Stage 3 Step 8 (`*user test` + `*user feedback`) on the
+full v1.1 feature set.
 
 ### Waiting On
 Nothing — groom is done, handing off now.
 
 ### Planned Work
 - [ ] If Smith finds bugs, expect a Trin triage round before retro.
-- [ ] After retro (Step 9), archive CHAT.md via `bobp chat-report` if it's
-      grown past threshold by then.
+- [ ] Watch CHAT.md length again at the next sprint's close (reset just
+      happened, so plenty of headroom for now).
 
 ---
-*Last updated: 2026-08-15 13:08*
+*Last updated: 2026-08-15 15:28*

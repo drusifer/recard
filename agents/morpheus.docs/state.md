@@ -29,6 +29,16 @@
   one decision (D2), not a rearchitecture.
 - v1 explicitly has no reconnect-after-refresh and no persistence (host
   tab closing ends the session) — documented, not hidden.
+- v1.1 (D7-D11, 2026-08-15): resolved Flag 3 by generalizing the existing
+  hand-privacy pattern (D3) to middle cards instead of inventing a new
+  mechanism — `viewFor()` gets one redaction rule (`faceUp || owner ===
+  viewer`) that produces all 4 visibility cases the PRD asked for. 3 new
+  reducer actions (PLAY+visibility, REVEAL, PICKUP). Presets/rules-
+  reference need zero state/protocol changes (pure client-side lookup
+  tables) — kept them out of state.js on purpose, no reason to sync data
+  that's identical on every client and never changes at runtime. Solo
+  play (US-17) needs no code change at all, confirmed by Cypher's own
+  grep before this was even handed to me — just needs a test.
 
 ## Current Task
 **Status:** Architecture complete, awaiting Smith Gate 2
@@ -39,12 +49,20 @@
 Design and record v1 architecture for the Recard sprint, then pass through
 Gate 2 (Smith UX review) before Mouse does phase breakdown.
 
-### Progress
-- [x] Wrote docs/ARCHITECTURE.md (D1-D6 decisions)
+### Progress — v1 (DONE, shipped)
+- [x] Wrote docs/ARCHITECTURE.md (D1-D6), Gate 2, Mouse phases, all 5
+      phases implemented/reviewed, launched.
+
+### Progress — v1.1 "clear backlog" — DONE (all 6 phases shipped)
+- [x] Wrote docs/ARCHITECTURE.md D7-D11 (Flag 3 resolution, new reducer
+      actions, score model, presets/rules-reference module layout, solo
+      play confirmation)
 - [x] Posted decision to Oracle for recording
-- [ ] Smith Gate 2 approval
-- [ ] Mouse phase breakdown
-- [ ] Morpheus review of Mouse's phase plan before Neo starts
+- [x] Smith Gate 2 approval
+- [x] Mouse phase breakdown (6 phases: 6-11), reviewed and approved
+- [x] Code-reviewed and approved all 6 phases (middle-zone data model,
+      score tracking, solo regression + static content, middle-zone UI,
+      score/preset/rules UI, final e2e verification)
 
 ### Blockers
 None
@@ -60,14 +78,11 @@ phase breakdown (`*sm plan sprint`), then review Mouse's phase plan before
 kicking off Neo on Phase 1.
 
 ### Waiting On
-@Smith: Gate 2 approval of docs/ARCHITECTURE.md.
+Nothing — Sprint 2 implementation complete, handed to Oracle for groom.
 
 ### Planned Work
-- [ ] Gate 2
-- [ ] Review Mouse's phase breakdown for alignment with D1-D6
-- [ ] Kick off Neo phase 1
-- [ ] Per-phase code review (Step 6 of Phase Bloop) for each of Mouse's
-      phases through to sprint close
+- [ ] Available if Smith's sprint-close testing surfaces anything needing
+      an architecture-level look.
 
 ---
 *Last updated: 2026-08-15 12:42*

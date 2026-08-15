@@ -11,6 +11,20 @@ deck they can shuffle, deal, draw from, and play to a table — for whatever
 card game they already know the rules to. The app does not referee any
 specific game; it is a deck-and-table simulator, not a rules engine.
 
+**Sharpened 2026-08-15 (user's own words, worth keeping verbatim):** "The
+goal is not to capture every rule of every game but rather to allow any
+game to be played by supporting basic operations that the player can use
+to play any game... basically open play but with just enough structure to
+support common card game mechanics." Concretely: the app ships a small,
+fixed set of composable primitives — deal, hold a private hand, play a
+card face-up or face-down, flip a face-down card, place cards in a shared
+middle either publicly or privately-owned, draw/pick up, track a manual
+score — and every card game people already know how to play is expressed
+by *how they use* those primitives, not by the app knowing the game. This
+is the yardstick for every future feature request: does it add a general,
+reusable primitive, or does it encode one game's specific rule? Only the
+former is in scope.
+
 ## Problem
 Groups of people together in person often want to play a card game but don't
 have a physical deck on hand. Existing "play cards online" apps assume remote
@@ -20,7 +34,9 @@ same-room case with no server infrastructure to run or pay for.
 ## Target User
 Friends/family/coworkers physically co-located, each with a phone or laptop
 and a browser, who want a deck of cards without installing an app or
-standing up any infrastructure.
+standing up any infrastructure. This includes a single person playing
+solitaire-type games alone — hosting a table with no one else joining is
+a valid, supported use, not just a degenerate case of the group scenario.
 
 ## Core Product Principles
 1. **Game-agnostic** — simulates a deck (or several), not any one game's rules.
@@ -57,7 +73,12 @@ standing up any infrastructure.
 
 ## Out of Scope (v1)
 - Enforcing rules for any specific game (no turn logic, no scoring, no win
-  detection).
+  detection). **Clarified 2026-08-15** after a "score keeping" request: a
+  player-editable shared tally (US-16) is in scope for v1.1 — it's a dumb
+  counter the app stores and displays, not the app computing or
+  interpreting scores. The app calculating/enforcing scores per a
+  specific game's rules remains out of scope. See `docs/USER_STORIES.md`
+  "v1.1 backlog: quick-start game presets + score keeping."
 - Remote / cross-room play, matchmaking, or spectating.
 - Accounts, persistent stats, leaderboards.
 - Voice/video chat (basic reactions/text chat may be a stretch goal).
@@ -89,8 +110,42 @@ channel(s) chosen for signaling/state sync, and whether "best-effort" should
 be implemented as unordered/unreliable delivery (e.g. WebRTC data channel in
 unreliable mode) vs. reliable delivery that the UI simply throttles.
 
+## Feasibility Flag → Morpheus (3): Face-Down Middle Cards (owner + faceUp)
+New requirement (2026-08-15, post-v1-launch, see `docs/USER_STORIES.md`
+"v1.1 backlog"). **Resolved 2026-08-15**: the user confirmed both
+face-down forms are wanted, not just one:
+1. Hidden from *everyone* until turned over (community-card style — a
+   flop, a face-down pile card with no owner).
+2. Hidden from *other players* but visible to whichever player placed it
+   (hole-card style — private, just displayed outside the hand).
+
+Proposed generalization for Morpheus to evaluate (this is a product-level
+proposal, not a technical decision — Morpheus owns whether it's the right
+shape): give every middle-zone card two fields, `owner: playerId | null`
+and `faceUp: boolean`, with a single redaction rule reused everywhere:
+**a viewer sees a card's identity if `faceUp` is true, OR the viewer is
+`owner`.** This one rule produces all four cases that matter: public
+middle card (`owner: null, faceUp: true` — today's behavior), unrevealed
+shared card (`owner: null, faceUp: false`), a private card placed in the
+middle in front of its owner (`owner: <id>, faceUp: false` — the hole-card
+case), and a card publicly "claimed" by a player face-up (`owner: <id>,
+faceUp: true` — e.g. an exposed meld). Hands stay a separate always-
+private zone as today (US-5), unchanged.
+
+Need Morpheus to confirm this still fits the existing `viewFor()`/D3/D4
+pattern (per-viewer redaction already exists for hands; this is the same
+pattern generalized to middle cards, not a new mechanism) before it goes
+into a sprint.
+
 ## Open Questions
-1. Max players per table? (assume 2–8 until told otherwise)
+1. Max players per table? (assume 2–8 until told otherwise). **Min
+   players resolved 2026-08-15: 1 player must be supported**, for
+   solitaire-type games — confirmed the existing architecture already
+   allows this with no code changes (the host is added as a player on
+   table creation via `JOIN`, and `DEAL`/`state.players.length` never
+   assumed more than one; there's no player-count gate anywhere in
+   `src/`). Adding as an explicit AC (US-17) so it's tested and never
+   accidentally gated later, not because it needs new engineering.
 2. Is game state fully freeform (players just drag/tap cards like a real
    table) or do we model structured zones (hand / discard / draw pile /
    table) that a host can configure per game? (assumed: structured zones,

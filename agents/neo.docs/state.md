@@ -80,20 +80,99 @@ None
 ### Oracle Consultations
 None yet
 
-## Next Steps
+## Next Steps — Sprint 2 ("clear backlog", v1.1)
+### Progress
+- [x] Phase 6 (T6.1-T6.3): src/state.js middle-zone model — PLAY now
+      takes `visibility` (public/shared-facedown/private-facedown)
+      computing owner/faceUp per D7; new REVEAL action (authorization:
+      shared→anyone, private→owner-only, no-op if already face-up); new
+      PICKUP action (face-up only, strips owner/faceUp when moving to
+      hand); viewFor() redaction extended to table entries (same rule as
+      hands: faceUp || owner===viewer, owner stays visible even redacted).
+      9 new tests (30/30 total passing), npm run test:e2e still green -
+      confirmed zero regression to existing public-PLAY callers.
+
+- [x] Trin UAT phase 6 PASS, Morpheus review PASS
+- [x] Phase 7 (T7.1-T7.2): src/state.js scores — init to 0 on JOIN
+      (preserved on re-join, not reset), ADJUST_SCORE ±1 only (throws on
+      other deltas), RESET_SCORES, confirmed RESET (deck reshuffle)
+      leaves scores untouched (spread-through, no explicit code needed
+      since scores was never in RESET's returned diff). 7 new tests,
+      37/37 total, npm run test:e2e still green.
+
+- [x] Trin UAT phase 7 PASS, Morpheus review PASS
+- [x] Phase 8 (T8.1-T8.3): solo-play regression test (deal/play/draw/
+      score/reset, single player, no code changes needed - confirms D11),
+      src/presets.js (5 presets: War/Gin Rummy/Hearts/5-Card Draw/Hold'em,
+      usesMiddle flag), src/rulesReference.js (matching consistent-shape
+      entries). New tests/presets.test.js cross-checks every preset has a
+      matching, well-shaped reference entry (not just eyeballed). 41/41
+      total, e2e still green.
+
+- [x] Trin UAT phase 8 PASS, Morpheus review PASS
+- [x] Phase 9 (T9.1-T9.3): middle-zone UI. Hand cards: primary tap =
+      public play (unchanged v1 behavior), two small secondary buttons
+      per card for shared/private face-down. Middle cards: card-back +
+      owner tag for redacted entries, "Turn over" (no confirm, shared
+      only) / "Reveal" (window.confirm gate, private-owner only) /
+      "Pick up" (any face-up card) as appropriate. Session-ended now
+      also freezes the table, not just hand/draw. **Did an ad-hoc real
+      2-browser Playwright check before calling this done** (not the
+      formal suite yet, that's Phase 11) - confirmed live over real
+      WebRTC: correct per-viewer rendering of all 3 visibility states,
+      live cross-client reveal propagation, correct owner tags both
+      sides, zero console errors. One cosmetic-only note for Smith: the
+      🂠/🔒 button icons render as generic glyphs in this headless
+      Chromium's font set (likely missing color-emoji font in the
+      sandbox, not a code bug - real devices ship emoji fonts).
+
+- [x] Trin UAT phase 9 PASS (incl. independent confirm-cancel test I
+      hadn't covered), Morpheus review PASS
+- [x] Phase 10 (T10.1-T10.3): score +/- buttons in roster (host-only
+      Reset Scores button), preset selector (fills decks/jokers
+      immediately + text preview, applies cards-per-player once that
+      field exists post-creation), rules-reference overlay (independent
+      toggle, not a showScreen swap - verified by test that closing it
+      leaves game state untouched). Visually verified live: preset
+      preview, score increment, overlay state-preservation all correct.
+
+- [x] Trin UAT phase 10 PASS (incl. independent 2-client cross-
+      propagation check), Morpheus review PASS
+- [x] Phase 11 (final): folded all ad-hoc middle-zone/score checks into
+      the real tests/e2e.smoke.mjs suite - shared-facedown play+reveal
+      (by the OTHER client), private-facedown play+confirm-cancel+
+      confirm-accept, pickup, guest-adjusts-host-score cross-propagation,
+      Reset Scores cross-propagation. Hit 2 test-logic bugs while writing
+      it (wrong pickup-btn counts, not accounting for the already-public
+      card from earlier in the flow) - fixed, not implementation bugs.
+      41/41 unit + e2e 3/3 stable runs, zero v1 regressions.
+
+### Sprint 2 status: ALL 6 PHASES COMPLETE + Smith sprint-close bug round.
+Smith's `*user test` found 2 real bugs (agents/smith.docs/uat-report-
+sprint2.md) - both fixed:
+- #1 (HIGH): `.fd-btn`/`.score-btn` measured ~25x20px / ~19x17px on a
+  real 390px mobile viewport, well under the ~44px touch-target floor -
+  bumped both to 44px, and applied the same fix to `.reveal-btn`/
+  `.pickup-btn` too even though Smith only measured the first two (same
+  root cause, same small-button pattern - fixing one and leaving an
+  identical sibling unfixed would've been its own consistency bug).
+  Re-measured: all four now hit 44px+ for real.
+- #2 (MED): Reset Scores now confirm-gated (`window.confirm()`), matching
+  the precedent already set by private-card reveal.
+Updated tests/e2e.smoke.mjs's Reset Scores step to handle the new confirm
+dialog. 41/41 unit + e2e all green, re-verified visually (denser hand
+layout from bigger buttons is a real but acceptable tradeoff - still
+fully usable, just wraps to more rows).
+
 ### Immediate Next Action
-Handing to Trin for Phase 1 UAT. In parallel/next, will start Phase 2
-(state.js reducer) once Trin/Morpheus clear phase 1, per architecture D3/D4
-(host-authoritative state, per-connection privacy for hands).
+Handing to Trin for Phase 11 (final) UAT.
 
 ### Waiting On
-@Trin: UAT sign-off on Phase 1.
+@Trin: UAT sign-off on Phase 11.
 
 ### Planned Work
-- [ ] Phase 2: src/state.js + tests/state.test.js
-- [ ] Phase 3: src/session.js + src/protocol.js
-- [ ] Phase 4: src/ui.js + src/qrcode.js + src/main.js + index.html/style.css
-- [ ] Phase 5: motion sync wiring + reset/deck-config UI + README
+- [ ] Phase 10: score buttons + preset selector + rules-reference overlay UI
+- [ ] Phase 11: e2e verification + full regression
 
 ---
 *Last updated: 2026-08-15 12:44*

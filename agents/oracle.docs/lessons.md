@@ -53,4 +53,48 @@ This file contains critical lessons and rules derived from past errors, technica
   the lifecycle event the app depends on, before concluding the app is
   slow to detect disconnects.
 
+## 2026-08-15 — Sprint 2 ("clear backlog", v1.1) lessons
+
+- **When a new privacy/visibility requirement shows up, check whether it
+  generalizes an existing mechanism before designing a new one.** D7
+  (middle-zone card visibility) reused the exact same per-viewer
+  redaction rule D3 already used for hands (`viewFor()`), just applied to
+  a second field (`owner`/`faceUp`) on a second zone. One redaction rule
+  ended up covering all four visibility cases the user asked for. Look
+  for "this is the same shape as X, generalized" before reaching for a
+  new mechanism — it kept a 6-phase, 7-user-story sprint's actual code
+  diff small.
+
+- **Flag genuinely ambiguous requirements instead of picking an
+  interpretation and hoping.** Cypher explicitly flagged "face-down
+  hidden from everyone vs. hidden from others but visible to the owner"
+  as an open product question rather than silently assuming one — the
+  user's answer ("yes, there can be games that have held cards not
+  revealed") confirmed *both* were wanted, which would have been a
+  materially incomplete feature if only one had been built on
+  assumption. The cost of asking was one flagged note in a doc; the cost
+  of guessing wrong would have been a second implementation pass.
+
+- **Self-checks and independent checks catch different bugs — do both.**
+  Neo's own ad-hoc Playwright check (Phase 9) verified the reveal
+  *accept* path worked. Trin's independent UAT pass specifically tested
+  the *cancel* path Neo hadn't covered — dismissing the confirm dialog
+  needed to leave a private card hidden, which is exactly the kind of
+  gap a single author's self-check tends to miss (you test the path you
+  built, not the path you didn't). Same pattern in Phase 10: Neo verified
+  score buttons worked in a single browser; Trin verified a *guest*
+  adjusting the *host's* own score actually propagates over the real P2P
+  connection to both clients, not just locally.
+
+- **When writing e2e assertions against an accumulating UI state, count
+  from the actual current state, not from zero.** Two self-caught bugs in
+  the Phase 11 e2e additions were both this: expecting `pickup-btn`
+  count to be 1 after a reveal, when an earlier public play in the same
+  test flow had already put one `pickup-btn` on the table, making the
+  real expected count 2 (then 3 after the next reveal). A test that
+  doesn't account for prior steps in the same flow will either false-fail
+  immediately (loud, cheap to catch) or — worse — false-pass if the
+  earlier state happens to satisfy a weaker assertion (quiet, expensive
+  to catch later). Loud failures here saved real debugging time.
+
 ---
