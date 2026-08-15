@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Recard — a deck of cards for the same room</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body>
+  <div id="banner" class="banner" hidden></div>
+
+  <main id="screen-landing" class="screen">
+    <h1>Recard</h1>
+    <p>A shared deck of cards for people in the same room. No install, no accounts.</p>
+    <button id="show-host" type="button">Host a table</button>
+    <button id="show-join" type="button">Join a table</button>
+  </main>
+
+  <main id="screen-host" class="screen" hidden>
+    <h1>Host a table</h1>
+    <div id="host-form">
+      <label>Your name <input id="host-name" type="text" maxlength="20" /></label>
+      <label>Decks <select id="host-num-decks"><option value="1">1</option><option value="2">2</option></select></label>
+      <label>Jokers <select id="host-jokers"><option value="0">0</option><option value="2">2</option><option value="4">4</option></select></label>
+      <button id="create-table" type="button">Create Table</button>
+      <p id="host-create-error" class="error-text" hidden></p>
+    </div>
+    <div id="host-share" hidden>
+      <p>Share this code or link with the room:</p>
+      <div id="share-code-container"></div>
+      <p id="host-deck-config" class="deck-config"></p>
+      <ul id="host-roster" class="roster"></ul>
+      <label>Cards per player <input id="cards-per-player" type="number" min="1" max="20" value="7" /></label>
+      <button id="deal-btn" type="button">Deal &amp; Start</button>
+    </div>
+  </main>
+
+  <main id="screen-join" class="screen" hidden>
+    <h1>Join a table</h1>
+    <div id="join-form">
+      <label>Your name <input id="join-name" type="text" maxlength="20" /></label>
+      <label>Table code <input id="join-code" type="text" /></label>
+      <button id="join-btn" type="button">Join</button>
+    </div>
+    <p id="join-status"></p>
+    <ul id="join-roster" class="roster"></ul>
+  </main>
+
+  <main id="screen-game" class="screen" hidden>
+    <section>
+      <h2>Table</h2>
+      <div id="table-area" class="card-row"></div>
+    </section>
+    <section>
+      <h2>Players</h2>
+      <ul id="game-roster" class="roster"></ul>
+    </section>
+    <section>
+      <h2>Your hand</h2>
+      <div id="hand-area" class="card-row"></div>
+      <button id="draw-btn" type="button">Draw</button>
+      <button id="reset-btn" type="button" hidden>Reshuffle &amp; Reset</button>
+    </section>
+  </main>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
