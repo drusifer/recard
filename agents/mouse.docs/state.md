@@ -44,12 +44,17 @@ before kicking off the Phase Bloop (Neo → Trin → Morpheus per phase).
 
 ### Progress — Sprint 1: DONE (5/5 phases shipped)
 ### Progress — Sprint 2: DONE (6/6 phases shipped)
+### Progress — Sprint 3: DONE (9/9 phases shipped, incl. Phase 20 bug-fix)
 
-### Progress — Sprint 3 (v1.2)
-- [x] Wrote `task.md` Sprint 3 section, 9 phases (12-20, incl. reserved
-      bug-fix phase 20), 2-3 tasks each
+### Progress — Sprint 4 (v1.3, "top-down table redesign")
+- [x] Wrote `task.md` Sprint 4 section, 7 phases (21-27, incl. reserved
+      bug-fix phase 27 — carried the pattern forward proactively this
+      time instead of waiting for a 3rd retro to request it): 21 (data),
+      22-23 (structural layout: seating, personal zones, hand spread),
+      24-25 (interaction: drag-and-drop, live broadcast), 26 (e2e
+      verification), 27 (reserved bug-fix)
 - [ ] Morpheus review of phase plan
-- [ ] Phase Bloop x8 (12-19) + Phase 20 during Stage 3
+- [ ] Phase Bloop x6 (21-26) + Phase 27 during Stage 3
 
 ### Blockers
 None

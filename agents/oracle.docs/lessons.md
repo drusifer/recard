@@ -155,4 +155,51 @@ This file contains critical lessons and rules derived from past errors, technica
   done than actually is (or, worse, redoing already-shipped work) if
   someone trusts the checkboxes over the chat history.
 
+## 2026-08-15 — Sprint 4 ("top-down table redesign") lessons
+
+- **When a mid-draft user correction reopens a scoping decision, check
+  whether it's actually returning to something already documented rather
+  than inventing new scope.** The user corrected "animate on drop" to
+  "true real-time drag broadcast" mid-draft - this wasn't a new ask, it
+  was the PRD's original Principle 6 ("live, best-effort motion"), which
+  D13 had deliberately scoped down for build-cost reasons the user was
+  now explicitly declining. Recognizing this let the redesign extend
+  D13's existing channel instead of treating it as new architecture -
+  worth checking "have we already written this down and then backed off
+  it" before assuming a correction means greenfield design.
+
+- **"Unit tests form the base of the pyramid" is a standing principle to
+  apply retroactively, not just going forward.** Given mid-sprint, it
+  prompted pulling already-shipped, already-e2e-verified pure functions
+  (`seatedOrder`/`seatPosition`) out of DOM-coupled files into a
+  dedicated testable module (`seating.js`), after they'd already passed
+  UAT via indirect DOM-position assertions. The lesson isn't just "write
+  unit tests for new code" - it's noticing when existing code is pure
+  but *trapped* in a file that can't be imported by a test (main.js has
+  browser-only side effects at module scope), and extracting it once
+  identified, not waiting for the next greenfield feature to apply the
+  principle.
+
+- **A screenshot read and an objective measurement can both be honestly
+  reported yet differ in precision - prefer the measurement when the
+  finding matters.** Neo's screenshot-based density check ("badly
+  overlaps at 8, still cramped at 5") and Trin's `getBoundingClientRect()`
+  overlap count (0 pairs through 4 players, exactly 1 at 5, climbing to 6
+  at 8) told the same story, but only the second pinpoints the actual
+  threshold precisely enough to say "starts at 5, not 4 or 6" with
+  confidence - worth reaching for an objective measurement instead of a
+  visual read whenever a finding is going into a design/backlog decision,
+  not just a bug report.
+
+- **Reporting "improved, not fully resolved" is more valuable than either
+  overclaiming a fix or leaving a finding entirely unaddressed.** Faced
+  with a real, confirmed density problem and a fix that helped but hit a
+  genuine architectural floor (the 44px touch-target convention), the
+  team applied the improvement, verified it precisely, and reported the
+  honest residual rather than either (a) shipping a half-fix silently
+  labeled "done," or (b) leaving the finding untouched waiting for a
+  bigger redesign. This is the same discipline as Sprint 3's Phase 20
+  pattern (give a real finding its own tracked scope) applied one step
+  earlier - during implementation itself, not just at close-out.
+
 ---

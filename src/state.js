@@ -15,7 +15,7 @@ export function createInitialState(deckConfig = {}, rng = Math.random) {
     deckConfig,
     deck: shuffle(buildDeck(deckConfig), rng),
     hands: {},
-    zones: [{ id: DEFAULT_ZONE_ID, name: 'Table', cards: [] }],
+    zones: [{ id: DEFAULT_ZONE_ID, name: 'Table', ownerId: null, cards: [] }],
     players: [],
     scores: {},
     passed: {},
@@ -43,6 +43,17 @@ function dealCards(players, deck, cardsPerPlayer, existingHands) {
     }
   }
   return { deck: remaining, hands };
+}
+
+/**
+ * D17: shared zone-construction logic for both `CREATE_ZONE` and the
+ * personal zone `JOIN` auto-creates - a personal zone is an ordinary
+ * zone, just with `ownerId` set (used for UI seat placement only; every
+ * reducer case treats it like any other zone).
+ */
+function makeZone(name, ownerId = null) {
+  const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `zone-${Date.now()}-${Math.random()}`;
+  return { id, name, ownerId, cards: [] };
 }
 
 /**
@@ -81,16 +92,23 @@ function middleCardVisibility(visibility, playerId) {
  */
 export function reduce(state, action) {
   switch (action.type) {
-    case 'JOIN':
+    case 'JOIN': {
+      // D17: a returning player (SET_CONNECTION reconnect-of-same-id
+      // case) already has a personal zone - only create one the first
+      // time this playerId is seen, same "preserved on re-join" spirit
+      // as scores/passed below.
+      const alreadyHasPersonalZone = state.zones.some((z) => z.ownerId === action.playerId);
       return {
         ...state,
         players: [
           ...state.players.filter((p) => p.id !== action.playerId),
           { id: action.playerId, name: action.name, connection: 'connected' },
         ],
+        zones: alreadyHasPersonalZone ? state.zones : [...state.zones, makeZone(action.name, action.playerId)],
         scores: { [action.playerId]: 0, ...state.scores },
         passed: { [action.playerId]: false, ...state.passed },
       };
+    }
 
     case 'SET_CONNECTION':
       return {
@@ -112,10 +130,8 @@ export function reduce(state, action) {
       return { ...state, deck, hands };
     }
 
-    case 'CREATE_ZONE': {
-      const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `zone-${Date.now()}-${Math.random()}`;
-      return { ...state, zones: [...state.zones, { id, name: action.name, cards: [] }] };
-    }
+    case 'CREATE_ZONE':
+      return { ...state, zones: [...state.zones, makeZone(action.name)] };
 
     case 'PLAY': {
       const hand = state.hands[action.playerId] ?? [];
@@ -273,6 +289,7 @@ export function viewFor(state, playerId) {
   const zones = state.zones.map((z) => ({
     id: z.id,
     name: z.name,
+    ownerId: z.ownerId ?? null,
     cards: z.cards.map((card) => redactMiddleCard(card, playerId)),
   }));
   return {

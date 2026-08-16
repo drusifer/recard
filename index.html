@@ -63,19 +63,17 @@
   </main>
 
   <main id="screen-game" class="screen" hidden>
-    <section class="panel panel-felt">
-      <h2>Table</h2>
-      <div id="game-deck-area" class="deck-area"></div>
-      <div id="table-area"></div>
+    <section class="panel panel-felt table-section">
+      <h2 class="sr-only">Table</h2>
+      <div id="table-surface" class="table-surface">
+        <div id="game-deck-area" class="deck-area"></div>
+        <div id="table-area"></div>
+        <div id="seat-zones"></div>
+        <ul id="game-roster" class="roster"></ul>
+      </div>
       <div class="btn-row">
         <input id="new-zone-name" type="text" placeholder="New zone name" maxlength="24" />
         <button id="create-zone-btn" type="button">Add Zone</button>
-      </div>
-    </section>
-    <section class="panel">
-      <h2>Players</h2>
-      <ul id="game-roster" class="roster"></ul>
-      <div class="btn-row">
         <input id="deal-more-count" type="number" min="1" max="20" value="1" />
         <button id="deal-more-btn" type="button" hidden>Deal More (no reset)</button>
       </div>

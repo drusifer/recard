@@ -216,5 +216,74 @@ Nothing.
       useful twice this sprint (the sort-selector self-catch, the
       DEAL_MORE mutation test).
 
+### Progress — SPRINT 4 ("top-down table redesign") — IN PROGRESS
+- [x] Drafted US-26..30 in USER_STORIES.md + PRD Feasibility Flag 5.
+      Confirmed 3 forking questions with the user before drafting: drag
+      snaps to zones (not freeform x/y), every player auto-gets a
+      personal zone at their seat, and — corrected mid-draft by the user
+      — other players' card movement needs true real-time position
+      broadcast (best-effort/approximate accepted), not just an animated
+      jump on drop.
+- [x] Smith Gate 1 (4 amendments) + Gate 2 (D17-D19 approved) +
+      Mouse 7-phase plan (21-27, incl. proactive reserved bug-fix phase)
+
+### Blockers
+None.
+
+### Progress — SPRINT 4 ("top-down table redesign"): COMPLETE
+- [x] US-26..30, Gate 1 (4 amendments) + Gate 2 (D17-D19), Mouse 7-phase
+      plan (21-27, proactive reserved bug-fix phase - planned upfront
+      this time, not requested after the fact)
+- [x] All 6 implementation phases (21-26) implemented/UAT'd/code-reviewed
+- [x] Oracle groom (DECISIONS.md D17-D19, 4 new lessons, memory.md,
+      README - CHAT.md archived at 111 msgs)
+- [x] Smith close-out: 2 findings - #1 (cursor affordance) fixed via
+      Phase 27, re-verified, closed. #2 (5+-player mobile density)
+      deliberately NOT fixed - escalated to backlog below instead of a
+      rushed second attempt, per Smith/Trin/Morpheus consensus
+- [x] Full team retro posted to CHAT.md, backlog updated below
+- [x] Launched (see *pm launch below)
+
+### Blockers
+None.
+
+### Planned Work — backlog for next sprint's planning
+- [ ] **New, high priority**: seated-player mobile layout needs a real
+      compact-seat design (not a CSS tweak) - measured, not guessed:
+      clean through 4 players, overlap starts at exactly 5, worse by 8.
+      The 44px score-button touch-target floor (Sprint 2) is a hard
+      constraint on how compact a seat card carrying score controls can
+      get - likely needs score adjustment moved off the seat card itself,
+      or a fundamentally different compact layout. Worth its own small
+      sprint, not squeezed into a close-out phase a second time.
+- [ ] A real pre-existing bug (not caused by Sprint 4) - if 2+ players
+      click Join within the same moment (not sequentially), the host hits
+      "Maximum call stack size exceeded" inside PeerJS's msgpack pack()
+      broadcasting to a connection that isn't open yet. Confirmed on the
+      committed baseline, so not a Sprint 4 regression. Likely needs
+      `sendTo` to defer/queue until a connection's `open` event fires.
+- Items 1 (reconnect) and 3 (real QR) — STILL OPEN, now 4 sprints running.
+- **New from Sprint 4's retro:**
+  13. Neo: check whether new pure logic has a natural dedicated-module
+      home BEFORE writing it, not only after a prompt to extract it
+      (seating.js was pulled out of main.js/ui.js reactively this
+      sprint).
+  14. Trin: reach for an objective measurement, not just a visual/
+      screenshot read, whenever a UAT finding will inform a scope or
+      priority decision (this is what let the team confidently escalate
+      the density finding instead of guessing at its severity).
+  15. Morpheus: architecture review for a new geometry/layout decision
+      should explicitly ask "does this scale against an existing hard
+      constraint" (here: seat count vs. the 44px touch-target floor) as
+      its own question, not just "is the geometry correct."
+  16. Oracle: the continuous-groom gap (items 9, originally from Sprint
+      1) did NOT recur this sprint - first repeat-pattern item to
+      actually break its streak. Retiring this item; worth noticing
+      when a fix actually holds, not just when a pattern repeats.
+  17. Smith: add "does this new gesture/control have a visual
+      affordance signaling it's interactive" as a standing Gate 1
+      question, same tier as touch-target-size (item 7) and
+      info-duplication (item 10) checks.
+
 ---
-*Last updated: 2026-08-15 21:35*
+*Last updated: 2026-08-15 22:55*

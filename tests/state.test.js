@@ -86,14 +86,18 @@ test('RESET: reshuffles the deck and clears hands/zone cards, keeps roster + zon
   state = reduce(state, { type: 'DEAL', cardsPerPlayer: 5 });
   state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId: state.hands.p1[0].id });
   state = reduce(state, { type: 'CREATE_ZONE', name: 'Discard' });
+  const zoneCountBeforeReset = state.zones.length; // default + 2 personal (D17) + Discard
 
   state = reduce(state, { type: 'RESET' });
 
   assert.equal(state.deck.length, 52);
   assert.deepEqual(state.hands, {});
-  assert.equal(state.zones.length, 2, 'zone structure (incl. player-created zones) survives a reset');
-  assert.deepEqual(state.zones[0].cards, []);
-  assert.deepEqual(state.zones[1].cards, []);
+  assert.equal(
+    state.zones.length,
+    zoneCountBeforeReset,
+    'zone structure (incl. personal and player-created zones) survives a reset',
+  );
+  assert.ok(state.zones.every((z) => z.cards.length === 0), 'every zone\'s cards clear on reset');
   assert.equal(state.players.length, 2);
 });
 
@@ -254,13 +258,14 @@ test('PLAY: with zoneId targets that zone instead of the default', () => {
   state = reduce(state, { type: 'CREATE_ZONE', name: 'Discard' });
   state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
   const cardId = state.hands.p1[0].id;
-  const discardZoneId = state.zones[1].id;
+  const discardZoneId = state.zones.find((z) => z.name === 'Discard').id;
 
   state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId, zoneId: discardZoneId });
 
   assert.equal(state.zones[0].cards.length, 0, 'default zone untouched');
-  assert.equal(state.zones[1].cards.length, 1);
-  assert.equal(state.zones[1].cards[0].id, cardId);
+  const discardZone = state.zones.find((z) => z.id === discardZoneId);
+  assert.equal(discardZone.cards.length, 1);
+  assert.equal(discardZone.cards[0].id, cardId);
 });
 
 test('PLAY: throws for a zoneId that does not exist', () => {
@@ -277,7 +282,7 @@ test('REVEAL and PICKUP: find a card in any zone, not just the default', () => {
   state = reduce(state, { type: 'CREATE_ZONE', name: 'Discard' });
   state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
   const cardId = state.hands.p1[0].id;
-  const discardZoneId = state.zones[1].id;
+  const discardZoneId = state.zones.find((z) => z.name === 'Discard').id;
   state = reduce(state, {
     type: 'PLAY',
     playerId: 'p1',
@@ -287,10 +292,10 @@ test('REVEAL and PICKUP: find a card in any zone, not just the default', () => {
   });
 
   state = reduce(state, { type: 'REVEAL', playerId: 'p2', cardId });
-  assert.equal(state.zones[1].cards[0].faceUp, true);
+  assert.equal(state.zones.find((z) => z.id === discardZoneId).cards[0].faceUp, true);
 
   state = reduce(state, { type: 'PICKUP', playerId: 'p2', cardId });
-  assert.equal(state.zones[1].cards.length, 0);
+  assert.equal(state.zones.find((z) => z.id === discardZoneId).cards.length, 0);
   assert.ok(state.hands.p2.some((c) => c.id === cardId));
 });
 
@@ -300,15 +305,16 @@ test('MOVE_CARD: relocates a visible card between zones, preserving its owner/fa
   state = reduce(state, { type: 'CREATE_ZONE', name: 'Melds' });
   state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
   const cardId = state.hands.p1[0].id;
-  const meldsZoneId = state.zones[1].id;
+  const meldsZoneId = state.zones.find((z) => z.name === 'Melds').id;
   state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId }); // public, default zone
 
   state = reduce(state, { type: 'MOVE_CARD', playerId: 'p2', cardId, toZoneId: meldsZoneId });
 
   assert.equal(state.zones[0].cards.length, 0);
-  assert.equal(state.zones[1].cards.length, 1);
-  assert.equal(state.zones[1].cards[0].id, cardId);
-  assert.equal(state.zones[1].cards[0].faceUp, true, 'moving does not reveal/hide - it was already public');
+  const meldsZone = state.zones.find((z) => z.id === meldsZoneId);
+  assert.equal(meldsZone.cards.length, 1);
+  assert.equal(meldsZone.cards[0].id, cardId);
+  assert.equal(meldsZone.cards[0].faceUp, true, 'moving does not reveal/hide - it was already public');
 });
 
 test('MOVE_CARD: only the owner can move their own still-hidden private card', () => {
@@ -317,13 +323,13 @@ test('MOVE_CARD: only the owner can move their own still-hidden private card', (
   state = reduce(state, { type: 'CREATE_ZONE', name: 'Melds' });
   state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
   const cardId = state.hands.p1[0].id;
-  const meldsZoneId = state.zones[1].id;
+  const meldsZoneId = state.zones.find((z) => z.name === 'Melds').id;
   state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId, visibility: 'private-facedown' });
 
   assert.throws(() => reduce(state, { type: 'MOVE_CARD', playerId: 'p2', cardId, toZoneId: meldsZoneId }));
 
   const moved = reduce(state, { type: 'MOVE_CARD', playerId: 'p1', cardId, toZoneId: meldsZoneId });
-  assert.equal(moved.zones[1].cards[0].id, cardId);
+  assert.equal(moved.zones.find((z) => z.id === meldsZoneId).cards[0].id, cardId);
 });
 
 test('MOVE_CARD: throws for an unknown destination zone or an unknown card', () => {
@@ -341,13 +347,109 @@ test('MOVE_CARD: throws for an unknown destination zone or an unknown card', () 
   );
 });
 
+// --- Personal per-seat zones (D17, US-27) ---
+
+test('JOIN: auto-creates a personal zone owned by the joining player', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = reduce(state, { type: 'JOIN', playerId: 'p1', name: 'Alice' });
+
+  assert.equal(state.zones.length, 2, 'default zone + Alice\'s personal zone');
+  const personalZone = state.zones.find((z) => z.ownerId === 'p1');
+  assert.ok(personalZone, 'a zone owned by p1 exists');
+  assert.equal(personalZone.name, 'Alice');
+  assert.deepEqual(personalZone.cards, []);
+});
+
+test('JOIN: each new player gets their own personal zone, existing ones untouched', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = withPlayers(state, ['p1', 'p2', 'p3']);
+
+  assert.equal(state.zones.length, 4, 'default + 3 personal zones');
+  for (const id of ['p1', 'p2', 'p3']) {
+    assert.equal(state.zones.filter((z) => z.ownerId === id).length, 1, `exactly one zone owned by ${id}`);
+  }
+  const defaultZone = state.zones.find((z) => z.id === 'table');
+  assert.equal(defaultZone.ownerId, null, 'the original default zone stays unowned');
+});
+
+test('JOIN: re-joining with the same playerId does not create a second personal zone', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = reduce(state, { type: 'JOIN', playerId: 'p1', name: 'Alice' });
+  const zoneCountAfterFirstJoin = state.zones.length;
+
+  // SET_CONNECTION then JOIN again is exactly what a reconnect looks like.
+  state = reduce(state, { type: 'SET_CONNECTION', playerId: 'p1', connection: 'connecting' });
+  state = reduce(state, { type: 'JOIN', playerId: 'p1', name: 'Alice' });
+
+  assert.equal(state.zones.length, zoneCountAfterFirstJoin, 'no duplicate personal zone on re-join');
+  assert.equal(state.zones.filter((z) => z.ownerId === 'p1').length, 1);
+});
+
+test('personal zones behave exactly like any other zone for PLAY/MOVE_CARD/REVEAL/PICKUP', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = withPlayers(state, ['p1', 'p2']);
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
+  const cardId = state.hands.p1[0].id;
+  const p1ZoneId = state.zones.find((z) => z.ownerId === 'p1').id;
+  const p2ZoneId = state.zones.find((z) => z.ownerId === 'p2').id;
+
+  // Play into your own personal zone, privately-owned face-down (D17: no
+  // special-casing - same authorization/visibility rules as any zone).
+  state = reduce(state, {
+    type: 'PLAY',
+    playerId: 'p1',
+    cardId,
+    zoneId: p1ZoneId,
+    visibility: 'private-facedown',
+  });
+  assert.equal(state.zones.find((z) => z.id === p1ZoneId).cards[0].owner, 'p1');
+  assert.throws(
+    () => reduce(state, { type: 'REVEAL', playerId: 'p2', cardId }),
+    'a non-owner cannot reveal a private card even sitting in the owner\'s own personal zone',
+  );
+
+  // "Put or take is open to all" (US-19) applies to personal zones too -
+  // p2 can move p1's now-face-up card into p1's personal zone.
+  state = reduce(state, { type: 'REVEAL', playerId: 'p1', cardId });
+  state = reduce(state, { type: 'MOVE_CARD', playerId: 'p2', cardId, toZoneId: p2ZoneId });
+  assert.equal(state.zones.find((z) => z.id === p2ZoneId).cards[0].id, cardId);
+
+  state = reduce(state, { type: 'PICKUP', playerId: 'p2', cardId });
+  assert.equal(state.zones.find((z) => z.id === p2ZoneId).cards.length, 0);
+  assert.ok(state.hands.p2.some((c) => c.id === cardId));
+});
+
+test('RESET: personal zones keep their ownerId, only cards clear', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = withPlayers(state, ['p1', 'p2']);
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
+  const p1ZoneId = state.zones.find((z) => z.ownerId === 'p1').id;
+  state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId: state.hands.p1[0].id, zoneId: p1ZoneId });
+
+  state = reduce(state, { type: 'RESET' });
+
+  const p1Zone = state.zones.find((z) => z.id === p1ZoneId);
+  assert.equal(p1Zone.ownerId, 'p1', 'ownerId survives a reset, not just zone count/cards');
+  assert.deepEqual(p1Zone.cards, []);
+});
+
+test('viewFor: personal zone ownerId is visible to every viewer', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = reduce(state, { type: 'JOIN', playerId: 'p1', name: 'Alice' });
+  state = reduce(state, { type: 'JOIN', playerId: 'p2', name: 'Bob' });
+
+  const view = viewFor(state, 'p2');
+  const aliceZone = view.zones.find((z) => z.name === 'Alice');
+  assert.equal(aliceZone.ownerId, 'p1', 'ownerId is public info, needed to place the zone at the right seat');
+});
+
 test('viewFor: every zone is redacted per-card, zone name/count always visible', () => {
   let state = createInitialState({}, () => 0.5);
   state = withPlayers(state, ['p1', 'p2']);
   state = reduce(state, { type: 'CREATE_ZONE', name: 'Melds' });
   state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
   const cardId = state.hands.p1[0].id;
-  const meldsZoneId = state.zones[1].id;
+  const meldsZoneId = state.zones.find((z) => z.name === 'Melds').id;
   state = reduce(state, {
     type: 'PLAY',
     playerId: 'p1',
@@ -357,10 +459,11 @@ test('viewFor: every zone is redacted per-card, zone name/count always visible',
   });
 
   const otherView = viewFor(state, 'p2');
-  assert.equal(otherView.zones.length, 2);
-  assert.equal(otherView.zones[1].name, 'Melds');
-  assert.equal(otherView.zones[1].cards.length, 1, 'card count visible even though contents are hidden');
-  assert.ok(!('rank' in otherView.zones[1].cards[0]));
+  assert.equal(otherView.zones.length, state.zones.length, 'zone count matches (default + 2 personal + Melds)');
+  const meldsView = otherView.zones.find((z) => z.id === meldsZoneId);
+  assert.equal(meldsView.name, 'Melds');
+  assert.equal(meldsView.cards.length, 1, 'card count visible even though contents are hidden');
+  assert.ok(!('rank' in meldsView.cards[0]));
 });
 
 // --- Score tracking (D9, US-16) ---

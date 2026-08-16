@@ -67,6 +67,30 @@ per sprint.md Stage 3 Step 7.
 - [ ] Hand to Smith for Stage 3 end-to-end test on the full v1.2 feature
       set.
 
+### Progress — Sprint 4 ("top-down table redesign") groom
+- [x] docs/DECISIONS.md +1 entry (D17-D19), matching prior entries'
+      format/depth, including the honest density-finding disposition
+- [x] agents/oracle.docs/lessons.md +4 lessons: recognizing a mid-draft
+      user correction as reopening previously-declined PRD scope (not
+      new scope), applying "unit tests form the base of the pyramid"
+      retroactively (not just to new code), preferring an objective
+      measurement over a screenshot read once a finding feeds a
+      design/backlog decision, and "improved not resolved" as its own
+      valid, honest disposition distinct from both overclaiming and
+      ignoring
+- [x] agents/oracle.docs/memory.md updated (Major Decisions +1 row,
+      Repository Structure: seating.js, cardDragPayload, 86 tests)
+- [x] README.md updated: features list covers the table/seating/drag/
+      personal-zones redesign, the now-outdated "cursor+lift not
+      pixel-drag" limitation removed (D19 delivers real drag now), the
+      5+-player mobile density gap added as an honestly-reported known
+      limitation (not silently dropped), ARCHITECTURE.md index line
+      D1-D16 -> D1-D19.
+- [x] CHAT.md archived: was at 111 messages (over threshold), archived to
+      `agents/chat_archive/CHAT_SPRINT_3_4.md` (bundled Sprints 3+4 since
+      Sprint 3's own count - 66 at its own groom - hadn't yet crossed the
+      threshold on its own), reset for the next stretch of work.
+
 ### Blockers
 None
 
@@ -76,17 +100,17 @@ N/A (this is Oracle's own task)
 ## Next Steps
 ### Immediate Next Action
 Hand to Smith for Stage 3 Step 8 (`*user test` + `*user feedback`) on
-Sprint 3's full feature set (zones, cursor/lift, deck visual, mini-hand,
-hand sort/drag, Deal More, pass marker).
+Sprint 4's full feature set - specifically re-checking the 5+-player
+mobile density finding via her own Gate 1 requirement.
 
 ### Waiting On
 Nothing — groom is done, handing off now.
 
 ### Planned Work
-- [ ] If Smith finds bugs, expect a Trin triage round + Phase 20 before
-      retro (same pattern as Sprints 1 and 2).
-- [ ] Watch CHAT.md length again at Sprint 3's actual close (currently 66,
-      still headroom before the 50-100 archive threshold).
+- [ ] If Smith finds bugs (or formally escalates the density finding),
+      expect a Trin triage round + Phase 27 before retro (same pattern as
+      the last two sprints).
+- [ ] CHAT.md just reset - plenty of headroom before the next archive.
 
 ---
-*Last updated: 2026-08-15 21:20*
+*Last updated: 2026-08-15 22:48*

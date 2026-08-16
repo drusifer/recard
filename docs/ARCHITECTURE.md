@@ -1,8 +1,8 @@
 # Architecture — Recard
 
 **Owner:** Morpheus (Tech Lead)
-**Status:** v1 + v1.1 shipped. v1.2 decisions below (D12-D16) are binding
-for the current sprint (US-19..25, "zones, presence, hand tools").
+**Status:** v1, v1.1, v1.2 shipped. v1.3 decisions below (D17-D19) are
+binding for the current sprint (US-26..30, "top-down table redesign").
 **Last updated:** 2026-08-15
 
 ## Decisions (resolves PRD Feasibility Flags 1 & 2)
@@ -230,6 +230,88 @@ existing dispatch path already overwrites a guest-originated action's
 mechanism that already makes `DRAW`/`PLAY` "act as yourself only" today.
 Public to all viewers unconditionally in `viewFor()`, like scores.
 
+## v1.3 Decisions (resolves PRD Feasibility Flag 5)
+
+### D17. Personal per-seat zones are ordinary zones with an optional `ownerId`
+`state.zones` entries gain one new optional field: `ownerId: playerId |
+null` (existing zones — the default table pile, anything created via
+`CREATE_ZONE` — are unaffected, `ownerId` simply absent/`null`, so this
+is additive, not a breaking change to D12). `JOIN` now also internally
+appends one zone with `ownerId: action.playerId` (reusing `CREATE_ZONE`'s
+own zone-construction logic rather than duplicating it, named from the
+joining player's name at that moment — names aren't editable after join,
+so no staleness risk). `ownerId` affects **UI placement only** (drawn at
+that player's seat) — every reducer case (`PLAY`, `MOVE_CARD`, `REVEAL`,
+`PICKUP`) treats a personal zone exactly like any other zone, same "put
+or take is open to all" authorization already established by US-19,
+deliberately not special-cased. "Not user-deletable" (US-27 AC) needs
+**zero new guard code**: there has never been a `DELETE_ZONE` action for
+*any* zone, personal or shared, so this guarantee already holds by
+omission.
+
+### D18. Seating is a per-viewer client-side presentation, not new state
+Each client computes its own seat order locally from `view.players` (join
+order, unchanged) and `myId`: rotate the array so the viewer is first
+("at the bottom"), everyone else follows in their existing relative
+order around the rest of the table. Pure `ui.js`/`main.js` rendering
+logic — no new field on `state`, no protocol change, and no coupling
+found to anything that currently assumes roster order is *visual* order
+(`renderRoster`/`renderMiniHand` just iterate `players` in whatever order
+they arrive in; nothing reads position as meaning). Every player's screen
+computes its own rotation independently — no synchronization needed since
+each rotation is a pure function of already-shared data (the roster) plus
+a purely-local value (`myId`).
+
+### D19. Live card-drag broadcast extends D13's existing motion channel — restores PRD Principle 6
+D13 scoped "card motion" down to a boolean lift cue for build-cost
+reasons. The user has now explicitly asked for the fuller version (true
+live position while dragging, best-effort/approximate explicitly
+accepted) — this doesn't contradict D13's reasoning, the cost/benefit
+the user is choosing has changed, and what's being asked for is in fact
+exactly the PRD's original Principle 6. No new transport mechanism: one
+more `kind` (`'card-drag'`) on the existing best-effort motion channel
+(D4), broadcasting `{ originId, cardId: string | null, x, y }` at the
+same throttle/coalesce rate already used for cursor (US-22's rate is
+adequate — card-drag is not meaningfully higher-frequency than cursor
+tracking, both are pointer-driven).
+
+**Privacy rule (resolves Smith's Gate 1 amendment on US-29):** `cardId`
+is included in the broadcast **if and only if the card's current
+`faceUp` is `true` at drag-start** — i.e., it's already public to
+literally everyone. This single condition is provably sufficient and
+correct given the existing authorization rule for what's draggable at
+all (`MOVE_CARD`/D12: a still-hidden card can only be moved by its
+owner): any card a player is allowed to drag is either already
+`faceUp: true` (visible to everyone, safe to name) or `faceUp: false`
+and owned by the dragger themself (visible *only* to the dragger, so
+by construction invisible to every possible receiver of this broadcast).
+There is no third case where a receiver could legitimately see a card
+the dragger cannot. When `cardId` is omitted, every receiver renders a
+generic anonymous card-back at the broadcast position — this also
+mechanically satisfies Smith's "zone-level not hand-slot-level" privacy
+requirement (already established for cursor, US-22 Open Question 2):
+since no card identity is ever sent for a not-yet-public card, there is
+no hand-slot-precision to leak in the first place, only an approximate
+position near the dragger's seat.
+
+On drag-end without a completed drop, the broadcaster simply stops
+sending; receivers clear the ghost via the same TTL-staleness pattern
+`markCursorStale`/`removeRemoteCursor` already implement for cursors —
+no new cleanup mechanism. The actual `PLAY`/`MOVE_CARD` reliable-state
+message on a real drop remains the sole source of truth throughout, per
+D4 — this channel is presentation-only and never a second path to
+mutate game state.
+
+**Drop-target highlighting** (Smith's Gate 1 amendment on US-28) is pure
+client-side UI state (which zone element the pointer is currently over
+during a drag), no state/protocol involvement — implementation detail
+for Neo, not a binding decision here.
+
+**Superseded:** the "Full pixel-synchronized card dragging... deferred"
+item in Open Items Carried Forward below is removed — this sprint
+delivers it (in best-effort/approximate form, as the user explicitly
+accepted, not frame-perfect).
+
 ## Module Layout
 ```
 index.html              entry page, host/join screens, game screen
@@ -239,16 +321,22 @@ src/state.js               host-side authoritative state + reducer(action) -> st
 src/session.js              PeerJS wiring: create/join, connection roster, send/recv envelope
 src/protocol.js              message envelope helpers: state vs. motion, throttling/coalescing
 src/ui.js                     DOM rendering: hand, table, roster, connection status
+                                 v1.3: top-down table/seat layout, drag-and-drop
+                                 (D17-D19), live card-drag ghost rendering
 src/qrcode.js                  small vendored QR renderer (no external network call at runtime)
 src/presets.js                  v1.1: static game-preset lookup (US-15)
 src/rulesReference.js            v1.1: static rules-reference content (US-18)
 src/handOrder.js                  v1.2: pure client-side hand-order reconcile/sort (US-23, D14)
+src/seating.js                      v1.3: pure per-viewer seat rotation + seat geometry (D18),
+                                     unit-testable in isolation rather than only verified via DOM
+                                     position assertions in e2e
 src/main.js                        wires session + state + ui together
 tests/deck.test.js                  node:test unit tests for deck.js
 tests/state.test.js                  node:test unit tests for state.js reducer (incl. D7-D9: middle
                                       redaction, REVEAL authorization, PICKUP, scores, solo/1-player;
                                       v1.2: D12 zones/CREATE_ZONE/MOVE_CARD, D15 DEAL_MORE, D16 pass)
 tests/handOrder.test.js               v1.2: node:test unit tests for handOrder.js (D14)
+tests/seating.test.js                 v1.3: node:test unit tests for seating.js (D18)
 ```
 
 ## Testing Strategy
@@ -277,7 +365,3 @@ cover (visual/UX judgment calls, not just functional correctness).
   after Sprint 3.
 - Max players — soft cap at 8, enforced in UI copy only, not hard-blocked.
 - Custom card backs/themes — deferred.
-- Full pixel-synchronized card dragging (as opposed to D13's lift-cue
-  scope) — deferred; would need a shared coordinate/layout model across
-  independently-rendered clients, a materially bigger feature than what
-  US-22 actually asked for.

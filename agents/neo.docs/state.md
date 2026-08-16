@@ -352,8 +352,264 @@ Handed to Trin for Phase 20 UAT.
 to Smith to close out uat-report-sprint3.md.
 
 ### Planned Work
-- [ ] None pending - Sprint 3 implementation + bug-fix work is complete
-      pending Trin/Morpheus/Smith re-verification.
+- [ ] None pending - Sprint 3 is fully shipped.
+
+## Sprint 4 ("top-down table redesign")
+### Progress
+- [x] Phase 21 (T21.1-T21.2): `zones` entries gain optional `ownerId`;
+      extracted `makeZone(name, ownerId)` so `CREATE_ZONE` and `JOIN`'s
+      new personal-zone creation share one construction path instead of
+      duplicating id-generation logic. `JOIN` guards against creating a
+      second personal zone on re-join (checks `zones.some(z => z.ownerId
+      === playerId)` first), same "preserved not reset" spirit as
+      scores/passed.
+
+      **Found and fixed 6 existing tests with a real correctness gap**
+      while regression-testing, not just a cosmetic one: several
+      pre-Phase-21 tests captured `state.zones[1].id` as "the zone I just
+      created" (e.g. `discardZoneId`), which was only correct because no
+      players had personal zones yet. Once JOIN started appending
+      personal zones, `zones[1]` silently became a DIFFERENT player's
+      personal zone in several tests instead of the named zone the test
+      claimed to be exercising - most of these didn't fail (the
+      assertions were self-referential enough to still pass), they just
+      quietly started testing the wrong zone. Fixed all 6 by looking
+      zones up by name (`zones.find(z => z.name === 'Discard')`) instead
+      of position - robust regardless of how many other zones exist.
+      Added 5 new dedicated tests for D17 itself (creation, uniqueness
+      across players, re-join doesn't duplicate, full PLAY/MOVE_CARD/
+      REVEAL/PICKUP parity, viewFor exposes ownerId). 69/69 unit tests
+      (was 64), e2e still green 2/2 stable runs (personal zones show up
+      as ordinary extra zones in today's UI for now - Phase 22/23 gives
+      them their spatial seat placement, this phase was data-layer only
+      per the sprint plan).
+
+### Immediate Next Action
+Handed to Trin for Phase 21 UAT.
+
+### Waiting On
+@Trin: UAT sign-off on Phase 21.
+
+- [x] Phase 22 (T22.1-T22.2): `seatedOrder()` in main.js rotates the
+      roster so the viewer is always first (D18); `renderRoster` grew a
+      `seated` option that positions each `<li>` absolutely around the
+      new `.table-surface` oval via `seatPosition(index, count)` (pure
+      geometry, radius 42% to stay inside the surface), plus an explicit
+      "🧑 You" text tag + a border highlight on the viewer's own seat
+      (Smith Gate 1 - two independent signals, not just position). Host-
+      setup screen's roster (`#host-roster`, pre-deal) deliberately
+      untouched - stays a flat list, this redesign is scoped to the game
+      screen per US-26.
+
+      **Found and fixed a real bug via the e2e suite, not just
+      eyeballed**: the absolutely-positioned `<ul>` (needed as a
+      positioning frame spanning the whole surface) was silently
+      intercepting clicks meant for zone buttons underneath it -
+      `pointer-events: none` on the list, `auto` back on individual
+      seats, fixed it. Caught because the e2e suite actually tries to
+      click through it, not because it looked wrong in a screenshot.
+
+      **Found and worked around a second real bug, pre-existing and
+      unrelated to this phase**: simultaneous (not sequential) Joins
+      crash the host with a stack overflow inside PeerJS's own msgpack
+      packer - reproduced identically on the last commit, so not
+      something I broke. Filed to Cypher's backlog (Phase 27 candidate),
+      worked around it in my own verification script by joining
+      sequentially like the existing e2e suite already does.
+
+      Verified visually at 390px (3-player) and 1280px (2-player): D18's
+      per-viewer rotation genuinely works - Alice's own screen seats
+      Alice at the bottom, Bob's own screen seats Bob at the bottom,
+      confirmed via two independent screenshots from two different
+      clients in the same session. One known rough edge, expected and
+      scoped to Phase 23: personal zones (Phase 21) still render in the
+      flat zone stack for now, crowding the seats visually at 3 players -
+      Phase 23 moves them onto the seats themselves, which should
+      resolve this. 70/70 unit, e2e 3/3 stable after the pointer-events
+      fix.
+
+### Immediate Next Action
+Handed to Trin for Phase 22 UAT.
+
+### Waiting On
+@Trin: UAT sign-off on Phase 22.
+
+- [x] Phase 23 (T23.1-T23.2): `renderZones` now takes an optional
+      `allZones` override so it can render a FILTERED (shared-only) list
+      while still offering every zone (incl. personal ones) as a "Move
+      to…" destination. New `renderSeatZones()` places each personal zone
+      at its owner's seat using the same `seatPosition()` geometry as
+      roster seats, just a smaller radius (26 vs 42) so it sits toward
+      the center - "in front of" the seat rather than at the table's edge.
+
+      **Found and fixed a second real bug via e2e, more serious than
+      Phase 22's**: once personal zones moved to their own absolute
+      position, they visually overlapped the shared zones' in-flow
+      content and started covering real buttons (not just a stray full-
+      surface pointer-events issue this time - actual spatial collision
+      between two different zones' cards). Fixed properly, not just
+      patched: gave `#table-area`/`#game-deck-area` a bounded, centered
+      footprint (`max-width`, `max-height` + scroll) instead of letting
+      shared content grow into the personal-zone ring. This is the real
+      fix for the crowding I'd flagged as a known rough edge in Phase 22
+      - confirmed resolved, not just deferred again.
+
+      Hand spread (US-30): rotation + a slight vertical arc per card
+      (`transform-origin: bottom center`, pivoting like cards actually
+      fanned in a hand), deliberately NOT horizontal overlap - overlap
+      would shrink a covered card's real tap target below the 44px floor
+      Smith's Gate 1 amendment requires, rotation alone never touches
+      hit-testing. Hit a real layout bug fanning this into flex-wrap:
+      the 5th+ card wrapped onto a visually-broken second row once
+      rotated - fixed by making the hand scroll horizontally instead of
+      wrapping (verified via script: all 7 cards of a 7-card hand stay in
+      the DOM and reachable, `scrollWidth > clientWidth` confirmed, none
+      lost - just requires a swipe on a big hand, a legitimate mobile
+      pattern, not a fanciness-over-usability tradeoff. No affordance
+      hinting "more cards to the right" yet - flagging for Smith's
+      close-out review rather than guessing at a fix now).
+
+      70/70 unit, e2e 3/3 stable throughout both fixes.
+
+### Immediate Next Action
+Handed to Trin for Phase 23 UAT.
+
+### Waiting On
+@Trin: UAT sign-off on Phase 23.
+
+- [x] Phase 24 (T24.1-T24.2): factored zone-panel rendering into a
+      shared `renderZonePanel()` (was duplicated between `renderZones`/
+      `renderSeatZones`) so the new drop-target wiring only needed to be
+      written once. Zones gained `dragover`/`dragleave`/`drop` handlers
+      (`onDropCard(cardId, zoneId)`); main.js's new `dropCardOnZone()`
+      checks whether the card is currently in the viewer's hand (PLAY)
+      or already on the table (MOVE_CARD) and dispatches accordingly -
+      the drop target itself doesn't need to know which. `playCard()`
+      grew an optional `zoneId` param (state.js's `PLAY` reducer already
+      supported this since D12, just never had a caller use it) so a
+      drag can actually land a card in a SPECIFIC zone, not just the
+      default one. Middle-cards became draggable exactly where
+      `MOVE_CARD`'s own authorization would already permit a drop to
+      succeed (mirrors precisely where the existing "Move to…" control
+      is shown, so no new authorization surface). Drop-target highlight
+      via a `.zone-drag-over` class, cleared on drop/dragleave. Verified
+      no conflict with the existing card-lift pointer-based cue (a risk
+      I flagged going in, given middle-cards are now ALSO draggable) -
+      confirmed via a real click-drag test that the lift cue still fires
+      cleanly. Tap-to-play and the Move-to dropdown both independently
+      re-verified still working unchanged. 70/70 unit, e2e 3/3 stable.
+
+      **User asked to switch to TDD partway through this phase** -
+      Phase 24 itself was implemented-then-verified (same order as
+      Phases 21-23). Adopting test-first for Phase 25 onward: writing
+      the e2e assertions for live card-drag broadcast BEFORE wiring the
+      feature, confirming they fail for the right reason first.
+
+### Immediate Next Action
+Handed to Trin for Phase 24 UAT.
+
+### Waiting On
+@Trin: UAT sign-off on Phase 24.
+
+- [x] Phase 25 (T25.1-T25.2), done test-first per the user's TDD request:
+      1. Wrote 5 unit tests for `cardDragPayload()` (new pure function in
+         protocol.js) BEFORE it existed - confirmed the import itself
+         failed first, then implemented until all 5 passed. The privacy
+         rule collapses to one condition (`card.faceUp === true`),
+         proven sufficient by the same MOVE_CARD-authorization argument
+         Morpheus's D19 architecture already made.
+      2. Wrote the e2e assertions (real face while dragging a public
+         card, anonymous back for a still-hidden one, ghost clears on
+         dragend, dragger never sees their own ghost) directly into
+         `tests/e2e.smoke.mjs` BEFORE wiring the feature - confirmed the
+         suite failed at that exact point (no `[data-card-drag-id]`
+         anywhere yet), then implemented until it passed.
+      3. Implementation: `renderHand`/`renderZoneCards` gained an
+         `onCardDrag` callback fired on the native `drag` event (fires
+         continuously during a real drag, unlike `dragstart`/`dragend`);
+         `dragend` sends a `card: null` "stopped" signal so the ghost
+         clears promptly on a normal drop instead of waiting out the
+         full TTL. `updateCardDragGhost`/`removeCardDragGhost` in ui.js
+         mirror the existing cursor pattern exactly. main.js's
+         `resolveVisibleCard()` looks up a broadcast `cardId` against the
+         receiver's OWN already-known view (the broadcast itself never
+         carries rank/suit, by design - minimal data, and the same
+         reasoning D19 used: nothing here is a second path to leak
+         information beyond what `viewFor`'s existing redaction already
+         allows this viewer to see).
+
+      Hit two real test-authoring bugs while writing the e2e checks (not
+      implementation bugs) - both self-caught before reporting: (a) first
+      checked `[data-card-drag-id="<cardId>"]` when that attribute
+      actually holds the DRAGGING PLAYER's id, not the card's - fixed to
+      match the existing `[data-cursor-id]` presence-check pattern; (b) a
+      throwaway visual-verification script computed the drag's screen
+      coordinates from the WRONG client's viewport (host's 390px-wide
+      screen used to compute a position later applied within join's own,
+      differently-sized, screen) - caught because the ghost rendered
+      nearly off-screen in a manual screenshot check, not because
+      anything errored.
+
+      86/86 unit (was 81), e2e 3/3 stable.
+
+### Immediate Next Action
+Handed to Trin for Phase 25 UAT.
+
+### Waiting On
+@Trin: UAT sign-off on Phase 25.
+
+- [x] Phase 26 (T26.1-T26.3, final implementation phase): folded personal
+      zones (US-27) and drag-and-drop play/move + drop-target highlight
+      (US-28) into `tests/e2e.smoke.mjs` - T26.2 (card-drag privacy) was
+      already there from Phase 25's test-first work, nothing new needed.
+      Ran the T26.3 density pass Smith's Gate 1 specifically asked for
+      (~8-player table, mobile + desktop) and **found the risk was
+      real**: 8 players badly overlapped on a 390px screen, cards
+      genuinely illegible in places. Applied a real fix, not a token
+      gesture - `.table-surface`'s height now scales with player count
+      (`--seat-count` CSS var, set from `renderRosterOnly`) and seat
+      cards got more compact (smaller max-width/font/padding). Re-checked
+      after the fix: meaningfully better, but **honestly not fully
+      resolved starting around 5 players on mobile** - the 44px
+      score-button touch-target floor (an existing, non-negotiable
+      convention from Sprint 2) puts a hard floor under how compact a
+      seat card carrying score controls can get, and taller/8-per-row
+      seats crowding the same narrow top band can't be solved by height
+      alone. Did not paper over this - flagged clearly in task.md and
+      here for Smith's close-out test, which has exactly this check
+      built into her own Gate 1 amendment. A full fix likely needs a
+      genuine compact-seat-mode design (e.g. drop score buttons from the
+      seat itself, adjust scores elsewhere) - real scope, not something
+      to rush unilaterally mid-phase without design input.
+      86/86 unit, e2e 3/3 stable throughout.
+
+### Immediate Next Action
+Handed to Trin for Phase 26 UAT.
+
+### Waiting On
+@Trin: UAT sign-off on Phase 26 (the final implementation phase - after
+this, Sprint 4 moves to Stage 3 close: Oracle groom -> Smith end-to-end
+test, which should specifically re-check the mobile density finding).
+
+- [x] Phase 27 fix (T27.1), test-first: added the cursor-affordance
+      assertion to `tests/e2e.smoke.mjs` before touching CSS, confirmed
+      it failed (`got "auto"`), then fixed. `.hand-card` (always
+      draggable) and `.middle-card[draggable="true"]` (the attribute
+      selector already tracks exactly the same authorization condition
+      the draggable-wiring in Phase 24 used, no separate logic needed)
+      get `cursor: grab`, `:active` gets `cursor: grabbing` - pure CSS,
+      no JS class-toggling needed. 86/86 unit, e2e stable.
+
+### Immediate Next Action
+Handed to Trin for Phase 27 UAT.
+
+### Waiting On
+@Trin: UAT sign-off on Phase 27.
+
+### Planned Work
+- [ ] None pending - all Sprint 4 work (6 implementation phases +
+      Phase 27 close-out fix) will be complete once Phase 27 clears
+      UAT/review.
 
 ---
-*Last updated: 2026-08-15 21:22*
+*Last updated: 2026-08-15 22:50*

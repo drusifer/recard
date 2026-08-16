@@ -486,6 +486,178 @@ separate story.
 
 ---
 
+## v1.3 backlog: top-down table redesign (2026-08-15)
+
+New requirement, added after v1.2 launch: redesign the game screen as a
+top-down card table — players seated around it, each with a personal
+zone in front of their seat, the viewer's own hand spread below, cards
+played and moved by drag-and-drop, and other players' card movements
+visible live as they happen. This is a visual/interaction overhaul of
+the existing zone (US-19/D12) and motion (US-11/US-22/D13) systems, not
+a new data model — see PRD Feasibility Flag 5 for the architecture
+proposal.
+
+**Forking questions confirmed with the user before drafting (not
+assumed):**
+1. Drag targets **snap to zones** (today's named-zone model, drag
+   replaces/augments tap as the gesture), not freeform per-pixel
+   placement. Freeform would need per-card x/y coordinates synced across
+   clients with differently-sized/shaped screens — "the same spot"
+   isn't well-defined between players, and it's not what the request
+   needs (a real table still has clearly-implied zones — cards in front
+   of you, a discard pile — even though nothing is drawn on the felt).
+2. Every player **auto-gets one personal zone** at their seat, created
+   on `JOIN`, always present (can't be deleted) — in addition to any
+   shared zones (discard, community cards, etc.) created the existing
+   way (US-19).
+3. **Corrected mid-draft**: other players' card movement should be
+   **true real-time position broadcast** (you see the card itself
+   following their drag, live, the whole time they're moving it), not
+   just an animated jump when they release it. Best-effort/approximate
+   is explicitly fine — this is actually the PRD's original Principle 6
+   ("live, best-effort motion... should animate on other players'
+   screens as it happens"), which D13 had scoped down to a lighter lift
+   cue for build-cost reasons; this sprint restores the fuller version
+   the user actually wants, extending D13's existing throttled motion
+   channel rather than replacing it.
+
+**Assumptions stated inline (not fork-worthy, but worth being explicit
+about):**
+- Each viewer renders **themselves at the bottom of their own screen**,
+  with other players distributed around the rest of the table relative
+  to that — this is a *per-viewer* relative seating arrangement, not one
+  shared absolute layout, since "top-down table" only reads correctly
+  from your own point of view. Seat order otherwise follows join order.
+- Drag is **additive, not a replacement** for the existing tap-to-play
+  and "Move to…" dropdown — phones are the primary target device (PRD
+  Target User) and drag gestures are harder to land precisely on a small
+  touchscreen than a tap, so the existing lower-friction paths stay.
+- Dragging a card out of your hand and dropping it on your own personal
+  zone (or any shared zone) is a normal **public** play, matching
+  today's "primary tap = public play" precedent (US-12). The existing
+  small face-down buttons remain the way to play face-down — drag isn't
+  overloaded with a mid-drag visibility choice.
+
+**Smith Gate 1 amendments (2026-08-15, approved with additions):**
+- US-26: the viewer's own seat must carry an explicit visual marker (not
+  just "it's the one at the bottom") — a "You" label or equivalent —
+  since position alone is ambiguous the first time someone opens the
+  screen (Nielsen #6 Recognition, not recall). Density check required at
+  this sprint's close-out test specifically at the soft-cap player count
+  (~8, per `docs/ARCHITECTURE.md`), not just 2-3 players, given every
+  seat now carries a name, personal zone, and mini-hand indicator all
+  needing to fit around one table edge.
+- US-28: a valid drop target must visually highlight while a dragged card
+  is over it, and revert when it isn't (Nielsen #1 Visibility of System
+  Status) — without this, drag-and-drop has no affordance for "this is
+  droppable here" beyond guessing, which is worse UX than the tap model
+  it's supplementing.
+- US-29: the anonymized-card-back broadcast must follow the **exact same
+  zone-level-not-hand-slot-level granularity boundary already adopted for
+  cursor position** (US-22 Open Question 2) — the origin point rendered
+  for other viewers must never be precise enough to imply *which slot* in
+  the dragger's hand the card came from, only that it came from "near
+  their seat." This is a new channel carrying an actual card silhouette
+  (not just a dot), so it needs its own explicit restatement of that
+  privacy boundary, not just inherited by association with US-22.
+- US-30: overlapping/fanned cards must still show enough of each card
+  (rank+suit corner index) to be individually identifiable without
+  needing to tap/select it first — overlap is a layout choice, not
+  permission to hide information a player already has (their own hand,
+  US-5).
+
+### US-26: Top-down table with seats around it
+**As** a player, **I want** the game screen to look like a real card
+table viewed from above, with every player seated around it, **so that**
+the app feels like sitting at a table instead of a stacked list of
+panels.
+**AC:**
+- The table is drawn as a single visual surface (not separate stacked
+  "Table"/"Players" panels like today); seats are arranged around its
+  edge, one per player, each labeled with that player's name and
+  connection status.
+- The viewer's own seat is always at the bottom of their screen; other
+  players are distributed around the remaining edge, closest-to-furthest
+  in join order either direction from the viewer (exact geometry is an
+  implementation UI detail, not a product decision).
+- Existing per-player info (connection state, score, pass marker, the
+  compact closed-hand fan) still appears at or near that player's seat —
+  this redesign changes *where* it's drawn, not what it shows.
+
+### US-27: A personal zone in front of every seat
+**As** a player, **I want** my own area on the table in front of my
+seat, **so that** cards I've played land somewhere clearly "mine" instead
+of one shared undifferentiated pile.
+**AC:**
+- Every player gets exactly one personal zone, auto-created on `JOIN`,
+  positioned at their seat, always present (not user-deletable, unlike
+  manually-created shared zones from US-19).
+- Cards in a personal zone follow the exact same per-card visibility
+  rules as any other zone (public / shared face-down / privately-owned
+  face-down, US-12) — a personal zone is a *position* on the table, not
+  a new privacy mechanism.
+- Shared zones (the default table pile, any player-created zone from
+  US-19) remain and are drawn in the table's open center area, distinct
+  from any player's personal zone.
+
+### US-28: Drag-and-drop to play and move cards
+**As** a player, **I want** to drag a card from my hand or from a zone to
+where I want it, **so that** playing feels like handling a physical card
+instead of tapping buttons and menus.
+**AC:**
+- Dragging a card from your hand and dropping it on a zone (your own or
+  a shared one) plays it there — same underlying action `PLAY` already
+  performs today, just triggered by a drop instead of a tap.
+- Dragging a card already on the table from one zone to another performs
+  the existing `MOVE_CARD` action (US-19), same authorization rules
+  (still-hidden private cards can only be moved by their owner).
+- Existing tap-to-play and the "Move to…" dropdown **still work
+  unchanged** — drag is an additional gesture, not a replacement (Smith
+  Gate 1 precedent: don't cost the common/simple path anything extra,
+  and phones make precise dragging harder than a tap for some players).
+- Dropping outside any valid target is a no-op (card returns to where it
+  was) — never a silent action on an unintended zone.
+
+### US-29: See other players actually moving their cards, live
+**As** a player, **I want** to see a card actually move across the table
+in real time when another player drags it, **so that** the table feels
+alive instead of state just snapping between frames.
+**AC:**
+- While another player is dragging a card, its live position broadcasts
+  to everyone (best-effort, throttled/coalesced like today's cursor and
+  hand-motion cues — dropped frames are fine, per PRD Principle 6; the
+  final committed state via `PLAY`/`MOVE_CARD` is always the source of
+  truth regardless of what any intermediate frame showed).
+- **Privacy holds throughout the drag, not just at the end**: if the
+  card isn't yet visible to a given viewer (still in the dragger's
+  private hand, or a still-hidden face-down card only its owner may
+  move), that viewer sees an anonymous card-back following the live
+  position — never the rank/suit — exactly the same visibility rule
+  already applied to committed state (US-12/D7), just applied
+  continuously during the drag instead of only at rest.
+- A card already visible to a viewer (face-up on the table, moving zone
+  to zone) shows its real face while being dragged, live.
+- If a drag never completes (e.g. connection drops mid-drag), the ghost
+  card clears on the same TTL/timeout basis as today's cursor indicator
+  — never left stuck on-screen indefinitely.
+
+### US-30: Hand spread below the table
+**As** a player, **I want** my own hand shown as a fanned spread below
+the table instead of a plain row, **so that** it reads like cards held
+in hand rather than a UI list.
+**AC:**
+- Purely visual — no change to what actions are available per card
+  (tap-to-play, drag, the small face-down buttons, sort, all unchanged
+  in *function*, only in layout/presentation).
+- Must still be usable one-handed on a phone at a realistic hand size
+  (this sprint's own density risk — see Smith Gate 1 requirement below).
+- **Smith UX requirement (Gate 1):** a fanned/overlapping layout must not
+  make any card's tap target smaller than the existing ≥44×44px floor
+  (`docs/ARCHITECTURE.md` UI Conventions) — overlap is visual, not
+  interactive; every card must stay individually, reliably tappable.
+
+---
+
 ## Deferred / Stretch
 - Scannable QR code image for joining (v1 ships join-code + Copy Link
   instead; descoped 2026-08-15, see CHAT.md Neo→Cypher).

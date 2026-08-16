@@ -162,3 +162,57 @@ real pre-existing test-infrastructure gap surfaced during this sprint's
 regression testing (native HTML5 drag-and-drop doesn't fire from
 synthetic input in this headless environment) and was fixed at the test
 level only; see `agents/oracle.docs/lessons.md` Sprint 3 section.
+
+## 2026-08-15 — v1.3 architecture (D17-D19): top-down table redesign
+
+**Context:** Post-v1.2, the user asked for a visual/interaction overhaul:
+a top-down table with players seated around it, a personal area in front
+of each seat, drag-and-drop instead of tap+dropdown as the primary
+interaction, and seeing other players' card movements live. Three
+forking questions were confirmed with the user before drafting stories
+(not assumed): drag snaps to the existing named-zone model rather than
+freeform per-pixel placement; every player auto-gets one personal zone;
+and — corrected mid-draft by the user — live card-drag should be true
+real-time position broadcast (best-effort/approximate explicitly
+accepted), not just an animated jump on drop.
+
+**Decision:** Morpheus recorded three more binding decisions:
+- D17: personal zones are ordinary `zones` entries with one new optional
+  field, `ownerId: playerId | null`. `JOIN` auto-creates one (reusing
+  `CREATE_ZONE`'s own construction logic, not duplicated); every reducer
+  case treats it exactly like any other zone - `ownerId` only matters for
+  UI seat placement. "Not user-deletable" needed zero new guard code,
+  since no zone (personal or shared) has ever had a delete action.
+- D18: seating is a per-viewer client-side rotation (`seatedOrder`) plus
+  pure geometry (`seatPosition`) - no new state or protocol field. Each
+  client computes its own seat order from the same shared roster; the
+  viewer always lands at the bottom. Both functions were extracted into
+  a new `src/seating.js` (mid-sprint, in direct response to user
+  feedback - "unit tests form the base of the pyramid" - mirroring the
+  existing `handOrder.js` precedent) so the geometry is verified by real
+  unit tests, not only indirectly through DOM position assertions.
+- D19: live card-drag broadcast extends D13's existing best-effort
+  motion channel with one new kind, restoring the PRD's original
+  Principle 6 rather than contradicting D13's earlier build-cost
+  reasoning - the user explicitly accepted the tradeoff D13 had
+  previously declined. Privacy rule: a dragged card's id is broadcast
+  iff it's already face-up at drag-start, proven sufficient by the
+  existing `MOVE_CARD` authorization rule (nothing draggable at all can
+  be visible to a receiver but invisible to the dragger). The pure
+  privacy predicate (`cardDragPayload`) was written test-first, per the
+  user's TDD request partway through this sprint - the test import
+  failed before the function existed, then passed once implemented.
+
+**Consequences:** Zero new protocol messages across all three decisions
+- one new zone field, one new client-side-only module, one new `kind` on
+an already-generic channel. A real, measured UX finding came out of the
+Phase 26 density pass Smith's Gate 1 had specifically asked for: an
+~8-player table badly overlaps on a 390px screen, and objective
+`getBoundingClientRect()` measurement (not just a screenshot read)
+pinpointed the degradation starting exactly at 5 players, not sooner or
+later. A first fix (table surface scales with player count) measurably
+helped but didn't fully resolve it - the existing 44px touch-target
+floor (Sprint 2) puts a hard lower bound on how compact a seat card
+carrying score controls can get. Reported honestly as "improved, not
+resolved" rather than overclaimed; see `agents/smith.docs/` for the
+Stage-3 close-out disposition.

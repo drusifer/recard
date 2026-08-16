@@ -140,6 +140,20 @@ UAT gate for each phase of Sprint 2 ("clear backlog," v1.1) per task.md.
       the fan from the preceding text. Screenshotted at 390px for the
       record.
 
+- [x] Sprint 3: fully shipped (Phase 20 UAT above, retro done).
+
+## Sprint 4 ("top-down table redesign")
+- [x] Phase 21 UAT: PASS. 70/70 unit (independently re-run) + e2e still
+      green. Went beyond Neo's own check: verified `ownerId` specifically
+      survives `RESET`, not just zone count/cards-cleared (Neo's own
+      RESET test fix asserted count-preserved and cards-empty, but not
+      that the per-zone `ownerId` field itself came through the reset
+      spread correctly - confirmed it does, codified as a new test
+      rather than just an ad-hoc check). Also independently re-verified
+      the 6 pre-existing tests Neo fixed are now finding the RIGHT zone
+      by name, not just passing for the same accidental reason they used
+      to.
+
 ### Blockers
 None
 
@@ -148,14 +162,123 @@ None yet
 
 ## Next Steps
 ### Immediate Next Action
-Handed to Morpheus for Phase 20 code review, then back to Smith to
-re-test and close uat-report-sprint3.md.
+Handed to Morpheus for Phase 21 code review.
+
+- [x] Phase 22 UAT: PASS. 70/70 unit + e2e 3/3 stable (independently
+      re-run). Went beyond Neo's 2-3-player checks: solo (1-player)
+      case exercises `seatPosition(0, 1)` cleanly (1 seat, correctly
+      "You"-marked), and a 5-player case confirms all 5 computed
+      positions are genuinely distinct and symmetric (`50,92` bottom for
+      the viewer, then mirrored pairs going up each side) - the kind of
+      geometry bug that's easy to get subtly wrong (e.g. an off-by-one in
+      the angle step) but wouldn't show up at 2-3 players. Also
+      independently re-verified the pointer-events fix didn't overcorrect
+      into making seats' OWN buttons unclickable (a real inverse-
+      regression risk of that exact fix) - hit a false alarm on my first
+      pass (my own test script's fault, an irrelevant leftover
+      `reset-scores-btn` click), caught it by rereading my own test
+      before reporting a false regression, fixed the script, re-ran
+      clean.
+
+- [x] Phase 23 UAT: PASS. 70/70 unit + e2e 3/3 stable. Independently
+      exercised the exact scenario Neo's own screenshots didn't cover
+      (a card actually IN a personal zone, not just the zone rendering
+      empty): played a card to the shared zone, moved it into Alice's
+      personal zone via the existing Move-to control, then verified (1)
+      that same card's own Move-to dropdown correctly lists the shared
+      Table zone AND Bob's personal zone as destinations (not just
+      whatever happens to be in the same render call), (2) a
+      private-facedown card moved into a personal zone still hides its
+      rank from a non-owner - privacy holds through the new
+      `renderSeatZones` path, not just the original `renderZones` one,
+      (3) drag-reorder in the hand still works after the fan's switch
+      from `for..of` to indexed `forEach`. Had to fix my own test
+      twice - first assumed tapping/face-down-button plays a card
+      straight into the player's own personal zone, but that's not how
+      it works yet (tap always plays to the shared default zone; landing
+      a card in a personal zone currently requires the existing Move-to
+      control - direct-to-zone dragging is Phase 24's job). Good
+      reminder that UAT scripts need to match what the app ACTUALLY
+      does, not what you'd expect the finished feature to do.
+
+- [x] Phase 24 UAT: PASS. 70/70 unit + e2e 3/3 stable at the time.
+      Independently checked three things beyond Neo's happy-path
+      verification: (1) an invalid drop (onto the roster, not a zone) is
+      a genuine no-op - hand count unchanged, card still present, not
+      just "didn't crash", (2) a non-owner truly cannot drag another
+      player's still-hidden private card - `draggable` is false on that
+      element, not just "no visible button" the way it read before, (3)
+      only the zone actually under the pointer highlights during a
+      multi-zone drag, not every zone at once (a real risk given the
+      highlight is a plain class toggle per zone, not scoped by anything
+      else). All 3 passed clean.
+- [x] Re-verified after Neo's `seating.js` extraction (response to "unit
+      tests form the base of the pyramid"): 81/81 unit + e2e still 3/3
+      stable. The extraction is DOM-behavior-neutral by construction (same
+      functions, same call sites, just relocated + exported), so this was
+      a quick confirmation pass, not a full re-UAT.
+
+- [x] Phase 25 UAT: PASS. 86/86 unit + e2e stable. Went beyond Neo's
+      explicit-dragend-only coverage with two independent checks: (1)
+      the literal TTL AC ("if a drag never completes... clears on the
+      same TTL basis") - dispatched dragstart+drag with NO dragend at
+      all (simulating a crash/dropped connection mid-drag), confirmed
+      the ghost is still present right after (proving it's not somehow
+      auto-clearing immediately) then genuinely gone ~2.2s later with
+      zero further app interaction; (2) dragging a card FROM a personal
+      zone (not just the shared default Neo's tests used) still resolves
+      its real face correctly - `resolveVisibleCard()` iterates every
+      zone, but only Neo's own tests happened to exercise the shared one.
+
+- [x] Phase 26 UAT (final implementation phase): PASS. 86/86 unit + e2e
+      stable. Went beyond Neo's screenshot-based density check with an
+      objective, measured one: computed real `getBoundingClientRect()`
+      overlap between every pair of seat cards at 390px width, across
+      2/3/4/5/6/8 players. Precisely confirms and quantifies Neo's
+      finding rather than just trusting the screenshot read: **0
+      overlapping pairs through 4 players, 1 at 5, climbing to 6 at 8** -
+      the degradation genuinely starts at 5, not earlier or later, and
+      Neo's "not fully resolved at 5+ players" characterization is
+      accurate, not overstated or understated. This is exactly the kind
+      of finding that deserves a precise number, not just "looks
+      cramped."
+
+- [x] Triaged Smith's Sprint 4 close-out findings: finding #1 (cursor
+      affordance) confirmed real by checking the code myself - no
+      `cursor` rule anywhere in style.css for `.hand-card`/`.middle-card`,
+      matches Smith's `getComputedStyle` result exactly. Small, contained,
+      populated as Phase 27 T27.1. Finding #2 (density) - agreed with
+      Smith's recommendation NOT to force a Phase 27 fix; re-read the
+      existing Neo/Morpheus record (task.md, DECISIONS.md) and confirmed
+      the team already correctly scoped this as needing a real redesign,
+      so routing to Cypher's backlog is the right call, not a second
+      rushed attempt.
+
+### Blockers
+None
+
+### Oracle Consultations
+None yet
+
+## Next Steps
+### Immediate Next Action
+Handed to Neo for Phase 27 fix (cursor affordance only).
+
+- [x] Phase 27 UAT: PASS. 86/86 unit + e2e stable. Went beyond Neo's
+      base-case check with two independent verifications: (1) a
+      NON-draggable card (another player's still-hidden private card,
+      which correctly gets no drag wiring at all per Phase 24's
+      authorization logic) genuinely does NOT get the grab cursor -
+      confirmed `auto`, proving the `[draggable="true"]` attribute
+      selector is scoped correctly, not just applied broadly and hoping;
+      (2) the `:active` "grabbing" state genuinely fires under a real
+      mousedown-and-hold, not just present in the stylesheet unverified.
 
 ### Waiting On
-@Morpheus: Phase 20 code review.
+@Morpheus: Phase 27 code review.
 
 ### Planned Work
-- [ ] Sprint 3 retro once Smith closes the report.
+- [ ] Hand back to Smith to close uat-report-sprint4.md once reviewed.
 
 ---
-*Last updated: 2026-08-15 21:25*
+*Last updated: 2026-08-15 22:47*

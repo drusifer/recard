@@ -1,10 +1,11 @@
 import { Session } from './session.js';
 import { createInitialState, reduce, viewFor } from './state.js';
-import { makeStateMessage, makeMotionMessage, createMotionThrottler } from './protocol.js';
+import { makeStateMessage, makeMotionMessage, createMotionThrottler, cardDragPayload } from './protocol.js';
 import { buildJoinUrl, renderShareCode } from './qrcode.js';
 import {
   renderHand,
   renderZones,
+  renderSeatZones,
   renderRoster,
   renderRulesPanel,
   renderBanner,
@@ -13,10 +14,13 @@ import {
   updateRemoteCursor,
   removeRemoteCursor,
   setCardLifted,
+  updateCardDragGhost,
+  removeCardDragGhost,
 } from './ui.js';
 import { PRESETS } from './presets.js';
 import { RULES_REFERENCE } from './rulesReference.js';
 import { reconcileOrder, sortByRank, sortBySuit } from './handOrder.js';
+import { seatedOrder } from './seating.js';
 
 const MOTION_FLUSH_MS = 50;
 const MOTION_TTL_MS = 2000; // auto-clear a stale "organizing hand" cue if the end-event is dropped
@@ -104,6 +108,7 @@ const motionThrottler = createMotionThrottler();
 const movingIds = new Set();
 const moveTimers = new Map();
 const cursorTimers = new Map();
+const cardDragTimers = new Map();
 
 // --- Live cursor (US-22, D13): while the pointer is down anywhere on
 // the game screen, broadcast its position normalized to that screen's
@@ -283,9 +288,15 @@ document.getElementById('join-btn').addEventListener('click', () => {
     if (latestView) {
       renderHand(handAreaEl, orderedHand(latestView.myHand), {});
       const nameById = new Map(latestView.players.map((p) => [p.id, p.id === myId ? 'You' : p.name]));
-      renderZones(tableAreaEl, latestView.zones, {
-        resolveOwnerName: (ownerId) => nameById.get(ownerId) ?? ownerId,
-      });
+      const frozenOpts = { resolveOwnerName: (ownerId) => nameById.get(ownerId) ?? ownerId };
+      renderZones(tableAreaEl, latestView.zones.filter((z) => !z.ownerId), frozenOpts, latestView.zones);
+      renderSeatZones(
+        document.getElementById('seat-zones'),
+        latestView.zones.filter((z) => z.ownerId),
+        latestView.zones,
+        seatedOrder(latestView.players, myId),
+        frozenOpts,
+      );
     }
     renderRosterOnly();
   });
@@ -314,7 +325,11 @@ function renderRosterOnly() {
     renderRoster(hostRosterEl, players, opts);
     renderDeck(document.getElementById('host-deck-area'), view.deckCount);
   }
-  renderRoster(gameRosterEl, players, opts);
+  renderRoster(gameRosterEl, seatedOrder(players, myId), { ...opts, seated: true });
+  // Scales the table surface's size with player count (style.css) so
+  // seats have room to spread out - confirmed necessary at 8 players,
+  // not just a theoretical density concern (Phase 26 T26.3 finding).
+  document.getElementById('table-surface').style.setProperty('--seat-count', players.length);
   renderDeck(document.getElementById('game-deck-area'), view.deckCount);
   passToggleBtn.textContent = view.passed?.[myId] ? 'Unpass' : 'Pass';
 }
@@ -329,14 +344,24 @@ function renderGameFromView(view) {
     onReorder: (newOrderIds) => {
       handOrderIds = newOrderIds;
     },
+    onCardDrag: broadcastCardDrag,
   });
-  renderZones(tableAreaEl, view.zones, {
+  const zoneOpts = {
     resolveOwnerName: (ownerId) => nameById.get(ownerId) ?? ownerId,
     onReveal: (cardId) => revealCard(cardId),
     onPickup: (cardId) => pickupCard(cardId),
     onMoveCard: (cardId, toZoneId) => moveCard(cardId, toZoneId),
     onCardLift: (cardId, active) => motionThrottler.schedule('card-lift', { cardId, active }),
-  });
+    onDropCard: (cardId, toZoneId) => dropCardOnZone(cardId, toZoneId),
+    onCardDrag: broadcastCardDrag,
+  };
+  // D17/US-27: personal zones render at their owner's seat, not in the
+  // shared flat stack - both still list every zone (this array, passed
+  // as allZones) as a "Move to…" destination.
+  const sharedZones = view.zones.filter((z) => !z.ownerId);
+  const personalZones = view.zones.filter((z) => z.ownerId);
+  renderZones(tableAreaEl, sharedZones, zoneOpts, view.zones);
+  renderSeatZones(document.getElementById('seat-zones'), personalZones, view.zones, seatedOrder(view.players, myId), zoneOpts);
   resetBtn.hidden = role !== 'host';
   resetScoresBtn.hidden = role !== 'host';
   dealMoreBtn.hidden = role !== 'host';
@@ -344,10 +369,10 @@ function renderGameFromView(view) {
   renderRosterOnly();
 }
 
-function playCard(cardId, visibility) {
+function playCard(cardId, visibility, zoneId) {
   if (sessionEnded) return;
-  if (role === 'host') dispatch({ type: 'PLAY', playerId: myId, cardId, visibility });
-  else session.send({ type: 'action', action: { type: 'PLAY', cardId, visibility } });
+  if (role === 'host') dispatch({ type: 'PLAY', playerId: myId, cardId, visibility, zoneId });
+  else session.send({ type: 'action', action: { type: 'PLAY', cardId, visibility, zoneId } });
 }
 
 function revealCard(cardId) {
@@ -366,6 +391,23 @@ function moveCard(cardId, toZoneId) {
   if (sessionEnded) return;
   if (role === 'host') dispatch({ type: 'MOVE_CARD', playerId: myId, cardId, toZoneId });
   else session.send({ type: 'action', action: { type: 'MOVE_CARD', cardId, toZoneId } });
+}
+
+// US-28: dropping a dragged card on a zone plays it (if it came from
+// hand) or moves it (if it was already on the table) - the drop target
+// itself doesn't know or care which, it just hands back a card id and a
+// destination zone. Always plays public on drop, matching the existing
+// "primary gesture = public play" precedent (US-12); face-down stays
+// button-only (Smith Gate 1: don't overload drag with a mid-drag choice).
+function dropCardOnZone(cardId, targetZoneId) {
+  if (sessionEnded) return;
+  const view = currentView();
+  if (!view) return;
+  if (view.myHand.some((c) => c.id === cardId)) {
+    playCard(cardId, 'public', targetZoneId);
+  } else {
+    moveCard(cardId, targetZoneId);
+  }
 }
 
 document.getElementById('create-zone-btn').addEventListener('click', () => {
@@ -447,6 +489,45 @@ function markCursorStale(playerId) {
   );
 }
 
+// D19: finds a card's full data among whatever's currently visible to
+// THIS viewer (own hand excluded - a dragged card broadcasts identity
+// only when public, and a public card always lives in a zone, never a
+// hand). Redacted placeholders (`card.faceDown: true`) have no rank/
+// suit and are skipped - only a real, renderable card is ever returned.
+function resolveVisibleCard(cardId) {
+  const view = currentView();
+  if (!view) return null;
+  for (const zone of view.zones) {
+    const card = zone.cards.find((c) => c.id === cardId);
+    if (card && !card.faceDown) return card;
+  }
+  return null;
+}
+
+function markCardDragStale(playerId) {
+  clearTimeout(cardDragTimers.get(playerId));
+  cardDragTimers.set(
+    playerId,
+    setTimeout(() => removeCardDragGhost(gameScreenEl, playerId), MOTION_TTL_MS),
+  );
+}
+
+// US-29/D19: broadcasts live position while dragging, extending D13's
+// existing throttled channel with one new kind. `card: null` is the
+// dragend "stopped" signal (see renderHand/renderZoneCards' dragend
+// handlers) - sent as `active: false` so receivers clear the ghost
+// promptly instead of waiting out the full TTL after a normal drop.
+function broadcastCardDrag(card, clientX, clientY) {
+  if (!card) {
+    motionThrottler.schedule('card-drag', { cardId: null, x: 0, y: 0, active: false });
+    return;
+  }
+  const rect = gameScreenEl.getBoundingClientRect();
+  const x = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+  const y = Math.min(1, Math.max(0, (clientY - rect.top) / rect.height));
+  motionThrottler.schedule('card-drag', { ...cardDragPayload(card, x, y), active: true });
+}
+
 function applyIncomingMotion(playerId, msg) {
   if (msg.kind === 'hand') {
     markMoving(playerId, msg.data.active);
@@ -457,6 +538,16 @@ function applyIncomingMotion(playerId, msg) {
     markCursorStale(playerId);
   } else if (msg.kind === 'card-lift') {
     setCardLifted(msg.data.cardId, msg.data.active);
+  } else if (msg.kind === 'card-drag') {
+    if (playerId === myId) return; // never render my own drag ghost back at me
+    if (!msg.data.active) {
+      clearTimeout(cardDragTimers.get(playerId));
+      removeCardDragGhost(gameScreenEl, playerId);
+      return;
+    }
+    const card = msg.data.cardId ? resolveVisibleCard(msg.data.cardId) : null;
+    updateCardDragGhost(gameScreenEl, playerId, card, msg.data.x, msg.data.y);
+    markCardDragStale(playerId);
   }
 }
 

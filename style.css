@@ -66,6 +66,21 @@ h2 {
 
 .panel-felt { background: var(--felt); }
 
+/* Visually hides content while keeping it for screen readers - the
+   "Table" heading is now self-evident from the table-surface visual
+   (US-26), but a heading still belongs in the DOM for a11y. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 label {
   display: flex;
   flex-direction: column;
@@ -200,6 +215,23 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   flex-direction: column;
   align-items: center;
   gap: 0.3rem;
+  /* Fan pivot (US-30): rotates from the bottom, like cards actually held
+     in a hand, not around the wrapper's own center. */
+  transform-origin: bottom center;
+}
+
+/* Headroom for the fan's rotation/arc (US-30) so rotated card corners
+   and the lowest dipped card don't get clipped by the container edge.
+   A fan reads as one continuous arc - wrapping a big hand onto a second
+   row (the plain .card-row behavior) broke that into two disconnected-
+   looking rows once rotation was applied, so scroll horizontally
+   instead of wrapping (real cards in a big hand fan out sideways past
+   the edge of your view too, not stack into rows). */
+#hand-area {
+  padding: 0.6rem 0.4rem 0;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: visible;
 }
 
 .hand-card-fd-row {
@@ -227,6 +259,21 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   gap: 0.3rem;
 }
 
+/* Drag cursor affordance (US-28, Smith Sprint 4 close-out finding #1):
+   the only visual hint a mouse user has that a card is draggable at all
+   - hand cards are always draggable, middle-cards only where MOVE_CARD's
+   own authorization allows it (the `[draggable="true"]` attribute
+   selector already tracks that exactly, no separate condition needed). */
+.hand-card,
+.middle-card[draggable='true'] {
+  cursor: grab;
+}
+
+.hand-card:active,
+.middle-card[draggable='true']:active {
+  cursor: grabbing;
+}
+
 .owner-tag {
   font-size: 0.7rem;
   color: var(--muted);
@@ -245,6 +292,14 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .zone:last-child { margin-bottom: 0; }
 
+/* Drop-target affordance (US-28, Smith Gate 1 - Nielsen #1): a zone
+   needs to visibly say "droppable here" while a drag is over it, since
+   native drag-and-drop otherwise gives no feedback at all until release. */
+.zone.zone-drag-over {
+  border-color: var(--accent);
+  background: rgba(79, 157, 255, 0.12);
+}
+
 .zone-name {
   font-size: 0.8rem;
   font-weight: 700;
@@ -261,6 +316,100 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 
 #new-zone-name { flex: 1; min-width: 0; }
+
+/* Top-down table surface (US-26, D18): one visual "table" instead of
+   separate stacked Table/Players panels. Rounded rather than a strict
+   oval/circle so it can still grow to fit a variable amount of zone
+   content (Phase 23 moves personal zones out to seats, which will make
+   this read even more table-like) - seats are positioned as a % of
+   this container regardless of its actual height, so "around the edge"
+   holds up either way. */
+.table-surface {
+  position: relative;
+  /* Scales with player count (--seat-count, set by main.js) so seats
+     have more physical room to spread around as more players join -
+     positions are already percentage-based, so a taller surface directly
+     increases the pixel distance between seats with no math changes.
+     Confirmed necessary, not just theoretical: an 8-player table at a
+     fixed height badly overlapped seat cards on a 390px screen (Smith's
+     Gate 1 density flag for this sprint, caught for real at T26.3). */
+  min-height: clamp(26rem, calc(var(--seat-count, 2) * 3.4rem), 62rem);
+  margin: 0 3rem 2.5rem;
+  padding: 1rem 0.5rem;
+  border-radius: 999px / 12%;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.04), transparent 70%);
+}
+
+/* Shared zones (US-19) stay in a bounded, centered "pot" rather than
+   flowing full-width - personal zones (D17/US-27) sit in a ring around
+   this at a smaller radius than the seats, and without a fixed footprint
+   here the two would grow into each other and physically overlap (a
+   real bug: it broke click-through, not just looked messy - caught by
+   the e2e suite actually clicking a zone button that was covered). */
+#game-deck-area, #table-area {
+  position: relative;
+  max-width: 13rem;
+  margin: 0 auto;
+}
+
+#table-area {
+  max-height: 9rem;
+  overflow-y: auto;
+}
+
+/* Seats (roster rows) positioned around the table surface's edge instead
+   of stacked in a plain list - same content as the pre-redesign roster
+   list, just relocated (Smith Gate 1: WHERE it's drawn changes, not
+   WHAT it shows). */
+.table-surface .roster {
+  position: absolute;
+  inset: 0;
+  display: block;
+  /* The <ul> itself is just a positioning frame spanning the whole
+     surface - without this it silently intercepts clicks meant for
+     zone controls underneath it (a real bug caught by the e2e suite,
+     not just eyeballed). Individual seats opt back in below. */
+  pointer-events: none;
+}
+
+.table-surface .roster li.seat {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: max-content;
+  max-width: 8.5rem;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.8rem;
+  margin: 0;
+  z-index: 2;
+  pointer-events: auto;
+}
+
+/* The viewer's own seat needs an explicit marker beyond position alone
+   (Smith Gate 1) - the "You" text tag is the actual requirement; this
+   border is a secondary visual reinforcement, not the only signal. */
+.table-surface .roster li.seat-you {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+/* Personal zones (D17, US-27) - positioned "in front of" their owner's
+   seat, same absolute-overlay pattern as #game-roster. */
+#seat-zones {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.seat-zone {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: max-content;
+  max-width: 9rem;
+  margin: 0;
+  z-index: 1;
+  pointer-events: auto;
+}
 
 /* Visual deck stack (US-20) instead of a bare "N cards left" line. */
 .deck-area {
@@ -445,4 +594,16 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   padding: 0.05rem 0.3rem;
   white-space: nowrap;
   color: var(--text);
+}
+
+/* Live card-drag ghost (US-29, D19) - same normalized-position/transition
+   pattern as .remote-cursor, sized to actually show the card it carries
+   (real face or anonymous back, decided by the sender - see D19). */
+.card-drag-ghost {
+  position: absolute;
+  z-index: 6;
+  transform: translate(-50%, -50%) scale(0.8);
+  pointer-events: none;
+  transition: left 0.08s linear, top 0.08s linear;
+  opacity: 0.85;
 }

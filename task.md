@@ -162,7 +162,7 @@ Phase 6-11: DONE — all phases complete.
 
 ---
 
-## Sprint 3 ("zones, presence, hand tools") — IN PROGRESS
+## Sprint 3 ("zones, presence, hand tools") — SHIPPED 2026-08-15
 
 Covers US-19..25. Architecture: `docs/ARCHITECTURE.md` D12-D16. Bigger
 than sprints 1-2, so more phases; includes a **dedicated bug-fix phase**
@@ -301,3 +301,102 @@ Phase 17: Done
 Phase 18: Done
 Phase 19: Done
 Phase 20: Done — Smith re-tested and closed the report
+
+---
+
+## Sprint 4 ("top-down table redesign") — IN PROGRESS
+
+Covers US-26..30. Architecture: `docs/ARCHITECTURE.md` D17-D19. Splits
+data (21), structural layout (22-23), interaction (24-25), verification
+(26), and a **dedicated bug-fix phase** (27) — the Phase 20 pattern that
+worked last sprint, carried forward proactively rather than waiting for
+a 3rd retro to ask for it again.
+
+### Phase 21 — Personal zone data model ✅ DONE
+- [x] T21.1 `src/state.js`: `zones` entries gain optional `ownerId`;
+      `JOIN` auto-creates one personal zone per joining player (reusing
+      `CREATE_ZONE`'s zone-construction logic internally, not duplicated)
+- [x] T21.2 `tests/state.test.js`: personal zone created on JOIN, has the
+      right `ownerId`, behaves exactly like any other zone for
+      PLAY/MOVE_CARD/REVEAL/PICKUP (D17)
+Covers: US-27 (data layer).
+
+### Phase 22 — Top-down table layout + seating ✅ DONE
+- [x] T22.1 `src/ui.js`/`src/main.js`: per-viewer seat rotation (viewer
+      always seated at the bottom, others distributed around the rest of
+      the table in join order) — pure presentation, D18
+- [x] T22.2 `index.html`/`style.css`: table drawn as one visual surface
+      with seats around its edge; explicit "You" marker on the viewer's
+      own seat (Smith Gate 1)
+Covers: US-26.
+
+### Phase 23 — Personal zones on the table + hand spread ✅ DONE
+- [x] T23.1 `src/ui.js`: render each player's personal zone at their
+      seat (D17's `ownerId`); shared zones stay in the table's center
+- [x] T23.2 `src/ui.js`/`style.css`: hand rendered as a fanned/overlapping
+      spread (US-30) — cards stay individually identifiable (rank+suit
+      visible) and individually tappable at the existing ≥44×44px floor
+      (Smith Gate 1)
+Covers: US-27 (UI layer), US-30.
+
+### Phase 24 — Drag-and-drop play and move ✅ DONE
+- [x] T24.1 `src/ui.js`/`src/main.js`: dragging a hand card onto a zone
+      plays it there (`PLAY`); dragging a table card onto another zone
+      moves it (`MOVE_CARD`); existing tap-to-play and "Move to…"
+      dropdown keep working unchanged (US-28)
+- [x] T24.2 `src/ui.js`/`style.css`: valid drop targets highlight while a
+      drag is over them, revert otherwise (Smith Gate 1) — invalid drops
+      are a no-op, card returns to its origin
+Covers: US-28.
+
+### Phase 25 — Live card-drag broadcast ✅ DONE
+- [x] T25.1 `src/main.js`: new `'card-drag'` motion kind on the existing
+      throttled channel — `cardId` included iff `faceUp === true` at
+      drag-start (D19's privacy rule), omitted otherwise
+- [x] T25.2 `src/ui.js`: render the live ghost (real face if `cardId`
+      present, anonymous back otherwise) at the broadcast position on
+      every other client; TTL-based cleanup on an incomplete/dropped drag
+      (reuses the existing cursor staleness pattern)
+Covers: US-29.
+
+### Phase 26 — e2e verification (final implementation phase) ✅ DONE
+- [x] T26.1 `tests/e2e.smoke.mjs`: personal zones on JOIN, drag-and-drop
+      play/move (dispatched as real `DragEvent`s per the Sprint 3
+      headless-Chromium lesson, not raw mouse synthesis), drop-target
+      highlight state
+- [x] T26.2 `tests/e2e.smoke.mjs`: card-drag broadcast privacy — a
+      not-yet-public card shows as anonymous to another client during the
+      drag, a public card shows its real face; ghost clears on an
+      incomplete drag (done test-first in Phase 25, already in the suite)
+- [x] T26.3 Full regression (`npm test` + `npm run test:e2e`, stable
+      multi-run) + mobile/desktop screenshot pass **at both a 2-player
+      table and Smith's flagged ~8-player density case** — the risk was
+      real (8 players badly overlapped on a 390px screen); applied a
+      genuine fix (table surface scales with player count, smaller seat
+      cards) — confirmed improved but **not fully resolved at 5+ players
+      on mobile**, a real remaining geometric constraint (44px
+      score-button touch targets leave no more room to shrink). Flagged
+      explicitly for Smith's close-out, not glossed over.
+Covers: full-sprint verification.
+
+### Phase 27 — Dedicated bug-fix phase
+Populated from Smith's Stage-3 close-out test (`agents/smith.docs/
+uat-report-sprint4.md`). Finding #2 (5+-player mobile density) is
+deliberately NOT included here — Smith/Trin/Morpheus agreed it needs a
+real compact-seat design pass, not a rushed close-out fix, and it's
+escalated to Cypher's backlog for proper sprint scoping instead.
+- [x] T27.1 `style.css`: draggable card wrappers (`.hand-card`,
+      `.middle-card` where draggable) get `cursor: grab`; `cursor:
+      grabbing` while a drag is actually in progress (toggle a class on
+      `dragstart`/`dragend`) — the only visual cue a mouse user has that
+      dragging is possible at all (Smith Gate-close finding #1).
+Covers: Sprint 4 close-out bug fix (US-28).
+
+### Sprint 4 status
+Phase 21: Done
+Phase 22: Done
+Phase 23: Done
+Phase 24: Done
+Phase 25: Done
+Phase 26: Done
+Phase 27: Done — Smith re-tested and closed the report; finding #2 (density) escalated to Cypher's backlog, not fixed here

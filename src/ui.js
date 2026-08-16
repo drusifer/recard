@@ -1,3 +1,5 @@
+import { seatPosition } from './seating.js';
+
 const SUIT_SYMBOL = { clubs: '♣', diamonds: '♦', hearts: '♥', spades: '♠' };
 const RED_SUITS = new Set(['diamonds', 'hearts']);
 
@@ -66,17 +68,33 @@ function ownerTag(name) {
  * buttons write to (D14) - sorting and dragging share one source of
  * truth instead of fighting each other (Smith Gate 1).
  */
-export function renderHand(container, cards, { onPlay, onPlayFacedown, onHandMotion, onReorder } = {}) {
+export function renderHand(container, cards, { onPlay, onPlayFacedown, onHandMotion, onReorder, onCardDrag } = {}) {
   container.innerHTML = '';
-  for (const card of cards) {
+  cards.forEach((card, i) => {
     const wrapper = document.createElement('div');
     wrapper.className = 'hand-card';
+    // US-30: a fanned spread via rotation + a slight arc, not horizontal
+    // overlap - overlap would shrink covered cards' tap targets below
+    // the 44px floor (Smith Gate 1), rotation/arc alone doesn't touch
+    // hit-testing at all, so every card stays fully, individually
+    // tappable no matter how many are in hand.
+    const center = (cards.length - 1) / 2;
+    const offset = i - center;
+    wrapper.style.transform = `rotate(${offset * 4}deg) translateY(${Math.abs(offset) * 0.35}rem)`;
     wrapper.draggable = true;
     wrapper.addEventListener('dragstart', (e) => {
       e.dataTransfer.setData('text/plain', card.id);
       onHandMotion?.(true);
     });
-    wrapper.addEventListener('dragend', () => onHandMotion?.(false));
+    // US-29/D19: live position while actually dragging (not just the
+    // start/end boolean onHandMotion already sends) - card is a plain
+    // hand card with no `faceUp` field, which `cardDragPayload` treats
+    // the same as `faceUp: false` (never reveals identity), by design.
+    wrapper.addEventListener('drag', (e) => onCardDrag?.(card, e.clientX, e.clientY));
+    wrapper.addEventListener('dragend', () => {
+      onHandMotion?.(false);
+      onCardDrag?.(null, 0, 0); // signals "stopped" - see main.js's onCardDrag
+    });
     wrapper.addEventListener('dragover', (e) => e.preventDefault());
     wrapper.addEventListener('drop', (e) => {
       e.preventDefault();
@@ -114,7 +132,7 @@ export function renderHand(container, cards, { onPlay, onPlayFacedown, onHandMot
     }
 
     container.appendChild(wrapper);
-  }
+  });
 }
 
 /**
@@ -157,7 +175,7 @@ function renderZoneCards(
   container,
   zone,
   allZones,
-  { resolveOwnerName, onReveal, onPickup, onMoveCard, onCardLift } = {},
+  { resolveOwnerName, onReveal, onPickup, onMoveCard, onCardLift, onCardDrag } = {},
 ) {
   container.innerHTML = '';
   for (const card of zone.cards) {
@@ -171,6 +189,26 @@ function renderZoneCards(
       wrapper.addEventListener('pointerdown', () => onCardLift(card.id, true));
       wrapper.addEventListener('pointerup', () => onCardLift(card.id, false));
       wrapper.addEventListener('pointerleave', () => onCardLift(card.id, false));
+    }
+
+    // US-28: draggable exactly where MOVE_CARD's own authorization would
+    // allow a drop to succeed - a visible card (already face-up, or my
+    // own still-hidden private one) or a redacted-but-unowned card
+    // (shared face-down, movable by anyone per US-19 "put or take").
+    // Someone else's still-hidden private card gets no controls at all
+    // today (see below) and stays non-draggable to match.
+    if (onMoveCard && (!card.faceDown || card.owner === null)) {
+      wrapper.draggable = true;
+      wrapper.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', card.id);
+      });
+      // US-29/D19: live position while dragging. A redacted placeholder
+      // (`card.faceDown: true`) has no `faceUp` field either, so
+      // `cardDragPayload` correctly treats it the same as hidden - even
+      // a blind "put or take" move of a shared face-down card never
+      // reveals its identity mid-drag.
+      wrapper.addEventListener('drag', (e) => onCardDrag?.(card, e.clientX, e.clientY));
+      wrapper.addEventListener('dragend', () => onCardDrag?.(null, 0, 0));
     }
 
     if (card.faceDown) {
@@ -231,25 +269,90 @@ function renderZoneCards(
 }
 
 /**
+ * Builds one zone's sub-panel (name/count heading + its cards) - shared
+ * by `renderZones` (shared zones) and `renderSeatZones` (personal zones)
+ * so the drop-target wiring below only needs to exist once.
+ *
+ * US-28: dropping a dragged card here plays it (from hand) or moves it
+ * (from another zone) - `opts.onDropCard(cardId, zone.id)` does the
+ * PLAY-vs-MOVE_CARD branching (main.js knows where the card currently
+ * lives, this file doesn't need to). Additive: tap-to-play and the
+ * "Move to…" dropdown are untouched, this is one more way in, not a
+ * replacement (Smith Gate 1). The zone highlights while a drag is over
+ * it (Smith Gate 1: Nielsen #1, drag needs a droppable-here affordance)
+ * and reverts on drop/dragleave; dropping somewhere invalid is naturally
+ * a no-op since nothing here ever moves a DOM node directly - only a
+ * successful `onDropCard` dispatch (and the resulting re-render) changes
+ * what's on screen.
+ */
+function renderZonePanel(zone, allZones, opts) {
+  const zoneEl = document.createElement('div');
+  zoneEl.className = 'zone';
+
+  const heading = document.createElement('div');
+  heading.className = 'zone-name';
+  heading.textContent = `${zone.name} (${zone.cards.length})`;
+  zoneEl.appendChild(heading);
+
+  const row = document.createElement('div');
+  row.className = 'card-row';
+  zoneEl.appendChild(row);
+  renderZoneCards(row, zone, allZones, opts);
+
+  if (opts.onDropCard) {
+    zoneEl.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      zoneEl.classList.add('zone-drag-over');
+    });
+    zoneEl.addEventListener('dragleave', () => zoneEl.classList.remove('zone-drag-over'));
+    zoneEl.addEventListener('drop', (e) => {
+      e.preventDefault();
+      zoneEl.classList.remove('zone-drag-over');
+      const cardId = e.dataTransfer.getData('text/plain');
+      if (cardId) opts.onDropCard(cardId, zone.id);
+    });
+  }
+
+  return zoneEl;
+}
+
+/**
  * Renders every zone as its own labeled sub-panel (US-19, D12) - zone
  * names/counts are always shown, per Smith's Gate 1 requirement that a
- * zone never be identifiable only by position.
+ * zone never be identifiable only by position. `allZones` (defaults to
+ * `zones`) is what the "Move to…" dropdown offers as destinations - the
+ * caller passes the *full*, unfiltered zone list here when `zones` has
+ * been filtered down to just the shared ones (D17/US-27: personal zones
+ * render separately via `renderSeatZones`, but must still appear as
+ * valid move-to targets).
  */
-export function renderZones(container, zones, opts = {}) {
+export function renderZones(container, zones, opts = {}, allZones = zones) {
   container.innerHTML = '';
   for (const zone of zones) {
-    const zoneEl = document.createElement('div');
-    zoneEl.className = 'zone';
+    container.appendChild(renderZonePanel(zone, allZones, opts));
+  }
+}
 
-    const heading = document.createElement('div');
-    heading.className = 'zone-name';
-    heading.textContent = `${zone.name} (${zone.cards.length})`;
-    zoneEl.appendChild(heading);
+/**
+ * Personal zones (D17, US-27) render "in front of" their owning
+ * player's seat instead of in the flat shared-zone stack - same
+ * `seatPosition()` geometry `renderRoster`'s seats use, at a smaller
+ * radius so they sit toward the table's center rather than its edge.
+ * `seatedPlayers` must be in the same seat order used to render the
+ * roster (viewer first, D18), so a zone lands at the SAME seat its
+ * owner's roster entry is drawn at.
+ */
+export function renderSeatZones(container, personalZones, allZones, seatedPlayers, opts = {}) {
+  container.innerHTML = '';
+  for (const zone of personalZones) {
+    const seatIndex = seatedPlayers.findIndex((p) => p.id === zone.ownerId);
+    if (seatIndex === -1) continue; // owner not in the current roster (shouldn't happen) - skip defensively
 
-    const row = document.createElement('div');
-    row.className = 'card-row';
-    zoneEl.appendChild(row);
-    renderZoneCards(row, zone, zones, opts);
+    const zoneEl = renderZonePanel(zone, allZones, opts);
+    zoneEl.classList.add('seat-zone');
+    const { leftPct, topPct } = seatPosition(seatIndex, seatedPlayers.length, 26);
+    zoneEl.style.left = `${leftPct}%`;
+    zoneEl.style.top = `${topPct}%`;
 
     container.appendChild(zoneEl);
   }
@@ -301,15 +404,32 @@ function renderMiniHand(container, count) {
   }
 }
 
-export function renderRoster(container, players, { movingIds, scores, onAdjustScore, myId, passed } = {}) {
+
+/**
+ * `seated: true` (US-26, D18) positions each player absolutely around
+ * the table surface instead of stacking them in a plain list - same
+ * per-player info as before (Smith Gate 1: this redesign changes WHERE
+ * it's drawn, not what it shows), plus an explicit "You" marker on the
+ * viewer's own seat (Smith Gate 1: position alone is ambiguous).
+ * `players` must already be in seat order (viewer first) when seated.
+ */
+export function renderRoster(container, players, { movingIds, scores, onAdjustScore, myId, passed, seated } = {}) {
   container.innerHTML = '';
-  for (const p of players) {
+  players.forEach((p, i) => {
     const li = document.createElement('li');
     li.className = `roster-player roster-${p.connection}`;
+    if (seated) {
+      const { leftPct, topPct } = seatPosition(i, players.length);
+      li.style.left = `${leftPct}%`;
+      li.style.top = `${topPct}%`;
+      li.classList.add('seat');
+      if (p.id === myId) li.classList.add('seat-you');
+    }
     const count = typeof p.handCount === 'number' ? ` (${p.handCount} cards)` : '';
     const moving = movingIds?.has(p.id) ? ' ✋ organizing hand' : '';
     const passedTag = passed?.[p.id] ? ' 🙅 Passed' : '';
-    li.append(`${p.name} - ${p.connection}${count}${moving}${passedTag}`);
+    const youTag = seated && p.id === myId ? ' 🧑 You' : '';
+    li.append(`${p.name} - ${p.connection}${count}${moving}${passedTag}${youTag}`);
 
     if (p.id !== myId && typeof p.handCount === 'number') {
       const miniHandEl = document.createElement('div');
@@ -338,7 +458,7 @@ export function renderRoster(container, players, { movingIds, scores, onAdjustSc
     }
 
     container.appendChild(li);
-  }
+  });
 }
 
 /**
@@ -400,6 +520,33 @@ export function updateRemoteCursor(container, playerId, name, x, y) {
 
 export function removeRemoteCursor(container, playerId) {
   container.querySelector(`[data-cursor-id="${CSS.escape(playerId)}"]`)?.remove();
+}
+
+/**
+ * Live card-drag ghost (US-29, D19): same normalized-position pattern as
+ * the remote cursor, but shows an actual card - its real face if `card`
+ * is given (already resolved by the caller to a full `{id,rank,suit}`
+ * object, only ever done for a card that's genuinely public), or a
+ * generic anonymous back if `card` is `null` (still-hidden to this
+ * viewer - D19's privacy rule, enforced by the sender never including a
+ * resolvable id in the first place, not by this function).
+ */
+export function updateCardDragGhost(container, playerId, card, x, y) {
+  let el = container.querySelector(`[data-card-drag-id="${CSS.escape(playerId)}"]`);
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'card-drag-ghost';
+    el.dataset.cardDragId = playerId;
+    container.appendChild(el);
+  }
+  el.innerHTML = '';
+  el.appendChild(card ? cardEl(card, { disabled: true }) : cardBackEl(null));
+  el.style.left = `${x * 100}%`;
+  el.style.top = `${y * 100}%`;
+}
+
+export function removeCardDragGhost(container, playerId) {
+  container.querySelector(`[data-card-drag-id="${CSS.escape(playerId)}"]`)?.remove();
 }
 
 export function renderBanner(container, message) {

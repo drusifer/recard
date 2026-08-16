@@ -28,8 +28,31 @@
 ### Task Description
 Sprint review gates for the Recard P2P card game sprint.
 
+### Progress — v1.3 ("top-down table redesign")
+- [x] Gate 2: **Approved.** D19's privacy proof (cardId iff faceUp===true
+      at drag-start) is airtight given the existing MOVE_CARD
+      authorization rule - checked the logic myself rather than taking it
+      on faith, and it holds: nothing draggable at all can be visible to
+      a receiver but not the dragger. One non-blocking note for Neo/Trin:
+      cursor's existing throttle rate is a reasonable starting point, but
+      a larger card-sized ghost may read as choppier than a small cursor
+      dot at the same update rate - verify visually during Phase Bloop
+      and adjust the rate only if it actually looks bad, not
+      preemptively.
+- [x] Gate 1: **Approved with 4 substantive amendments** to
+      docs/USER_STORIES.md v1.3 backlog (US-26..30): explicit "You" seat
+      marker + 8-player density check (US-26), drop-target hover
+      highlighting (US-28, Nielsen #1 - drag has no affordance without
+      it), the anonymized-card-back broadcast must follow the exact same
+      zone-not-slot privacy granularity already set for cursor (US-29 -
+      this is a new channel carrying an actual card silhouette, deserves
+      its own explicit restatement not just inherited by association),
+      and fanned hand cards must stay individually identifiable, not just
+      individually tappable (US-30). This sprint carries real density AND
+      privacy risk simultaneously (a first for this project) - will watch
+      both closely at close-out.
+
 ### Progress
-- [x] Gate 1: reviewed + approved-with-notes docs/USER_STORIES.md
 - [x] Gate 2: approved docs/ARCHITECTURE.md, conditional on explicit
       "Host disconnected - session ended" message (added as D6 condition)
 - [x] Sprint-close `*user test`: ran full flow via Playwright screenshots
@@ -89,6 +112,26 @@ None yet
       scenario: clean now, count shown once, real spacing. Report closed,
       approved for retro. `agents/smith.docs/uat-report-sprint3.md`.
 
+- [x] Sprint 3: fully closed out (implementation + bug-fix + re-test + retro).
+
+### Progress — v1.3 ("top-down table redesign") Stage-3 close-out test
+- [x] Ran the real app at 390px and 1280px, host+guest over real WebRTC.
+      **2 findings**: (1) draggable cards give zero cursor affordance
+      (`cursor: auto`, no `grab`/`grabbing`) on a mouse-driven client -
+      real discoverability gap for this sprint's headline drag feature,
+      medium severity, small contained fix. (2) re-confirmed the
+      5+-player mobile density finding Neo/Trin already measured -
+      independently verified their numbers hold, high severity (hits the
+      CORE redesign at an ordinary group size, not an edge case), but
+      recommending against a rushed Phase 27 fix since the team already
+      correctly identified this needs a real compact-seat design pass -
+      escalating to Cypher's backlog for proper scoping instead of
+      squeezing a second "improved not resolved" attempt into this
+      sprint's closing hours. Full report:
+      `agents/smith.docs/uat-report-sprint4.md`. Everything else
+      (personal zones, drag mechanics once discovered, drag-broadcast
+      privacy, You marker, hand fan) tested clean.
+
 ### Blockers
 None
 
@@ -97,14 +140,21 @@ None yet
 
 ## Next Steps
 ### Immediate Next Action
-Sprint 3 fully closed out (implementation + bug-fix + re-test). Handing
-to Mouse for the retro.
+Handed to Trin to triage finding #1 (cursor affordance, recommend
+Phase 27). Finding #2 (density) recommended for Cypher's backlog, not a
+close-out fix phase.
+
+- [x] Re-tested finding #1 with the exact original repro: both cursor
+      checks now report `grab`. Report closed, approved for retro.
+      Finding #2 intentionally left open in the report, tracked in
+      Cypher's backlog per the agreed disposition (not a close-out item).
 
 ### Waiting On
 Nothing.
 
 ### Planned Work
-- [ ] Next sprint's Gate 1, whenever Cypher opens one.
+- [ ] Next sprint's Gate 1, whenever Cypher opens one - including
+      whatever sprint eventually picks up the density backlog item.
 
 ---
-*Last updated: 2026-08-15 21:29*
+*Last updated: 2026-08-15 22:53*

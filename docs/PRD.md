@@ -162,6 +162,52 @@ hand-slot-level) granularity boundary from US-22's Open Question 2 so a
 future implementer doesn't accidentally leak hand-slot positions that
 could aid inferring card identity via timing/position side-channels.
 
+## Feasibility Flag → Morpheus (5): Top-Down Table Redesign
+New requirement (2026-08-15, post-v1.2-launch, see `docs/USER_STORIES.md`
+"v1.3 backlog" US-26..30). Three related architecture questions, each
+with a product-level proposal for Morpheus to evaluate/own the technical
+shape of:
+
+**Per-seat personal zones:** extend the existing `zones` list (D12) so a
+zone can optionally carry an `ownerId: playerId`. `JOIN` auto-creates one
+such zone for the joining player (`CREATE_ZONE`'s existing logic, called
+internally, not a new reducer case) — it's a zone like any other for
+`PLAY`/`MOVE_CARD`/`REVEAL`/`PICKUP` purposes, `ownerId` only matters for
+UI placement (drawn at that player's seat) and for marking it
+non-deletable. Need Morpheus to confirm this is additive (existing
+zone-consumers ignore a field they don't know about) rather than a
+breaking change to D12.
+
+**Per-viewer relative seating:** each client computes its own seating
+order locally from the existing roster (viewer always "at the bottom",
+others distributed around the rest) — this is pure presentation, reads
+`state.players` the same way `renderRoster` already does today, needs no
+new state field or protocol message. Need Morpheus to confirm there's no
+hidden coupling (e.g. anything that currently assumes roster order ==
+visual/seat order) before this ships.
+
+**Live card-drag broadcast (extends D13, corrects its scope):** D13
+deliberately scoped "card motion" down to a boolean lift cue, reasoning
+that full live-position sync "isn't what the table feels live actually
+needs." The user has now explicitly asked for the fuller version (true
+real-time position while dragging, best-effort/approximate accepted) —
+this restores the PRD's original Principle 6 rather than contradicting
+D13's build-cost reasoning; the cost tradeoff the user is accepting has
+changed. Proposed shape: extend the existing best-effort motion channel
+(D4, already generic `kind`/`data`, already throttled/coalesced) with a
+new kind carrying `{originId, cardId-or-null, x, y}` — `cardId` is
+included only when the dragged card is already visible to *every*
+possible receiver (face-up on the table); for a card starting in a
+private hand or a still-hidden face-down zone card, `cardId` is omitted
+and every receiver renders a generic anonymous back at the broadcast
+position, so the existing per-viewer redaction invariant (D7) holds
+continuously through the drag, not just at the committed end state. The
+actual `PLAY`/`MOVE_CARD` action on drop remains the sole source of
+truth, exactly as today — this channel is presentation-only and
+best-effort, matching D4's existing reliable-state/best-effort-motion
+split. Need Morpheus to confirm the throttle rate used for cursor (US-22)
+is adequate for this too, or whether card-drag warrants its own rate.
+
 ## Open Questions
 1. Max players per table? (assume 2–8 until told otherwise). **Min
    players resolved 2026-08-15: 1 player must be supported**, for
