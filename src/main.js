@@ -2,9 +2,21 @@ import { Session } from './session.js';
 import { createInitialState, reduce, viewFor } from './state.js';
 import { makeStateMessage, makeMotionMessage, createMotionThrottler } from './protocol.js';
 import { buildJoinUrl, renderShareCode } from './qrcode.js';
-import { renderHand, renderTable, renderRoster, renderRulesPanel, renderBanner, showScreen } from './ui.js';
+import {
+  renderHand,
+  renderZones,
+  renderRoster,
+  renderRulesPanel,
+  renderBanner,
+  renderDeck,
+  showScreen,
+  updateRemoteCursor,
+  removeRemoteCursor,
+  setCardLifted,
+} from './ui.js';
 import { PRESETS } from './presets.js';
 import { RULES_REFERENCE } from './rulesReference.js';
+import { reconcileOrder, sortByRank, sortBySuit } from './handOrder.js';
 
 const MOTION_FLUSH_MS = 50;
 const MOTION_TTL_MS = 2000; // auto-clear a stale "organizing hand" cue if the end-event is dropped
@@ -23,6 +35,22 @@ const gameRosterEl = document.getElementById('game-roster');
 const drawBtn = document.getElementById('draw-btn');
 const resetBtn = document.getElementById('reset-btn');
 const resetScoresBtn = document.getElementById('reset-scores-btn');
+const dealMoreBtn = document.getElementById('deal-more-btn');
+const dealMoreCountEl = document.getElementById('deal-more-count');
+const passToggleBtn = document.getElementById('pass-toggle-btn');
+const sortRankBtn = document.getElementById('sort-rank-btn');
+const sortSuitBtn = document.getElementById('sort-suit-btn');
+
+let handOrderIds = []; // D14: persists hand display order across state updates
+
+// D14: reconciles handOrderIds against the current hand (existing cards
+// keep position, new ones append, gone ones drop) so sort buttons and
+// manual drag-reorder share one source of truth instead of fighting.
+function orderedHand(myHand) {
+  handOrderIds = reconcileOrder(handOrderIds, myHand);
+  const byId = new Map(myHand.map((c) => [c.id, c]));
+  return handOrderIds.map((id) => byId.get(id));
+}
 
 let role = null; // 'host' | 'join'
 let session = null;
@@ -75,6 +103,27 @@ presetSelect.addEventListener('change', () => {
 const motionThrottler = createMotionThrottler();
 const movingIds = new Set();
 const moveTimers = new Map();
+const cursorTimers = new Map();
+
+// --- Live cursor (US-22, D13): while the pointer is down anywhere on
+// the game screen, broadcast its position normalized to that screen's
+// own bounding box (0-1 on each axis) - the only value that means the
+// same thing across devices with different viewport sizes. ---
+const gameScreenEl = document.getElementById('screen-game');
+let pointerActive = false;
+gameScreenEl.addEventListener('pointerdown', () => {
+  pointerActive = true;
+});
+window.addEventListener('pointerup', () => {
+  pointerActive = false;
+});
+gameScreenEl.addEventListener('pointermove', (e) => {
+  if (!pointerActive || sessionEnded) return;
+  const rect = gameScreenEl.getBoundingClientRect();
+  const x = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+  const y = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+  motionThrottler.schedule('cursor', { x, y });
+});
 
 // --- Landing ---
 document.getElementById('show-host').addEventListener('click', () => showScreen(screens, 'host'));
@@ -232,9 +281,9 @@ document.getElementById('join-btn').addEventListener('click', () => {
     // (Smith Gate-close finding #1 — don't leave any control looking
     // live once the session is actually over).
     if (latestView) {
-      renderHand(handAreaEl, latestView.myHand, {});
+      renderHand(handAreaEl, orderedHand(latestView.myHand), {});
       const nameById = new Map(latestView.players.map((p) => [p.id, p.id === myId ? 'You' : p.name]));
-      renderTable(tableAreaEl, latestView.table, {
+      renderZones(tableAreaEl, latestView.zones, {
         resolveOwnerName: (ownerId) => nameById.get(ownerId) ?? ownerId,
       });
     }
@@ -254,31 +303,44 @@ function renderRosterOnly() {
   let players = rosterWithCounts(view);
   if (sessionEnded) players = players.map((p) => ({ ...p, connection: 'disconnected' }));
   const opts = {
-    deckCount: view.deckCount,
     movingIds,
     scores: view.scores,
     onAdjustScore: sessionEnded ? null : adjustScore,
+    myId,
+    passed: view.passed,
   };
   const hostRosterEl = document.getElementById('host-roster');
-  if (hostRosterEl) renderRoster(hostRosterEl, players, opts);
+  if (hostRosterEl) {
+    renderRoster(hostRosterEl, players, opts);
+    renderDeck(document.getElementById('host-deck-area'), view.deckCount);
+  }
   renderRoster(gameRosterEl, players, opts);
+  renderDeck(document.getElementById('game-deck-area'), view.deckCount);
+  passToggleBtn.textContent = view.passed?.[myId] ? 'Unpass' : 'Pass';
 }
 
 function renderGameFromView(view) {
   const nameById = new Map(view.players.map((p) => [p.id, p.id === myId ? 'You' : p.name]));
 
-  renderHand(handAreaEl, view.myHand, {
+  renderHand(handAreaEl, orderedHand(view.myHand), {
     onPlay: (card) => playCard(card.id, 'public'),
     onPlayFacedown: (card, visibility) => playCard(card.id, visibility),
     onHandMotion: (active) => motionThrottler.schedule('hand', { active }),
+    onReorder: (newOrderIds) => {
+      handOrderIds = newOrderIds;
+    },
   });
-  renderTable(tableAreaEl, view.table, {
+  renderZones(tableAreaEl, view.zones, {
     resolveOwnerName: (ownerId) => nameById.get(ownerId) ?? ownerId,
     onReveal: (cardId) => revealCard(cardId),
     onPickup: (cardId) => pickupCard(cardId),
+    onMoveCard: (cardId, toZoneId) => moveCard(cardId, toZoneId),
+    onCardLift: (cardId, active) => motionThrottler.schedule('card-lift', { cardId, active }),
   });
   resetBtn.hidden = role !== 'host';
   resetScoresBtn.hidden = role !== 'host';
+  dealMoreBtn.hidden = role !== 'host';
+  dealMoreCountEl.hidden = role !== 'host'; // no orphaned input once its button is hidden
   renderRosterOnly();
 }
 
@@ -300,10 +362,58 @@ function pickupCard(cardId) {
   else session.send({ type: 'action', action: { type: 'PICKUP', cardId } });
 }
 
+function moveCard(cardId, toZoneId) {
+  if (sessionEnded) return;
+  if (role === 'host') dispatch({ type: 'MOVE_CARD', playerId: myId, cardId, toZoneId });
+  else session.send({ type: 'action', action: { type: 'MOVE_CARD', cardId, toZoneId } });
+}
+
+document.getElementById('create-zone-btn').addEventListener('click', () => {
+  if (sessionEnded) return;
+  const nameInput = document.getElementById('new-zone-name');
+  const name = nameInput.value.trim();
+  if (!name) return; // Smith Gate 1: zones need a real name, no silent auto-numbering
+  if (role === 'host') dispatch({ type: 'CREATE_ZONE', name });
+  else session.send({ type: 'action', action: { type: 'CREATE_ZONE', name } });
+  nameInput.value = '';
+});
+
 drawBtn.addEventListener('click', () => {
   if (sessionEnded) return;
   if (role === 'host') dispatch({ type: 'DRAW', playerId: myId });
   else session.send({ type: 'action', action: { type: 'DRAW' } });
+});
+
+// --- Hand sort (US-23, D14): local-only, never broadcast. Writes into
+// the same handOrderIds that manual drag-reorder writes into, so the two
+// never fight (Smith Gate 1). ---
+sortRankBtn.addEventListener('click', () => {
+  const view = currentView();
+  if (!view) return;
+  handOrderIds = sortByRank(view.myHand);
+  renderGameFromView(view);
+});
+sortSuitBtn.addEventListener('click', () => {
+  const view = currentView();
+  if (!view) return;
+  handOrderIds = sortBySuit(view.myHand);
+  renderGameFromView(view);
+});
+
+// --- Deal More (US-24): host-only, adds to existing hands without a
+// reset. Deliberately a different label/section/style than "Deal &
+// Start" so a mid-game host can't mis-tap into a reset (Smith Gate 1). ---
+dealMoreBtn.addEventListener('click', () => {
+  if (sessionEnded) return;
+  const cardsPerPlayer = Number(dealMoreCountEl.value);
+  dispatch({ type: 'DEAL_MORE', cardsPerPlayer });
+});
+
+// --- Pass marker (US-25): self-toggle only, like US-13's precedent. ---
+passToggleBtn.addEventListener('click', () => {
+  if (sessionEnded) return;
+  if (role === 'host') dispatch({ type: 'TOGGLE_PASS', playerId: myId });
+  else session.send({ type: 'action', action: { type: 'TOGGLE_PASS' } });
 });
 
 // --- Motion (US-11): best-effort, cosmetic only. See protocol.js/ARCHITECTURE.md D4. ---
@@ -324,10 +434,30 @@ function markMoving(playerId, active) {
   }
 }
 
+function resolvePlayerName(playerId) {
+  const view = currentView();
+  return view?.players.find((p) => p.id === playerId)?.name ?? playerId;
+}
+
+function markCursorStale(playerId) {
+  clearTimeout(cursorTimers.get(playerId));
+  cursorTimers.set(
+    playerId,
+    setTimeout(() => removeRemoteCursor(gameScreenEl, playerId), MOTION_TTL_MS),
+  );
+}
+
 function applyIncomingMotion(playerId, msg) {
-  if (msg.kind !== 'hand') return;
-  markMoving(playerId, msg.data.active);
-  renderRosterOnly();
+  if (msg.kind === 'hand') {
+    markMoving(playerId, msg.data.active);
+    renderRosterOnly();
+  } else if (msg.kind === 'cursor') {
+    if (playerId === myId) return; // never render my own cursor back at me
+    updateRemoteCursor(gameScreenEl, playerId, resolvePlayerName(playerId), msg.data.x, msg.data.y);
+    markCursorStale(playerId);
+  } else if (msg.kind === 'card-lift') {
+    setCardLifted(msg.data.cardId, msg.data.active);
+  }
 }
 
 function relayMotion(fromId, msg) {

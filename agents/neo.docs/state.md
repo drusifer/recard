@@ -147,6 +147,55 @@ None yet
       card from earlier in the flow) - fixed, not implementation bugs.
       41/41 unit + e2e 3/3 stable runs, zero v1 regressions.
 
+### Sprint 3 ("zones, presence, hand tools") in progress
+- [x] Phase 12 (T12.1-T12.3): src/state.js zones model — CREATE_ZONE,
+      MOVE_CARD (auth mirrors REVEAL), PLAY+optional zoneId,
+      REVEAL/PICKUP search all zones by globally-unique card id (zero
+      signature change). RESET preserves zone structure, clears cards
+      only. 12 new tests, 49/49 total, first-try pass. Kept e2e green via
+      a transitional `view.table` alias — confirmed working, `npm run
+      test:e2e` unchanged/green with zero UI code touched yet.
+- [x] Trin UAT phase 12 PASS, Morpheus review PASS
+- [x] Phase 13 (T13.1-T13.3): DEAL_MORE (factored `dealCards()` shared
+      helper out of DEAL rather than duplicating round-robin logic),
+      pass marker (state.passed, TOGGLE_PASS, RESET clears passed but
+      not scores - regression-tested that divergence explicitly). 6 new
+      tests, 55/55 total, first try. e2e still green.
+- [x] Trin UAT phase 13 PASS, Morpheus review PASS
+- [x] Phase 14 (T14.1-T14.2): src/handOrder.js — reconcileOrder (keeps
+      existing/appends new/drops removed), sortByRank/sortBySuit (JOKER
+      always last, suit tiebreak on rank sort and vice versa). Pure, no
+      DOM - this is the actual fix for the Sprint-1 "drag reorder doesn't
+      persist" tech debt, ready to be wired into main.js/ui.js in phase
+      18. 10 new tests, 64/64 total, first try. e2e unaffected (data-
+      layer phases 12-14 all complete now).
+
+**All 3 data-layer phases done — moving to UI phases 15-18 next.**
+- [x] Trin UAT phase 14 PASS, Morpheus review PASS
+- [x] Phase 15 (T15.1-T15.2): renderZones() replaces renderTable(),
+      removed the transitional view.table alias (full suite re-run after
+      removal proved it safe). Zone creation control + per-card "Move
+      to…" select (only shown when relevant). Live 2-browser check:
+      zone creation and MOVE_CARD both propagate correctly over real
+      WebRTC, screenshotted and confirmed. npm test 64/64, e2e green.
+- [x] Trin UAT phase 15 PASS (incl. independent privacy-authorization
+      test I hadn't covered), Morpheus review PASS
+- [x] Phase 16 (T16.1-T16.2): renderDeck() visual stack+badge (lobby +
+      game screen), renderMiniHand() compact opponent-hand fan. Caught
+      and fixed a REAL bug via screenshot verification: mini-hand cards
+      were invisible (same background color as their container) - fixed,
+      re-screenshotted to confirm visible before calling it done, not
+      just assumed fixed from reading the CSS diff.
+- [x] Trin UAT phase 16 PASS (incl. independent 0-cards/0-opponent edge
+      case checks), Morpheus review PASS
+- [x] Phase 17 (T17.1-T17.3): pointer-down cursor broadcast (normalized
+      0-1, existing motionThrottler, zero protocol changes per D13),
+      updateRemoteCursor/removeRemoteCursor (labeled dot, TTL auto-
+      clear), card-lift cue via pointerdown/up/leave on zone cards
+      (privacy-safe - only id broadcast). Live 2-browser check: cursor
+      appears/labeled/clears correctly, card-lift propagates live, both
+      screenshotted. npm test 64/64, e2e green.
+
 ### Post-launch UX overhaul (2026-08-15, user: "the ux is dog shit")
 Smith ran a full audit (agents/smith.docs/uat-report-ux-audit.md), 5
 findings. Fixed all 5, UI-only (no state/protocol changes):
@@ -188,15 +237,123 @@ dialog. 41/41 unit + e2e all green, re-verified visually (denser hand
 layout from bigger buttons is a real but acceptable tradeoff - still
 fully usable, just wraps to more rows).
 
+- [x] Phase 18 (T18.1-T18.3): sort-rank/sort-suit buttons wired to
+      handOrder.js (main.js's `orderedHand()` calls reconcileOrder on
+      every render, sort buttons + drag's `onReorder` callback both write
+      into the same `handOrderIds`, matching D14/Smith Gate 1 - verified
+      live that a Deal More after sorting keeps the sorted 5 in place and
+      appends the new card at the end, not just eyeballed). Deal More
+      button + count input both host-only-hidden (found and fixed a
+      stray-input gap myself: the count input wasn't hidden alongside its
+      button for guests, a Smith Gate-close-style "no orphaned control"
+      issue). Pass toggle dispatches TOGGLE_PASS (self only, matches
+      US-13 precedent), roster tag already existed from Phase 13's data
+      layer, button label flips Pass/Unpass on state.
+
+      **Found + fixed a real pre-existing bug while regression-testing**:
+      tests/e2e.smoke.mjs's US-11 drag-motion assertion (mouse.down/move
+      raw input) timed out deterministically - confirmed via isolation
+      (swapped back to the exact turn-start main.js/ui.js, still failed)
+      that this was NOT caused by Phase 18. Root cause: Chromium's native
+      HTML5 drag-and-drop arbitration doesn't fire from Playwright's raw
+      synthetic mouse input in this headless host (no Xvfb/DISPLAY
+      available) - a browser/environment limitation, not an app bug.
+      Fixed by rewriting that one assertion to dispatch real `DragEvent`s
+      (`dragstart`/`dragend` with a `DataTransfer`) directly instead of
+      relying on native low-level-input drag arbitration - still exercises
+      the real app-level dragstart/dragend handlers, just doesn't depend
+      on the flaky browser internal. 3/3 stable e2e runs after the fix.
+
+      Also ran an ad-hoc 2-browser Playwright check (screenshots saved to
+      scratchpad) confirming all 3 features live over real WebRTC before
+      calling this done - sort-by-rank/suit produce correct order, Deal
+      More preserves existing hand order, pass marker propagates to the
+      OTHER client's roster and clears on second toggle.
+      npm test 64/64, npm run test:e2e 3/3 stable.
+- [x] task.md checkboxes/status line updated for Phases 12-18 (they were
+      stale - said "Not started" despite being done and CHAT'd).
+
+- [x] Phase 18 UAT PASSED (Trin), code review PASSED (Morpheus) - see
+      CHAT.md 20:50/20:51.
+- [x] Phase 19 (final implementation phase, T19.1-T19.3): folded every
+      ad-hoc-verified Phase 18 behavior into the formal
+      tests/e2e.smoke.mjs suite instead of leaving it only manually
+      checked:
+      - Zones (US-19/D12): CREATE_ZONE propagates live, MOVE_CARD
+        relocates a card between zones (verified via the zone's own
+        count going 0->1), PICKUP from that non-default zone (not just
+        the default one - D12's actual point, that REVEAL/PICKUP search
+        ALL zones by card id).
+      - DEAL_MORE (US-24/D15): hand grows by the exact requested count
+        AND an explicit assertion that every pre-existing card id is
+        still present (not just a count check - actually proves nothing
+        got discarded), roster count propagates to the other client.
+      - Pass marker (US-25/D16): toggle propagates, clears on second
+        toggle.
+      - Hand sort persistence (US-23/D14) - **the actual regression test
+        Sprint 1's retro item was asking for**: sort, then trigger a
+        real state broadcast (Draw), assert the sorted prefix is
+        byte-for-byte unchanged and the new card only appends at the
+        end. This is the test that would have caught the original bug.
+      - Cursor broadcast (US-22/D13): real pointerdown+move (not native
+        drag - plain pointer events fire fine from synthetic input, only
+        HTML5 DnD arbitration doesn't), asserts the label matches the
+        sender's name AND that a client never renders its own cursor
+        back at itself (both halves of the requirement, not just the
+        happy path).
+      Hit one real test-authoring bug while writing the cursor check:
+      first attempt anchored mouse coordinates to an `<h2>`'s
+      boundingBox() without scrolling it into view first - by that point
+      in the test the page had scrolled and the box came back with a
+      negative y (off-screen), so the synthetic mouse events silently
+      landed nowhere and the test hung. Fixed by calling
+      `scrollIntoViewIfNeeded()` before reading the box - a good example
+      of why "it times out" always deserves a real root-cause look, not
+      a bigger timeout.
+      Also did the T19.3 visual pass this sprint's density risk warranted
+      (Smith flagged zones/hand-tools stacking up as a scalability risk):
+      screenshotted a populated game screen (2 zones, hand + face-down
+      buttons, Deal More, sort/pass row) at 390px and 1280px - both clean,
+      no overflow, everything wraps sensibly. Screenshots in scratchpad
+      (not committed, ad-hoc verification artifacts).
+      npm test 64/64, npm run test:e2e 3/3 stable runs, both independently
+      re-run after every fix, not just once.
+
 ### Immediate Next Action
-Handing to Trin for Phase 11 (final) UAT.
+Handed to Trin for Phase 19 UAT.
 
 ### Waiting On
-@Trin: UAT sign-off on Phase 11.
+@Trin: UAT sign-off on Phase 19 (final implementation phase). After that:
+Morpheus review, then Stage 3 close (Oracle groom -> Smith end-to-end
+test -> Phase 20 bug-fix phase if Smith finds anything -> retro ->
+Cypher launch), matching the Sprint 1/2 close-out pattern.
+
+- [x] Phase 20 (T20.1): fixed Smith's mini-hand duplicate-count finding.
+      Chose to drop the redundant count from `renderMiniHand`'s own badge
+      (removed it entirely) rather than from the roster row's `(N cards)`
+      text, since the row text is the one place that already serves BOTH
+      "you" and other players consistently (the mini-hand fan only ever
+      renders for others) - keeping it means every player's count is
+      still shown exactly once, in exactly one place, regardless of
+      viewer. The fan of card-backs alone still conveys "they're holding
+      cards" (US-21's actual point) without repeating the exact number.
+      Also added `.mini-hand { margin-left: 0.5rem }` so it no longer
+      runs flush against whatever text precedes it. Removed the now-dead
+      `.mini-hand-count` CSS rule (grepped first to confirm no other
+      caller). Re-ran Smith's exact dense repro scenario (390px, 3 zones,
+      full hand, pass marker, long name) and visually confirmed: clean
+      spacing, count shown once. npm test 64/64, e2e 3/3 stable.
+
+### Immediate Next Action
+Handed to Trin for Phase 20 UAT.
+
+### Waiting On
+@Trin: UAT sign-off on the mini-hand fix, then Morpheus review, then back
+to Smith to close out uat-report-sprint3.md.
 
 ### Planned Work
-- [ ] Phase 10: score buttons + preset selector + rules-reference overlay UI
-- [ ] Phase 11: e2e verification + full regression
+- [ ] None pending - Sprint 3 implementation + bug-fix work is complete
+      pending Trin/Morpheus/Smith re-verification.
 
 ---
-*Last updated: 2026-08-15 12:44*
+*Last updated: 2026-08-15 21:22*

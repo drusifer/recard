@@ -37,7 +37,7 @@ body {
 
 /* The game screen benefits from more room (cards, roster, hand) on
    anything wider than a phone - Smith UX audit finding #4. */
-#screen-game { max-width: 760px; }
+#screen-game { max-width: 760px; position: relative; }
 
 h1 {
   font-weight: 700;
@@ -232,6 +232,87 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   color: var(--muted);
 }
 
+/* A named zone (US-19) - its own bordered sub-panel so it reads as a
+   distinct area on the table, not just a blob of cards (Smith Gate 1:
+   zone names must always be visible as labels). */
+.zone {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.zone:last-child { margin-bottom: 0; }
+
+.zone-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.5rem;
+}
+
+.move-to-select {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.35rem;
+  min-height: 2.75rem;
+}
+
+#new-zone-name { flex: 1; min-width: 0; }
+
+/* Visual deck stack (US-20) instead of a bare "N cards left" line. */
+.deck-area {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 4.6rem;
+  padding-left: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.deck-stack-card {
+  position: absolute;
+  width: 3.1rem;
+  height: 4.3rem;
+}
+
+.deck-count-badge {
+  position: relative;
+  left: 3.6rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Compact "closed hand" fan for other players (US-21) - capped visual
+   count so it never explodes with 3+ players x 10+ cards (Smith Gate 1). */
+.mini-hand {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0.3rem;
+  margin-left: 0.5rem; /* Sprint 3 close-out fix: was flush against the
+    roster row's own text with zero gap (Smith finding) */
+}
+
+.mini-card-back {
+  width: 1rem;
+  height: 1.4rem;
+  border-radius: 0.15rem;
+  /* Deliberately lighter than the roster row it sits on (--surface-2) -
+     using that same color made these invisible against their own
+     background (Smith Gate-close-style finding, caught in visual
+     verification before shipping, not after). */
+  background: #465066;
+  border: 1px solid #5a6684;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
 /* Same small-button pattern and Smith Gate-close finding as .fd-btn/
    .score-btn - not separately measured, but identical root cause
    (undersized secondary buttons), so fixed together for consistency
@@ -330,3 +411,38 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .roster-connecting { color: var(--muted); font-style: italic; }
 .roster-disconnected { color: var(--danger); }
+
+/* Card-lift cue (US-22): a light, cosmetic-only highlight - never
+   changes layout/size, so it can't be mistaken for a real state change. */
+.card-lifted {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  transform: translateY(-3px);
+  transition: transform 0.1s ease-out;
+}
+
+/* Live remote cursor (US-22): light and labeled, not visually heavy even
+   with several players moving things at once (Smith Gate 1). */
+.remote-cursor {
+  position: absolute;
+  z-index: 5;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 999px;
+  background: var(--accent);
+  pointer-events: none;
+  transition: left 0.08s linear, top 0.08s linear;
+}
+
+.remote-cursor-label {
+  position: absolute;
+  left: 0.6rem;
+  top: -0.5rem;
+  font-size: 0.65rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 0.3rem;
+  padding: 0.05rem 0.3rem;
+  white-space: nowrap;
+  color: var(--text);
+}

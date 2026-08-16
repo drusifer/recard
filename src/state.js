@@ -1,5 +1,7 @@
 import { buildDeck, shuffle } from './deck.js';
 
+const DEFAULT_ZONE_ID = 'table';
+
 /**
  * Host-authoritative game state. This is the single source of truth per
  * ARCHITECTURE.md D3 — only the host runs `reduce`; other clients send
@@ -13,10 +15,47 @@ export function createInitialState(deckConfig = {}, rng = Math.random) {
     deckConfig,
     deck: shuffle(buildDeck(deckConfig), rng),
     hands: {},
-    table: [],
+    zones: [{ id: DEFAULT_ZONE_ID, name: 'Table', cards: [] }],
     players: [],
     scores: {},
+    passed: {},
   };
+}
+
+/**
+ * Round-robin deals `cardsPerPlayer` cards from `deck` into `existingHands`
+ * (which may already contain cards, per D15's `DEAL_MORE` - this is the
+ * shared logic behind both `DEAL` and `DEAL_MORE`, differing only in
+ * whether the caller passes empty or existing hands).
+ */
+function dealCards(players, deck, cardsPerPlayer, existingHands) {
+  const totalNeeded = cardsPerPlayer * players.length;
+  if (totalNeeded > deck.length) {
+    throw new Error(
+      `Cannot deal ${cardsPerPlayer} cards to ${players.length} players: only ${deck.length} left`,
+    );
+  }
+  const hands = { ...existingHands };
+  const remaining = [...deck];
+  for (let round = 0; round < cardsPerPlayer; round++) {
+    for (const player of players) {
+      hands[player.id] = [...(hands[player.id] ?? []), remaining.shift()];
+    }
+  }
+  return { deck: remaining, hands };
+}
+
+/**
+ * D12: card ids are globally unique (assigned once per physical card by
+ * deck.js), so a card can be located across every zone without the
+ * caller needing to know which zone it's in.
+ */
+function findZoneAndCard(zones, cardId) {
+  for (const zone of zones) {
+    const card = zone.cards.find((c) => c.id === cardId);
+    if (card) return { zoneId: zone.id, card };
+  }
+  return null;
 }
 
 /**
@@ -50,6 +89,7 @@ export function reduce(state, action) {
           { id: action.playerId, name: action.name, connection: 'connected' },
         ],
         scores: { [action.playerId]: 0, ...state.scores },
+        passed: { [action.playerId]: false, ...state.passed },
       };
 
     case 'SET_CONNECTION':
@@ -61,21 +101,20 @@ export function reduce(state, action) {
       };
 
     case 'DEAL': {
-      const hands = { ...state.hands };
-      let deck = [...state.deck];
-      const totalNeeded = action.cardsPerPlayer * state.players.length;
-      if (totalNeeded > deck.length) {
-        throw new Error(
-          `Cannot deal ${action.cardsPerPlayer} cards to ${state.players.length} players: only ${deck.length} left`,
-        );
-      }
+      const hands = {};
       for (const player of state.players) hands[player.id] = [];
-      for (let round = 0; round < action.cardsPerPlayer; round++) {
-        for (const player of state.players) {
-          hands[player.id] = [...hands[player.id], deck.shift()];
-        }
-      }
+      const { deck, hands: dealt } = dealCards(state.players, state.deck, action.cardsPerPlayer, hands);
+      return { ...state, deck, hands: dealt };
+    }
+
+    case 'DEAL_MORE': {
+      const { deck, hands } = dealCards(state.players, state.deck, action.cardsPerPlayer, state.hands);
       return { ...state, deck, hands };
+    }
+
+    case 'CREATE_ZONE': {
+      const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `zone-${Date.now()}-${Math.random()}`;
+      return { ...state, zones: [...state.zones, { id, name: action.name, cards: [] }] };
     }
 
     case 'PLAY': {
@@ -84,6 +123,10 @@ export function reduce(state, action) {
       if (!card) {
         throw new Error(`Card ${action.cardId} is not in ${action.playerId}'s hand`);
       }
+      const zoneId = action.zoneId ?? DEFAULT_ZONE_ID;
+      if (!state.zones.some((z) => z.id === zoneId)) {
+        throw new Error(`Zone ${zoneId} does not exist`);
+      }
       const { owner, faceUp } = middleCardVisibility(action.visibility ?? 'public', action.playerId);
       return {
         ...state,
@@ -91,30 +134,38 @@ export function reduce(state, action) {
           ...state.hands,
           [action.playerId]: hand.filter((c) => c.id !== action.cardId),
         },
-        table: [...state.table, { ...card, owner, faceUp }],
+        zones: state.zones.map((z) =>
+          z.id === zoneId ? { ...z, cards: [...z.cards, { ...card, owner, faceUp }] } : z,
+        ),
       };
     }
 
     case 'REVEAL': {
-      const card = state.table.find((c) => c.id === action.cardId);
-      if (!card) {
-        throw new Error(`Card ${action.cardId} is not in the middle`);
+      const found = findZoneAndCard(state.zones, action.cardId);
+      if (!found) {
+        throw new Error(`Card ${action.cardId} is not in any zone`);
       }
+      const { zoneId, card } = found;
       if (card.faceUp) return state;
       if (card.owner !== null && card.owner !== action.playerId) {
         throw new Error(`Player ${action.playerId} is not authorized to reveal ${action.cardId}`);
       }
       return {
         ...state,
-        table: state.table.map((c) => (c.id === action.cardId ? { ...c, faceUp: true } : c)),
+        zones: state.zones.map((z) =>
+          z.id === zoneId
+            ? { ...z, cards: z.cards.map((c) => (c.id === action.cardId ? { ...c, faceUp: true } : c)) }
+            : z,
+        ),
       };
     }
 
     case 'PICKUP': {
-      const card = state.table.find((c) => c.id === action.cardId);
-      if (!card) {
-        throw new Error(`Card ${action.cardId} is not in the middle`);
+      const found = findZoneAndCard(state.zones, action.cardId);
+      if (!found) {
+        throw new Error(`Card ${action.cardId} is not in any zone`);
       }
+      const { zoneId, card } = found;
       if (!card.faceUp) {
         throw new Error(`Cannot pick up a face-down card: ${action.cardId}`);
       }
@@ -122,8 +173,33 @@ export function reduce(state, action) {
       const hand = state.hands[action.playerId] ?? [];
       return {
         ...state,
-        table: state.table.filter((c) => c.id !== action.cardId),
+        zones: state.zones.map((z) =>
+          z.id === zoneId ? { ...z, cards: z.cards.filter((c) => c.id !== action.cardId) } : z,
+        ),
         hands: { ...state.hands, [action.playerId]: [...hand, plainCard] },
+      };
+    }
+
+    case 'MOVE_CARD': {
+      const found = findZoneAndCard(state.zones, action.cardId);
+      if (!found) {
+        throw new Error(`Card ${action.cardId} is not in any zone`);
+      }
+      if (!state.zones.some((z) => z.id === action.toZoneId)) {
+        throw new Error(`Zone ${action.toZoneId} does not exist`);
+      }
+      const { zoneId: fromZoneId, card } = found;
+      if (fromZoneId === action.toZoneId) return state;
+      if (!card.faceUp && card.owner !== null && card.owner !== action.playerId) {
+        throw new Error(`Player ${action.playerId} is not authorized to move ${action.cardId}`);
+      }
+      return {
+        ...state,
+        zones: state.zones.map((z) => {
+          if (z.id === fromZoneId) return { ...z, cards: z.cards.filter((c) => c.id !== action.cardId) };
+          if (z.id === action.toZoneId) return { ...z, cards: [...z.cards, card] };
+          return z;
+        }),
       };
     }
 
@@ -151,6 +227,11 @@ export function reduce(state, action) {
       };
     }
 
+    case 'TOGGLE_PASS': {
+      const current = state.passed[action.playerId] ?? false;
+      return { ...state, passed: { ...state.passed, [action.playerId]: !current } };
+    }
+
     case 'RESET_SCORES': {
       const scores = {};
       for (const player of state.players) scores[player.id] = 0;
@@ -163,7 +244,13 @@ export function reduce(state, action) {
         ...state,
         deck: shuffle(buildDeck(state.deckConfig), rng),
         hands: {},
-        table: [],
+        // Zone structure (player-created zones included) survives a
+        // reset - only the cards inside each zone clear. A round reset
+        // shouldn't force players to recreate their table layout.
+        zones: state.zones.map((z) => ({ ...z, cards: [] })),
+        // Passing is round-scoped (D16, unlike scores) - explicitly
+        // rezeroed here, not left to fall through via `...state`.
+        passed: Object.fromEntries(state.players.map((p) => [p.id, false])),
       };
     }
 
@@ -183,13 +270,19 @@ export function viewFor(state, playerId) {
   for (const [id, hand] of Object.entries(state.hands)) {
     if (id !== playerId) otherHandCounts[id] = hand.length;
   }
+  const zones = state.zones.map((z) => ({
+    id: z.id,
+    name: z.name,
+    cards: z.cards.map((card) => redactMiddleCard(card, playerId)),
+  }));
   return {
     myHand: state.hands[playerId] ?? [],
     otherHandCounts,
-    table: state.table.map((card) => redactMiddleCard(card, playerId)),
+    zones,
     deckCount: state.deck.length,
     players: state.players,
     scores: state.scores,
+    passed: state.passed,
   };
 }
 

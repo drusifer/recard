@@ -109,3 +109,56 @@ phases, mostly additive). Smith's Gate 1 added several UX requirements
 for revealing *private* cards, reused tap/drag gestures) that the e2e
 suite (Phase 11) now directly verifies, including the confirm-cancel path
 Neo's own ad-hoc check hadn't covered but Trin's independent UAT did.
+
+## 2026-08-15 — v1.2 architecture (D12-D16): zones, presence, hand tools
+
+**Context:** Post-v1.1, the user asked for named work areas beyond one
+shared middle pile (multiplayer layouts like a discard pile separate from
+a shared draw pile), a livelier sense of "the table feels live" (cursor/
+motion visibility), a fix for Sprint 1's retro-flagged tech debt (manual
+hand drag-reorder gets silently wiped by the next state broadcast),
+incremental/staged dealing, and a simple pass marker.
+
+**Decision:** Morpheus recorded five more binding decisions:
+- D12: `state.table` generalizes to `state.zones` (named, each with its
+  own card list). Card ids are already globally unique, so `REVEAL`/
+  `PICKUP` need no signature change — they search across all zones.
+  `PLAY` gets an optional `zoneId` (defaults to the original single
+  zone). New `CREATE_ZONE`/`MOVE_CARD` actions; `MOVE_CARD`'s
+  authorization mirrors D8's `REVEAL` rule (owner-only while still
+  hidden, anyone once visible).
+- D13: live cursor (broadcast position normalized 0.0-1.0 to the game
+  screen's own bounding box, so it means the same thing across different
+  viewport sizes) reuses D4's existing best-effort motion channel with
+  zero new transport. Full pixel-synchronized card dragging was
+  deliberately scoped down to a lightweight "lift cue" (broadcast
+  `{cardId, active}`, receivers who can already see that card per D7 show
+  a lifted state) rather than solving cross-client layout-independent
+  drag math, which the actual "table feels live" goal didn't need.
+- D14: hand order (sort buttons + manual drag-reorder) is a new pure
+  client-side module (`src/handOrder.js`), never part of authoritative
+  state. `reconcileOrder()` keeps existing ids in position across a state
+  update, appends new ones, drops gone ones — the actual fix for the
+  Sprint-1 tech debt, and both sort buttons and drag-reorder write into
+  the same order list so they can't fight each other (Smith Gate 1).
+- D15: `DEAL_MORE` is a new, separate reducer action from `DEAL` (same
+  distribution logic, but doesn't clear existing hands first) rather than
+  a flag on `DEAL` — the two have different enough semantics
+  (round-start reset vs. mid-round top-up) that conflating them would
+  cost clarity for no savings.
+- D16: pass marker (`state.passed`, cleared on `RESET` unlike scores)
+  needed zero new authorization code — `main.js`'s existing
+  guest-action-id-overwrite (the same mechanism that already makes
+  `DRAW`/`PLAY` "act as yourself only") already enforces self-only
+  toggling.
+
+**Consequences:** No new protocol/transport surface across all five
+decisions — D12-D16 each generalize or reuse an existing v1/v1.1
+mechanism (D3/D4/D8/D9's actor-auth pattern) rather than inventing a new
+one, consistent with the pattern D7 set last sprint. Phases 18-19 (UI
+wiring + formal e2e coverage) needed zero `state.js`/`protocol.js`
+changes as a result - confirmed in code review, not just predicted. One
+real pre-existing test-infrastructure gap surfaced during this sprint's
+regression testing (native HTML5 drag-and-drop doesn't fire from
+synthetic input in this headless environment) and was fixed at the test
+level only; see `agents/oracle.docs/lessons.md` Sprint 3 section.

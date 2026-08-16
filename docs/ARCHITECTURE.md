@@ -1,8 +1,8 @@
 # Architecture — Recard
 
 **Owner:** Morpheus (Tech Lead)
-**Status:** v1 shipped; v1.1 decisions below (D7-D11) are binding for the
-current sprint (US-12..18, "clear backlog").
+**Status:** v1 + v1.1 shipped. v1.2 decisions below (D12-D16) are binding
+for the current sprint (US-19..25, "zones, presence, hand tools").
 **Last updated:** 2026-08-15
 
 ## Decisions (resolves PRD Feasibility Flags 1 & 2)
@@ -132,6 +132,104 @@ gate exists anywhere): US-17 is a **regression-test-only** item for this
 sprint. Neo should add a dedicated `npm test`/e2e case with exactly one
 player dealt/played/drawn through a full round, not new implementation.
 
+## v1.2 Decisions (resolves PRD Feasibility Flag 4)
+
+### D12. `table` generalizes to `zones`, keyed by globally-unique card ids
+`state.table: MiddleCard[]` becomes `state.zones: { id, name, cards:
+MiddleCard[] }[]`. A default zone (`id: 'table', name: 'Table'`) is
+always present in `createInitialState`, so every existing single-pile
+story (US-6, US-12/13/14) keeps working with zero call-site changes for
+`REVEAL`/`PICKUP` and only an optional new field on `PLAY`:
+- `PLAY {..., zoneId?}` — defaults to `'table'` if omitted. Existing
+  `PLAY` calls from Sprint 1/2 need no changes.
+- `REVEAL {playerId, cardId}` and `PICKUP {playerId, cardId}` **keep
+  their existing signatures unchanged** — card `id`s are already globally
+  unique (assigned once per physical card at deck-build time, D1's
+  `deck.js`), so the reducer searches across all zones for the matching
+  id instead of requiring the caller to know which zone it's in. This
+  avoids churn in Phase-9-era UI code that already calls
+  `revealCard(cardId)`/`pickupCard(cardId)`.
+- New `CREATE_ZONE {name}`: appends `{id: <generated>, name, cards: []}`.
+- New `MOVE_CARD {playerId, cardId, toZoneId}`: relocates a card between
+  zones, **preserving its existing `owner`/`faceUp`** — moving is not
+  revealing. Authorization mirrors D8's `REVEAL` rule: a still-hidden
+  privately-owned card (`faceUp: false, owner !== null`) can only be
+  moved by its owner; anything visible (`faceUp: true` or `owner ===
+  null`) can be moved by any player, per US-19's "put or take" AC.
+- `viewFor()`'s per-card redaction (D7) is unchanged, just applied to
+  every zone's `cards` array instead of one `table` array. Zone
+  existence, name, and card *count* are always public (US-19 AC);
+  individual card visibility within a zone still follows D7.
+
+### D13. Live cursor is the real feature; "card motion" is a lightweight lift cue, not pixel-tracked dragging
+Resolves the motion half of Flag 4. **No new transport mechanism** — this
+reuses D4's existing best-effort motion channel and `createMotionThrottler`
+exactly as built (it's already generic: arbitrary `kind`/`data` keyed by
+an arbitrary throttle key).
+- **Cursor** (US-22, the reliable core of this story): while a player's
+  pointer is down anywhere on the game screen, broadcast `kind: 'cursor'`
+  with position **normalized to the game screen's bounding box (0.0-1.0
+  on each axis)**, not raw pixels — devices have different viewport
+  sizes, a percentage is the only value that means the same thing on
+  every client. Receivers render a small labeled dot at that percentage
+  position within their own game screen. Throttled/coalesced like every
+  other motion message; a dropped frame just costs smoothness.
+- **Card motion** (US-22's second AC, scoped deliberately narrow): full
+  pixel-accurate synchronized dragging of a specific card across
+  independent browser layouts is a much bigger feature (each client's
+  DOM layout differs) and isn't what "the table feels live" actually
+  needs. Scoping it as a **lift cue**: starting to drag a card the
+  dragger can see broadcasts `kind: 'card-lift', data: {cardId, active}`;
+  any receiver who can *also* see that card (same D7 visibility rule)
+  applies a "lifted" CSS state (scale/shadow) to their own rendering of
+  it for as long as `active`. This satisfies "see the motion, not just a
+  cursor, for cards I can already see" without needing shared coordinate
+  math across devices. A viewer who can't see the card (private, not
+  theirs) gets nothing extra — consistent with D7, never a side channel.
+- Explicitly out of scope, matching US-22's non-negotiable AC: motion
+  data for **hand** cards stays a boolean-only cue (today's US-11
+  behavior, unchanged) — hand slot positions are never broadcast, since
+  position/timing could leak which card is which.
+
+### D14. Hand order persistence lives entirely client-side, in a new small pure module
+Resolves the Sprint-1 tech debt US-23 explicitly calls out. **No
+`state.js` change** — hand order was never part of authoritative state
+and doesn't need to be; it's a per-viewer display preference.
+`src/handOrder.js` (new, pure functions, unit-testable in isolation):
+- `reconcileOrder(previousOrder: string[], currentCards: Card[]):
+  string[]` — keeps existing ids in their prior position, appends newly
+  seen ids (arrival order), drops ids no longer present. Called every
+  time a new view arrives, before rendering the hand.
+- `sortByRank(cards)`, `sortBySuit(cards)` — pure sort helpers; a sort
+  button calls one of these and replaces the current order with the
+  result (still just reordering `main.js`'s in-memory id list, never sent
+  anywhere).
+- Manual drag-reorder (existing, US-11-era code) is updated to mutate
+  this same order list instead of only the DOM, so it and the new sort
+  buttons operate on one shared source of truth instead of two competing
+  ones (Smith's Gate 1 "sort vs. drag shouldn't fight" requirement).
+
+### D15. Incremental dealing is a new, non-destructive reducer action
+`DEAL_MORE {cardsPerPlayer}`: identical card-distribution logic to
+`DEAL`, but does not clear existing hands first — cards are appended.
+Same "not enough cards left" guard. Kept as a separate action from `DEAL`
+rather than a flag on it, because the two have meaningfully different
+semantics (start-of-round reset vs. mid-round top-up) and conflating them
+into one action with a mode flag would make both harder to reason about
+for no real code savings.
+
+### D16. Pass marker reuses existing actor-authorization, no new mechanism
+`state.passed: { [playerId]: boolean }`, initialized `false` on `JOIN`
+(same pattern as D9's scores), **cleared on `RESET`** (unlike scores —
+explicit `passed: {}` in `RESET`'s returned state, since a pass is
+round-scoped per US-25 AC). `TOGGLE_PASS {playerId}` flips the caller's
+own entry. Self-only authorization needs **no new code**: `main.js`'s
+existing dispatch path already overwrites a guest-originated action's
+`playerId` with the verified transport-level sender id before calling
+`reduce()` (see `session.on('data', ...)` in `main.js`) — the same
+mechanism that already makes `DRAW`/`PLAY` "act as yourself only" today.
+Public to all viewers unconditionally in `viewFor()`, like scores.
+
 ## Module Layout
 ```
 index.html              entry page, host/join screens, game screen
@@ -144,10 +242,13 @@ src/ui.js                     DOM rendering: hand, table, roster, connection sta
 src/qrcode.js                  small vendored QR renderer (no external network call at runtime)
 src/presets.js                  v1.1: static game-preset lookup (US-15)
 src/rulesReference.js            v1.1: static rules-reference content (US-18)
-src/main.js                       wires session + state + ui together
-tests/deck.test.js                 node:test unit tests for deck.js
-tests/state.test.js                 node:test unit tests for state.js reducer (incl. D7-D9: middle
-                                     redaction, REVEAL authorization, PICKUP, scores, solo/1-player)
+src/handOrder.js                  v1.2: pure client-side hand-order reconcile/sort (US-23, D14)
+src/main.js                        wires session + state + ui together
+tests/deck.test.js                  node:test unit tests for deck.js
+tests/state.test.js                  node:test unit tests for state.js reducer (incl. D7-D9: middle
+                                      redaction, REVEAL authorization, PICKUP, scores, solo/1-player;
+                                      v1.2: D12 zones/CREATE_ZONE/MOVE_CARD, D15 DEAL_MORE, D16 pass)
+tests/handOrder.test.js               v1.2: node:test unit tests for handOrder.js (D14)
 ```
 
 ## Testing Strategy
@@ -172,6 +273,11 @@ cover (visual/UX judgment calls, not just functional correctness).
   per phase.
 
 ## Open Items Carried Forward (not blocking v1)
-- Reconnect-after-refresh (PRD Open Question 4) — deferred.
+- Reconnect-after-refresh (PRD Open Question 4) — deferred, still open
+  after Sprint 3.
 - Max players — soft cap at 8, enforced in UI copy only, not hard-blocked.
 - Custom card backs/themes — deferred.
+- Full pixel-synchronized card dragging (as opposed to D13's lift-cue
+  scope) — deferred; would need a shared coordinate/layout model across
+  independently-rendered clients, a materially bigger feature than what
+  US-22 actually asked for.

@@ -8,11 +8,15 @@ hidden-but-mine, reveal, draw or pick up, a manual score — rather than any
 one game's rules, so you use it alongside whatever game you already know
 how to play.
 
-**Features:** private hands · a shared "middle" that supports public,
-face-down, and privately-owned face-down cards (community cards *and*
-hole cards) · quick-start presets for common games · simple +/- score
-tracking · an in-app rules reference · works solo for solitaire-type
-games too.
+**Features:** private hands · named zones on the table (e.g. a discard
+pile separate from a shared draw pile) that support public, face-down,
+and privately-owned face-down cards (community cards *and* hole cards) ·
+quick-start presets for common games · simple +/- score tracking · an
+in-app rules reference · works solo for solitaire-type games too · sort
+your hand by rank/suit or drag to reorder, both persist · incremental
+"Deal More" mid-round · a self-toggle "Passed" marker · live cursors and
+a card-lift cue so the table feels live even though everyone's on their
+own screen.
 
 See `docs/PRD.md` for the product vision and `docs/ARCHITECTURE.md` for
 the technical design.
@@ -52,8 +56,9 @@ Chrome installed (the test falls back to `/usr/bin/chromium`,
 - **No persistence.** Nothing survives past the browser tab being open.
 - Soft cap of ~8 players; not enforced, just not tested past that. 1
   player (solo/solitaire) is explicitly supported at the other end.
-- Hand-drag reordering is cosmetic only — it doesn't persist across the
-  next state update (known tech debt, tracked in the backlog).
+- Card motion is a cursor + "lift" cue, not pixel-synchronized dragging —
+  you'll see *that* a card is being moved and roughly where, not a smooth
+  shared drag across every screen (deliberate scope, see D13).
 
 ## How it works, briefly
 
@@ -76,7 +81,7 @@ Full rationale: `docs/ARCHITECTURE.md`.
 
 - [`docs/PRD.md`](docs/PRD.md) — product vision, scope, feasibility flags
 - [`docs/USER_STORIES.md`](docs/USER_STORIES.md) — user stories + acceptance criteria
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — technical design (D1-D6), testing strategy
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — technical design (D1-D16), testing strategy
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) — decision log with context/consequences
 - [`task.md`](task.md) — sprint task board
 - `agents/` — Bob Protocol persona docs, state, and team chat log (`agents/CHAT.md`)

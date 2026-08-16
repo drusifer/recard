@@ -9,11 +9,12 @@ function withPlayers(state, ids) {
   );
 }
 
-test('createInitialState: empty roster, full shuffled deck, no hands/table', () => {
+test('createInitialState: empty roster, full shuffled deck, one empty default zone', () => {
   const state = createInitialState({ numDecks: 1, jokers: 0 }, () => 0.5);
   assert.equal(state.deck.length, 52);
   assert.deepEqual(state.players, []);
-  assert.deepEqual(state.table, []);
+  assert.equal(state.zones.length, 1);
+  assert.deepEqual(state.zones[0].cards, []);
 });
 
 test('JOIN: adds a player to the roster with connecting state', () => {
@@ -47,8 +48,8 @@ test('PLAY: moves a card from a hand to the table', () => {
   state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId });
 
   assert.equal(state.hands.p1.length, 2);
-  assert.equal(state.table.length, 1);
-  assert.equal(state.table[0].id, cardId);
+  assert.equal(state.zones[0].cards.length, 1);
+  assert.equal(state.zones[0].cards[0].id, cardId);
   assert.ok(!state.hands.p1.some((c) => c.id === cardId));
 });
 
@@ -79,17 +80,20 @@ test('DRAW: throws when the deck is empty', () => {
   assert.throws(() => reduce(state, { type: 'DRAW', playerId: 'p1' }));
 });
 
-test('RESET: reshuffles the deck and clears hands/table, keeps roster', () => {
+test('RESET: reshuffles the deck and clears hands/zone cards, keeps roster + zone structure', () => {
   let state = createInitialState({}, () => 0.5);
   state = withPlayers(state, ['p1', 'p2']);
   state = reduce(state, { type: 'DEAL', cardsPerPlayer: 5 });
   state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId: state.hands.p1[0].id });
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Discard' });
 
   state = reduce(state, { type: 'RESET' });
 
   assert.equal(state.deck.length, 52);
   assert.deepEqual(state.hands, {});
-  assert.deepEqual(state.table, []);
+  assert.equal(state.zones.length, 2, 'zone structure (incl. player-created zones) survives a reset');
+  assert.deepEqual(state.zones[0].cards, []);
+  assert.deepEqual(state.zones[1].cards, []);
   assert.equal(state.players.length, 2);
 });
 
@@ -119,8 +123,8 @@ test('viewFor: deck is exposed only as a count, table is fully public', () => {
   const view = viewFor(state, 'p1');
   assert.equal(typeof view.deckCount, 'number');
   assert.equal(view.deckCount, state.deck.length);
-  assert.equal(view.table.length, 1);
-  assert.equal(view.table[0].id, state.table[0].id);
+  assert.equal(view.zones[0].cards.length, 1);
+  assert.equal(view.zones[0].cards[0].id, state.zones[0].cards[0].id);
 });
 
 // --- Middle-zone visibility (D7/D8, US-12/13/14) ---
@@ -131,8 +135,8 @@ test('PLAY: defaults to public visibility (owner null, faceUp true) — regressi
   state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
   state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId: state.hands.p1[0].id });
 
-  assert.equal(state.table[0].owner, null);
-  assert.equal(state.table[0].faceUp, true);
+  assert.equal(state.zones[0].cards[0].owner, null);
+  assert.equal(state.zones[0].cards[0].faceUp, true);
 });
 
 test('PLAY: shared-facedown has no owner and is hidden from everyone, including the player', () => {
@@ -142,14 +146,14 @@ test('PLAY: shared-facedown has no owner and is hidden from everyone, including 
   const cardId = state.hands.p1[0].id;
   state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId, visibility: 'shared-facedown' });
 
-  assert.equal(state.table[0].owner, null);
-  assert.equal(state.table[0].faceUp, false);
+  assert.equal(state.zones[0].cards[0].owner, null);
+  assert.equal(state.zones[0].cards[0].faceUp, false);
   const p1View = viewFor(state, 'p1');
   const p2View = viewFor(state, 'p2');
-  assert.equal(p1View.table[0].faceDown, true);
-  assert.equal(p1View.table[0].owner, null);
-  assert.ok(!('rank' in p1View.table[0]), 'even the player who played it cannot see a shared face-down card');
-  assert.ok(!('rank' in p2View.table[0]));
+  assert.equal(p1View.zones[0].cards[0].faceDown, true);
+  assert.equal(p1View.zones[0].cards[0].owner, null);
+  assert.ok(!('rank' in p1View.zones[0].cards[0]), 'even the player who played it cannot see a shared face-down card');
+  assert.ok(!('rank' in p2View.zones[0].cards[0]));
 });
 
 test('PLAY: private-facedown is owned by the player and visible only to them', () => {
@@ -159,16 +163,16 @@ test('PLAY: private-facedown is owned by the player and visible only to them', (
   const cardId = state.hands.p1[0].id;
   state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId, visibility: 'private-facedown' });
 
-  assert.equal(state.table[0].owner, 'p1');
-  assert.equal(state.table[0].faceUp, false);
+  assert.equal(state.zones[0].cards[0].owner, 'p1');
+  assert.equal(state.zones[0].cards[0].faceUp, false);
 
   const ownerView = viewFor(state, 'p1');
   const otherView = viewFor(state, 'p2');
-  assert.equal(ownerView.table[0].id, cardId);
-  assert.ok('rank' in ownerView.table[0], 'owner can see their own private middle card');
-  assert.equal(otherView.table[0].faceDown, true);
-  assert.equal(otherView.table[0].owner, 'p1', 'ownership stays visible even when face-down');
-  assert.ok(!('rank' in otherView.table[0]), 'non-owner cannot see a private middle card');
+  assert.equal(ownerView.zones[0].cards[0].id, cardId);
+  assert.ok('rank' in ownerView.zones[0].cards[0], 'owner can see their own private middle card');
+  assert.equal(otherView.zones[0].cards[0].faceDown, true);
+  assert.equal(otherView.zones[0].cards[0].owner, 'p1', 'ownership stays visible even when face-down');
+  assert.ok(!('rank' in otherView.zones[0].cards[0]), 'non-owner cannot see a private middle card');
 });
 
 test('REVEAL: any player can reveal a shared face-down card', () => {
@@ -180,9 +184,9 @@ test('REVEAL: any player can reveal a shared face-down card', () => {
 
   state = reduce(state, { type: 'REVEAL', playerId: 'p2', cardId });
 
-  assert.equal(state.table[0].faceUp, true);
+  assert.equal(state.zones[0].cards[0].faceUp, true);
   const anyView = viewFor(state, 'p2');
-  assert.ok('rank' in anyView.table[0]);
+  assert.ok('rank' in anyView.zones[0].cards[0]);
 });
 
 test('REVEAL: only the owner can reveal a private face-down card', () => {
@@ -195,7 +199,7 @@ test('REVEAL: only the owner can reveal a private face-down card', () => {
   assert.throws(() => reduce(state, { type: 'REVEAL', playerId: 'p2', cardId }));
 
   const revealed = reduce(state, { type: 'REVEAL', playerId: 'p1', cardId });
-  assert.equal(revealed.table[0].faceUp, true);
+  assert.equal(revealed.zones[0].cards[0].faceUp, true);
 });
 
 test('REVEAL: revealing an already-face-up card is a no-op, not an error', () => {
@@ -206,7 +210,7 @@ test('REVEAL: revealing an already-face-up card is a no-op, not an error', () =>
   state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId });
 
   const result = reduce(state, { type: 'REVEAL', playerId: 'p1', cardId });
-  assert.equal(result.table[0].faceUp, true);
+  assert.equal(result.zones[0].cards[0].faceUp, true);
 });
 
 test('PICKUP: moves a face-up middle card into the picking player\'s hand', () => {
@@ -219,7 +223,7 @@ test('PICKUP: moves a face-up middle card into the picking player\'s hand', () =
   const p2HandSizeBefore = state.hands.p2.length;
   state = reduce(state, { type: 'PICKUP', playerId: 'p2', cardId });
 
-  assert.equal(state.table.length, 0);
+  assert.equal(state.zones[0].cards.length, 0);
   assert.equal(state.hands.p2.length, p2HandSizeBefore + 1);
   assert.ok(state.hands.p2.some((c) => c.id === cardId));
 });
@@ -232,6 +236,131 @@ test('PICKUP: throws when the card is face-down', () => {
   state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId, visibility: 'shared-facedown' });
 
   assert.throws(() => reduce(state, { type: 'PICKUP', playerId: 'p2', cardId }));
+});
+
+// --- Named zones (D12, US-19) ---
+
+test('CREATE_ZONE: adds a new empty zone by name, alongside the default', () => {
+  const state = reduce(createInitialState({}, () => 0.5), { type: 'CREATE_ZONE', name: 'Discard' });
+  assert.equal(state.zones.length, 2);
+  assert.equal(state.zones[1].name, 'Discard');
+  assert.deepEqual(state.zones[1].cards, []);
+  assert.notEqual(state.zones[1].id, state.zones[0].id);
+});
+
+test('PLAY: with zoneId targets that zone instead of the default', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = withPlayers(state, ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Discard' });
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
+  const cardId = state.hands.p1[0].id;
+  const discardZoneId = state.zones[1].id;
+
+  state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId, zoneId: discardZoneId });
+
+  assert.equal(state.zones[0].cards.length, 0, 'default zone untouched');
+  assert.equal(state.zones[1].cards.length, 1);
+  assert.equal(state.zones[1].cards[0].id, cardId);
+});
+
+test('PLAY: throws for a zoneId that does not exist', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = withPlayers(state, ['p1']);
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
+  const cardId = state.hands.p1[0].id;
+  assert.throws(() => reduce(state, { type: 'PLAY', playerId: 'p1', cardId, zoneId: 'no-such-zone' }));
+});
+
+test('REVEAL and PICKUP: find a card in any zone, not just the default', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = withPlayers(state, ['p1', 'p2']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Discard' });
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
+  const cardId = state.hands.p1[0].id;
+  const discardZoneId = state.zones[1].id;
+  state = reduce(state, {
+    type: 'PLAY',
+    playerId: 'p1',
+    cardId,
+    zoneId: discardZoneId,
+    visibility: 'shared-facedown',
+  });
+
+  state = reduce(state, { type: 'REVEAL', playerId: 'p2', cardId });
+  assert.equal(state.zones[1].cards[0].faceUp, true);
+
+  state = reduce(state, { type: 'PICKUP', playerId: 'p2', cardId });
+  assert.equal(state.zones[1].cards.length, 0);
+  assert.ok(state.hands.p2.some((c) => c.id === cardId));
+});
+
+test('MOVE_CARD: relocates a visible card between zones, preserving its owner/faceUp', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = withPlayers(state, ['p1', 'p2']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Melds' });
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
+  const cardId = state.hands.p1[0].id;
+  const meldsZoneId = state.zones[1].id;
+  state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId }); // public, default zone
+
+  state = reduce(state, { type: 'MOVE_CARD', playerId: 'p2', cardId, toZoneId: meldsZoneId });
+
+  assert.equal(state.zones[0].cards.length, 0);
+  assert.equal(state.zones[1].cards.length, 1);
+  assert.equal(state.zones[1].cards[0].id, cardId);
+  assert.equal(state.zones[1].cards[0].faceUp, true, 'moving does not reveal/hide - it was already public');
+});
+
+test('MOVE_CARD: only the owner can move their own still-hidden private card', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = withPlayers(state, ['p1', 'p2']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Melds' });
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
+  const cardId = state.hands.p1[0].id;
+  const meldsZoneId = state.zones[1].id;
+  state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId, visibility: 'private-facedown' });
+
+  assert.throws(() => reduce(state, { type: 'MOVE_CARD', playerId: 'p2', cardId, toZoneId: meldsZoneId }));
+
+  const moved = reduce(state, { type: 'MOVE_CARD', playerId: 'p1', cardId, toZoneId: meldsZoneId });
+  assert.equal(moved.zones[1].cards[0].id, cardId);
+});
+
+test('MOVE_CARD: throws for an unknown destination zone or an unknown card', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = withPlayers(state, ['p1']);
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
+  const cardId = state.hands.p1[0].id;
+  state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId });
+
+  assert.throws(() =>
+    reduce(state, { type: 'MOVE_CARD', playerId: 'p1', cardId, toZoneId: 'no-such-zone' }),
+  );
+  assert.throws(() =>
+    reduce(state, { type: 'MOVE_CARD', playerId: 'p1', cardId: 'no-such-card', toZoneId: state.zones[0].id }),
+  );
+});
+
+test('viewFor: every zone is redacted per-card, zone name/count always visible', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = withPlayers(state, ['p1', 'p2']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Melds' });
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
+  const cardId = state.hands.p1[0].id;
+  const meldsZoneId = state.zones[1].id;
+  state = reduce(state, {
+    type: 'PLAY',
+    playerId: 'p1',
+    cardId,
+    zoneId: meldsZoneId,
+    visibility: 'private-facedown',
+  });
+
+  const otherView = viewFor(state, 'p2');
+  assert.equal(otherView.zones.length, 2);
+  assert.equal(otherView.zones[1].name, 'Melds');
+  assert.equal(otherView.zones[1].cards.length, 1, 'card count visible even though contents are hidden');
+  assert.ok(!('rank' in otherView.zones[1].cards[0]));
 });
 
 // --- Score tracking (D9, US-16) ---
@@ -298,6 +427,68 @@ test('viewFor: scores are public to every viewer', () => {
 
 // --- Solo play (D11, US-17) — regression guarantee, no gate exists ---
 
+// --- Incremental dealing (D15, US-24) ---
+
+test('DEAL_MORE: adds cards to existing hands without clearing them', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = withPlayers(state, ['p1', 'p2']);
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 3 });
+  const deckSizeAfterDeal = state.deck.length;
+
+  state = reduce(state, { type: 'DEAL_MORE', cardsPerPlayer: 2 });
+
+  assert.equal(state.hands.p1.length, 5);
+  assert.equal(state.hands.p2.length, 5);
+  assert.equal(state.deck.length, deckSizeAfterDeal - 4);
+});
+
+test('DEAL_MORE: throws if there are not enough cards left', () => {
+  let state = createInitialState({ numDecks: 1 }, () => 0.5);
+  state = withPlayers(state, ['p1']);
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 50 });
+  assert.throws(() => reduce(state, { type: 'DEAL_MORE', cardsPerPlayer: 5 }));
+});
+
+// --- Pass marker (D16, US-25) ---
+
+test('JOIN: initializes a new player as not passed', () => {
+  const state = reduce(createInitialState({}, () => 0.5), {
+    type: 'JOIN',
+    playerId: 'p1',
+    name: 'Alice',
+  });
+  assert.equal(state.passed.p1, false);
+});
+
+test('TOGGLE_PASS: flips the acting player\'s own passed flag', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1', 'p2']);
+  state = reduce(state, { type: 'TOGGLE_PASS', playerId: 'p1' });
+  assert.equal(state.passed.p1, true);
+  assert.equal(state.passed.p2, false);
+
+  state = reduce(state, { type: 'TOGGLE_PASS', playerId: 'p1' });
+  assert.equal(state.passed.p1, false);
+});
+
+test('RESET clears pass markers but (regression) leaves scores untouched', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'TOGGLE_PASS', playerId: 'p1' });
+  state = reduce(state, { type: 'ADJUST_SCORE', targetPlayerId: 'p1', delta: 1 });
+
+  state = reduce(state, { type: 'RESET' });
+
+  assert.equal(state.passed.p1, false);
+  assert.equal(state.scores.p1, 1);
+});
+
+test('viewFor: passed markers are public to every viewer', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1', 'p2']);
+  state = reduce(state, { type: 'TOGGLE_PASS', playerId: 'p1' });
+
+  const view = viewFor(state, 'p2');
+  assert.equal(view.passed.p1, true);
+});
+
 test('solo play: a single player can deal, play, draw, and reset a full round alone', () => {
   let state = withPlayers(createInitialState({}, () => 0.5), ['solo']);
   assert.equal(state.players.length, 1);
@@ -309,7 +500,7 @@ test('solo play: a single player can deal, play, draw, and reset a full round al
   const cardId = state.hands.solo[0].id;
   state = reduce(state, { type: 'PLAY', playerId: 'solo', cardId });
   assert.equal(state.hands.solo.length, 6);
-  assert.equal(state.table.length, 1);
+  assert.equal(state.zones[0].cards.length, 1);
 
   state = reduce(state, { type: 'DRAW', playerId: 'solo' });
   assert.equal(state.hands.solo.length, 7);

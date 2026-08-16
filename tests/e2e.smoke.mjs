@@ -183,6 +183,40 @@ try {
   );
   console.log('pickup: face-up middle card moved into the picking player\'s hand');
 
+  // --- Zones (US-19, D12): create a new zone, move a card into it, then
+  // pick it up from that NON-default zone - exercises D12's "REVEAL/
+  // PICKUP search all zones by id", not just the default one. ---
+  await host.fill('#new-zone-name', 'Discard');
+  await host.click('#create-zone-btn');
+  await join.waitForFunction(
+    () => [...document.querySelectorAll('.zone-name')].some((el) => el.textContent.startsWith('Discard (')),
+    undefined,
+    { timeout: 10000 },
+  );
+  console.log('CREATE_ZONE: new zone propagated to the other client');
+
+  await host
+    .locator('#table-area .middle-card')
+    .filter({ has: host.locator('.move-to-select') })
+    .first()
+    .locator('.move-to-select')
+    .selectOption({ label: 'Discard' });
+  await join.waitForFunction(
+    () => [...document.querySelectorAll('.zone-name')].some((el) => el.textContent === 'Discard (1)'),
+    undefined,
+    { timeout: 10000 },
+  );
+  console.log('MOVE_CARD: card relocated zone->zone, propagated live');
+
+  const hostHandSizeBeforeZonePickup = await host.locator('#hand-area .card').count();
+  await host.locator('.zone').filter({ hasText: 'Discard' }).locator('.pickup-btn').first().click();
+  await host.waitForFunction(
+    (before) => document.querySelectorAll('#hand-area .card').length === before + 1,
+    hostHandSizeBeforeZonePickup,
+    { timeout: 10000 },
+  );
+  console.log('PICKUP: card picked up from a non-default zone, not just the default one');
+
   // --- Score (US-16): a GUEST adjusting the HOST's score must propagate to both ---
   const aliceRosterRow = join
     .locator('#game-roster li.roster-player')
@@ -211,23 +245,112 @@ try {
 
   // US-11: dragging a card in your own hand broadcasts a best-effort
   // "organizing hand" cue to other clients - motion only, no card identity.
-  const joinFirstCard = join.locator('#hand-area .card').first();
-  const box = await joinFirstCard.boundingBox();
-  await join.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await join.mouse.down();
-  await join.mouse.move(box.x + 40, box.y, { steps: 5 });
+  // Dispatched as real DragEvents rather than raw mouse.down/move (Chromium's
+  // native HTML5 drag-and-drop arbitration doesn't fire from synthetic
+  // low-level input in this headless environment - confirmed by isolating
+  // against pre-Phase-18 code, so this exercises the exact same app-level
+  // dragstart/dragend handlers without depending on that browser internal).
+  await join.evaluate(() => {
+    const wrapper = document.querySelector('#hand-area .hand-card');
+    wrapper.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: new DataTransfer() }));
+  });
   await host.waitForFunction(
     () => [...document.querySelectorAll('#game-roster li')].some((li) => li.textContent.includes('organizing hand')),
     undefined,
     { timeout: 5000 },
   );
-  await join.mouse.up();
+  await join.evaluate(() => {
+    const wrapper = document.querySelector('#hand-area .hand-card');
+    wrapper.dispatchEvent(new DragEvent('dragend', { bubbles: true }));
+  });
   await host.waitForFunction(
     () => ![...document.querySelectorAll('#game-roster li')].some((li) => li.textContent.includes('organizing hand')),
     undefined,
     { timeout: 5000 },
   );
   console.log('US-11 motion cue propagated join -> host, and cleared on drag end');
+
+  // --- Deal More (US-24, D15): host-only, adds to existing hands without
+  // discarding them - the actual point of the "MORE" in the name. ---
+  const hostHandIdsBeforeDealMore = await host.evaluate(() =>
+    [...document.querySelectorAll('#hand-area .card')].map((c) => c.dataset.cardId),
+  );
+  await host.fill('#deal-more-count', '2');
+  await host.click('#deal-more-btn');
+  await host.waitForFunction(
+    (before) => document.querySelectorAll('#hand-area .card').length === before + 2,
+    hostHandIdsBeforeDealMore.length,
+    { timeout: 10000 },
+  );
+  const hostHandIdsAfterDealMore = await host.evaluate(() =>
+    [...document.querySelectorAll('#hand-area .card')].map((c) => c.dataset.cardId),
+  );
+  assert(
+    hostHandIdsBeforeDealMore.every((id) => hostHandIdsAfterDealMore.includes(id)),
+    'DEAL_MORE must not discard cards already in hand',
+  );
+  await join.waitForFunction(
+    (expected) =>
+      [...document.querySelectorAll('#game-roster li')].some(
+        (li) => li.textContent.includes('Alice') && li.textContent.includes(`${expected} cards`),
+      ),
+    hostHandIdsAfterDealMore.length,
+    { timeout: 10000 },
+  );
+  console.log('DEAL_MORE: hand grew without discarding existing cards, propagated to the other client');
+
+  // --- Pass marker (US-25, D16): self-toggle only, visible to everyone. ---
+  await join.click('#pass-toggle-btn');
+  await host.waitForFunction(
+    () => [...document.querySelectorAll('#game-roster li')].some((li) => li.textContent.includes('Bob') && li.textContent.includes('Passed')),
+    undefined,
+    { timeout: 10000 },
+  );
+  console.log('TOGGLE_PASS: pass marker propagated to the other client');
+  await join.click('#pass-toggle-btn');
+  await host.waitForFunction(
+    () => ![...document.querySelectorAll('#game-roster li')].some((li) => li.textContent.includes('Bob') && li.textContent.includes('Passed')),
+    undefined,
+    { timeout: 10000 },
+  );
+  console.log('TOGGLE_PASS: cleared on second toggle');
+
+  // --- Hand sort persistence (US-23, D14): this is the actual regression
+  // proof for Sprint 1's retro backlog item - a sorted (or dragged) order
+  // must survive the NEXT state broadcast instead of being silently wiped
+  // like the old drag-reorder-only behavior was. ---
+  await join.click('#sort-rank-btn');
+  const joinSortedIds = await join.evaluate(() => [...document.querySelectorAll('#hand-area .card')].map((c) => c.dataset.cardId));
+  await join.click('#draw-btn'); // triggers a fresh state broadcast
+  await join.waitForFunction(
+    (before) => document.querySelectorAll('#hand-area .card').length === before + 1,
+    joinSortedIds.length,
+    { timeout: 10000 },
+  );
+  const joinIdsAfterDraw = await join.evaluate(() => [...document.querySelectorAll('#hand-area .card')].map((c) => c.dataset.cardId));
+  assert(
+    joinSortedIds.every((id, i) => joinIdsAfterDraw[i] === id),
+    'a sorted hand order must survive the next state broadcast (D14) - the newly drawn card should append at the end without disturbing the sorted prefix',
+  );
+  console.log('hand sort order survives a state update - D14 regression covered');
+
+  // --- Live cursor (US-22, D13): pointerdown+move broadcasts a normalized
+  // position, rendered as a labeled dot on the OTHER client only. ---
+  const cursorAnchorEl = join.locator('#screen-game h2').first();
+  await cursorAnchorEl.scrollIntoViewIfNeeded();
+  const cursorAnchorBox = await cursorAnchorEl.boundingBox();
+  await join.mouse.move(cursorAnchorBox.x, cursorAnchorBox.y);
+  await join.mouse.down();
+  await join.mouse.move(cursorAnchorBox.x + 60, cursorAnchorBox.y + 60, { steps: 5 });
+  await host.waitForFunction(() => document.querySelector('#screen-game [data-cursor-id]') !== null, undefined, {
+    timeout: 5000,
+  });
+  const cursorLabel = await host.evaluate(() => document.querySelector('#screen-game [data-cursor-id]').textContent);
+  assert(cursorLabel.includes('Bob'), 'remote cursor must be labeled with the sender name');
+  const joinSeesOwnCursor = await join.evaluate(() => document.querySelectorAll('#screen-game [data-cursor-id]').length);
+  assert(joinSeesOwnCursor === 0, 'a client must never render its own cursor back at itself');
+  await join.mouse.up();
+  console.log('cursor broadcast (US-22): labeled remote cursor appears on the other client only');
 
   // A real closed tab fires page-unload lifecycle events (unlike an abrupt
   // process kill), which is what lets PeerJS signal a clean close.
@@ -259,7 +382,9 @@ try {
   );
 
   console.log(
-    'e2e smoke test PASSED (US-1, US-2, US-4, US-6, US-7, US-8, US-11, US-12, US-13, US-14, US-16; D6 disconnect message)',
+    'e2e smoke test PASSED (US-1, US-2, US-4, US-6, US-7, US-8, US-11, US-12, US-13, US-14, US-16, US-19, ' +
+      'US-22, US-23, US-24, US-25; D6 disconnect message, D12 zones, D13 cursor/lift, D14 hand-order ' +
+      'persistence, D15 DEAL_MORE, D16 pass marker)',
   );
 } finally {
   await browser.close();

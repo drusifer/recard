@@ -149,11 +149,72 @@ are resolved.
       implemented/UAT'd/reviewed, Oracle groom, Smith close-out (2 bugs
       found+fixed+re-verified), full retro, launched (see *pm launch).
 
-### Planned Work
-- [ ] Backlog carried into v1.2/v2 planning — see Important Notes above:
-      items 1-3 (reconnect, hand-order persistence, real QR) STILL OPEN;
-      item 6 (dedicated bug-fix phase) escalated as a 2-sprint-running
-      pattern, worth actually doing next sprint rather than re-noting again.
+### Progress — SPRINT 3 ("zones, presence, hand tools"): COMPLETE
+- [x] Drafted US-19..25 in USER_STORIES.md + Feasibility Flag 4 in PRD.md.
+      Flagged 2 open questions rather than assuming: "incremental
+      dealing" (assumed = deal-more-without-wiping, not animation
+      pacing) and cursor/motion granularity (assumed = zone-level, not
+      hand-slot-level, to avoid a privacy side-channel). US-23
+      (hand sort) explicitly folds in the still-open Sprint-1 tech debt
+      (hand order doesn't persist) rather than repeating the same bug
+      with a new feature built on the same foundation.
+- [x] Smith Gate 1 (approved, 5 UX requirements added) + Gate 2
+      (Morpheus's D12-D16 approved)
+- [x] Mouse 9-phase plan (12-20, incl. a dedicated reserved bug-fix
+      phase — item 6 below, finally acted on after 2 sprints of just
+      re-noting it)
+- [x] All 8 implementation phases (12-19) implemented/UAT'd/code-reviewed
+- [x] Oracle groom (DECISIONS.md D12-D16 entry, 4 new lessons, memory.md,
+      README)
+- [x] Smith close-out test: found 1 bug (mini-hand duplicate hand-count,
+      squished with no spacing) — Phase 20 fix, re-UAT'd, re-reviewed,
+      re-tested by Smith, report closed
+- [x] Full team retro posted to CHAT.md, backlog updated below
+- [x] Launched (see *pm launch below)
+
+### Blockers
+None.
+
+### Oracle Consultations
+None this sprint beyond the standard close-out groom handoff.
+
+## Next Steps
+### Immediate Next Action
+Sprint 3 is fully closed. No active sprint queued — next work starts
+when the user brings a new request/backlog item.
+
+### Waiting On
+Nothing.
+
+### Planned Work — backlog for v2 planning
+- [x] Item 2 (hand-order persistence) — DONE this sprint via US-23/D14,
+      not deferred again.
+- [x] Item 6 (dedicated bug-fix phase) — DONE this sprint (Phase 20),
+      worked exactly as intended per Mouse's retro. Retiring this item.
+- [ ] Item 1 (reconnect-after-refresh / host handoff) — STILL OPEN, now
+      3 sprints running. Biggest remaining architectural gap per
+      Morpheus's original Sprint 1 retro note.
+- [ ] Item 3 (real QR code image) — STILL OPEN, 3 sprints running.
+- **New from Sprint 3's retro:**
+  9. Oracle: the continuous-groom gap (record decisions/lessons as they
+     happen, not just at Stage 3 close) was already flagged in Sprint 1's
+     retro and recurred again this sprint unchanged — this is now a
+     repeat-pattern item like #6 was, worth actually acting on next
+     sprint rather than re-noting a third time.
+  10. Smith/Morpheus: add "does this new visual indicator duplicate info
+      already shown elsewhere on the same row/element" as a standing
+      Gate 1 AC / design-review question, same tier as the touch-target-
+      size check adopted after Sprint 2 (item 7) — this sprint's bug
+      (mini-hand count duplicating roster text) is exactly the class of
+      thing that check would catch before implementation, not after.
+  11. Neo: diff the working tree against the last commit at phase/sprint
+      start, don't just trust task.md's checkboxes — this sprint's
+      Phase 18 scaffolding was already sitting uncommitted from an
+      interrupted session and task.md didn't reflect it.
+  12. Trin: "can this assertion fail on purpose" as a standing question
+      for any new regression test, not a one-off — proved genuinely
+      useful twice this sprint (the sort-selector self-catch, the
+      DEAL_MORE mutation test).
 
 ---
-*Last updated: 2026-08-15 15:37*
+*Last updated: 2026-08-15 21:35*

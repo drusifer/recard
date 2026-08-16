@@ -137,6 +137,31 @@ pattern (per-viewer redaction already exists for hands; this is the same
 pattern generalized to middle cards, not a new mechanism) before it goes
 into a sprint.
 
+## Feasibility Flag → Morpheus (4): Named Zones + Live Cursor/Motion Protocol
+New requirement (2026-08-15, post-v1.1-launch, see `docs/USER_STORIES.md`
+"v1.2 backlog" US-19/US-22). Two related architecture questions:
+
+**Zones:** generalize the single `table` array (D7) into a list of named
+zones, each holding cards with the existing per-card `owner`/`faceUp`
+visibility model unchanged. Proposed shape: `zones: [{id, name, cards:
+MiddleCard[]}]`, with a default zone always present so existing single-
+pile play (US-6/US-12/13/14) keeps working unmodified. New actions
+needed: `CREATE_ZONE`, and generalizing `PLAY`/`REVEAL`/`PICKUP` to take a
+`zoneId` instead of assuming the one table. Need Morpheus to confirm this
+is additive to D7 (same redaction rule, just keyed by zone) rather than a
+rearchitecture, and to decide whether moving a card zone→zone is one new
+action or expressed as pickup-to-hand + play-to-new-zone (two existing
+actions) — the latter is simpler but costs an extra round-trip/UI step.
+
+**Live cursor/motion:** extends the existing best-effort motion channel
+(D4, Flag 2) to carry continuous position data, not just a boolean
+"organizing" flag. Need Morpheus to confirm the same throttle/coalesce
+approach scales to per-frame position updates (likely a higher message
+rate than today's hand-organizing cue), and to define the zone-level (not
+hand-slot-level) granularity boundary from US-22's Open Question 2 so a
+future implementer doesn't accidentally leak hand-slot positions that
+could aid inferring card identity via timing/position side-channels.
+
 ## Open Questions
 1. Max players per table? (assume 2–8 until told otherwise). **Min
    players resolved 2026-08-15: 1 player must be supported**, for
@@ -148,10 +173,15 @@ into a sprint.
    accidentally gated later, not because it needs new engineering.
 2. Is game state fully freeform (players just drag/tap cards like a real
    table) or do we model structured zones (hand / discard / draw pile /
-   table) that a host can configure per game? (assumed: structured zones,
-   generic enough to fit most trick-taking/shedding/rummy-style games)
-3. Custom card backs/themes — v1 or later?
+   table) that a host can configure per game? **Resolved 2026-08-15**:
+   structured named zones, per US-19/Feasibility Flag 4 — the "freeform"
+   half of this question is also partly answered by US-22's live-motion
+   work, which makes card movement feel less rigid even within a
+   structured-zone model.
+3. Custom card backs/themes — v1 or later? Still open, still deferred.
 4. Reconnect behavior if a player's browser refreshes or drops mid-session?
+   Still open — carried as Sprint 1 retro backlog item 1, not addressed
+   this sprint either.
 
 ## Success Criteria (v1)
 - A host can start a session and 3+ other players can join from their own

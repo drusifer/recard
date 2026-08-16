@@ -35,13 +35,37 @@ None yet
 Sprint-close documentation grooming for Sprint 2 ("clear backlog", v1.1),
 per sprint.md Stage 3 Step 7.
 
-### Progress
+### Progress — Sprint 2 (v1.1)
 - [x] docs/DECISIONS.md updated
 - [x] agents/oracle.docs/lessons.md updated
 - [x] agents/oracle.docs/memory.md updated
 - [x] README.md updated
 - [x] CHAT.md archived (109 msgs, over threshold) and reset
-- [ ] Hand to Smith for end-to-end user testing
+- [x] Handed to Smith for end-to-end user testing
+
+### Progress — Sprint 3 ("zones, presence, hand tools") groom
+- [x] docs/DECISIONS.md +1 entry (D12-D16, matching the D7-D11 entry's
+      format/depth)
+- [x] agents/oracle.docs/lessons.md +4 lessons: the headless-Chromium
+      native-drag-and-drop gap (mirrors Sprint 1's `page.close()`
+      lifecycle lesson - both are "the test harness, not the app, is the
+      problem" gotchas), a self-check-your-check catch (Trin's first pass
+      at verifying sort read a dataset attribute that doesn't exist and
+      would have trivially rubber-stamped a pass), proving an assertion
+      has teeth via a deliberate mutation test (Trin's DEAL_MORE swap),
+      and task.md drifting stale relative to CHAT.md's actual history.
+- [x] agents/oracle.docs/memory.md updated (Major Decisions +1 row,
+      Repository Structure updated for handOrder.js/64 tests/new e2e
+      coverage)
+- [x] README.md updated: features list now covers zones/sort/Deal More/
+      pass/cursor, removed the now-fixed "hand-drag doesn't persist" known
+      limitation (that was literally this sprint's D14), added the
+      lift-cue-not-pixel-drag scope note in its place, ARCHITECTURE.md
+      index line D1-D6 -> D1-D16.
+- [x] CHAT.md checked: 66 messages, under the 50-100 archive threshold
+      (last reset was for Sprint 1+2's close) - not archived this time.
+- [ ] Hand to Smith for Stage 3 end-to-end test on the full v1.2 feature
+      set.
 
 ### Blockers
 None
@@ -51,16 +75,18 @@ N/A (this is Oracle's own task)
 
 ## Next Steps
 ### Immediate Next Action
-Hand to Smith for Stage 3 Step 8 (`*user test` + `*user feedback`) on the
-full v1.1 feature set.
+Hand to Smith for Stage 3 Step 8 (`*user test` + `*user feedback`) on
+Sprint 3's full feature set (zones, cursor/lift, deck visual, mini-hand,
+hand sort/drag, Deal More, pass marker).
 
 ### Waiting On
 Nothing — groom is done, handing off now.
 
 ### Planned Work
-- [ ] If Smith finds bugs, expect a Trin triage round before retro.
-- [ ] Watch CHAT.md length again at the next sprint's close (reset just
-      happened, so plenty of headroom for now).
+- [ ] If Smith finds bugs, expect a Trin triage round + Phase 20 before
+      retro (same pattern as Sprints 1 and 2).
+- [ ] Watch CHAT.md length again at Sprint 3's actual close (currently 66,
+      still headroom before the 50-100 archive threshold).
 
 ---
-*Last updated: 2026-08-15 15:28*
+*Last updated: 2026-08-15 21:20*

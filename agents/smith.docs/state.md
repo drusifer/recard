@@ -70,19 +70,41 @@ None
 ### Oracle Consultations
 None yet
 
+- [x] Sprint 3 ("zones, presence, hand tools") Stage-3 end-to-end test:
+      ran the real app, two 390px mobile clients, deliberately built a
+      dense scene (3 zones, 5 middle cards across all 3 visibility
+      states, a full 7-card hand, pass marker, live cursor) since this
+      sprint's own Gate 1/2 flagged density risk. **1 bug found**: a
+      player's hand count renders twice - once as roster text `(N
+      cards)`, again as the mini-hand fan's own count badge - squished
+      together with zero spacing since `.mini-hand` has no left margin
+      and is appended with no separator. Reproduced on both clients, with
+      both a long name and a short one, base case not an edge case. Full
+      report: `agents/smith.docs/uat-report-sprint3.md`. Everything else
+      (zones, middle-zone density, move-to, pass propagation, hand sort
+      at full density, cursor labeling/self-exclusion, deck visual) tested
+      clean. Filed to Trin for triage.
+
+- [x] Re-tested the mini-hand fix with the exact original repro
+      scenario: clean now, count shown once, real spacing. Report closed,
+      approved for retro. `agents/smith.docs/uat-report-sprint3.md`.
+
+### Blockers
+None
+
+### Oracle Consultations
+None yet
+
 ## Next Steps
 ### Immediate Next Action
-Waiting on the fix + re-test loop for the 2 bugs found in Sprint 2's
-sprint-close test, then re-approve and move to retro.
+Sprint 3 fully closed out (implementation + bug-fix + re-test). Handing
+to Mouse for the retro.
 
 ### Waiting On
-Nothing — re-tested all 5 fixes via fresh screenshots at 390px and
-1280px. Real, visible improvement (not just "it compiles"): button
-hierarchy is now legible at a glance, sections are clearly grouped,
-cards look like cards, desktop uses its space. Report closed.
+Nothing.
 
 ### Planned Work
-- [ ] None pending.
+- [ ] Next sprint's Gate 1, whenever Cypher opens one.
 
 ---
-*Last updated: 2026-08-15 15:31*
+*Last updated: 2026-08-15 21:29*

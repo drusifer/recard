@@ -331,6 +331,161 @@ mid-session.
 
 ---
 
+## v1.2 backlog: zones, live presence, hand tools, pass marker (2026-08-15)
+
+New requirement, added after v1.1 launch. Generalizes "the middle" (a
+single shared pile, US-12/13/14) into multiple named zones, adds visual
+presence for the deck/other hands, live cursor/motion feedback, hand
+sorting, incremental dealing, and a pass marker.
+
+**Open questions (flagging, not assuming):**
+1. "Incremental dealing" is genuinely ambiguous between two different
+   features: (a) the deal *animates* card-by-card instead of appearing
+   instantly (a visual-pacing nice-to-have), or (b) the host can deal
+   *additional* cards to everyone later in the round without wiping
+   existing hands (a new mechanic — today's `DEAL` action always resets
+   every hand to empty first). **US-24 below assumes (b)** since it's the
+   one that actually changes what's possible to play (some games deal in
+   stages), and (a) is easy to layer on top later as pure animation
+   polish. Flag back if (a) was the actual ask.
+2. "See the motion, or at least see my cursor" for card drags — hand
+   contents are private (US-5), so literally showing an opponent's hand
+   card moving would leak its identity. **US-22 below scopes this as:
+   live cursor/pointer position always (privacy-safe, works for any
+   drag), plus real card-motion visualization specifically for cards
+   already visible to the viewer** (zone-to-zone moves of face-up cards,
+   or your own private zone cards). Not assuming players want to see
+   *where in their hand* an opponent's cursor is hovering vs. just "they're
+   near their hand" — scoped to zone-level position, not hand-slot-level,
+   to avoid re-opening a privacy question by accident.
+
+### US-19: Named zones for laying out cards
+**As** a player, **I want** multiple named areas on the table (not just
+one shared pile), **so that** games like Gin Rummy can have separate
+melds, a discard pile, etc., all visible and usable by anyone.
+**AC:**
+- The middle generalizes to a list of zones, each with a name and its own
+  cards (existing US-12/13/14 visibility rules — public / shared
+  face-down / privately-owned face-down — apply per-card within any
+  zone, unchanged).
+- Any player can create a new zone (a name, nothing fancier) and move any
+  card they're allowed to see between hand ↔ zone or zone ↔ zone — "put
+  or take" access is open to all players, per the request, consistent
+  with the app's no-turn-enforcement design.
+- All zones are visible to all players (zone existence and card counts
+  are always public, even if individual cards within a zone are hidden
+  per their own visibility rule).
+- A default zone always exists so existing single-pile play (War, poker
+  community cards) keeps working without every game needing to create
+  zones first.
+- **Smith UX requirement (Gate 1):** zone names must always be visible as
+  labels on the table, never just implied by position (Nielsen #6
+  Recognition, not recall). Creating a zone requires typing a name (no
+  silent "Zone 4" auto-numbering) so the table stays legible as more
+  zones accumulate over a session.
+
+### US-20: See the deck, not just a number
+**As** a player, **I want** the draw deck rendered as a visible stack,
+**so that** the table looks and feels like it has a real deck on it, not
+just a text counter.
+**AC:**
+- The deck renders as a face-down card stack; the remaining count is
+  still shown (as a label/badge), not replaced.
+- Purely presentational — no change to draw mechanics (US-7).
+
+### US-21: See other players' hands as closed cards
+**As** a player, **I want** to see a row of face-down cards for each
+other player representing their hand, **so that** the table reads as
+"everyone has cards in hand," not just a name and a number.
+**AC:**
+- Renders one face-down card per card in that player's hand count —
+  purely visual, no new data is sent (already-public hand *count* is all
+  this needs, per US-8's existing privacy guarantee).
+- Does not replace the existing text roster row, sits alongside it.
+- **Smith UX requirement (Gate 1):** must stay compact as hand size and
+  player count grow — a full-size card-back per card, per opponent, for
+  3+ players with 10+ cards each would flood the screen (Nielsen #8
+  Aesthetic and Minimalist Design). Use a condensed/overlapping
+  representation, not one full card slot per card.
+
+### US-22: Live drag motion and cursor visibility
+**As** a player, **I want** other players to see me actively moving a
+card (or at least see my cursor), **so that** the table feels live and
+responsive, closer to sitting across from someone.
+**AC:**
+- Best-effort, cosmetic-only, per the existing motion model (Principle 6,
+  US-11, ARCHITECTURE.md D4) — dropping frames under load only costs
+  smoothness, never correctness.
+- At minimum: while a player is dragging anything, other clients see a
+  labeled cursor/pointer indicator tracking their live position.
+- Where privacy allows (see Open Question 2 above): actual card motion is
+  shown, not just a cursor, for drags of cards the viewer can already see
+  the identity of.
+- Never reveals a hand card's identity via motion alone (same invariant
+  as today's US-11 AC) — motion data must not let a viewer infer rank/
+  suit through position, timing, or any other side channel.
+- **Smith UX requirement (Gate 1):** cursor indicators must be labeled
+  (whose cursor) and visually light (small, not a full-opacity blocking
+  element) — Nielsen #1 Visibility of System Status without turning into
+  visual noise when 4+ players are all moving things at once.
+
+### US-23: Sort my hand by suit or rank
+**As** a player, **I want** one-tap buttons to sort my hand by suit or by
+rank, **so that** I don't have to manually drag cards into order.
+**AC:**
+- Two buttons ("Sort by rank", "Sort by suit") reorder the local hand
+  display.
+- **Fixes existing tech debt** (Sprint 1 retro backlog item 2): today's
+  manual drag-reorder is purely cosmetic and gets wiped by the next state
+  broadcast — sorting would have the exact same bug if built on the same
+  foundation. This story includes making hand order durable client-side
+  (survives state updates: existing cards keep their position, newly
+  drawn/dealt cards append, removed cards drop out) so both drag-reorder
+  and the new sort buttons actually stick.
+- Sorting is local-only — never broadcast, never affects other players'
+  views (consistent with hand privacy, US-5).
+- **Smith UX requirement (Gate 1):** sort buttons and manual drag-reorder
+  must not fight each other — sorting sets an order, dragging afterward
+  should still work from that new order rather than snapping back
+  (Nielsen #3 User Control and Freedom — one action shouldn't silently
+  undo another).
+
+### US-24: Incremental dealing
+**As** a host, **I want** to deal additional cards to everyone later in a
+round without discarding hands already dealt, **so that** games that deal
+in stages are possible.
+**AC:** (see Open Question 1 — this story assumes interpretation (b))
+- A "Deal More" action adds N cards to every player's existing hand
+  without clearing it first (today's `DEAL` always resets hands to empty
+  — this is a genuinely new action, not a change to existing `DEAL`,
+  since some games really do want the reset-then-deal behavior too).
+- Throws the same "not enough cards left" guard as today's deal.
+- **Smith UX requirement (Gate 1):** "Deal More" must be visually and
+  spatially distinct from "Deal & Start" so a host mid-game can't
+  mis-tap and accidentally trigger the wrong one (Nielsen #5 Error
+  Prevention) — different label, not adjacent buttons of the same style.
+
+### US-25: Pass marker
+**As** a player, **I want** to mark myself as having passed, **so that**
+everyone can see who's passed without asking out loud.
+**AC:**
+- A per-player toggleable marker, visible to all (like a small "Passed"
+  tag next to their roster row).
+- Self-toggle only — unlike score (anyone can adjust anyone's), a pass
+  marker represents *your own* declared state, so only you can set/clear
+  yours (consistent with US-13's precedent: actions that represent a
+  personal declaration get an authorization boundary, shared actions
+  don't).
+- Clears on `RESET` (new round) — unlike score, which intentionally spans
+  rounds, a pass is round-scoped by definition.
+
+### "More fun" (general)
+Not a discrete deliverable — addressed by the above (a livelier, more
+game-like table) plus the prior sprint's UX overhaul. Not tracking as a
+separate story.
+
+---
+
 ## Deferred / Stretch
 - Scannable QR code image for joining (v1 ships join-code + Copy Link
   instead; descoped 2026-08-15, see CHAT.md Neo→Cypher).

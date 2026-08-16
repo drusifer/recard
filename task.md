@@ -159,3 +159,145 @@ Covers: full-sprint verification.
 
 ### Sprint 2 status
 Phase 6-11: DONE — all phases complete.
+
+---
+
+## Sprint 3 ("zones, presence, hand tools") — IN PROGRESS
+
+Covers US-19..25. Architecture: `docs/ARCHITECTURE.md` D12-D16. Bigger
+than sprints 1-2, so more phases; includes a **dedicated bug-fix phase**
+(20) instead of tailing fixes onto the last implementation phase, per the
+2-sprint-escalated retro process note.
+
+### Phase 12 — Zones data model ✅ DONE
+- [x] T12.1 `src/state.js`: `table` → `zones: {id,name,cards}[]` with a
+      default zone; `CREATE_ZONE {name}`; `MOVE_CARD {playerId, cardId,
+      toZoneId}` (auth mirrors REVEAL: hidden-private → owner only,
+      visible → anyone); `PLAY` gains optional `zoneId` (defaults to the
+      default zone — no existing call site needs to change)
+- [x] T12.2 `src/state.js`: `REVEAL`/`PICKUP` search across all zones by
+      card id (ids are globally unique, D12) — signatures unchanged
+- [x] T12.3 `tests/state.test.js`: zone creation, move-card authorization
+      (both allow/deny paths), cross-zone reveal/pickup, regression that
+      existing single-zone PLAY/REVEAL/PICKUP calls still work unmodified.
+      12 new tests, 49/49 total passing first try. Added a transitional
+      `view.table` alias (= default zone's cards) so `npm run test:e2e`
+      stays green through phases 12-14 with zero UI changes yet — removed
+      once Phase 15 migrates ui.js/main.js to the real `zones` array.
+Covers: US-19 (data layer).
+
+### Phase 13 — Incremental dealing + pass marker ✅ DONE
+- [x] T13.1 `src/state.js`: `DEAL_MORE {cardsPerPlayer}` — factored the
+      round-robin distribution logic out of `DEAL` into a shared
+      `dealCards()` helper both actions call, rather than duplicating it
+- [x] T13.2 `src/state.js`: `state.passed`, init `false` on `JOIN`,
+      `TOGGLE_PASS {playerId}`, `RESET` clears `passed` (regression:
+      confirmed `RESET` still leaves `scores` untouched, per D9)
+- [x] T13.3 `tests/state.test.js`: DEAL_MORE (incl. not-enough-cards
+      guard), pass toggle/reset, regression on scores-vs-passed RESET
+      behavior diverging correctly. 6 new tests, 55/55 total, first try.
+      e2e still unchanged/green.
+Covers: US-24, US-25 (data layer).
+
+### Phase 14 — Hand order module ✅ DONE
+- [x] T14.1 `src/handOrder.js`: `reconcileOrder(prevOrder, currentCards)`,
+      `sortByRank(cards)`, `sortBySuit(cards)` — pure, no DOM
+- [x] T14.2 `tests/handOrder.test.js`: reconcile keeps existing positions/
+      appends new/drops removed; sort correctness for both axes. 10 new
+      tests, 64/64 total, first try. e2e unaffected (no UI touched yet).
+Covers: US-23 (logic layer, fixes Sprint-1 tech debt).
+
+### Phase 15 — Zones UI ✅ DONE (verified live, real WebRTC)
+- [x] T15.1 `src/ui.js`: `renderZones()` replaces `renderTable()` —
+      every zone gets its own labeled sub-panel (name + live count),
+      removed the transitional `view.table` alias from state.js now that
+      main.js/ui.js are fully migrated (re-ran full test+e2e suite after
+      removal to prove it was safe, not just assumed)
+- [x] T15.2 `src/main.js` + `index.html`: zone creation control (name
+      required, no auto-numbering, per Smith Gate 1), move-card
+      interaction via a per-card "Move to…" select (only shown when
+      there's another zone to move to, and only for cards the viewer has
+      authority/visibility over)
+- Live 2-browser check: zone creation propagates to both clients,
+  MOVE_CARD zone-to-zone propagates live, screenshotted and visually
+  confirmed correct (zone names/counts always visible, per Gate 1).
+Covers: US-19 (UI layer).
+
+### Phase 16 — Deck + opponent hands visualization ✅ DONE (visually verified live)
+- [x] T16.1 `src/ui.js`: `renderDeck()` — face-down card stack + count
+      badge (US-20), used in both the host lobby and the game screen
+- [x] T16.2 `src/ui.js`: `renderMiniHand()` — compact fan (max 5 visible
+      backs + a count badge) per other player, alongside (not replacing)
+      the existing text count (US-21, Smith Gate 1)
+- Caught and fixed a real visual bug during screenshot verification: mini
+  hand card-backs were the exact same color as the roster row background
+  (`--surface-2` on `--surface-2`), rendering them invisible. Not
+  hypothetical - seen directly in a screenshot, fixed, re-verified
+  visible in a second screenshot before calling this done.
+Covers: US-20, US-21.
+
+### Phase 17 — Cursor + lift-cue motion ✅ DONE (verified live, real WebRTC)
+- [x] T17.1 `src/main.js`: broadcast normalized (0-1) pointer position
+      while the pointer is down anywhere on the game screen, throttled
+      via the existing `motionThrottler` (D13 — no protocol.js changes
+      needed, exactly as architected)
+- [x] T17.2 `src/ui.js`: `updateRemoteCursor()`/`removeRemoteCursor()` —
+      labeled, lightweight dot, auto-clears via TTL if updates stop
+      arriving (best-effort, same pattern as the existing hand-motion cue)
+- [x] T17.3 `src/main.js` + `src/ui.js`: card-lift cue via
+      pointerdown/up/leave on zone cards (not HTML5 drag-and-drop — a
+      "held" state is simpler and works uniformly for touch/mouse);
+      `setCardLifted()` toggles a cosmetic CSS state. Verified privacy-
+      safe: only the card id is broadcast (already known to every viewer
+      even in redacted form), so this works identically for face-down
+      and face-up zone cards with no rank/suit leak.
+- Live 2-browser check: remote cursor appears/labeled correctly/clears on
+  pointer-up, card-lift highlight propagates live — both screenshotted.
+Covers: US-22.
+
+### Phase 18 — Hand sort, Deal More UI, pass marker UI
+- [x] T18.1 `src/ui.js` + `src/main.js`: "Sort by rank"/"Sort by suit"
+      buttons wired to `handOrder.js`; existing drag-reorder updated to
+      share the same order list (Smith Gate 1: sort and drag must not
+      fight each other)
+- [x] T18.2 `index.html` + `src/main.js`: "Deal More" control, styled/
+      placed distinctly from "Deal & Start" (Smith Gate 1 AC)
+- [x] T18.3 `src/ui.js` + `src/main.js`: pass-marker toggle button +
+      "Passed" tag in the roster
+Covers: US-23 (UI layer), US-24 (UI layer), US-25 (UI layer).
+
+### Phase 19 — e2e verification (final implementation phase)
+- [x] T19.1 `tests/e2e.smoke.mjs`: zones (create, move card zone→zone,
+      pickup from a non-default zone), DEAL_MORE, pass-marker propagation
+- [x] T19.2 `tests/e2e.smoke.mjs`: hand sort persists across a state
+      update (regression-proves D14 actually fixed the old bug), cursor
+      broadcast basic check
+- [x] T19.3 Full regression (`npm test` + `npm run test:e2e`, stable
+      multi-run) + a visual screenshot pass at mobile/desktop viewports —
+      this sprint has real density/scalability risk (Smith flagged it),
+      check before declaring done, not just after Smith finds it
+Covers: full-sprint verification.
+
+### Phase 20 — Dedicated bug-fix phase
+Populated from Smith's Stage-3 close-out test (`agents/smith.docs/
+uat-report-sprint3.md`):
+- [x] T20.1 `src/ui.js` (`renderRoster`/`renderMiniHand`) +
+      `style.css` (`.mini-hand`): another player's hand count currently
+      renders twice - once as the roster row's own `(N cards)` text
+      (`src/ui.js:310`), again as the mini-hand fan's count badge
+      (`src/ui.js:301`, same `handCount` value) - with no spacing between
+      the two, so they visually run together (`.mini-hand` has no left
+      margin, `style.css:295-299`). Drop the duplicate count from one of
+      the two places, and add real spacing regardless.
+Covers: Sprint 3 close-out bug fix (US-21).
+
+### Sprint 3 status
+Phase 12: Done
+Phase 13: Done
+Phase 14: Done
+Phase 15: Done
+Phase 16: Done
+Phase 17: Done
+Phase 18: Done
+Phase 19: Done
+Phase 20: Done — Smith re-tested and closed the report

@@ -14,6 +14,14 @@
   phases (6-8) from UI phases (9-10) since they're independently
   verifiable and data-layer work has no DOM/network dependency (same
   pattern that worked well in Sprint 1).
+- Sprint 3 ("zones, presence, hand tools," v1.2, US-19..25) broken into
+  9 phases (12-20): 3 data-layer (zones/DEAL_MORE+pass/hand-order-module),
+  4 UI (zones/deck+hands/cursor+lift/sort+deal-more+pass), 1 e2e
+  verification, and — new this sprint — **Phase 20 is a dedicated,
+  reserved bug-fix phase**, deliberately left unfilled until Smith's
+  close-out test runs, instead of tailing fixes onto the last impl
+  phase. This directly answers the process note that had been re-raised
+  at both prior sprint retros without being acted on.
 
 ### Key Findings
 - Phases 1-2 are pure logic (unit-testable, no DOM/network) and can move
@@ -35,11 +43,13 @@ Break the Recard sprint into small phases and get Morpheus's sign-off
 before kicking off the Phase Bloop (Neo → Trin → Morpheus per phase).
 
 ### Progress — Sprint 1: DONE (5/5 phases shipped)
+### Progress — Sprint 2: DONE (6/6 phases shipped)
 
-### Progress — Sprint 2 (v1.1)
-- [x] Wrote `task.md` Sprint 2 section, 6 phases (6-11), 2-3 tasks each
+### Progress — Sprint 3 (v1.2)
+- [x] Wrote `task.md` Sprint 3 section, 9 phases (12-20, incl. reserved
+      bug-fix phase 20), 2-3 tasks each
 - [ ] Morpheus review of phase plan
-- [ ] Phase Bloop x6
+- [ ] Phase Bloop x8 (12-19) + Phase 20 during Stage 3
 
 ### Blockers
 None

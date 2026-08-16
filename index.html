@@ -44,6 +44,7 @@
       <p>Share this code or link with the room:</p>
       <div id="share-code-container"></div>
       <p id="host-deck-config" class="deck-config"></p>
+      <div id="host-deck-area" class="deck-area"></div>
       <ul id="host-roster" class="roster"></ul>
       <label>Cards per player <input id="cards-per-player" type="number" min="1" max="20" value="7" /></label>
       <button id="deal-btn" type="button" class="btn-primary">Deal &amp; Start</button>
@@ -64,14 +65,28 @@
   <main id="screen-game" class="screen" hidden>
     <section class="panel panel-felt">
       <h2>Table</h2>
-      <div id="table-area" class="card-row"></div>
+      <div id="game-deck-area" class="deck-area"></div>
+      <div id="table-area"></div>
+      <div class="btn-row">
+        <input id="new-zone-name" type="text" placeholder="New zone name" maxlength="24" />
+        <button id="create-zone-btn" type="button">Add Zone</button>
+      </div>
     </section>
     <section class="panel">
       <h2>Players</h2>
       <ul id="game-roster" class="roster"></ul>
+      <div class="btn-row">
+        <input id="deal-more-count" type="number" min="1" max="20" value="1" />
+        <button id="deal-more-btn" type="button" hidden>Deal More (no reset)</button>
+      </div>
     </section>
     <section class="panel">
       <h2>Your hand</h2>
+      <div class="btn-row">
+        <button id="sort-rank-btn" type="button">Sort by rank</button>
+        <button id="sort-suit-btn" type="button">Sort by suit</button>
+        <button id="pass-toggle-btn" type="button">Pass</button>
+      </div>
       <div id="hand-area" class="card-row"></div>
       <div class="btn-row">
         <button id="draw-btn" type="button" class="btn-primary">Draw</button>
