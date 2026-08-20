@@ -1,3 +1,6 @@
+import { resolveDropTarget } from './dropTarget.js';
+import { step as touchDragStep, HOLD_MS } from './touchDrag.js';
+import { ACTIONS, PILE_ACTIONS, actionsForCard, pileLevelActions, targetsForAction } from './pileActions.js';
 import { seatPosition } from './seating.js';
 
 const SUIT_SYMBOL = { clubs: '♣', diamonds: '♦', hearts: '♥', spades: '♠' };
@@ -52,23 +55,240 @@ function ownerTag(name) {
 }
 
 /**
+ * How far above the finger the drag ghost floats (Smith Gate 2 #2). A
+ * ghost centred on the touch point is under the hand holding the phone,
+ * and so is the `drop-onto`/`drop-before` hint beneath it — the feedback
+ * this whole story exists to deliver would arrive exactly where it can't
+ * be seen. There is no mouse equivalent of this problem, which is why a
+ * design derived from the mouse path misses it.
+ */
+const GHOST_LIFT_PX = 28;
+
+/**
+ * Finds what a touch point is over. `setPointerCapture` stops events
+ * retargeting, so hit-testing has to be explicit — and the ghost is
+ * `pointer-events: none` precisely so it never hit-tests as itself.
+ */
+function touchTargetAt(x, y) {
+  const el = document.elementFromPoint(x, y);
+  if (!el) return null;
+  const handCard = el.closest('#hand-area .hand-card');
+  if (handCard) return { kind: 'hand', el: handCard };
+  const zone = el.closest('.zone[data-zone-id]');
+  if (zone) return { kind: 'zone', el: zone, row: zone.querySelector('.card-row') };
+  return null;
+}
+
+/** Clone of the *rendered* card face, never a re-render from card data:
+ *  a redacted card is only redacted in the DOM, so cloning is safe by
+ *  construction where rebuilding would not be. The face is cloned rather
+ *  than the wrapper because the wrapper also holds the action row. */
+function makeDragGhost(sourceEl) {
+  const face = sourceEl.querySelector('.card') ?? sourceEl;
+  const rect = face.getBoundingClientRect();
+  const ghost = face.cloneNode(true);
+  ghost.classList.add('touch-drag-ghost');
+  ghost.removeAttribute('data-card-id'); // never hit-testable, never queryable as the real card
+  ghost.style.width = `${rect.width}px`;
+  ghost.style.height = `${rect.height}px`;
+  document.body.appendChild(ghost);
+  return ghost;
+}
+
+/**
+ * Positions the ghost with `left`/`top`, NOT a `transform` translate.
+ * Smith found the ghost landing 38px *below* the finger despite code that
+ * reads as if it floats it above: the `scale` property composes outside
+ * the `transform` property, so a translate written here is itself
+ * multiplied by the scale (and taken about the transform origin) - the
+ * ghost drifted 12% further down the page the further it travelled.
+ * `left`/`top` don't participate in that composition at all, so the pop
+ * animation and the positioning stop having any relationship to argue
+ * about. Same trap as the earlier animation-vs-inline-transform one, from
+ * the other side: two ways to move an element are not interchangeable.
+ */
+function moveDragGhost(ghost, x, y) {
+  ghost.style.left = `${x - ghost.offsetWidth / 2}px`;
+  ghost.style.top = `${y - ghost.offsetHeight - GHOST_LIFT_PX}px`;
+}
+
+/**
+ * Touch drag for one card (US-40, D28). The recognizer in `touchDrag.js`
+ * decides *when* a drag exists; everything DOM-shaped — capture,
+ * hit-testing, the ghost — lives here. Crucially, the drop itself is
+ * `performHandReorder` / `performZoneDrop`, the same functions the
+ * native `drop` listeners call: there is one implementation of what a
+ * drop means, so touch and mouse cannot drift apart.
+ *
+ * Mouse pointers are ignored outright — native HTML5 DnD still owns
+ * them, and it gives us the drag image, Escape-to-cancel and cursor
+ * feedback for free.
+ */
+function attachTouchDrag(sourceEl, card, ctx) {
+  let state = null;
+  let timer = null;
+  let ghost = null;
+  let hinted = null; // the zone currently showing drop feedback
+
+  const clearHint = () => {
+    if (hinted) clearZoneDragOver(hinted.el, hinted.row);
+    hinted = null;
+  };
+
+  const teardown = () => {
+    clearTimeout(timer);
+    ghost?.remove();
+    ghost = null;
+    sourceEl.classList.remove('card-dragging');
+    clearHint();
+  };
+
+  const handle = {
+    lift: (ev) => {
+      // Morpheus, Phase 43 review: every state broadcast rebuilds the
+      // cards, and a broadcast mid-hold is routine - any other player
+      // drawing causes one. That detaches `sourceEl` while the 250ms
+      // timer is still armed. Removal during pointer capture *should*
+      // fire `pointercancel` and clear it, but leaning on that leaves a
+      // ghost cloned from a zero-sized rect, appended to `body`, with no
+      // surviving handler to remove it. Checking the DOM directly costs
+      // nothing and doesn't depend on a browser being well-behaved.
+      if (!sourceEl.isConnected) {
+        state = null;
+        return;
+      }
+      ghost = makeDragGhost(sourceEl);
+      moveDragGhost(ghost, ev.x, ev.y);
+      sourceEl.classList.add('card-dragging');
+      // Smith Gate 2 #1: the D13 cue fires HERE, not on raw pointerdown.
+      // Bound to pointerdown it announced a lift the instant a finger
+      // landed — so the rest of the table saw you pick a card up before
+      // you did, and a finger merely brushing a card on its way to
+      // scrolling broadcast a lift that never happened.
+      ctx.onCardLift?.(card.id, true);
+      ctx.onHandMotion?.(true);
+    },
+    move: (ev) => {
+      if (!ghost) return; // the lift was refused above; there is nothing in flight
+      moveDragGhost(ghost, ev.x, ev.y);
+      ctx.onCardDrag?.(card, ev.x, ev.y);
+      const target = touchTargetAt(ev.x, ev.y);
+      if (hinted && (target?.kind !== 'zone' || target.el !== hinted.el)) clearHint();
+      if (target?.kind === 'zone') {
+        showZoneDragOver(target.el, target.row, { x: ev.x, y: ev.y });
+        hinted = target;
+      }
+    },
+    drop: (ev) => {
+      if (!ghost) return;
+      const target = touchTargetAt(ev.x, ev.y);
+      teardown();
+      ctx.onCardLift?.(card.id, false);
+      ctx.onHandMotion?.(false);
+      ctx.onCardDrag?.(null, 0, 0);
+      if (!target) return; // dropped in dead space: a no-op, same as mouse
+      if (target.kind === 'hand') {
+        // A card that isn't in the hand resolves to nothing here, which
+        // is the same no-op the native path gives it.
+        performHandReorder(target.el.parentElement, card.id, target.el, ctx.onReorder);
+      } else if (ctx.onDropCard) {
+        performZoneDrop(target.el, target.row, target.el.dataset.zoneId, card.id,
+          { x: ev.x, y: ev.y }, ctx.onDropCard);
+      }
+    },
+    cancel: () => {
+      if (!ghost) return;
+      teardown();
+      // Smith Gate 1 #5: end the gesture properly. The 2s motion TTL is
+      // a backstop for dropped packets, not a way to finish a drag.
+      ctx.onCardLift?.(card.id, false);
+      ctx.onHandMotion?.(false);
+      ctx.onCardDrag?.(null, 0, 0);
+    },
+  };
+
+  const feed = (sample) => {
+    const out = touchDragStep(state, sample);
+    state = out.state;
+    for (const ev of out.events) handle[ev.type](ev);
+  };
+
+  sourceEl.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse') return;
+    feed({ type: 'down', x: e.clientX, y: e.clientY, t: performance.now() });
+    clearTimeout(timer);
+    // A finger that never moves fires no pointermove, so the timer is
+    // the only thing that can start the drag.
+    timer = setTimeout(() => feed({ type: 'tick', t: performance.now() }), HOLD_MS);
+    sourceEl.setPointerCapture(e.pointerId);
+  });
+  sourceEl.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'mouse') return;
+    feed({ type: 'move', x: e.clientX, y: e.clientY, t: performance.now() });
+  });
+  sourceEl.addEventListener('pointerup', (e) => {
+    if (e.pointerType === 'mouse') return;
+    clearTimeout(timer);
+    feed({ type: 'up', x: e.clientX, y: e.clientY, t: performance.now() });
+  });
+  sourceEl.addEventListener('pointercancel', (e) => {
+    if (e.pointerType === 'mouse') return;
+    clearTimeout(timer);
+    feed({ type: 'cancel', t: performance.now() });
+  });
+
+  // `touch-action` is resolved when the touch STARTS, so switching it to
+  // `none` at lift time does nothing for the gesture already in flight —
+  // and setting it up front would kill scrolling on every card forever,
+  // which is the exact failure the AC forbids. Cancelling `touchmove`
+  // instead works mid-gesture, and is safe here because a drag only
+  // exists after 250ms of stillness, by which point the browser has not
+  // begun scrolling and will still honour preventDefault.
+  sourceEl.addEventListener('touchmove', (e) => {
+    if (state?.phase === 'dragging') e.preventDefault();
+  }, { passive: false });
+}
+
+/**
+ * D28: the one implementation of "reorder my hand", called by both the
+ * native `drop` listener and the touch recognizer. Extracted before any
+ * touch code existed, specifically so there can never be two of these -
+ * two placement paths would drift, and only the mouse one is covered by
+ * the e2e suite.
+ *
+ * `beforeEl` is the hand card the dragged card lands in front of, or
+ * null to move it to the end.
+ */
+function performHandReorder(container, draggedId, beforeEl, onReorder) {
+  if (!draggedId) return;
+  const draggedEl = container.querySelector(`[data-card-id="${CSS.escape(draggedId)}"]`)?.closest('.hand-card');
+  if (!draggedEl || draggedEl === beforeEl) return;
+  container.insertBefore(draggedEl, beforeEl);
+  const newOrder = [...container.children].map((el) => el.querySelector('.card').dataset.cardId);
+  onReorder?.(newOrder);
+}
+
+/**
  * Renders your own hand. Cards are draggable so you can reorder your own
  * view of your hand (a purely local/cosmetic preference - hand order isn't
  * part of authoritative state). `onHandMotion` fires on drag start/end so
  * the caller can broadcast a best-effort "organizing hand" cue (US-11) -
  * it never reveals which/how many cards moved, just that motion happened.
  *
- * Playing a card is one tap (public, unchanged from v1). Playing it
- * face-down is a second, smaller pair of buttons on the same card
- * (Smith Gate 1: don't cost the common path anything extra) rather than
- * a new gesture (Smith Gate 1: reuse tap, don't invent long-press/etc.).
+ * Playing a card is one tap, or a drag onto a zone. Face-down play used
+ * to be a pair of icon buttons under *every* card; with drag-and-drop
+ * (US-28/32/33) that per-card clutter cost the whole hand vertical room
+ * for a rarely-used option, so it moved to one control in the hand
+ * toolbar that sets what the *next* play does. The capability is
+ * unchanged - US-12/13/14 community and hole cards still work - it's
+ * just stated once instead of 2xN times.
  *
  * `onReorder(newOrderIds)` fires after a manual drag-reorder completes,
  * so the caller can fold the result into the same order list the sort
  * buttons write to (D14) - sorting and dragging share one source of
  * truth instead of fighting each other (Smith Gate 1).
  */
-export function renderHand(container, cards, { onPlay, onPlayFacedown, onHandMotion, onReorder, onCardDrag } = {}) {
+export function renderHand(container, cards, { onPlay, onHandMotion, onReorder, onCardDrag, onDropCard } = {}) {
   container.innerHTML = '';
   cards.forEach((card, i) => {
     const wrapper = document.createElement('div');
@@ -98,38 +318,14 @@ export function renderHand(container, cards, { onPlay, onPlayFacedown, onHandMot
     wrapper.addEventListener('dragover', (e) => e.preventDefault());
     wrapper.addEventListener('drop', (e) => {
       e.preventDefault();
-      const draggedId = e.dataTransfer.getData('text/plain');
-      const draggedEl = container.querySelector(`[data-card-id="${CSS.escape(draggedId)}"]`)?.closest('.hand-card');
-      if (draggedEl && draggedEl !== wrapper) {
-        container.insertBefore(draggedEl, wrapper);
-        const newOrder = [...container.children].map((el) => el.querySelector('.card').dataset.cardId);
-        onReorder?.(newOrder);
-      }
+      performHandReorder(container, e.dataTransfer.getData('text/plain'), wrapper, onReorder);
     });
+    // US-40/D28: the same three things a mouse drag does - play onto a
+    // zone, reorder within the hand, broadcast live motion - now reachable
+    // with a finger, through the same functions.
+    attachTouchDrag(wrapper, card, { onDropCard, onReorder, onCardDrag, onHandMotion });
 
     wrapper.appendChild(cardEl(card, { onClick: onPlay }));
-
-    if (onPlayFacedown) {
-      const fdRow = document.createElement('div');
-      fdRow.className = 'hand-card-fd-row';
-
-      const sharedBtn = document.createElement('button');
-      sharedBtn.type = 'button';
-      sharedBtn.className = 'fd-btn';
-      sharedBtn.title = 'Play face-down, hidden from everyone';
-      sharedBtn.textContent = '🂠';
-      sharedBtn.addEventListener('click', () => onPlayFacedown(card, 'shared-facedown'));
-
-      const privateBtn = document.createElement('button');
-      privateBtn.type = 'button';
-      privateBtn.className = 'fd-btn';
-      privateBtn.title = 'Play face-down, private to you';
-      privateBtn.textContent = '🔒';
-      privateBtn.addEventListener('click', () => onPlayFacedown(card, 'private-facedown'));
-
-      fdRow.append(sharedBtn, privateBtn);
-      wrapper.appendChild(fdRow);
-    }
 
     container.appendChild(wrapper);
   });
@@ -171,24 +367,147 @@ function moveToControl(card, currentZoneId, allZones, onMoveCard) {
  * (state.js's viewFor — see ARCHITECTURE.md D7). `resolveOwnerName` maps
  * an owner id to a display name (the caller already has the roster).
  */
-function renderZoneCards(
-  container,
-  zone,
-  allZones,
-  { resolveOwnerName, onReveal, onPickup, onMoveCard, onCardLift, onCardDrag } = {},
-) {
+
+// --- Card actions (D25) ------------------------------------------------
+// Hovering a card reveals what it can do; choosing an action lights up
+// every pile that can receive it, and clicking one completes the move.
+// Which actions exist, and which piles qualify, both come from
+// `pileActions.js` rather than being re-derived here - so the offer can
+// never disagree with the rule.
+
+let cancelTargeting = null;
+
+/** Drops any in-progress targeting and removes every highlight. */
+export function clearPileTargets() {
+  for (const el of document.querySelectorAll('.pile-target')) {
+    el.classList.remove('pile-target');
+  }
+  document.body.classList.remove('targeting');
+  if (cancelTargeting) {
+    cancelTargeting();
+    cancelTargeting = null;
+  }
+}
+
+/** The element standing in for a pile id, for highlighting/clicking. */
+function pileElement(pileId) {
+  if (pileId === HAND_PILE_ID) return document.getElementById('hand-area');
+  return document.querySelector(`.zone[data-zone-id="${CSS.escape(pileId)}"]`);
+}
+
+const HAND_PILE_ID = '__hand__';
+
+/**
+ * Highlights every pile that accepts `action` and waits for a click.
+ * Escape or a click anywhere else cancels, so the user is never stuck in
+ * a mode they can't leave (Nielsen #3).
+ */
+function beginTargeting(action, targetIds, onChoose) {
+  clearPileTargets();
+  const els = targetIds.map(pileElement).filter(Boolean);
+  if (els.length === 0) return;
+
+  document.body.classList.add('targeting');
+  const onPick = (e) => {
+    const el = e.currentTarget;
+    e.preventDefault();
+    e.stopPropagation();
+    const id = el.id === 'hand-area' ? HAND_PILE_ID : el.dataset.zoneId;
+    clearPileTargets();
+    onChoose(id);
+  };
+  const onEscape = (e) => { if (e.key === 'Escape') clearPileTargets(); };
+  const onElsewhere = () => clearPileTargets();
+
+  for (const el of els) {
+    el.classList.add('pile-target');
+    el.addEventListener('click', onPick);
+  }
+  document.addEventListener('keydown', onEscape);
+  // Deferred so the click that opened targeting doesn't immediately close it.
+  setTimeout(() => document.addEventListener('click', onElsewhere, { once: true }), 0);
+
+  cancelTargeting = () => {
+    for (const el of els) el.removeEventListener('click', onPick);
+    document.removeEventListener('keydown', onEscape);
+    document.removeEventListener('click', onElsewhere);
+  };
+}
+
+/**
+ * The hover-revealed action row for one card in a zone.
+ */
+function actionMenuEl(zone, card, allZones, opts) {
+  const { viewerId, onReveal, onPickup, onMoveCard } = opts;
+  const pile = { id: zone.id, kind: 'zone', ownerId: zone.ownerId ?? null };
+  const available = actionsForCard(pile, card, viewerId);
+  if (available.length === 0) return null;
+
+  const piles = [
+    ...allZones.map((z) => ({ id: z.id, kind: 'zone', ownerId: z.ownerId ?? null })),
+    { id: HAND_PILE_ID, kind: 'hand', ownerId: viewerId },
+  ];
+
+  const row = document.createElement('div');
+  row.className = 'middle-card-actions';
+
+  for (const action of available) {
+    const spec = ACTIONS[action];
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'action-btn';
+    btn.dataset.action = action;
+    btn.textContent = spec.label;
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (action === 'reveal') {
+        clearPileTargets();
+        // Revealing your *own* private card is irreversible and only you
+        // can undo the decision by not making it - so it stays
+        // confirm-gated, exactly as before D25. Turning over a shared
+        // face-down card is not owned by anyone and stays a single tap.
+        const mine = card.owner != null && card.owner === viewerId;
+        if (mine && !window.confirm('Reveal this card to everyone? This cannot be undone.')) return;
+        onReveal?.(card.id);
+        return;
+      }
+      const targets = targetsForAction(action, piles, { viewerId, fromPileId: zone.id });
+      beginTargeting(action, targets, (targetId) => {
+        if (action === 'pickup') onPickup?.(card.id);
+        else if (action === 'move') onMoveCard?.(card.id, targetId);
+      });
+    });
+    row.appendChild(btn);
+  }
+  return row;
+}
+
+function renderZoneCards(container, zone, allZones, opts = {}) {
+  const { resolveOwnerName, onMoveCard, onCardLift, onCardDrag } = opts;
   container.innerHTML = '';
   for (const card of zone.cards) {
     const wrapper = document.createElement('div');
     wrapper.className = 'middle-card';
+    // US-32/33: `data-card-id` makes the wrapper hit-testable for
+    // drop-region detection; `data-layout` is what style.css keys the
+    // stacked/overlapped rendering off, so the visual is driven straight
+    // from authoritative state rather than a separate UI-side flag that
+    // could drift out of sync with it.
+    wrapper.dataset.cardId = card.id;
+    if (card.layout) wrapper.dataset.layout = card.layout;
 
     // Card-lift cue (US-22, D13): press-and-hold broadcasts motion.
     // Safe for redacted cards too - only the id (already known to every
     // viewer, even in redacted form) is broadcast, never rank/suit.
+    // Smith Gate 2 #1: mouse only. On touch this same binding fired the
+    // instant a finger landed, so the table saw you lift a card before
+    // you saw it yourself, and a finger brushing past on its way to a
+    // scroll broadcast a lift that never happened. Touch gets the cue
+    // from the recognizer's `lift` instead - see `attachTouchDrag`.
     if (onCardLift) {
-      wrapper.addEventListener('pointerdown', () => onCardLift(card.id, true));
-      wrapper.addEventListener('pointerup', () => onCardLift(card.id, false));
-      wrapper.addEventListener('pointerleave', () => onCardLift(card.id, false));
+      wrapper.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse') onCardLift(card.id, true); });
+      wrapper.addEventListener('pointerup', (e) => { if (e.pointerType === 'mouse') onCardLift(card.id, false); });
+      wrapper.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') onCardLift(card.id, false); });
     }
 
     // US-28: draggable exactly where MOVE_CARD's own authorization would
@@ -209,63 +528,109 @@ function renderZoneCards(
       // reveals its identity mid-drag.
       wrapper.addEventListener('drag', (e) => onCardDrag?.(card, e.clientX, e.clientY));
       wrapper.addEventListener('dragend', () => onCardDrag?.(null, 0, 0));
+      attachTouchDrag(wrapper, card, { onDropCard: opts.onDropCard, onCardDrag, onCardLift });
     }
 
+    // D25: one hover-revealed action row, built from `pileActions.js`,
+    // replacing the per-card Turn over / Pick up / Move to… buttons that
+    // used to render unconditionally. Those made every zone about twice
+    // the height of the cards in it, and each site re-derived its own
+    // "may this card do this" condition inline.
     if (card.faceDown) {
       wrapper.appendChild(cardBackEl(card.id));
-      if (card.owner === null) {
-        if (onReveal) {
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = 'reveal-btn';
-          btn.textContent = 'Turn over';
-          btn.addEventListener('click', () => onReveal(card.id));
-          wrapper.appendChild(btn);
-        }
-        const moveSelect = moveToControl(card, zone.id, allZones, onMoveCard);
-        if (moveSelect) wrapper.appendChild(moveSelect);
-      } else {
-        // Someone else's still-hidden private card: no authority, no
-        // visibility, no controls at all - just the anonymous back + tag.
+      if (card.owner !== null && card.owner !== opts.viewerId) {
+        // Someone else's still-hidden card: no visibility, no authority,
+        // so no actions - just the anonymous back and whose it is.
         wrapper.appendChild(ownerTag(resolveOwnerName?.(card.owner) ?? card.owner));
       }
-      container.appendChild(wrapper);
-      continue;
+    } else {
+      wrapper.appendChild(cardEl(card, { disabled: true }));
+      if (card.owner) wrapper.appendChild(ownerTag(resolveOwnerName?.(card.owner) ?? card.owner));
+      if (!card.faceUp) {
+        const hiddenTag = document.createElement('div');
+        hiddenTag.className = 'owner-tag';
+        hiddenTag.textContent = 'hidden from others';
+        wrapper.appendChild(hiddenTag);
+      }
     }
 
-    wrapper.appendChild(cardEl(card, { disabled: true }));
-    if (card.owner) wrapper.appendChild(ownerTag(resolveOwnerName?.(card.owner) ?? card.owner));
-
-    if (!card.faceUp && onReveal) {
-      // My own still-hidden private card (only I ever see this branch —
-      // everyone else gets the redacted `faceDown` case above).
-      const hiddenTag = document.createElement('div');
-      hiddenTag.className = 'owner-tag';
-      hiddenTag.textContent = 'hidden from others';
-      wrapper.appendChild(hiddenTag);
-
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'reveal-btn';
-      btn.textContent = 'Reveal';
-      btn.addEventListener('click', () => {
-        if (window.confirm('Reveal this card to everyone? This cannot be undone.')) onReveal(card.id);
-      });
-      wrapper.appendChild(btn);
-    } else if (card.faceUp && onPickup) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'pickup-btn';
-      btn.textContent = 'Pick up';
-      btn.addEventListener('click', () => onPickup(card.id));
-      wrapper.appendChild(btn);
-    }
-
-    const moveSelect = moveToControl(card, zone.id, allZones, onMoveCard);
-    if (moveSelect) wrapper.appendChild(moveSelect);
+    const actions = actionMenuEl(zone, card, allZones, opts);
+    if (actions) wrapper.appendChild(actions);
 
     container.appendChild(wrapper);
   }
+}
+
+/**
+ * Boxes for drop hit-testing (US-32/33). Measures the `.card` face
+ * rather than its wrapper: the wrapper also contains the Pick up / Move
+ * to… controls below the card, so wrapper rects would make the "on the
+ * card body" region reach well under the card into its own buttons.
+ */
+function cardBoxesIn(rowEl) {
+  return [...rowEl.querySelectorAll('.middle-card[data-card-id]')].flatMap((wrapper) => {
+    const face = wrapper.querySelector('.card');
+    if (!face) return [];
+    const r = face.getBoundingClientRect();
+    return [{
+      cardId: wrapper.dataset.cardId,
+      left: r.left, right: r.right, top: r.top, bottom: r.bottom,
+      width: r.width, height: r.height,
+    }];
+  });
+}
+
+const DROP_HINTS = ['drop-onto', 'drop-before', 'drop-after'];
+
+function clearDropHints(rowEl) {
+  for (const el of rowEl.querySelectorAll('.middle-card')) el.classList.remove(...DROP_HINTS);
+}
+
+/**
+ * Smith Gate 1 (Nielsen #1/#6): native drag-and-drop gives no feedback
+ * until release, so the *mode* a drop is about to use has to be visible
+ * during the drag or it isn't discoverable at all. A glow on the card
+ * body reads "will stack here"; an insertion line beside it reads "will
+ * slot in here".
+ */
+function showDropHint(rowEl, placement) {
+  clearDropHints(rowEl);
+  if (!placement.targetCardId) return;
+  const target = rowEl.querySelector(`.middle-card[data-card-id="${CSS.escape(placement.targetCardId)}"]`);
+  if (!target) return;
+  if (placement.layout === 'stack') target.classList.add('drop-onto');
+  else target.classList.add(placement.side === 'before' ? 'drop-before' : 'drop-after');
+}
+
+/**
+ * D28: the drag-over feedback and the drop itself, extracted from the
+ * native listeners so the touch recognizer can call exactly the same
+ * code. See `performHandReorder` for why this matters more than it
+ * looks: if touch computed placement separately it would drift from
+ * mouse, and only mouse is covered by the e2e suite.
+ */
+function showZoneDragOver(zoneEl, row, point) {
+  zoneEl.classList.add('zone-drag-over');
+  showDropHint(row, resolveDropTarget(cardBoxesIn(row), point));
+}
+
+function clearZoneDragOver(zoneEl, row) {
+  zoneEl.classList.remove('zone-drag-over');
+  clearDropHints(row);
+}
+
+function performZoneDrop(zoneEl, row, zoneId, cardId, point, onDropCard) {
+  clearZoneDragOver(zoneEl, row);
+  if (!cardId) return;
+  // US-32/33: the drop point decides stack vs. overlap vs. plain
+  // append. Aiming at the card being dragged itself is meaningless
+  // (it's about to leave that position), so it's treated as open
+  // space rather than a self-referential placement.
+  const placement = resolveDropTarget(
+    cardBoxesIn(row).filter((b) => b.cardId !== cardId),
+    point,
+  );
+  onDropCard(cardId, zoneId, placement);
 }
 
 /**
@@ -288,6 +653,7 @@ function renderZoneCards(
 function renderZonePanel(zone, allZones, opts) {
   const zoneEl = document.createElement('div');
   zoneEl.className = 'zone';
+  zoneEl.dataset.zoneId = zone.id; // D25: addressable as a drop target
 
   const heading = document.createElement('div');
   heading.className = 'zone-name';
@@ -302,14 +668,13 @@ function renderZonePanel(zone, allZones, opts) {
   if (opts.onDropCard) {
     zoneEl.addEventListener('dragover', (e) => {
       e.preventDefault();
-      zoneEl.classList.add('zone-drag-over');
+      showZoneDragOver(zoneEl, row, { x: e.clientX, y: e.clientY });
     });
-    zoneEl.addEventListener('dragleave', () => zoneEl.classList.remove('zone-drag-over'));
+    zoneEl.addEventListener('dragleave', () => clearZoneDragOver(zoneEl, row));
     zoneEl.addEventListener('drop', (e) => {
       e.preventDefault();
-      zoneEl.classList.remove('zone-drag-over');
-      const cardId = e.dataTransfer.getData('text/plain');
-      if (cardId) opts.onDropCard(cardId, zone.id);
+      performZoneDrop(zoneEl, row, zone.id, e.dataTransfer.getData('text/plain'),
+        { x: e.clientX, y: e.clientY }, opts.onDropCard);
     });
   }
 
@@ -363,25 +728,90 @@ export function renderSeatZones(container, personalZones, allZones, seatedPlayer
  * (US-20) instead of just a text counter - purely presentational, draw
  * mechanics (US-7) are unchanged.
  */
-export function renderDeck(container, count) {
+export function renderDeck(container, count, opts = {}) {
   container.innerHTML = '';
-  if (count <= 0) {
-    container.hidden = true;
-    return;
-  }
   container.hidden = false;
-  const stackSize = Math.min(count, 3);
-  for (let i = 0; i < stackSize; i++) {
-    const back = cardBackEl();
-    back.classList.add('deck-stack-card');
-    back.style.top = `${-i * 2}px`;
-    back.style.left = `${i * 2}px`;
-    container.appendChild(back);
+
+  // D29: the stack and the controls are SIBLINGS. The empty-deck
+  // short-circuit below therefore hides the cards only - it used to hide
+  // the whole container, which would have taken the deal controls with it
+  // exactly when a host most needs them (Smith Gate 1 blocker). The fix
+  // is the structure, not a special case inside it.
+  const stack = document.createElement('div');
+  stack.className = 'deck-stack';
+  if (count > 0) {
+    for (let i = 0; i < Math.min(count, 3); i++) {
+      const back = cardBackEl();
+      back.classList.add('deck-stack-card');
+      back.style.top = `${-i * 2}px`;
+      back.style.left = `${i * 2}px`;
+      stack.appendChild(back);
+    }
+    const badge = document.createElement('span');
+    badge.className = 'deck-count-badge';
+    badge.textContent = count;
+    stack.appendChild(badge);
+  } else {
+    const empty = document.createElement('div');
+    empty.className = 'deck-empty';
+    empty.textContent = 'Deck empty';
+    stack.appendChild(empty);
   }
-  const badge = document.createElement('span');
-  badge.className = 'deck-count-badge';
-  badge.textContent = count;
-  container.appendChild(badge);
+  container.appendChild(stack);
+
+  const actions = pileLevelActions('deck', { isHost: opts.isHost === true });
+  if (!actions.length || !opts.onPileAction) return;
+  container.appendChild(deckControls(actions, count, opts));
+}
+
+/**
+ * The persistent pile-level control strip (D29) - not the D25 hover row.
+ * These act on the deck, not on a card, so they are always visible rather
+ * than revealed by pointing at something.
+ */
+function deckControls(actions, count, opts) {
+  const strip = document.createElement('div');
+  strip.className = 'deck-controls-strip';
+
+  const countInput = document.createElement('input');
+  countInput.type = 'number';
+  countInput.min = '1';
+  countInput.max = '20';
+  countInput.value = String(opts.dealCount ?? 1);
+  countInput.className = 'deal-count';
+  countInput.id = 'deck-deal-count';
+  countInput.setAttribute('aria-label', 'Cards to deal each player');
+  // `renderDeck` rebuilds this strip wholesale on EVERY state broadcast,
+  // so a number the host has typed but not yet used is destroyed by any
+  // unrelated action from any player - someone else drawing a card resets
+  // what you were about to deal. Reporting each keystroke lets the caller
+  // hold the value across re-renders. This is a race the host cannot see,
+  // which is why it needs closing rather than documenting.
+  countInput.addEventListener('input', () => opts.onDealCountChange?.(Number(countInput.value)));
+  strip.appendChild(countInput);
+
+  for (const id of actions) {
+    const spec = PILE_ACTIONS[id];
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.dataset.pileAction = id;
+    btn.textContent = spec.label;
+    btn.title = spec.hint;
+    // Smith Gate 2 #1: this sprint deliberately moves dealing under the
+    // cursor of a host who came to deal one more card, so the click that
+    // wipes every hand now lands somewhere people actually look. New
+    // discoverability, new risk - hence the danger styling AND a confirm.
+    if (spec.destructive) btn.classList.add('btn-danger');
+    if (id === 'deal' && count <= 0) btn.disabled = true; // nothing left to deal from
+    btn.addEventListener('click', () => {
+      const n = Number(countInput.value);
+      if (spec.destructive && !window.confirm(
+        `${spec.hint}\n\nEvery player's current hand will be cleared. Continue?`)) return;
+      opts.onPileAction(id, n);
+    });
+    strip.appendChild(btn);
+  }
+  return strip;
 }
 
 /**
@@ -426,35 +856,50 @@ export function renderRoster(container, players, { movingIds, scores, onAdjustSc
       if (p.id === myId) li.classList.add('seat-you');
     }
     const count = typeof p.handCount === 'number' ? ` (${p.handCount} cards)` : '';
-    const moving = movingIds?.has(p.id) ? ' ✋ organizing hand' : '';
-    const passedTag = passed?.[p.id] ? ' 🙅 Passed' : '';
-    const youTag = seated && p.id === myId ? ' 🧑 You' : '';
-    li.append(`${p.name} - ${p.connection}${count}${moving}${passedTag}${youTag}`);
+    const moving = movingIds?.has(p.id) ? ' \u270B organizing hand' : '';
+    const passedTag = passed?.[p.id] ? ' \uD83D\uDE45 Passed' : '';
+    const youTag = seated && p.id === myId ? ' \uD83E\uDDD1 You' : '';
+
+    // A seat is one horizontal row: [-] [who they are + score] [+].
+    // The score buttons used to be appended *after* the text inside the
+    // card, which on a narrow seat pushed them out past its own edge and
+    // over whatever sat next to it. Flanking the info keeps both 44px
+    // targets inside the card and makes the seat wider-than-taller,
+    // which is what the table has room for.
+    const info = document.createElement('span');
+    info.className = 'seat-info';
+    info.append(`${p.name} - ${p.connection}${count}${moving}${passedTag}${youTag}`);
 
     if (p.id !== myId && typeof p.handCount === 'number') {
       const miniHandEl = document.createElement('div');
       renderMiniHand(miniHandEl, p.handCount);
-      li.appendChild(miniHandEl);
+      info.appendChild(miniHandEl);
     }
 
-    if (scores && p.id in scores) {
-      const scoreRow = document.createElement('span');
-      scoreRow.className = 'score-row';
-      scoreRow.append(`Score: ${scores[p.id]}`);
-      if (onAdjustScore) {
-        const minusBtn = document.createElement('button');
-        minusBtn.type = 'button';
-        minusBtn.className = 'score-btn';
-        minusBtn.textContent = '-';
-        minusBtn.addEventListener('click', () => onAdjustScore(p.id, -1));
-        const plusBtn = document.createElement('button');
-        plusBtn.type = 'button';
-        plusBtn.className = 'score-btn';
-        plusBtn.textContent = '+';
-        plusBtn.addEventListener('click', () => onAdjustScore(p.id, 1));
-        scoreRow.append(minusBtn, plusBtn);
-      }
-      li.appendChild(scoreRow);
+    const hasScore = scores && p.id in scores;
+    if (hasScore) {
+      const scoreEl = document.createElement('span');
+      scoreEl.className = 'score-row';
+      scoreEl.append(`Score: ${scores[p.id]}`);
+      info.appendChild(scoreEl);
+    }
+
+    if (hasScore && onAdjustScore) {
+      const minusBtn = document.createElement('button');
+      minusBtn.type = 'button';
+      minusBtn.className = 'score-btn';
+      minusBtn.textContent = '-';
+      minusBtn.addEventListener('click', () => onAdjustScore(p.id, -1));
+
+      const plusBtn = document.createElement('button');
+      plusBtn.type = 'button';
+      plusBtn.className = 'score-btn';
+      plusBtn.textContent = '+';
+      plusBtn.addEventListener('click', () => onAdjustScore(p.id, 1));
+
+      li.append(minusBtn, info, plusBtn);
+    } else {
+      li.appendChild(info);
     }
 
     container.appendChild(li);

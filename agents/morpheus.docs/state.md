@@ -248,4 +248,274 @@ Sprint 4 retro, then Cypher launch.
 - [ ] Cypher launch.
 
 ---
-*Last updated: 2026-08-15 22:48*
+
+## Sprint 5 ("desktop table width", US-31) — Architecture
+
+### Recent Decisions
+- Wrote D20 in docs/ARCHITECTURE.md: pure CSS breakpoint fix, zero
+  JS/state/protocol change. Verified by reading `src/seating.js` before
+  deciding anything (not assumed) - `seatPosition()` places seats/zones
+  as a percentage of `.table-surface`, which itself has no independent
+  max-width and just inherits `#screen-game`'s width. So the existing
+  geometry already scales; it just never got a wider box. Two new
+  tiers: `@media (min-width:1024px)` → 1100px, `@media (min-width:1440px)`
+  → 1300px - chosen to land exactly on Smith's requested UAT checkpoints
+  (1024/1440) so testing hits the breakpoint boundaries themselves, not
+  just mid-tier. 1300px cap is deliberate per Cypher's AC (no
+  unconstrained full-bleed on 4K).
+- Explicitly noted in D20 what does NOT change: the pot area's existing
+  13rem max-width (stays bounded on purpose, separate from the seat
+  ring), fixed card pixel dimensions (cards don't get physically bigger),
+  and `.screen`'s 480px base (host/join forms, per Smith's Gate 1 note).
+- No Tank/devops involvement - static CSS, no new env vars/services.
+
+### Blockers
+None.
+
+## Next Steps
+### Immediate Next Action
+Handed to Smith for Gate 2 (architecture UX review) — concrete
+1024px/1300px/1440px values now available for Smith to sanity-check
+against the checkpoints Smith itself requested at Gate 1.
+
+### Waiting On
+@Smith: Gate 2 `*user feedback` / `*user approve`.
+
+### Planned Work
+- [ ] Smith Gate 2.
+- [ ] Mouse phase plan (likely 1 phase — single CSS-only story, Cypher
+      already flagged this as a Fast-Track candidate).
+
+### Progress — Sprint plan review (Phase 28)
+- [x] Reviewed Mouse's single-phase plan (task.md Phase 28) against D20:
+      T28.1 is exactly the two `@media` tiers, no drift. T28.2's
+      checkpoints (1023/1024/1439/1440px) match D20's own breakpoint
+      values, not arbitrary numbers. Confirmed `tests/e2e.smoke.mjs`
+      already uses Playwright (`chromium`, real `page`/`context`
+      objects) — `page.setViewportSize()` is a standard Playwright API,
+      so T28.2 needs no new test infrastructure, just new assertions in
+      the existing suite. **Approved, no changes requested.**
+
+### Progress — Phase 28 code review
+- [x] Reviewed the actual diff (`git diff -- style.css tests/e2e.smoke.mjs`),
+      not just Neo's/Trin's summaries. `style.css`: exactly the two
+      `@media` tiers D20 specifies, nothing else touched, well-commented
+      with the "why" (percentage geometry already scales). No
+      src/*.js changed - confirmed the "pure CSS, zero JS" claim from
+      D20 actually held through implementation, not just at design time.
+- [x] `tests/e2e.smoke.mjs`: sound. One minor, non-blocking nit -
+      `screenGameWidth`/`tableSurfaceWidth` are near-duplicate 3-line
+      helpers (only the locator selector differs) - could collapse to
+      one `elementWidth(selector, width)`. Not worth a reject/fix cycle
+      over 3 duplicate lines in a test script on a Fast-Track sprint;
+      noting for Neo to fold in opportunistically if this file gets
+      touched again, not blocking this phase.
+- [x] Confirmed Trin's added assertions (`.table-surface` width growth,
+      continuous-resize monotonicity sweep) are real, targeted checks
+      that fill gaps D20/T28.2 didn't originally specify, not scope
+      creep - both trace directly back to Cypher's AC and Smith's Gate 2
+      note respectively.
+- **Approved. Sprint 5 ("desktop table width") is now fully implemented,
+  test-covered, and reviewed - 1 implementation phase, no bug-fix phase
+  needed.**
+
+## Next Steps
+### Immediate Next Action
+Only phase this sprint - handing directly to Oracle for groom rather
+than back to Neo for a next phase.
+
+### Waiting On
+@Oracle: groom (DECISIONS.md already has D20 from the arch step; Oracle
+should cross-reference/archive per usual, update lessons/memory, check
+CHAT.md length).
+
+### Planned Work
+- [ ] Oracle groom.
+- [ ] Smith close-out test.
+- [ ] Retro + Cypher launch.
+
+---
+
+## Sprint 6 ("snap-to stack/overlap" + deck operations) — Architecture
+
+### Recent Decisions
+- D21 (docs/ARCHITECTURE.md): **corrected** Cypher's Flag 6 proposal —
+  a boolean `stacked` doesn't fit Smith's "two explicit modes"; used a
+  `layout: 'stack'|'overlap'|undefined` enum instead. `PLAY`/`MOVE_CARD`
+  gain optional `beforeCardId`/`layout` params via one shared
+  `insertCard()` helper (both reducer cases call it, no duplicated
+  splice-or-push logic); omitted = today's exact append behavior, 100%
+  backward compatible with every existing call site. `MOVE_CARD`'s
+  same-zone no-op is deleted (was correct when reordering didn't exist;
+  now it does). No privacy/protocol changes — confirmed both of
+  Cypher's flagged open questions resolve to "no new logic needed."
+- D22: **corrected** Cypher's Flag 7 proposal — `dealCards()`'s actual
+  contract (fixed count per destination) doesn't match `SPLIT_DECK`'s
+  need (exhaust the whole deck); `SPLIT_DECK` gets its own small
+  round-robin loop instead of being forced through `dealCards()`.
+  `SHUFFLE_DECK` reuses `shuffle()` directly, confirmed trivial. Caught
+  one small correctness fix while in this area: `PICKUP` needs to also
+  strip the new `layout` field when a card returns to a hand (already
+  strips `owner`/`faceUp` the same way).
+- No Tank/devops gate needed — app code only, no env/deploy/CI surface.
+
+### Blockers
+None.
+
+## Next Steps
+### Immediate Next Action
+Handed to Smith for Gate 2.
+
+### Waiting On
+@Smith: Gate 2 (`*user feedback` / `*user approve`).
+
+- [x] **D23 added mid-Gate-2**, user-directed: unified `Pile` storage
+      model (`state.piles` replaces `deck`/`hands`/`zones`). Scoped
+      tightly: `viewFor`'s output shape stays byte-for-byte identical
+      (two existing redaction behaviors preserved), so the refactor is
+      contained entirely inside `state.js` - `ui.js`/`main.js`/
+      `protocol.js` need zero changes. No data-migration risk (app is
+      fully ephemeral, no persisted state to migrate). Resolves D22's
+      own noted duplication for real: one `dealRoundRobin()` replaces
+      both `dealCards()` and `SPLIT_DECK`'s dedicated loop. Sequenced as
+      its own phase BEFORE the D21/D22 feature work.
+- [x] Smith Gate 2: approved D21/D22/D23, with one real correction to
+      D21 (layout-write direction bug, see CHAT.md) folded in before
+      approval.
+
+### Blockers
+None.
+
+## Next Steps
+### Immediate Next Action
+Handing to Mouse for phase planning — sprint now has 4 concerns: (0)
+Pile unification refactor [must be first], (1) card stack/overlap, (2)
+deck operations, (3) e2e verification across all of it.
+
+### Waiting On
+Nothing.
+
+### Progress — Sprint plan review (Phases 29-34)
+- [x] Reviewed Mouse's 6-phase plan against D21/D22/D23: sequencing is
+      correct (29 foundation -> 30 state -> 31 UI -> 32 deck ops -> 33
+      e2e -> 34 reserved), matches the explicit "D23 must land first"
+      requirement, and T30.2 names the before-side-overlap direction
+      test explicitly rather than leaving it as incidental coverage.
+      **Approved, no changes requested.**
+
+## Next Steps
+### Immediate Next Action
+Handing to Neo for Phase 29 (Pile unification) — the whole sprint
+depends on this landing cleanly with zero regressions first.
+
+### Waiting On
+Nothing.
+
+### Progress — Phase 29 code review: APPROVED
+- [x] **Ruled on Neo's flagged D23 deviation: ACCEPTED**, recorded in
+      ARCHITECTURE.md D23. Decisive reason is the data clump — a hand
+      card's `owner` would permanently duplicate its pile's `ownerId`,
+      two places expressing one fact, the exact drift risk D17 was
+      careful to avoid. The Pile abstraction stays uniform; only the
+      card payload varies, and that variance is real (a hand card has no
+      independent visibility; a zone card does). Noted the accepted cost
+      honestly rather than pretending there is none: "is this card
+      visible" is now a two-step question.
+- [x] Reviewed the diff: no positional `state.piles[i]` indexing
+      anywhere, all access goes through the selectors or `kind` checks.
+      `DEAL`/`DEAL_MORE` collapsing to one case + `fresh` flag is
+      correct and now covered (Trin's finding).
+- [x] **Found a forward-looking landmine and recorded it as a binding
+      invariant**: `deckOf()` is deliberately unguarded
+      (`.find(...).cards`), so "exactly one deck pile always exists" is
+      load-bearing but was implicit. The natural-looking `SPLIT_DECK`
+      implementation ("the deck is now N piles, so drop the deck") would
+      break every later `DRAW`/`DEAL` with an opaque undefined error.
+      Written into D23 as an explicit constraint on Phase 32 rather than
+      left to be discovered by whoever writes it.
+- [x] Second, smaller note: in the merged `DEAL`/`DEAL_MORE` case, the
+      `findIndex(...) === -1` branch (a hand pile whose owner is no
+      longer in `players`) is **unreachable today** — no reducer ever
+      removes a player. Its behavior also differs subtly from pre-D23
+      (empties the hand rather than dropping it). Harmless now; flagged
+      so that if a `LEAVE`/`REMOVE_PLAYER` action is ever added, that
+      branch gets a deliberate decision instead of inheriting an
+      accidental one.
+- Smith UX gate skipped for this phase by the bloop rule (pure internal
+  data-layer refactor, zero observable surface — `viewFor` output and
+  every UI module are provably unchanged). Smith re-engages at the
+  sprint's Stage-3 close-out as normal.
+
+## Next Steps
+### Immediate Next Action
+Phase 29 approved. Neo to start Phase 30 (position-aware
+`PLAY`/`MOVE_CARD` + `layout`), now building on the unified model.
+
+### Waiting On
+@Neo: Phase 30.
+
+---
+*Last updated: 2026-08-16 (Sprint 6 Phase 29 review)*
+
+### Progress — Phase 30 code review: APPROVED
+- [x] **Ruled on Neo's flag: revision ACCEPTED**, D21 amended. This was a
+      real internal inconsistency in my own decision, not Neo redefining
+      the API: D21 specified `beforeCardId` + `layout` while *also*
+      specifying Smith's Gate 2 rule, and those are incompatible —
+      "insert before T" and "insert after T's predecessor" are the same
+      insertion point but must write `layout` to different cards, so
+      `beforeCardId` provably cannot carry the distinction.
+      `targetCardId` + `side` is the minimal repair.
+- [x] Recorded the process observation rather than just the fix: this is
+      the **second** implementation-stage catch of an architecture-stage
+      defect this sprint (D23's data clump, now D21's params-vs-rule
+      drift). Both came from writing the rule and the mechanism in
+      separate passes without checking them against each other. Flagged
+      for the retro.
+- [x] Reviewed the code: `placeCard()`/`withLayout()` correctly isolate
+      the rule to one branch; remove-then-insert ordering for same-zone
+      moves is right (and Neo's comment explains the off-by-one it
+      avoids). `PICKUP` strips `layout` consistently with `owner`/
+      `faceUp`.
+
+### Progress — Phases 31 + 32 code review: APPROVED
+- [x] Phase 31: `dropTarget.js` as a pure module is the right call and
+      applies Sprint 4 retro item 13 *proactively* for the first time -
+      the geometry is unit-tested directly instead of only through the
+      browser. Measuring the `.card` face rather than the wrapper is a
+      real correctness detail (the wrapper includes the controls below,
+      which would have made "on the card" reach into its own buttons).
+- [x] Phase 32 / D24: approved, and I've amended D24 to record that two
+      of its own premises were wrong (pot not centred; clearance bounded
+      by height, not width). That is now **three** implementation-stage
+      catches of architecture-stage defects this sprint (D23 data clump,
+      D21 params-vs-rule, D24 premises). The pattern is consistent:
+      every one came from writing a rule without checking it against the
+      concrete artifact it governs. Retro item, not a one-off.
+- [x] The strongest evidence this sprint: removing D24's centring makes
+      the e2e fail as a *click timeout*, reproducing the exact
+      click-through symptom the original 13rem cap comment describes.
+      The cap had been carrying that reputation without actually
+      delivering it since the surface grew.
+
+### Progress — Phase 33 code review: APPROVED
+- [x] `SPLIT_DECK` correctly honours D24's deck-pile invariant - the one
+      I flagged pre-emptively at Phase 29 review. Worth recording that
+      the flag paid off: Trin's mutation shows removing the pile fails
+      exactly the guard test written for it, so the invariant is now
+      enforced rather than merely documented.
+- [x] Reusing D21's `layout` to render Split's piles is the right call -
+      a pile IS a stack, so it needs no new rendering concept. This is
+      the second time this sprint that an earlier decision absorbed a
+      later requirement for free (D7 absorbed Split's face-down
+      redaction too).
+- [x] The `redactMiddleCard` change is correct and correctly scoped:
+      arrangement is shared state per D21, identity is not, and the
+      split is exactly along that line. Approved with the test Trin
+      mutation-verified.
+- [x] Accepted the pile-density finding as a **design item, not a bug**:
+      the pot's height is bounded by D24's measured seat-ring clearance,
+      so "see 4 piles at once" cannot be solved by enlarging it. Routing
+      to Smith at close-out for a UX read on the two candidate
+      directions (tighter peek for face-down piles vs. rendering a
+      face-down pile as a single back + count, like the deck stack).

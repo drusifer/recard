@@ -216,3 +216,41 @@ floor (Sprint 2) puts a hard lower bound on how compact a seat card
 carrying score controls can get. Reported honestly as "improved, not
 resolved" rather than overclaimed; see `agents/smith.docs/` for the
 Stage-3 close-out disposition.
+
+## 2026-08-16 — v1.4 architecture (D20): desktop table width
+
+**Context:** User report - "I need more room on desktop browsers."
+`#screen-game`'s `max-width` flatlined at 760px (itself the result of an
+earlier Smith finding, set relative to a 480px phone baseline) with no
+further tier for laptop/desktop viewports, so a 27" monitor rendered the
+same cramped-relative-to-screen table as a small laptop. Deliberately
+scoped away from the still-open 5+-player mobile density backlog item
+(D17-D19's Consequences above) - opposite problem, same code area, not
+conflated into one fix.
+
+**Decision:** Morpheus recorded D20: two new `@media` breakpoint tiers
+on `#screen-game` - `min-width:1024px` -> `max-width:1100px`,
+`min-width:1440px` -> `max-width:1300px` - chosen to land exactly on the
+UAT checkpoints Smith requested at Gate 1, and deliberately bounded
+(not unconstrained on an ultra-wide/4K monitor) per Cypher's AC. Verified
+in `src/seating.js` *before* deciding anything: `seatPosition()` already
+places every seat/zone as a percentage of `.table-surface`, which has no
+independent `max-width` of its own - so widening the outer container is
+provably sufficient on its own. **Zero JS/state/protocol changes** -
+pure CSS, the smallest-scoped sprint in the project's history (1 phase,
+1 story).
+
+**Consequences:** Trin's UAT added two checks beyond the story's own AC,
+both real gaps, not restatements: (1) an objective `.table-surface`
+width measurement (582px -> 922px across the range) actually proving the
+AC's "used by content, not padding" claim, which the 4 fixed-width
+checkpoints alone didn't verify; (2) a continuous-resize monotonicity
+sweep through both breakpoints (Smith's Gate 2 request), catching the
+class of bug a snapshot-only test can't. A real, non-blocking finding
+surfaced during that same measurement: with exactly 2 seated players,
+`seatPosition()`'s angle math places both seats at `leftPct=50`
+(directly above/below each other, not side-by-side), so a 2-player
+table's seats don't visibly spread out from this width increase even
+though the surface under them does - pre-existing geometry, not a D20
+defect, out of this story's scope. 3+-player tables get real horizontal
+seat spread. Logged for awareness, not filed as a bug.

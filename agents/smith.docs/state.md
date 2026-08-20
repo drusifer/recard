@@ -157,4 +157,212 @@ Nothing.
       whatever sprint eventually picks up the density backlog item.
 
 ---
-*Last updated: 2026-08-15 22:53*
+
+## Sprint 5 ("desktop table width") — Gate 1
+
+### Recent Decisions
+- Gate 1 for US-31: **Approved with amendments**. Verified against the
+  actual stylesheet before approving (not just the story text): `.screen`
+  (host/join forms) is correctly narrow at 480px and confirmed out of
+  scope; `#screen-game`'s 760px cap is real and has zero desktop
+  breakpoint above it. This is a legitimate follow-on to my own prior
+  Sprint-2-era finding that set the 760px value in the first place
+  (comment in style.css cites it directly) — 760px was right relative to
+  a 480px phone baseline but was never re-checked against real
+  laptop/desktop widths, which is exactly this user report.
+- Added 3 amendments directly in docs/USER_STORIES.md under US-31:
+  1. Host/join screens explicitly out of scope — don't let Neo drift
+     into widening forms that don't benefit from it.
+  2. Named the prior-finding lineage so this doesn't read as
+     contradicting a past decision.
+  3. For Trin's later UAT: test concrete checkpoints (1024px, 1440px) in
+     addition to the phone/ultra-wide extremes, so a mid-range reflow bug
+     can't hide between two passing edge checks.
+- Deliberately did NOT prescribe the exact new max-width/breakpoint
+  values — left that to Morpheus's Gate 2 sizing call, consistent with
+  how Cypher scoped the story.
+
+### Blockers
+None.
+
+## Next Steps
+### Immediate Next Action
+Approved and handed to Morpheus for architecture (Gate 2 to follow once
+Morpheus proposes concrete breakpoint/width values).
+
+### Waiting On
+@Morpheus: architecture + concrete sizing values, then back to me for
+Gate 2.
+
+---
+
+## Sprint 5 ("desktop table width") — Gate 2
+
+### Recent Decisions
+- Gate 2 for D20: **Approved**. All 3 of my Gate 1 amendments are
+  actually reflected in the decision, not just acknowledged: host/join
+  forms confirmed untouched, and the 1024px/1440px checkpoints I asked
+  Trin to test aren't just floating targets in a range - Morpheus made
+  them the literal breakpoint values, so UAT will test right at the
+  transition, which is the stronger check.
+- No breaking change, no new flag/naming surface (not applicable here -
+  no CLI), no worse path for any existing user. Confirmed geometry is
+  pure CSS percentage (`seatPosition()` returns %, not px) so a user
+  dragging their actual OS window width live across a breakpoint
+  reflows continuously with no JS re-render step involved - added as an
+  explicit Trin UAT check below since "does it look right at 5 fixed
+  widths" and "does it look right while continuously resizing" are not
+  the same test, and only the first was in the story's AC.
+- One non-blocking observation, NOT a Gate 2 objection: widening the
+  container alone grows *spacing*, not the mobile-sized type/padding
+  scale (rem values are unchanged) - desktop users get more breathing
+  room but the UI will still visually read as "mobile UI in a bigger
+  box," not a bespoke desktop density. That's exactly what the user
+  asked for ("more room"), not a redesign, so approving as scoped -
+  logging as a possible future backlog item, not blocking this sprint
+  over it.
+
+### Blockers
+None.
+
+## Next Steps
+### Immediate Next Action
+Approved, handed to Mouse for phase planning.
+
+### Waiting On
+Nothing from me until Trin's UAT.
+
+### Planned Work
+- [ ] When Trin runs UAT: test the 4 named widths (phone, 1024, 1440,
+      1920) AND one continuous drag-resize across both breakpoints, not
+      just the 4 fixed snapshots.
+- [ ] Backlog note (non-blocking): desktop-specific type/density scaling
+      is a separate future item from "more room," if the user wants it
+      later.
+
+---
+
+## Sprint 5 — Stage 3 close-out (`*user test`)
+
+### Recent Decisions
+- **Actually ran the app** (`npm run dev` + a real Playwright-driven
+  Chromium, not a re-read of Neo/Trin's assertions): hosted a 2-player
+  table, dealt 7 cards each, screenshotted the live game screen at
+  760px/1024px/1300px/1920px, plus the host form at 1920px.
+- **Visually confirmed real, positive wins**: at 760px the 7th hand card
+  was cut off (needs a scroll); at 1024px/1300px all 7 fit with room to
+  spare - the width increase visibly helps the one thing most players
+  will actually notice (their own hand), not just the table geometry.
+  At 1920px the table stays visually capped, not stretched thin -
+  matches Cypher's AC and the screenshot at 1300px is nearly identical
+  in absolute size, confirming the deliberate bound actually holds
+  visually, not just in an assertion.
+- **Confirmed my own Gate 1 amendment held**: host form screenshotted at
+  1920px stays narrow/centered exactly like at any other width - not
+  just claimed in the story, genuinely unaffected.
+- **Independently re-confirmed Trin's disclosed finding** (2-player
+  seats stay vertically stacked, pot/seat cards don't visually move
+  outward even though the surface behind them widens) by eye, matching
+  her measurement exactly - not a surprise, not a new bug, already
+  correctly scoped as non-blocking and out of this story's reach.
+- No new UX issues found. No `*user bug` filed.
+
+### Blockers
+None.
+
+## Next Steps
+### Immediate Next Action
+**`*user approve`** — Sprint 5 fully passes end-to-end user testing.
+Handing to `*sprint retro`.
+
+### Waiting On
+Nothing.
+
+### Planned Work
+- [ ] Sprint retro, then Cypher launch.
+
+---
+
+## Sprint 6 ("snap-to stack/overlap" + deck operations) — Gate 1
+
+### Recent Decisions
+- Gate 1 for US-32/33: **Approved with 2 amendments**, written directly
+  into `docs/USER_STORIES.md`: (1) proposed the concrete drop-region
+  mechanism myself (on-card body = stack, beside-card halo = overlap,
+  reusing the existing `.zone-drag-over` highlight pattern rather than
+  a new visual language) since Cypher explicitly left that to me; (2)
+  corrected scope on touch/mobile after checking the actual code —
+  native HTML5 drag-and-drop never fires from touch gestures in this
+  app (confirmed via grep, no touch/pointer DnD polyfill exists
+  anywhere), so this was already a desktop/mouse-only gesture family
+  before this sprint, not something US-32/33 regresses.
+- Gate 1 for US-34/35/36 (added mid-sprint): **Approved with 4
+  amendments**. Most consequential: **reversed US-34's own premise**
+  after checking the real layout — moving `Draw` away from `#hand-area`
+  would trade a real per-turn cost (the highest-frequency action in the
+  app, moved away from where its effect lands) for a one-time
+  discoverability nicety. Revised US-34 to leave `Draw` alone and only
+  place the genuinely new Split/Shuffle controls near the deck. Also:
+  no confirm dialog on Shuffle (checked - even destructive Reset has
+  none today, so a non-destructive action shouldn't have more friction
+  than it), reuse the existing `deal-more-count` number-input pattern
+  for pile count instead of a JS prompt, and cap+guard pile count since
+  zones are permanently non-deletable (D17) so a fat-fingered large
+  split has real, permanent clutter cost.
+
+### Blockers
+None.
+
+## Next Steps
+### Immediate Next Action
+Full US-32..36 set approved. Handing to Morpheus for architecture.
+
+### Waiting On
+Nothing.
+
+### Progress — Gate 2
+- [x] Reviewed D21/D22 against my own Gate 1 mechanism proposal - the
+      on-card/beside-card drop-region split and the highlight-reuse
+      pattern both carried through faithfully.
+- [x] **Found and corrected a real behavioral bug in D21's draft**, not
+      just a UX nit: the doc assumed the *dropped* card always receives
+      the new `layout` field, but for a before-side overlap drop
+      (insert X before target T), it's actually `T` that becomes
+      "second in the pair" per D21's own field semantic - so `T`, not
+      `X`, needs the write, or the wrong pair visually overlaps.
+      Corrected to one direction-agnostic rule ("layout always belongs
+      to whichever card ends up second in the newly-adjacent pair,
+      computed after insertion") that covers all three drop regions
+      with no special-cased branching - simpler than the two-case
+      framing I was about to write up.
+- [x] D22 (Shuffle/Split): matches my Gate 1 amendments exactly - host-
+      only, capped pile-count input, no confirm dialog. Confirmed Split
+      doesn't need a confirm gate either: it's additive (creates zones,
+      loses nothing), not destructive like Reset Scores, so the
+      cap+guard mitigation is the right level of friction, not a modal.
+
+### Blockers
+None.
+
+- [x] **D23 added mid-Gate-2** (user-directed): unified `Pile` storage
+      model (deck/hands/zones -> one `state.piles`). Reviewed for UX
+      impact specifically: `viewFor`'s output shape is explicitly
+      unchanged (same `myHand`/`otherHandCounts`/`zones`/`deckCount`
+      fields, same two redaction behaviors preserved) - this is an
+      internal storage refactor with **zero observable behavior
+      change**, so there's nothing new for a UX gate to approve/reject
+      on its own merits; approving on the basis that the "no observable
+      change" guarantee is real and explicit in the doc, not just
+      assumed. Sequencing (refactor phase before feature phases) is the
+      right call - lower risk than migrating mid-feature.
+
+## Next Steps
+### Immediate Next Action
+Approved (D21/D22/D23 - full sprint architecture), handing to Mouse for
+phase planning.
+
+### Waiting On
+Nothing.
+
+---
+*Last updated: 2026-08-16 (Sprint 6 Gate 2, incl. D23)*

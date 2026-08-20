@@ -12,13 +12,14 @@ how to play.
 always at the bottom of your own screen) · a personal area in front of
 your seat for cards you've played, plus named shared zones (e.g. a
 discard pile separate from a shared draw pile) · drag-and-drop to play or
-move cards, or tap + a "Move to…" menu if you'd rather · public,
+move cards — with a mouse, or by holding a card and dragging it with your
+finger on a phone or tablet — or tap + a "Move to…" menu if you'd rather · public,
 face-down, and privately-owned face-down cards (community cards *and*
 hole cards) · see other players actually dragging cards live, in real
 time · quick-start presets for common games · simple +/- score tracking ·
 an in-app rules reference · works solo for solitaire-type games too ·
 sort your hand by rank/suit or drag to reorder, both persist ·
-incremental "Deal More" mid-round · a self-toggle "Passed" marker.
+deal and re-deal straight from the deck itself · a self-toggle "Passed" marker · optionally start the game automatically once everyone you're expecting has joined.
 
 See `docs/PRD.md` for the product vision and `docs/ARCHITECTURE.md` for
 the technical design.
@@ -49,13 +50,24 @@ Chrome installed (the test falls back to `/usr/bin/chromium`,
 
 ## Known limitations
 
-- **No reconnect.** If the host's tab closes, the session ends for
-  everyone (you'll see an explicit "Host disconnected" message, not a
-  silent freeze). If your own tab refreshes, you drop out of the table.
+- **If the host's tab closes, the session ends for everyone** (you'll see
+  an explicit "Host disconnected" message, not a silent freeze). A *host*
+  who reloads is offered their table back; other players then rejoin with
+  the code they already have.
+- **A host reload no longer costs anyone their cards.** The saved table
+  brings back zones, piles, scores *and* hands, reunited with their
+  owners by the identity each browser holds (D27/D31). Players' clients
+  reconnect on their own, the host sees who is still missing by name, and
+  the game resumes once everyone is back — or the host can start without
+  a straggler.
+- **Hands are written to the host's own disk** (changed in v1.8, see
+  `docs/ARCHITECTURE.md` D31, which reverses D26). Only ever the host's
+  browser profile, never transmitted — but the snapshot does contain
+  every player's cards, along with the deck's full remaining order. If
+  you host on a shared machine, that is worth knowing.
 - **No QR code image.** Join via the code or the Copy Link button — a
   scannable QR was descoped for v1 (see `docs/USER_STORIES.md` Deferred/
   Stretch) rather than ship an unverifiable hand-rolled encoder.
-- **No persistence.** Nothing survives past the browser tab being open.
 - Soft cap of ~8 players; not enforced, just not tested past that. 1
   player (solo/solitaire) is explicitly supported at the other end.
 - **On a phone screen specifically, the seated-players layout gets
@@ -63,6 +75,14 @@ Chrome installed (the test falls back to `/usr/bin/chromium`,
   not just eyeballed: clean through 4 players, 1 overlapping pair at 5,
   worse by 8). A real, known gap, not silently accepted — see
   `docs/DECISIONS.md` v1.3 entry.
+- **With 3 or more players on a ~1024px-wide screen, a personal seat zone
+  can overlap the shared pot.** Found during Sprint 9 while adding touch
+  coverage; the D24 zone-size caps had only ever been measured against a
+  two-player seat ring. Recorded rather than quietly left, and separate
+  from the phone-density item above.
+- **Multi-touch gestures (pinch, rotate) and long-press menus do
+  nothing.** Touch support covers dragging cards; it isn't a full mobile
+  gesture vocabulary.
 
 ## How it works, briefly
 

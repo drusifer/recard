@@ -400,3 +400,337 @@ Phase 24: Done
 Phase 25: Done
 Phase 26: Done
 Phase 27: Done — Smith re-tested and closed the report; finding #2 (density) escalated to Cypher's backlog, not fixed here
+
+## Sprint 5 ("desktop table width") — SHIPPED 2026-08-16
+Fast-Track sprint: single story (US-31), pure CSS per D20
+(`docs/ARCHITECTURE.md`), no JS/state/protocol touched. Gates 1 and 2
+both passed with amendments folded into the story/decision already —
+one phase covers the whole sprint.
+
+### Phase 28 — Desktop breakpoint tiers (only phase)
+- [ ] T28.1 `style.css`: add two `@media` tiers on `#screen-game` per
+      D20 — `min-width:1024px` → `max-width:1100px`,
+      `min-width:1440px` → `max-width:1300px`. Below 1024px, existing
+      480px/760px rules stay byte-for-byte unchanged. No changes to
+      `#game-deck-area`/`#table-area` (13rem pot cap stays fixed) or any
+      `.card`/`.mini-card-back` pixel dimensions.
+- [ ] T28.2 `tests/e2e.smoke.mjs`: objective measurement, not just visual
+      — assert `#screen-game`'s actual rendered width at 1023px (still
+      760px cap), 1024px (now 1100px cap), 1439px (still 1100px), and
+      1440px (now 1300px cap), i.e. test *at* both breakpoint boundaries
+      per Smith's Gate 2 note, not just "looks fine somewhere in the
+      1024-1440 range". Also assert no horizontal scroll
+      (`document.documentElement.scrollWidth <=
+      document.documentElement.clientWidth`) at 320px and 1920px.
+Covers: US-31.
+
+### Sprint 5 status
+Phase 28: Done — Trin UAT passed, Morpheus reviewed and approved, Smith
+close-out found no bugs (screenshotted the real app at 760/1024/1300/
+1920px). Sprint launched 2026-08-16.
+
+## Sprint 6 ("snap-to stack/overlap" + deck operations) — IN PROGRESS
+US-32..36, architecture D21-D23 (docs/ARCHITECTURE.md), both gates
+passed. D23 (Pile unification) is a user-directed mid-sprint addition,
+sequenced first per Morpheus/Smith — the feature phases build on the
+unified model, not the old three-slice one.
+
+### Phase 29 — Pile unification (D23, foundation — must land first) ✅ DONE
+- [x] T29.1 `src/state.js`: unified `deck`/`hands`/`zones` into
+      `state.piles` (kind: 'deck'|'hand'|'zone', visibility *derived*
+      from kind — see D23's "Neo implementation revision"). `viewFor`'s
+      output shape byte-for-byte identical - `ui.js`/`main.js`/
+      `protocol.js` needed **zero** changes, verified by grep + a full
+      e2e pass. New generic `dealRoundRobin()` replaces `dealCards()`;
+      `DEAL`/`DEAL_MORE` collapsed to one case + a `fresh` flag. New
+      exported selectors `deckOf`/`handOf`/`handsOf`/`zonesOf`.
+- [x] T29.2 Full regression: `npm test` 86/86 + `npm run test:e2e` green.
+      **T29.2's original premise was impossible and was corrected**: it
+      required all 86 tests to pass *unmodified*, but 117 assertion
+      sites in `tests/state.test.js` read `state.deck`/`.hands`/`.zones`
+      directly — i.e. they assert on *storage shape*, which is exactly
+      what this phase changes. A storage refactor cannot leave
+      storage-shape assertions untouched. Corrected guarantee, which
+      **did** hold and is the real proof: every assertion against
+      `viewFor` output (the actual behavioral contract, and the only
+      thing that crosses the wire) is unmodified; only the internal-shape
+      reads were mechanically migrated to the new selectors.
+Covers: D23 foundation for everything below.
+
+### Phase 30 — Position-aware PLAY/MOVE_CARD + layout field (D21 state layer)
+- [ ] T30.1 `src/state.js`: shared `insertCard(cards, card,
+      beforeCardId)` helper; `PLAY`/`MOVE_CARD` gain optional
+      `beforeCardId`/`layout` params; same-zone no-op removed (real
+      reorder now); `PICKUP` strips `layout` on return to hand;
+      direction-agnostic rule from Smith's Gate 2 correction ("layout
+      belongs to whichever card is second in the newly-adjacent pair,
+      computed after insertion" - covers on-card/beside-before/
+      beside-after with one rule, no branching).
+- [ ] T30.2 `tests/state.test.js`: unit coverage for insert-before/
+      insert-after/append-unchanged, same-zone reorder, the
+      before-side-overlap direction case specifically (this is the bug
+      Smith caught - needs its own explicit regression test, not just
+      incidental coverage), and `PICKUP` clearing `layout`.
+Covers: US-32, US-33 (state layer only).
+
+### Phase 31 — Stack/overlap drag-drop UI + CSS
+- [ ] T31.1 `src/ui.js`/`src/main.js`: drop-region detection in
+      `renderZonePanel`'s drop handler - on-card body (stack, always
+      insert-after) vs. beside-card halo before/after (overlap) -
+      wired through `onDropCard`/`dropCardOnZone` into the new
+      `playCard`/`moveCard` params from Phase 30.
+- [ ] T31.2 `style.css`: negative-margin rendering for `layout: 'stack'`
+      (tight, corner-peek only) and `'overlap'` (partial, fully
+      readable) - reuses `.zone-drag-over`'s existing highlight pattern,
+      extended per-card (glow on-card = will-stack, insertion-line
+      beside = will-overlap) per Smith's Gate 1 mechanism.
+Covers: US-32, US-33 (UI layer).
+
+### Phase 32 — Zone room (D24, user-directed) ✅ DONE
+- [x] T32.1 `style.css`: grow the pot (`#game-deck-area`/`#table-area`),
+      `#table-area` max-height, and `.seat-zone` caps at D20's existing
+      1024px/1440px breakpoints per D24's measured budget. Below 1024px
+      byte-for-byte unchanged (mobile is already over-subscribed - the
+      known open density item).
+- [x] T32.2 `tests/e2e.smoke.mjs`: **required guard per D24** - measure
+      with `getBoundingClientRect()` at each breakpoint that no personal
+      seat zone intersects the pot. This invariant has been broken for
+      real before (a zone covering a pot control), so growing the cap
+      without measuring would trade a documented bug for a silent one.
+Covers: D24 (unblocks US-32/33 being usable in practice).
+
+### Phase 33 — Deck operations (US-34/35/36) ✅ DONE
+- [x] T33.1 `src/state.js`: `SHUFFLE_DECK` (reuses `shuffle()`) and
+      `SPLIT_DECK {pileCount}` (reuses Phase 29's `dealRoundRobin()`,
+      guards `pileCount <= deck.length`) reducer cases, host-only.
+- [x] T33.2 `index.html`/`src/main.js`: new `Shuffle`/`Split` controls
+      under `#game-deck-area`, host-only visibility (matches
+      `resetBtn`/`dealMoreBtn` pattern); `Split`'s pile-count input
+      reuses the `deal-more-count` pattern (`min="2" max="20"`).
+      `tests/state.test.js` coverage for both new reducer cases incl.
+      the "not enough cards" guard.
+Covers: US-34, US-35, US-36.
+
+### Phase 34 — e2e verification (final implementation phase) ✅ DONE
+Folded into phases 31-33 as each landed rather than deferred to a single
+pass at the end: real-DragEvent stack/overlap coverage, the D24 pot/zone
+overlap guard, and host-only + propagation checks for Shuffle/Split are
+all in `tests/e2e.smoke.mjs` and green.
+- [ ] T34.1 `tests/e2e.smoke.mjs`: real drag-and-drop coverage for both
+      stack and overlap (both before/after sides - specifically
+      exercising the direction case Smith's correction covers), Shuffle,
+      Split (incl. the guard error), full regression pass, stable
+      multi-run.
+Covers: full-sprint verification.
+
+### Phase 35 — Dedicated bug-fix phase (reserved, proactive per Sprint 3/4 pattern)
+Populated from Smith's Stage-3 close-out test, if anything is found.
+
+### Sprint 6 status
+Phase 29: Done — Trin UAT passed (91/91, mutation-verified), Morpheus approved
+Phase 30: Done — Trin UAT passed (mutation-verified), Morpheus approved
+Phase 31: Done — Trin UAT passed (mutation-verified), Morpheus approved
+Phase 32: Done — Trin UAT passed (guard mutation-verified), Morpheus approved.
+          Pot 13rem->24rem, seat zones 9rem->12rem; fixed a PRE-EXISTING
+          pot/zone overlap present on the committed baseline at every
+          width; <1024px verified byte-identical
+Phase 33: Done — Trin UAT passed (3 mutations verified), Morpheus approved
+Phase 34: Done — e2e coverage landed with each phase (see above)
+Phase 35: Reserved
+
+## Sprint 7 ("host-only save/restore") — SHIPPED 2026-08-20
+US-37, architecture D26. Both gates passed.
+
+### Phase 36 — persistence module (pure, no browser)
+- [x] T36.1 `src/persistence.js`: `snapshot(state, code)` (strips hand
+      piles at save time per D26), `save/load/clear(storage)`, versioned;
+      load returns `{ok:false, reason}` on missing/corrupt/wrong-version
+      rather than throwing or half-restoring.
+- [x] T36.2 `tests/persistence.test.js`: round-trip, hands absent from
+      the serialized blob (asserted on the JSON string, not the object),
+      version mismatch discarded, corrupt JSON discarded, `savedAt` age.
+Covers: US-37 data layer.
+
+### Phase 37 — wire into the host + restore prompt
+- [x] T37.1 `src/main.js`: debounced save on every host dispatch; on
+      load offer restore with Smith's required wording (hands *weren't
+      saved*, save age, players must rejoin), landing on the share
+      screen; re-request the saved table code with an explicit fallback
+      message if the broker refuses it; decline keeps the save.
+- [x] T37.2 `tests/e2e.smoke.mjs`: host reloads mid-game and restores -
+      zones/scores survive, hands are empty, table code is re-claimed.
+Covers: US-37 UI + session layer.
+
+### Sprint 7 status
+Phase 36: Done — Trin UAT passed (3 mutations verified), Morpheus approved
+Phase 37: Done — real host-reload e2e: 7 zones restored, no hands resurrected
+
+## Sprint 8 ("stable player identity / reconnect") — SHIPPED 2026-08-20
+User's own design, adopted as proposed: host issues a UUID on connect,
+both ends store it, client presents it on reconnect to get its cards back.
+Architecture: D27.
+
+### Phase 38 — identity module + handshake ✅ DONE
+- [x] T38.1 `src/identity.js` (pure): `newPlayerKey`, `resolvePlayer`
+      (unknown key -> fresh seat; key already live -> fresh seat, no
+      hijack), `peerFor`. 7 unit tests.
+- [x] T38.2 `src/session.js`: `playerKey` carried in the join handshake
+      metadata and surfaced on the roster.
+
+### Phase 39 — host wiring ✅ DONE
+- [x] T39.1 `src/main.js`: `peerToKey` transport map; game state keyed by
+      identity throughout (JOIN, actions, broadcast, motion relay);
+      identity announced once the connection is open (avoids the known
+      PeerJS still-connecting crash).
+- [x] T39.2 `tests/e2e.smoke.mjs`: a guest refreshes mid-game and gets
+      back the exact same card ids and the same seat (roster stays at 2).
+
+### Sprint 8 status
+Phase 38: Done — 142/142 unit
+Phase 39: Done — real guest-refresh e2e green
+
+### Phase 40 — remember the table (US-39) ✅ DONE
+- [x] T40.1 `src/identity.js`: `rememberSession`/`recallSession`/
+      `forgetSession` (+5 unit tests, incl. corrupt-record and hostile-
+      storage cases). `hostName` added to the host snapshot.
+- [x] T40.2 `src/main.js`: guest remembers code+name on join and
+      auto-rejoins on reload (only for a table it was actually in - a
+      bare shared ?join= link still asks for a name); host restore uses
+      the remembered host name. Deep-link and resume merged into one
+      end-of-module block, since it clicks Join and every handler must
+      already be attached.
+- [x] T40.3 `tests/e2e.smoke.mjs`: guest reloads with NOTHING typed and
+      lands back in the live game with the same hand and seat; host
+      restore no longer types a name.
+
+---
+
+## Sprint 9 ("touch parity" — v1.6) — SHIPPED 2026-08-20
+US-40. Native HTML5 DnD is mouse-only, so five shipped interactions
+(drag-to-play, hand reorder, stack, overlap, live drag ghost) do not
+exist on the PRD's primary device. Architecture: D28.
+
+### Phase 41 — extract the drop semantics (D28 precondition) ✅ DONE
+- [x] T41.1 `src/ui.js`: lift the inline bodies of the zone `drop` and
+      hand-reorder `drop` listeners into named `performZoneDrop` /
+      `performHandReorder`; native listeners call them. Pure refactor —
+      no behaviour change, no touch code yet.
+- [x] T41.2 Existing suite + e2e stay green, proving the extraction
+      changed nothing. This must be green *before* Phase 43 exists, so
+      there is only ever one implementation of what a drop means.
+
+### Phase 42 — the pure recognizer ✅ DONE
+- [x] T42.1 `src/touchDrag.js`: DOM-free press-and-hold state machine
+      (idle→pending→lifted→dragging→drop/cancel), 250ms hold, 8px slop,
+      `pointercancel` ⇒ abandon.
+- [x] T42.2 `tests/touchDrag.test.js`: the rules that carry the story —
+      a scroll (moved before the hold) can never become a drag; a hold
+      that stays still lifts; cancel is terminal; slop is measured from
+      the *origin*, not the previous sample.
+
+### Phase 43 — bind it to the DOM ✅ DONE
+- [x] T43.1 `src/ui.js`: attach the recognizer to hand cards and zone
+      cards; `setPointerCapture` + `elementFromPoint` hit-testing;
+      floating `.touch-drag-ghost` clone offset above the finger
+      (Smith Gate 2 #2); shared `showDropHint` feedback.
+- [x] T43.2 Smith Gate 2 #1: move the D13 lift cue off raw `pointerdown`
+      onto the recognizer's `lift`, so a scroll stops broadcasting a
+      phantom lift and the holder isn't the last to know.
+- [x] T43.3 `style.css`: `.card-dragging`, `.touch-drag-ghost`,
+      `touch-action: none` applied only while lifted.
+
+### Phase 44 — prove it on a real finger ✅ DONE
+- [x] T44.1 `tests/e2e.smoke.mjs`: a `hasTouch` context driving
+      `page.touchscreen` — hold-drag a card from hand onto a zone, and
+      confirm a short swipe over a card scrolls instead of dragging.
+- [x] T44.2 The discoverability hint (Smith Gate 1 #4).
+
+### Sprint 9 status
+Phase 41: Done — pure extraction; Trin found `performHandReorder` had no
+          coverage at all and added a real drag-reorder e2e case first
+Phase 42: Done — 13 recognizer tests, 4 mutations verified
+Phase 43: Done — Morpheus caught a detached-source lift (a state broadcast
+          mid-hold strands a ghost); guarded on `isConnected`
+Phase 44: Done — real `hasTouch` + CDP touch e2e; mutation-verified twice
+          (no-hold makes the swipe test fail; unbinding fails the drag test)
+
+**Found en route, deliberately NOT fixed here (scope: US-40 is input, not
+layout):** with 3 players at 1024px a personal seat zone overlaps the
+shared pot. Surfaced when the touch client was briefly a third browser.
+Real geometry, not a test artifact — D24's grown caps have only ever been
+measured against a 2-player ring. Filed for Cypher's backlog.
+
+**Close-out bug (Smith, fixed):** the drag ghost rendered 38px *below*
+the finger despite code that reads as if it floats above — the `scale`
+property composes outside `transform`, so the translate was itself
+multiplied by 1.12. Now positioned with `left`/`top`; e2e asserts the
+ghost/finger relationship and the assertion is mutation-verified.
+
+
+---
+
+## Sprint 10 ("deal on the deck; tables start themselves" — v1.7) — SHIPPED 2026-08-20
+US-41 + US-42. Both requested straight after the user asked "how to
+re-deal?" — which was the finding. Architecture: D29, D30.
+
+### Phase 45 — pure pile-level actions ✅ DONE
+- [x] T45.1 `src/pileActions.js`: `PILE_ACTIONS` + `pileLevelActions`,
+      deliberately a SECOND table, not an extension of the per-card one
+      (D29). `destructive` drives the confirm and the danger styling.
+- [x] T45.2 `tests/pileLevelActions.test.js`: 6 tests, incl. a guard that
+      `deal` never leaks into `actionsForPileKind`.
+
+### Phase 46 — the deck control strip ✅ DONE
+- [x] T46.1 `renderDeck`: stack and controls are now SIBLINGS, so the
+      empty-deck short-circuit hides the cards only — Smith's Gate 1
+      blocker dissolved by structure rather than a special case.
+- [x] T46.2 Game screen only (Smith Gate 2 #2); confirm on Reshuffle &
+      deal; `Deal More (no reset)` and its orphan input deleted.
+- [x] T46.3 Uncaught over-deal throw caught and surfaced beside the deck.
+
+### Phase 47 — auto-start ✅ DONE
+- [x] T47.1 Optional `expectedPlayers`, host-local (D30), + the
+      "waiting for N" status line (Smith Gate 1 #3).
+- [x] T47.2 `tests/e2e.smoke.mjs`: auto-start with no host click,
+      reshuffle & deal behind a confirm, empty-deck controls, and a
+      ghost-seat regression assertion.
+
+### Sprint 10 status
+Phases 45-47: Done. 166 unit + full e2e green, lint clean.
+Three real bugs found by running it: a dead once-only guard, an uncaught
+over-deal throw, and auto-start dealing to a still-`connecting` peer
+(ghost seat holding everyone's cards).
+
+
+---
+
+## Sprint 11 ("restart waits for the table" — v1.8) — SHIPPED 2026-08-20
+US-43/44/45, from the user's request. Architecture: D31 (reverses D26),
+D32, D33.
+
+### Phase 48 — persistence keeps hands ✅ DONE
+- [x] T48.1 `src/persistence.js`: hands persisted, `SNAPSHOT_VERSION` 2,
+      new pure `expectedReturners()` (Smith's Gate 1 blocker as a
+      function). D26's test inverted in place, not deleted.
+
+### Phase 49 — the host waits, and names who's missing ✅ DONE
+- [x] T49.1 Restore KEEPS the saved roster (marked away) — wiping it was
+      what orphaned every restored hand.
+- [x] T49.2 Waiting panel naming each player back/missing, auto-resume on
+      connected count, "Start anyway" sharing the same once-only flag.
+
+### Phase 50 — clients reconnect on their own ✅ DONE
+- [x] T50.1 `host-lost` split from `session-ended`; `forgetSession` moved
+      off the disconnect path; backoff ladder (~51s) + per-attempt
+      timeout; `Session.close()` so attempts don't leak peers.
+
+### Phase 51 — the wording sweep + e2e ✅ DONE
+- [x] T51.1 Restore prompt, README and D26 all corrected/superseded.
+- [x] T51.2 e2e: host reload → named wait list → guest returns unaided →
+      auto-resume → same card ids, two seats, no ghost.
+
+### Sprint 11 status
+Phases 48-51: Done. 171 unit + full e2e green, lint clean.
+Four bugs found by running it: a stalled retry loop (await with no
+timeout), an unregistered `host-lost` event, restore orphaning hands via
+a stale comment, and the manual Deal path seating unsettled peers.

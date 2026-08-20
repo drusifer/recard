@@ -203,3 +203,212 @@ This file contains critical lessons and rules derived from past errors, technica
   earlier - during implementation itself, not just at close-out.
 
 ---
+
+## 2026-08-16 — Sprint 5 ("desktop table width") lessons
+
+- **UAT means checking each AC bullet against actual test coverage, not
+  just confirming the handed-off tests pass.** Neo's Phase 28 tests all
+  passed, but Trin noticed one of US-31's own AC bullets ("extra width
+  is used by content, not just padding") had zero assertion covering it
+  - the 4 fixed-width checkpoints proved the CSS tiers were correct
+  without proving the AC's actual behavioral claim. Passing tests are
+  necessary but not sufficient for UAT sign-off; the gate is the AC
+  list, not the diff. Adding the missing `.table-surface` width
+  measurement then surfaced a real, previously-unnoticed finding (see
+  D20 Consequences, `docs/DECISIONS.md`) that would have shipped
+  unverified otherwise.
+- **Fast-Track (single-phase) sprint planning, used for the first time
+  this project, held up end-to-end.** Cypher's operational guideline for
+  minor/CSS-only/tech-debt sprints had existed since Sprint 1 but never
+  actually been exercised - every prior sprint ran 5-9 phases. Sprint 5
+  (1 story, 1 phase, pure CSS) went through all the same gates (Cypher
+  ->Smith->Morpheus->Smith->Mouse->Neo->Trin->Morpheus) with zero
+  process friction and no phase-count padding for its own sake - the
+  gate structure itself doesn't require multiple phases to function
+  correctly, confirming the guideline wasn't just unused, it was
+  correct.
+
+---
+
+## 2026-08-20 — Sprint 7 ("host-only save/restore") lessons
+
+- **Check what the data is *keyed by* before promising to restore it.**
+  US-37 looked like a storage story; the real problem was identity.
+  Hands are keyed by a PeerJS id that guests regenerate on every join, so
+  a restored hand belongs to nobody, and the obvious fallback -
+  matching rejoining players by display name - is unsafe because names
+  are neither unique nor verified. That wasn't hypothetical: a live
+  Sprint 6 table had two players named "Drew". Reading `session.js`
+  before writing the story is what turned a silent mis-assignment of
+  hole cards into a stated scope decision.
+- **Strip secrets at write time, not read time.** Dropping hands when
+  the snapshot is *built* (rather than ignoring them when it's read)
+  means the private data never lands on disk at all, so a shared browser
+  profile can't leak it and no future code path can mis-assign it. The
+  test asserts on the serialized JSON string rather than the parsed
+  object, because the claim is about what's written.
+- **State honestly what a security-flavoured claim does *not* cover.**
+  "Nothing private is saved" was overstated: the snapshot keeps the
+  deck's full remaining order, which breaks a game as thoroughly as
+  seeing a hand. It's acceptable (host's own machine, already in memory
+  there) - but Gate 2 caught that it was implicit, and implicit
+  qualifications on a privacy claim are how those claims quietly become
+  wrong.
+- **A lint catches the mistake you just made, not the one you remember
+  making.** Stylelint was added after two CSS structural bugs (an
+  unclosed media query, a stray override) and caught a *third*
+  duplicate-selector within minutes of being installed, while wiring an
+  unrelated feature.
+
+---
+
+## 2026-08-20 — Sprint 9 ("touch parity") lessons
+
+- **An API's platform assumptions are invisible in a passing test suite.**
+  Native HTML5 drag-and-drop is mouse-only. Five e2e-verified interactions
+  built over four sprints — drag-to-play, hand reorder, stack, overlap and
+  the live drag ghost — did not exist at all on the PRD's *primary* device,
+  and every one of them was green the whole time. Nothing in the code says
+  "mouse"; you have to know that `dataTransfer` implies it. When a feature
+  is verified only on the input device the developer happens to be using,
+  "tested" and "works" are different claims.
+- **A test written on the wrong input device would have passed anyway.**
+  A mouse emits pointer events too, so a mouse-driven "touch" test exercises
+  precisely the code path a finger fails. Smith made a `hasTouch` context an
+  acceptance criterion for exactly this reason, and it was the right call:
+  the test only has value because the input is real.
+- **Extract the shared function *before* the second caller exists, not
+  alongside it.** Phase 41 pulled the drop bodies out of the native
+  listeners as a standalone phase whose entire proof was the existing green
+  suite. Had it landed in the same change as its first touch caller, a
+  behaviour change and a new feature would have been indistinguishable in
+  the diff.
+- **"The existing suite is the proof" is only true where the suite actually
+  looks.** One of the two extracted functions (`performHandReorder`) had no
+  coverage at all — the hand-order test exercises the sort *buttons*,
+  despite a comment claiming it covered dragging. An untested function was
+  one phase away from acquiring a second caller. Check what observes a
+  behaviour before calling a refactor behaviour-preserving.
+- **Adding a guard can create the path it was meant to close.** Refusing
+  the lift on a detached element left the recogniser in `dragging` with no
+  ghost, so the next move would dereference null. The guard and the
+  consequence of the guard belong in the same change.
+- **Two browser CSS mechanisms that look interchangeable are not.**
+  `touch-action` is resolved when a touch *starts*, so setting it to `none`
+  at lift time does nothing for the gesture in flight — and setting it up
+  front would kill scrolling on every card permanently. Cancelling
+  `touchmove` from a non-passive listener works mid-gesture. Likewise, a
+  CSS animation on `transform` outranks an inline `transform`, so the drag
+  ghost's follow-the-finger positioning had to be `transform` and its
+  lift-pop `scale` — separate properties that compose instead of fight.
+- **A third participant in an e2e is not a free addition.** Adding a third
+  browser to get a touch client permanently reshaped the seat ring — a
+  disconnected player is never removed from state — and broke the D24
+  geometry assertions. Making the *existing* guest context `hasTouch`
+  bought the same coverage at no cost to the rest of the file. It also
+  surfaced a real defect on the way out: 3 players at 1024px overlap a seat
+  zone with the pot, geometry that had only ever been measured at 2 seats.
+- **Check the geometry before choosing the gesture.** The proposed
+  "start a drag once the finger commits to an axis" rule was wrong here for
+  a reason only the CSS could tell you: `#hand-area` scrolls horizontally
+  *and* hand reorder is horizontal; playing a card is vertical *and*
+  `#table-area` scrolls vertically. Neither axis was free. Reading the two
+  `overflow` declarations settled a design argument that could otherwise
+  have been decided by taste and discovered in production.
+- **A stale README is a documentation defect, not a cosmetic one.** Groom
+  found it still advertising "No reconnect" and "No persistence" two
+  sprints after both shipped. The features were real; the only thing
+  telling users they existed was wrong.
+
+---
+
+## 2026-08-20 — Sprint 10 ("deal on the deck; tables start themselves") lessons
+
+- **"How do I do X?" from a user is a defect report.** The sprint began
+  with the user asking how to re-deal. The answer was: click a red button
+  named `Reshuffle & Reset` (which does not deal), then find a button
+  named `Deal More (no reset)` in a row about zones. Nothing was broken;
+  it was simply unfindable. Treating the question as a question would have
+  produced an answer instead of a fix.
+- **Moving a control somewhere discoverable changes its risk profile.**
+  Smith's Gate 2 point generalizes: `Reshuffle & Reset` survived years
+  without a confirm because nobody found it. Putting the same destructive
+  power where people actually look made the missing confirm newly
+  dangerous. "It was already like that" is not a defence when you have
+  just made it reachable.
+- **Two questions deserve two tables, even when one looks like a special
+  case of the other.** Adding `deal` to D25's per-card action list would
+  have offered an irreversible action on every card in the deck stack, in
+  a *hover* row. Card actions answer "what can this card do"; pile actions
+  answer "what can this pile do". Keeping them separate (D29) is also what
+  made the empty-deck fix fall out of the structure rather than needing a
+  special case.
+- **A guard that is never true is worse than no guard**, because it reads
+  as protection. `#host-share.hidden` never became true - `showScreen`
+  hides the parent - so the auto-start once-only check was decorative. It
+  looked correct in review and in the architecture doc.
+- **A "ready" list is not a "reachable" list.** Auto-start counted seats,
+  and dealt to a peer still `connecting`. The client never received the
+  identity message and rejoined as a stranger, leaving a ghost seat
+  holding everyone's cards. D27 had already learned this exact lesson for
+  the identity announcement ("only once the connection is actually open")
+  and the new code did not reuse the condition. When a codebase already
+  waits for a state before doing something, ask whether the thing you are
+  adding needs the same wait.
+- **Assert on the payload, not the shape.** A roster length check would
+  have passed the ghost-seat bug at 2 seats before the reconnect. The
+  regression test asserts on the card counts and the disconnected marker,
+  because the ghost and the live seat both look like the same player in a
+  length check.
+- **A control rebuilt on every broadcast silently eats input.** The deal
+  count input is re-rendered whenever anyone does anything, so a number
+  typed but not yet used was destroyed by an unrelated player's action.
+  Any input inside a wholesale re-render needs its value lifted out.
+
+---
+
+## 2026-08-20 — Sprint 11 ("restart waits for the table") lessons
+
+- **A decision expires when its premise does.** D26 stripped hands from
+  the save for a good reason: guest ids were regenerated every join, so a
+  restored hand belonged to nobody. D27 replaced that with a stable
+  client-held key — and D26 was still being obeyed three sprints later,
+  purely because nobody re-read *why* it existed. Following the letter of
+  a decision after its reason is gone would have shipped "restore the
+  game" that restores empty hands. Record the reason next to the rule so
+  the expiry is visible.
+- **Reverse a decision on the record, and invert its tests rather than
+  deleting them.** D26 is marked superseded in place, and both the unit
+  and e2e assertions that guaranteed "no hand ever reaches disk" were
+  flipped to assert the opposite, with a comment saying why. A privacy
+  property that changed direction should be visible in the suite, not
+  quietly absent from it.
+- **A comment can outlive its truth and take working code with it.**
+  Restore wiped the saved roster with the comment "the saved roster
+  refers to ids from the previous session". True pre-D27, false after —
+  and wiping it made every returning key *unknown* to `resolvePlayer`, so
+  restored hands were orphaned. The bug was invisible because the comment
+  explained it.
+- **The same class of bug reappears one step upstream.** Sprint 10 fixed
+  auto-start dealing to a still-`connecting` peer by counting connected
+  players. Sprint 11 found the *manual* Deal button had the same defect,
+  because peers were seated while still connecting. Fixing the symptom in
+  one caller left the source intact. When a fix is "count only settled
+  things", ask whether the thing should have been in the list at all.
+- **An await with no timeout turns a bounded retry into an infinite
+  one.** `session.ready()` resolves when the data connection opens; when
+  the host is simply gone, PeerJS opens the *peer* and the connection
+  never opens, so the promise never settles either way. The retry budget
+  could never be spent, and the loop stalled on attempt 1 forever. Any
+  retry that awaits a third party needs a per-attempt timeout, not just a
+  budget.
+- **Erasing state at the moment of failure can be what makes recovery
+  impossible.** `forgetSession` ran on host disconnect, dropping the code
+  and name — exactly the two things needed to reconnect. It read as
+  tidy-up and was the single reason auto-reconnect could not exist.
+- **Size a timeout against the human in the loop, not the network.** The
+  retry budget had to outlast a host arriving at a surprise reload,
+  reading a confirm dialog and deciding — tens of seconds, not the
+  hundreds of milliseconds network flakiness would suggest. It stays
+  finite because a host who *declines* gets a new code, and clients would
+  otherwise hammer a dead one.

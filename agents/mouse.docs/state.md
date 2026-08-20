@@ -75,4 +75,68 @@ Phase 1.
       through phases 1-5.
 
 ---
-*Last updated: 2026-08-15 12:43*
+
+## Sprint 5 ("desktop table width")
+
+### Recent Decisions
+- Single Fast-Track phase (Phase 28, task.md), not the usual multi-phase
+  pattern — matches Cypher's Fast-Track flag and the actual scope: one
+  CSS file, two `@media` tiers per D20, no JS/state/protocol involved.
+  T28.1 is the CSS change itself; T28.2 is an objective width-assertion
+  test at both breakpoint boundaries (1023/1024/1439/1440px) plus a
+  no-horizontal-scroll check at the extremes (320px/1920px) — reusing
+  Sprint 4's "measure, don't just eyeball" lesson (Trin retro item 14)
+  even though this sprint is small.
+
+### Blockers
+None.
+
+## Next Steps
+### Immediate Next Action
+Wait for Morpheus's `*lead review sprint plan`. If approved, Neo starts
+Phase 28 (only phase) directly — no Trin UAT→Morpheus review cycle
+needed before Oracle groom, since there's only one phase; Trin's UAT
+still runs on Phase 28 per normal Phase Bloop before Oracle groom.
+
+### Waiting On
+@Morpheus: sprint plan review for Phase 28.
+
+### Planned Work
+- [ ] Track Phase 28 status in `task.md`.
+
+---
+
+## Sprint 6 ("snap-to stack/overlap" + deck operations)
+
+### Recent Decisions
+- 6-phase plan (29-34, task.md): Phase 29 (Pile unification, D23) is
+  the foundation and MUST land + pass full regression before Phase 30
+  starts building the `layout`/`insertCard` state-layer work on top of
+  it — sequencing directly reflects Morpheus/Smith's explicit
+  requirement, not just convention. Phase 30 (state layer) before
+  Phase 31 (UI) mirrors Phase 21-22-style dependency ordering from past
+  sprints. Deck ops (Phase 32) has no dependency on Phase 30/31 content
+  but is sequenced after them anyway since it reuses Phase 29's
+  `dealRoundRobin()` output — keeping foundation-dependent phases
+  together. Reserved bug-fix phase (34) included proactively, per the
+  pattern that's held for 2 sprints running.
+- T30.2 explicitly calls out a dedicated regression test for the
+  before-side-overlap direction bug Smith caught at Gate 2 — flagged by
+  name in the task so it isn't only incidentally covered by a broader
+  test.
+
+### Blockers
+None.
+
+## Next Steps
+### Immediate Next Action
+Handed to Morpheus for `*lead review sprint plan`.
+
+### Waiting On
+@Morpheus: sprint plan review.
+
+### Planned Work
+- [ ] Track Phase 29-34 status in `task.md` as the team cycles through.
+
+---
+*Last updated: 2026-08-16 (Sprint 6 planning)*

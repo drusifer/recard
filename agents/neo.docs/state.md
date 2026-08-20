@@ -612,4 +612,344 @@ Handed to Trin for Phase 27 UAT.
       UAT/review.
 
 ---
-*Last updated: 2026-08-15 22:50*
+
+## Sprint 5, Phase 28 (only phase) — DONE
+
+### Progress
+- [x] TDD: added the 6 width/scroll assertions to `tests/e2e.smoke.mjs`
+      first (US-31/D20), confirmed they FAILED against the unmodified
+      CSS (`at 1024px, #screen-game must grow to the 1100px desktop
+      cap, got 760px`), then implemented T28.1 - two `@media` tiers on
+      `#screen-game` in `style.css` per D20 exactly
+      (min-width:1024px->1100px, min-width:1440px->1300px). Re-ran:
+      green. No changes to `seating.js`/`main.js` - confirmed not
+      needed, geometry is already percentage-based.
+- [x] Pre-handoff validation: `npm test` 86/86 unit tests pass
+      (unaffected, pure CSS change); `npm run test:e2e` stable,
+      including the new US-31 assertions and the full existing flow
+      (host/join/deal/play/drag/disconnect all still pass — confirms
+      the new viewport-resize calls on the `host` page mid-test don't
+      break anything downstream).
+
+### Blockers
+None.
+
+## Next Steps
+### Immediate Next Action
+Handed to Trin for Phase 28 UAT — only phase this sprint, so a Trin
+pass here is effectively also the sprint's last implementation gate
+before Oracle groom.
+
+### Waiting On
+@Trin: UAT sign-off on Phase 28.
+
+### Planned Work
+None pending beyond Phase 28 clearing UAT/review.
+
+---
+
+## Sprint 6, Phase 29 (Pile unification, D23) — impl DONE
+
+### Progress
+- [x] T29.1: rewrote `src/state.js` around `state.piles` (one Pile shape
+      for deck/hands/zones). `viewFor` output byte-identical. Verified
+      by grep that **no** other `src/` module ever touched
+      `state.deck`/`.hands`/`.zones` (only `viewFor` output crosses to
+      ui/protocol — `makeStateMessage(view)`), so `ui.js`/`main.js`/
+      `protocol.js` are genuinely untouched, not just believed to be.
+- [x] T29.2: `npm test` 86/86, `npm run test:e2e` fully green including
+      real WebRTC 2-client flow, drag-and-drop, privacy, and the Sprint 5
+      width assertions.
+
+### Two findings raised rather than silently absorbed
+1. **T29.2's premise was impossible as written** (see task.md): "all 86
+   tests pass unmodified" can't hold for a *storage* refactor when 117
+   assertion sites read the storage shape directly. Corrected the
+   guarantee to the one that's actually meaningful and that did hold:
+   **every `viewFor` assertion unmodified** (the behavioral contract /
+   wire format); internal-shape reads mechanically migrated to new
+   selectors via a scripted sed, then diff-audited to confirm no
+   view-side assertion changed.
+2. **Deviated from D23's "every card uniformly carries `{owner,faceUp}`"**
+   — implemented visibility as *derived from `pile.kind`* instead.
+   Reasons in ARCHITECTURE.md D23 "Neo implementation revision":
+   it removes a data clump (a hand card's `owner` would always duplicate
+   its pile's `ownerId`), matches the user's own pile-level framing
+   ("A Pile can be open..., In Hand..., and Mixed"), avoids `viewFor`
+   having to strip fields back off to stay wire-identical, and shrinks
+   the diff (deck/hand cards keep their plain shape). **Flagged for
+   Morpheus to accept or reject at code review — not applied silently.**
+
+### Blockers
+None.
+
+## Next Steps
+### Immediate Next Action
+Handed to Trin for Phase 29 UAT.
+
+### Waiting On
+@Trin: UAT on Phase 29. Then Morpheus review (which must also rule on
+the D23 deviation above).
+
+---
+*Last updated: 2026-08-16 (Sprint 6 Phase 29)*
+
+## Sprint 6, Phase 30 (position-aware PLAY/MOVE_CARD + layout, D21) — impl DONE
+
+### Progress
+- [x] TDD: wrote all 10 D21 tests first, confirmed red (8 failed; the 2
+      that passed were the back-compat and authorization ones, which
+      *should* already hold - a useful signal that the new tests were
+      targeting real gaps rather than restating existing behavior), then
+      implemented. 101/101 unit + e2e green.
+- [x] `placeCard()` + `withLayout()` in `state.js`, shared by `PLAY` and
+      `MOVE_CARD` so placement and the layout rule can't drift.
+      Smith's Gate 2 direction rule lives in exactly one branch.
+- [x] `MOVE_CARD` same-zone no-op removed; remove-then-insert is now one
+      shared path for both same-zone and cross-zone (index math computed
+      against the array the card has already left, otherwise inserting
+      relative to a card sitting after the moved one is off by one).
+- [x] `PICKUP` also strips `layout` alongside `owner`/`faceUp`.
+
+### Flagged for review (2)
+1. **D21's documented params can't express its own rule.** D21 specifies
+   `beforeCardId` + `layout`, but Smith's Gate 2 correction requires
+   knowing *which card the user targeted* and *which side* - a bare
+   `beforeCardId` loses that (inserting "before T" and "after T's
+   predecessor" are the same insertion point but need the layout written
+   to different cards). Implemented as `targetCardId` + `side` +
+   `layout`, with before-card insertion kept as the internal primitive.
+   This is the minimal change that makes D21's own stated rule
+   implementable - flagged for Morpheus rather than quietly redefining
+   the action shape.
+2. **Real intermediate behavior change**: dropping a card back onto its
+   own zone used to be a silent no-op; it now moves that card to the end
+   of the zone. Phase 31 makes this deliberate (drop regions), but
+   between Phase 30 and 31 the existing drag-drop UI has a new,
+   unintended effect. Not a defect in the state layer, but Trin/Smith
+   should know it exists rather than discover it live.
+
+### Blockers
+None.
+
+## Next Steps
+### Immediate Next Action
+Handed to Trin for Phase 30 UAT.
+
+### Waiting On
+@Trin: UAT. Then Morpheus (ruling on flag 1).
+
+---
+*Last updated: 2026-08-16 (Sprint 6 Phase 30)*
+
+## Sprint 6, Phase 31 (stack/overlap drag-drop UI + CSS) — impl DONE
+
+### Progress
+- [x] New `src/dropTarget.js` — pure drop-region geometry, no DOM, its
+      own unit tests (8). **Applied Sprint 4 retro item 13 proactively**:
+      gave the new pure logic a dedicated module *before* writing it
+      rather than extracting it reactively like `seating.js`.
+- [x] `ui.js`: `data-card-id`/`data-layout` on zone card wrappers, rect
+      collection off the `.card` face (not the wrapper, which includes
+      the controls below and would make the "on the card" region reach
+      into its own buttons), live drop hints on dragover per Smith's
+      Gate 1 affordance requirement.
+- [x] `main.js` + `style.css`: placement forwarded through
+      `dropCardOnZone`/`playCard`/`moveCard`; stack/overlap rendering
+      via negative margins keyed off `data-layout`.
+- [x] 109/109 unit + e2e green, incl. 2 new e2e checks driving real
+      `DragEvent`s at real coordinates, asserting the layout round-trips
+      to the *other* client over WebRTC and that a before-side drop puts
+      the layout on the target (Smith's Gate 2 rule, end to end).
+
+### Findings
+1. **Integration bug that no unit test could have caught.** `main.js`
+   wired `onDropCard: (cardId, toZoneId) => dropCardOnZone(...)` — a
+   2-arg arrow silently swallowing the new 3rd `placement` argument.
+   Every unit test passed; the reducer was correct; the UI hit-test was
+   correct; the feature simply did nothing. Only found by *running it
+   and looking*. Fixed. Worth a retro note: arity-mismatch in a callback
+   wiring is invisible to JS and to layer-local tests.
+2. **Zone size now materially limits the feature's value — needs a
+   decision, flagging rather than deciding.** The user's ask was to make
+   it "easier to layout runs and sets in your zone", but shared zones are
+   capped at `max-width: 13rem` / `max-height: 9rem` and personal seat
+   zones — literally "your zone" — at `max-width: 9rem` (~2.5 cards
+   wide). Stacking helps density, but a run of 4-5 cards still has
+   nowhere to go. I had to temporarily widen the container just to
+   screenshot the feature working. Those caps are deliberate (D20 notes
+   the pot is bounded so the seat ring and the pot don't collide), so
+   loosening them is a geometry decision for Morpheus with a UX read
+   from Smith — not something to quietly change in a UI phase.
+
+### Blockers
+None for Phase 31 itself; finding 2 affects how useful US-32/33 actually
+are in practice.
+
+## Next Steps
+### Immediate Next Action
+Handed to Trin for Phase 31 UAT.
+
+### Waiting On
+@Trin: UAT. Then Morpheus/Smith on finding 2 (zone sizing).
+
+---
+*Last updated: 2026-08-16 (Sprint 6 Phase 31)*
+
+## Sprint 6, Phase 32 (zone room, D24) — impl DONE
+
+### Progress
+- [x] Pot 13rem -> 20/24rem wide, seat zones 9rem -> 11/12rem, surface
+      min-height 26rem -> 48/52rem, pot centred in the surface — all
+      scoped to D20's existing 1024/1440 breakpoints.
+- [x] Guard test (required by D24) measuring real pot/seat-zone
+      intersection at 1024/1440/1920. 109/109 unit + e2e green.
+
+### Findings
+1. **The guard test failed before I changed anything — the pot/zone
+   overlap already existed.** Confirmed against the committed baseline
+   (extracted HEAD into a temp dir and measured it): *both* personal
+   zones overlap the pot at 900/1024/1440/1920px today. So this wasn't a
+   risk introduced by growing caps; it was a live bug the cap was
+   believed to be preventing and wasn't.
+2. **Two of my own D24 premises were wrong and measuring caught both**
+   (now corrected in ARCHITECTURE.md rather than quietly fixed): the pot
+   was not centred (normal flow, near the top), and clearance is bounded
+   by *height*, not width — the 26% ring is a flat ellipse on a wide,
+   short surface, and a loaded personal zone is ~218px tall on its own.
+   Budgeting from an empty zone would have shipped an overlap.
+3. **I broke my own "<1024px unchanged" promise once and caught it by
+   measuring**: centring at all widths took 900px from one overlapping
+   zone to two. Re-scoped to >=1024px; 900px now byte-identical to
+   baseline, verified.
+4. Remaining, not addressed (out of D24's scope): the *seat card* (roster
+   row, radius 42%) still slightly overlaps its own personal zone at the
+   bottom seat. Different pair of elements than D24's pot-vs-zone
+   invariant. Visible in the Phase 32 screenshot; worth Smith's read.
+
+### Blockers
+None.
+
+## Next Steps
+### Immediate Next Action
+Phases 31 and 32 both need Trin UAT (31 was handed off just before 32
+was inserted).
+
+### Waiting On
+@Trin: UAT on phases 31 + 32.
+
+---
+*Last updated: 2026-08-16 (Sprint 6 Phase 32)*
+
+## Sprint 6, Phase 33 (deck operations, US-34/35/36) — impl DONE
+
+### Progress
+- [x] TDD: 5 reducer tests written first (red), then `SHUFFLE_DECK` and
+      `SPLIT_DECK`. 116/116 unit + e2e green, incl. 2 new e2e checks
+      (host-only visibility, and a Split propagating 3 face-down piles
+      to the other client with no identity leak).
+- [x] `SPLIT_DECK` reuses Phase 29's `dealRoundRobin()` in
+      exhaust-the-stock mode; the "every pile gets >=1 card" guard is one
+      condition covering both empty-deck and too-many-piles.
+- [x] Honoured D24's invariant: Split leaves an **empty deck pile in
+      place** rather than removing it, with a test asserting `DRAW` then
+      fails with "deck is empty" rather than a TypeError.
+- [x] Deck controls placed with the deck; `Draw` deliberately left by the
+      hand (Smith's Gate 1 reversal of US-34's first draft).
+
+### Three real bugs found by running it, not by tests
+1. **`.btn-row[hidden]` didn't hide.** A class selector's `display: flex`
+   outranks the UA stylesheet's `[hidden] { display: none }`, so the
+   host-only deck controls were **visible to guests**. Caught by the e2e
+   host-only assertion. Fixed generally for any `.btn-row`, not just
+   this one.
+2. **`redactMiddleCard` dropped `layout`.** Arrangement never reached
+   any viewer for face-down cards, so every face-down pile rendered
+   un-stacked. This affected US-32/33 too, not just Split. `layout`
+   now survives redaction - it describes arrangement, not identity, and
+   D21 makes arrangement shared state. Test asserts the redaction still
+   leaks no rank/suit.
+3. Split piles now carry D21's `stack` layout on every card after the
+   first, so a pile draws as a pile instead of N loose card-backs each
+   with its own controls - pure reuse of Phase 31, no new concept.
+
+### Finding (not fixed - flagging)
+With 4+ piles you must scroll the pot to see them all: the pot is capped
+at 12rem tall by D24's seat-ring clearance, and each stacked pile is
+~11rem wide, so only about two zones fit at once. Split works and the
+piles are all reachable, but "split into 4 and see 4" doesn't hold.
+Options (a Morpheus/Smith call, not mine): a tighter peek for face-down
+piles specifically, or piles rendered as a single back + count like the
+deck stack already does. Not silently claiming this is finished.
+
+### Blockers
+None.
+
+## Next Steps
+### Immediate Next Action
+Handed to Trin for Phase 33 UAT.
+
+### Waiting On
+@Trin: UAT on Phase 33; then Morpheus/Smith on the pile-density finding.
+
+---
+*Last updated: 2026-08-16 (Sprint 6 Phase 33)*
+
+## Sprints 7-8 + UI follow-ups (2026-08-20) — DONE
+
+### Shipped
+- **Sprint 7 (US-37/D26)** host-only localStorage save. `src/persistence.js`
+  (pure, injectable storage). Hands stripped **at save time**, so the blob
+  never contains private cards.
+- **Sprint 8 (US-38/D27)** stable identity, the user's own design:
+  host issues a UUID, both ends store it, client presents it on
+  reconnect. `src/identity.js`. **Game state is now keyed by playerKey,
+  not peer id** - peer id lives only in `peerToKey` in main.js. This
+  closed the reconnect-after-refresh backlog item open since Sprint 1.
+- **US-39** remember code+name; guest auto-rejoins on reload with nothing
+  typed; host snapshot carries `hostName`.
+- Landing screen is now Resume / Host / Join (Resume disabled when there's
+  nothing to resume; covers both host and guest). Table code shown for the
+  whole game via `showGameCode()`.
+- Earlier same day: D25 pile actions (hover -> action -> highlighted
+  targets), compact cards + font-minimum robustness, wide/short zones,
+  seat `[-] info [+]`, deck centred and rendered as a real card back.
+
+### Traps hit (all fixed - listed so they aren't re-learned)
+1. **Callback arity**: `onDropCard: (a,b) => f(a,b)` silently swallowed a
+   3rd argument; every unit test passed while the feature did nothing.
+2. **`redactMiddleCard` dropped `layout`** - arrangement never reached
+   viewers for face-down cards.
+3. **`.btn-row[hidden]` didn't hide** - a class's `display:flex` outranks
+   the UA `[hidden]` rule. Host-only controls were visible to guests.
+4. **Mechanical extraction over-captured** (`wireHostSession` swallowed
+   unrelated handlers). `node --check` caught it; run it after any
+   scripted refactor.
+5. **Module-order**: resume logic clicked `#join-btn` before its listener
+   existed. It now lives at the end of main.js with a comment saying why.
+6. **Stylesheet structure**: two unclosed/duplicated rules. `npm run lint`
+   (stylelint) exists now and catches these.
+7. **Dev-server caching**: `python3 -m http.server` sends no
+   `Cache-Control`, so edits looked like no-ops in the browser.
+   `npm run dev` is now `tools/devserver.mjs` with `no-store`.
+
+### Verified green at shutdown
+147 unit tests, full e2e (incl. host reload restore, guest auto-rejoin,
+stack/overlap drag, Shuffle/Split), stylelint clean.
+
+### Next / open
+- **Hands are still not persisted** (D26). Now that they're keyed by a
+  stable identity this is safe to do - it's the last piece before a host
+  crash is fully recoverable. Deliberate follow-on, not an oversight.
+- Mobile: drag-and-drop and the new hover-revealed actions have no touch
+  equivalent. Compounding with the 5+-player density item.
+- Pile density: only ~2 zones fit the pot, so "Split into 4 and see 4"
+  isn't true; needs a design call (tighter face-down peek, or draw a pile
+  as one back + count).
+- Pre-existing crash reproduced on the committed baseline: sequential
+  join-then-deal can hit PeerJS "Maximum call stack size exceeded".
+  Backlog lists it as simultaneous-joins-only; it's easier to trigger
+  than recorded.
+
+---
+*Last updated: 2026-08-20 (shutdown prep)*

@@ -281,4 +281,165 @@ Handed to Neo for Phase 27 fix (cursor affordance only).
 - [ ] Hand back to Smith to close uat-report-sprint4.md once reviewed.
 
 ---
-*Last updated: 2026-08-15 22:47*
+
+## Sprint 5, Phase 28 (only phase) — UAT
+
+### Progress
+- [x] Independently re-ran `npm test` (86/86) and `npm run test:e2e`
+      (stable) rather than trusting Neo's reported numbers.
+- [x] Verified against US-31's actual AC line by line, not just "tests
+      pass": found a genuine gap in Neo's own test - his 4 fixed-width
+      checkpoints prove each CSS tier individually but don't verify AC's
+      "extra width is actually used by content, not just wider padding"
+      claim. Added an objective measurement for it: `.table-surface`'s
+      own rendered width, 582px @ 760px container -> 922px @ 1300px
+      container - genuinely grows, confirmed not just outer padding.
+  - **Real finding surfaced, not glossed over** (same "measure, don't
+    guess" instinct as Sprint 4's density finding): with exactly 2
+    seated players, `seatPosition()`'s angle math puts both seats at
+    leftPct=50 (directly above/below, not side-by-side) - so the seats
+    THEMSELVES don't visibly spread horizontally from this width
+    increase, even though the surface under them does and 3+-player
+    tables would see real horizontal spread. Confirmed pre-existing
+    geometry (not introduced by D20) and out of this story's scope -
+    logging as a non-blocking observation, not filing a bug or
+    rejecting the phase over it.
+- [x] Added Smith's explicit Gate 2 UAT request: continuous-resize sweep
+      (5px steps) through both breakpoints, asserting width is never
+      monotonically decreasing during a live resize - not just the 4
+      fixed snapshots. Passed both sweeps (1000-1050px, 1420-1460px).
+- [x] Ran `python3 agents/tools/trace_annotate.py --date 2026-08-16` per
+      protocol: 12 flags total, all pre-existing patterns from earlier
+      in the day's session (AP-VIA-GREP/READ/DUP-READ/SKILL-RELOAD) or a
+      stack-mismatch false positive (AP-MAKE-BYPASS - this project has
+      no Makefile and has used `npm test`/`npm run test:e2e` directly
+      across all 4 prior sprints, matching every prior state.md; not a
+      real violation for this project). Nothing new or real from Phase
+      28 itself.
+
+**Verdict: PASS.**
+
+### Blockers
+None.
+
+## Next Steps
+### Immediate Next Action
+Handed to Morpheus for Phase 28 code review (only phase — this doubles
+as the sprint's final implementation gate before Oracle groom).
+
+### Waiting On
+@Morpheus: Phase 28 code review.
+
+### Planned Work
+None pending beyond Morpheus's review.
+
+---
+
+## Sprint 6, Phase 29 (Pile unification, D23) — UAT
+
+### Progress
+- [x] Independently re-ran `npm test` (86/86 as handed off) and
+      `npm run test:e2e` (green, real WebRTC).
+- [x] Audited Neo's corrected T29.2 claim rather than taking it: diffed
+      the migrated test file and confirmed **no assertion against a
+      `viewFor` result changed** — the only 4 diff lines touching a view
+      test changed the *expected* side (internal-state lookup), never
+      the asserted view field. Neo's correction is accurate as stated.
+- [x] **Added 5 tests for failure modes this refactor newly creates**
+      (91/91 now). Three separately-shaped state slices couldn't be
+      mis-routed into each other; one `piles` array keyed by `kind` can:
+      deck contents leaking into `zones`, another player's hand leaking
+      by id, a pile whose kind isn't routed silently vanishing from the
+      view, an undefined visibility rule, and the DEAL/DEAL_MORE merge.
+- [x] **Mutation-tested all of it** (standing "can this assertion fail
+      on purpose" rule, Sprint 3 retro item 12): injected each bug into
+      `state.js` and confirmed the tests catch it —
+      deck-routed-into-zones → 7 fail; unrouted pile kind → 7 fail;
+      `fresh` flag forced false → 1 fail. Restored and verified
+      `state.js` byte-identical to the e2e-verified version, then re-ran
+      e2e to be sure no mutation residue shipped.
+
+### Real finding (not a blocker — code is correct, coverage was not)
+- The `fresh`-flag mutation failed **exactly one** test, and it was one
+  I had just written. Meaning: collapsing `DEAL` and `DEAL_MORE` into a
+  single reducer case separated only by that flag had **zero** test
+  coverage distinguishing the two — the pre-existing 86 tests could not
+  tell "DEAL resets hands" from "DEAL appends." A one-character slip in
+  that flag would have silently turned every re-deal into a deal-more
+  and shipped green. This is a coverage gap the refactor *introduced*
+  (the two used to be independent code paths), and it was invisible
+  until mutation-tested. Now covered.
+
+**Verdict: PASS.**
+
+### Blockers
+None.
+
+## Next Steps
+### Immediate Next Action
+Handed to Morpheus for Phase 29 code review — which must also rule on
+Neo's flagged D23 deviation (visibility derived from `pile.kind` vs.
+D23's original per-card uniform `{owner, faceUp}`).
+
+### Waiting On
+@Morpheus: Phase 29 code review + D23 deviation ruling.
+
+---
+*Last updated: 2026-08-16 (Sprint 6 Phase 29 UAT)*
+
+## Sprint 6, Phase 30 (D21 layout/placement) — UAT: PASS
+- [x] 101/101 unit + e2e green, re-run independently.
+- [x] Mutation-verified the two things most likely to be silently wrong:
+      (1) writing `layout` to the dropped card on a before-side drop —
+      i.e. **the exact bug Smith predicted at Gate 2** — fails precisely
+      the one test written for it, nothing else. That test is genuinely
+      load-bearing, not decorative. (2) restoring `MOVE_CARD`'s same-zone
+      early return fails 7 tests. Restored and confirmed byte-identical.
+- [x] Confirmed Neo's flagged intermediate behavior change is real:
+      between Phase 30 and 31 a same-zone drop moves the card to the end
+      of its zone rather than doing nothing. Not a state-layer defect;
+      Phase 31 makes it intentional. Not filing a bug — noting it so
+      Smith doesn't hit it cold at close-out.
+
+
+## Sprint 6, Phases 31 + 32 — UAT: PASS
+- [x] 109/109 unit + full e2e green, re-run independently.
+- [x] Mutation-verified all three new guards actually fail on purpose:
+      - shrinking `dropTarget`'s halo reach to zero -> 4 failures, so the
+        overlap-vs-stack region split is genuinely covered, not incidental;
+      - pushing the pot's max-height far past D24's measured budget ->
+        the D24 overlap guard fires precisely, naming the offending zones;
+      - removing D24's pot centring -> the suite fails **earlier**, as a
+        click timeout rather than an assertion. That is worth recording:
+        it independently reproduces the original symptom in the D12-era
+        comment ("broke click-through, not just looked messy - caught by
+        the e2e suite actually clicking a zone button that was covered").
+        Direct evidence the pre-existing overlap Neo found was actively
+        breaking interaction, not merely cosmetic.
+- [x] Verified Neo's pre-existing-bug claim myself rather than taking it:
+      measured the extracted HEAD baseline, both personal zones do
+      overlap the pot at 900/1024/1440/1920.
+- [x] Confirmed the <1024px promise: 900px measurements identical to
+      baseline.
+- Noted, not filed: seat card vs. its own personal zone still overlap at
+  the bottom seat (different element pair than D24's invariant). Routing
+  to Smith at close-out rather than expanding this phase.
+
+## Sprint 6, Phase 33 (deck operations) — UAT: PASS
+- [x] 116/116 unit + full e2e green, independently re-run.
+- [x] Mutation-tested the three highest-risk edits, all caught:
+      - making `redactMiddleCard` leak the full card -> 4 failures. This
+        was the one that mattered: Neo modified the single function the
+        whole privacy model rests on, so the question isn't "does the
+        new behaviour work" but "would the privacy tests still notice if
+        redaction broke". They would.
+      - `SPLIT_DECK` removing the deck pile (the exact mistake Morpheus
+        pre-emptively flagged in D24) -> 2 failures, including the
+        DRAW-after-split guard.
+      - dropping Split's per-pile guard -> 1 failure.
+- [x] Confirmed the guest-visible-controls bug independently: the e2e
+      host-only assertion fails on the pre-fix CSS. Worth noting as a
+      class of defect - `hidden` silently losing to a class's `display`
+      is invisible to every unit test and to code review.
+- Endorsed Neo's pile-density finding as real and correctly *not* fixed
+  under this phase; it needs a design call, not a CSS nudge.

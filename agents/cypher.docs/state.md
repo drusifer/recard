@@ -285,5 +285,149 @@ None.
       question, same tier as touch-target-size (item 7) and
       info-duplication (item 10) checks.
 
+### Progress — SPRINT 5 ("desktop table width"): IN PROGRESS
+- [x] Drafted US-31 in USER_STORIES.md. Root cause confirmed by reading
+      style.css directly: `#screen-game { max-width: 760px; }` has no
+      desktop breakpoint at all — same cap applies whether the viewport
+      is a phone or a 27" monitor. Deliberately scoped this AWAY from
+      the open mobile-density backlog item (below) — same seat/table
+      code, opposite problem (desktop has too little use of space,
+      mobile has too much crowding); fixing one is not a reason to
+      touch the other in the same story.
+      Fast-Track candidate per Cypher operational guideline 7 (single
+      story, CSS-scoped, no new protocol/state) — flagging for Mouse to
+      consider a 1-phase sprint rather than the full 6-9 phase pattern
+      of Sprints 3/4.
+
+### Blockers
+None.
+
+### Next Steps
+### Immediate Next Action
+Handed to Smith for Gate 1 (`*user review`). Exact breakpoint/max-width
+values deliberately left to Morpheus's Gate 2 architecture pass, not
+prescribed in the story.
+
+### Waiting On
+Nothing.
+
+### Progress — SPRINT 5 ("desktop table width"): COMPLETE
+- [x] US-31, Gate 1 (3 amendments) + Gate 2, Mouse's first-ever
+      Fast-Track single phase (28), implemented/UAT'd/reviewed, Oracle
+      groom (D20), Smith close-out (screenshotted the real app, no
+      bugs), full retro, launched below.
+- Team retro highlights: Trin's "AC coverage, not just passing tests"
+  catch is the sprint's most reusable lesson - added to backlog as a
+  standing UAT checklist item. Fast-Track process itself validated
+  end-to-end for the first time since being written at Sprint 1.
+
+### Blockers
+None.
+
+## Next Steps
+### Immediate Next Action
+Sprint 5 is fully closed. No active sprint queued.
+
+### Waiting On
+Nothing.
+
+### Planned Work — backlog for next sprint's planning
+- [ ] **New process item**: "does every AC bullet have a corresponding
+      test assertion" as a standing Trin UAT checklist step (this
+      sprint's own finding - Neo's tests all passed but one AC bullet
+      had zero coverage until Trin checked line by line).
+- Items 1 (reconnect-after-refresh/host handoff) and 3 (real QR image)
+  - STILL OPEN, now 5 sprints running.
+- Item from Sprint 4: seated-player mobile density (5+ players) - still
+  needs its own real compact-seat design sprint, untouched by Sprint 5
+  (deliberately - opposite problem, same code area).
+- Non-blocking observation from Sprint 5 (Smith Gate 2): desktop
+  type/density scaling (the UI still visually reads as "mobile sizing in
+  a bigger box") is a separate future item from "more room," if ever
+  requested.
+
 ---
-*Last updated: 2026-08-15 22:55*
+*Last updated: 2026-08-16 (Sprint 5 close)*
+
+### Progress — SPRINT 6 ("snap-to stack/overlap for runs and sets"): IN PROGRESS
+- [x] User request: "snap to" logic for stacking/overlapping cards in a
+      zone. **Asked a clarifying question before drafting** (matches the
+      Sprint 2/3/4 precedent of confirming forking questions up front):
+      offered a continuous drop-position spectrum, two explicit discrete
+      modes, or stack-only-deferred-overlap. User picked **two explicit
+      discrete modes**.
+- [x] Grounded in actual code before writing AC (not guessed): confirmed
+      `MOVE_CARD` currently always appends and no-ops on a same-zone
+      move (zero reordering exists today), and that
+      `dropCardOnZone`/`renderZonePanel` already carry an explicit
+      precedent comment against mid-drag popups (established when
+      face-down play was kept button-only) — used that precedent to
+      shape AC toward a spatial drop-region distinction instead of a
+      dialog, rather than contradicting a decision the team already made.
+- [x] Drafted US-32 (stack) and US-33 (overlap/fan) in USER_STORIES.md,
+      as two stories sharing one mechanism (differ in render offset +
+      drop region only). Added PRD Feasibility Flag 6 for Morpheus with
+      a concrete technical proposal (position-aware `MOVE_CARD`, new
+      shared `stacked` per-card hint, drop-target detection extension).
+      Explicitly flagged the *exact* drop-region split (which half/edge
+      = which mode) as Smith's call at Gate 1, not prescribed here.
+- Not a Fast-Track candidate — real new reducer semantics, new shared
+  state field, new drag-drop wiring, new CSS. Expect a multi-phase plan
+  from Mouse.
+
+### Blockers
+None.
+
+## Next Steps
+### Immediate Next Action
+Handed to Smith for Gate 1 (`*user review` US-32/US-33) — specifically
+need Smith to propose the concrete drop-region mechanism.
+
+### Waiting On
+@Smith: Gate 1 approval + concrete drop-region UX proposal.
+
+### Mid-sprint addition (user, same session): deck operations
+User asked to also add "Draw, Split, Shuffle" deck operations for
+easier deck interaction. Checked existing code before drafting:
+- **Draw**: already exists (`DRAW` action, existing button) - real gap
+  is placement/discoverability, not missing logic. It's buried in the
+  hand panel's button row, not grouped with the deck visual
+  (`.deck-area`) it actually acts on.
+- **Shuffle**: does NOT exist as a standalone action today - `RESET` is
+  the only thing that reshuffles, and it also wipes every hand, every
+  zone's cards, and passed markers. No way to just reshuffle the
+  remaining deck in place without a full round reset.
+- **Split**: does not exist at all. Asked the user to clarify via
+  AskUserQuestion (two draw piles vs. a cosmetic cut); the user declined
+  to answer directly and said to stop asking and just proceed with
+  backlog items noted instead. **Proceeding on a stated assumption, not
+  blocking**: Split = divide the deck into two independently-drawable
+  piles (implemented as a new face-down zone carrying half the deck) -
+  the more useful of the two options, and the cosmetic-cut alternative
+  would be functionally undetectable by any player anyway since deck
+  order is never shown to anyone (`viewFor` only ever exposes
+  `deckCount`, never order/contents). **Flagged clearly as an
+  assumption for the user to correct, not silently decided.**
+- User separately said: "backlog mobile support" - referring to
+  Smith's Gate 1 finding that native drag-and-drop doesn't fire from
+  touch gestures on real mobile browsers (pre-existing since US-28, not
+  a regression from this sprint's work). Logged as a backlog item, not
+  a blocker for Sprint 6.
+- Drafted US-34 (Draw regrouped near the deck, no logic change), US-35
+  (Shuffle - new host-only `SHUFFLE_DECK`, reshuffles in place without
+  touching hands/zones/scores/passed, the one thing today's
+  Reshuffle&Reset can't do), US-36 (Split - new host-only `SPLIT_DECK
+  {pileCount}`, creates N face-down zones dealt round-robin, explicitly
+  supporting more than 2 piles per the user's solitaire correction).
+  Added PRD Feasibility Flag 7 for Morpheus - both new actions proposed
+  as thin reuses of existing helpers (`shuffle()`, `makeZone()`,
+  `dealCards()`'s round-robin loop), not new mechanisms.
+- Sprint 6 now covers US-32..36 (2 stories = card stacking/overlap
+  snap, 3 stories = deck operations) as one sprint, not split into two
+  sequential Bloop chains - both are "make card/deck interaction
+  easier" additions from the same conversation, consolidated per
+  Bloop-efficiency guidance.
+
+### Waiting On
+@Smith: Gate 1 covering the full US-32..36 set (32/33 already
+Gate-1-approved earlier this turn; 34/35/36 are new, need review).

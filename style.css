@@ -13,6 +13,14 @@
   --card-bg: #f8f7f2;
   --card-text: #1b1f24;
   --card-red: #c0392b;
+  /* Card geometry lives here so the stack/overlap offsets, the deck
+     stack and the card itself can't drift apart. `--card-w` is a
+     *minimum*: a card grows past it if the browser enlarges its text
+     (e.g. a user's minimum-font-size setting), rather than clipping. */
+  --card-w: 3rem;
+  --card-h: 4.1rem;
+  --card-gap: 0.5rem;
+  --card-peek: 0.85rem;
   --radius-sm: 0.45rem;
   --radius-md: 0.75rem;
   --radius-lg: 1.1rem;
@@ -38,6 +46,20 @@ body {
 /* The game screen benefits from more room (cards, roster, hand) on
    anything wider than a phone - Smith UX audit finding #4. */
 #screen-game { max-width: 760px; position: relative; }
+
+/* Desktop table width (US-31, D20): seat/zone geometry in
+   src/seating.js is already purely percentage-based, so widening this
+   container alone is sufficient to give seats, personal zones, and the
+   hand row more physical room - no JS change needed. Two tiers, capped
+   deliberately rather than unbounded, so an ultra-wide/4K monitor
+   doesn't just stretch the same layout thin. */
+@media (min-width: 1024px) {
+  #screen-game { max-width: 1240px; }
+}
+
+@media (min-width: 1440px) {
+  #screen-game { max-width: 1600px; }
+}
 
 h1 {
   font-weight: 700;
@@ -133,6 +155,12 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   margin-top: 0.5rem;
 }
 
+/* A class selector's `display: flex` outranks the UA stylesheet's
+   `[hidden] { display: none }`, so a `.btn-row` marked hidden would stay
+   visible - caught for real when the host-only deck controls showed up
+   on a guest's screen. Applies to any hidden row, not just that one. */
+.btn-row[hidden] { display: none; }
+
 .banner {
   background: var(--danger);
   color: white;
@@ -157,8 +185,8 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .card-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem;
-  min-height: 4.5rem;
+  gap: var(--card-gap);
+  min-height: calc(var(--card-h) + 0.2rem);
 }
 
 /* Corner-index playing card, closer to a real card's layout than a bare
@@ -169,9 +197,9 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   color: var(--card-text);
   border: 1px solid #d9d9d3;
   border-radius: var(--radius-sm);
-  width: 3.1rem;
-  height: 4.3rem;
-  padding: 0;
+  min-width: var(--card-w);
+  min-height: var(--card-h);
+  padding: 0.15rem 0.2rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -186,27 +214,35 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   position: absolute;
   top: 0.2rem;
   left: 0.3rem;
-  font-size: 0.65rem;
+  font-size: 0.8rem;
   font-weight: 700;
   line-height: 1.05;
   text-align: center;
 }
 
 .card-pip {
-  font-size: 1.6rem;
+  font-size: 1.35rem;
   font-weight: 700;
 }
 
 .card-red { color: var(--card-red); }
 
+/* A real card back rather than a grey placeholder: same silhouette as a
+   face-up card (border, radius, shadow) with a woven two-tone pattern,
+   so a face-down card reads as a *card* at a glance instead of an empty
+   slot. */
 .card-back {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--surface-2);
-  color: var(--muted);
-  border: 1px solid var(--border);
-  font-size: 1.4rem;
+  color: transparent;
+  font-size: 0;
+  background-color: #2b4a7d;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(255,255,255,0.16) 0 2px, transparent 2px 6px),
+    repeating-linear-gradient(-45deg, rgba(0,0,0,0.22) 0 2px, transparent 2px 6px);
+  border: 1px solid #12233f;
+  box-shadow: inset 0 0 0 2px var(--card-bg), 0 2px 5px rgba(0, 0, 0, 0.35);
   opacity: 1;
 }
 
@@ -257,6 +293,11 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   flex-direction: column;
   align-items: center;
   gap: 0.3rem;
+  /* Capped so a card's controls (wider than the card) can't set its
+     width - see .middle-card-controls. */
+  max-width: 8.5rem;
+  /* Anchor for the hover action row (D25). */
+  position: relative;
 }
 
 /* Drag cursor affordance (US-28, Smith Sprint 4 close-out finding #1):
@@ -274,8 +315,78 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   cursor: grabbing;
 }
 
+/* Stacked / overlapped cards (US-32/33, D21). The negative margin has to
+   swallow `.card-row`'s own 0.6rem gap as well as the intended overlap,
+   which is why these aren't simply "card width minus what shows".
+   Driven off `data-layout`, which ui.js copies straight from
+   authoritative state - so every player sees the same arrangement. */
+.middle-card[data-layout] {
+  position: relative; /* so :hover can lift it above its neighbours */
+}
+
+/* Tight pile for a SET: only a corner index of each buried card shows -
+   enough to still identify it at a glance (US-32 AC explicitly rules out
+   fully hiding a lower card). */
+.middle-card[data-layout='stack'] { margin-left: calc(-1 * (var(--card-w) - var(--card-peek)) - var(--card-gap)); }
+
+/* Fanned run: every card keeps enough of its left edge to read rank+suit
+   from the corner index, so a sequence stays legible end to end. */
+.middle-card[data-layout='overlap'] { margin-left: calc(-1 * (var(--card-w) - 1.7rem) - var(--card-gap)); }
+
+/* Overlapping necessarily covers the buried cards' own Pick up / Move
+   to… controls. Raising the hovered/focused card (and its controls)
+   above its neighbours keeps every card individually operable, so the
+   44px touch-target floor still holds in practice and not just on paper.
+   `:focus-within` carries the same escape hatch to keyboard users. */
+.middle-card[data-layout]:hover,
+.middle-card[data-layout]:focus-within {
+  z-index: 4;
+}
+
+/* Without this, a pile's stacked cards each render their own Pick up /
+   Move to… controls at full width underneath, which collide into an
+   unreadable smear (measured, not guessed - see the Phase 31
+   screenshot). The controls are still one hover/focus away, and the
+   cards' own overlap already communicates that they're a group. */
+.middle-card[data-layout] > :not(.card):not(.middle-card-controls) {
+  display: none;
+}
+
+.middle-card[data-layout]:hover > :not(.card),
+.middle-card[data-layout]:focus-within > :not(.card) {
+  display: revert;
+}
+
+/* Live drop-mode affordance (Smith Gate 1, Nielsen #1/#6): native
+   drag-and-drop shows nothing until release, so which mode a drop is
+   about to use has to be visible mid-drag or it can't be discovered. */
+.middle-card.drop-onto .card {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(79, 157, 255, 0.25);
+}
+
+.middle-card.drop-before,
+.middle-card.drop-after {
+  position: relative;
+}
+
+.middle-card.drop-before::before,
+.middle-card.drop-after::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  height: var(--card-h); /* the card face, not the controls below it */
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.middle-card.drop-before::before { left: -0.35rem; }
+.middle-card.drop-after::after { right: -0.35rem; }
+
 .owner-tag {
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   color: var(--muted);
 }
 
@@ -285,8 +396,8 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .zone {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 0.75rem;
-  margin-bottom: 0.75rem;
+  padding: 0.4rem 0.6rem;
+  margin-bottom: 0.5rem;
   background: rgba(0, 0, 0, 0.15);
 }
 
@@ -306,11 +417,11 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 
 .move-to-select {
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   padding: 0.25rem 0.35rem;
   min-height: 2.75rem;
 }
@@ -347,16 +458,27 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    here the two would grow into each other and physically overlap (a
    real bug: it broke click-through, not just looked messy - caught by
    the e2e suite actually clicking a zone button that was covered). */
-#game-deck-area, #table-area {
+#game-deck-area {
   position: relative;
   max-width: 13rem;
   margin: 0 auto;
 }
 
 #table-area {
+  position: relative;
+  max-width: 13rem;
+  margin: 0 auto;
   max-height: 9rem;
   overflow-y: auto;
+  /* Zones flow side by side: a Split makes N piles at once, and stacking
+     them vertically buried everything past the first behind this
+     element's own scroll - you could create four piles and see one. */
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-content: flex-start;
 }
+
 
 /* Seats (roster rows) positioned around the table surface's edge instead
    of stacked in a plain list - same content as the pre-redesign roster
@@ -377,12 +499,26 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   position: absolute;
   transform: translate(-50%, -50%);
   width: max-content;
-  max-width: 8.5rem;
-  padding: 0.4rem 0.5rem;
+  max-width: 20rem;
+  padding: 0.3rem 0.4rem;
   font-size: 0.8rem;
   margin: 0;
   z-index: 2;
   pointer-events: auto;
+  /* [-] info [+] on one line - see renderRoster. Keeps both 44px score
+     targets inside the card instead of hanging off its edge, and makes
+     the seat wide-and-short, which is the axis the table has spare. */
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.seat-info {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+  min-width: 0;
 }
 
 /* The viewer's own seat needs an explicit marker beyond position alone
@@ -401,6 +537,8 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   pointer-events: none;
 }
 
+.seat-zone .card-row { flex-wrap: nowrap; overflow-x: auto; }
+
 .seat-zone {
   position: absolute;
   transform: translate(-50%, -50%);
@@ -416,20 +554,20 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   position: relative;
   display: inline-flex;
   align-items: center;
-  height: 4.6rem;
+  height: 3.7rem;
   padding-left: 0.4rem;
   margin-bottom: 0.75rem;
 }
 
 .deck-stack-card {
   position: absolute;
-  width: 3.1rem;
-  height: 4.3rem;
+  width: var(--card-w);
+  height: var(--card-h);
 }
 
 .deck-count-badge {
   position: relative;
-  left: 3.6rem;
+  left: 2.9rem;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -515,7 +653,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .rules-entry dt {
   color: var(--muted);
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
   margin-top: 0.6rem;
@@ -587,7 +725,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   position: absolute;
   left: 0.6rem;
   top: -0.5rem;
-  font-size: 0.65rem;
+  font-size: 0.8rem;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 0.3rem;
@@ -607,3 +745,331 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   transition: left 0.08s linear, top 0.08s linear;
   opacity: 0.85;
 }
+
+/* The surface has to get *taller* too, not just let the pot grow. Seat
+   and zone rings are a percentage of the surface (D18), and `top` is a
+   percentage of its height - so on a 26rem-tall surface the 26% zone
+   ring sits only ~108px above centre, which a taller pot overruns
+   immediately. Measured, not assumed: growing the pot alone put both
+   personal zones on top of it at every desktop width. */
+@media (min-width: 1024px) {
+  .table-surface { min-height: clamp(40rem, calc(var(--seat-count, 2) * 4.4rem), 62vh); }
+  /* Centred *in the surface* rather than left in normal flow. The pot
+     had been flowing just under the deck area near the top, while
+     personal zones ring the surface's true centre
+     (`seatPosition(..., 26)`) - so the two were never concentric and the
+     seat opposite the viewer (topPct 24%) sat on top of the pot. That
+     collision is real and pre-existing, measured on the committed
+     baseline at every width. Centring is what makes the geometry match
+     the model the rest of the table already assumes, and what makes
+     D24's clearance budget valid.
+     Scoped to this breakpoint up: applying it below 1024px measurably
+     made the already-over-subscribed phone layout *worse* (one
+     overlapping zone became two), and D24 commits to leaving that tier
+     alone for the open mobile-density item to address properly. */
+  #table-center {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    max-width: 42rem;
+  }
+  #table-area { margin: 0; max-width: 30rem; max-height: 8rem; }
+  /* Wide and short: cards run across instead of wrapping downward, so a
+     zone costs the table width (which it has) rather than height (which
+     it doesn't). min-width matters as much as max - without it an empty
+     or single-card zone collapses to a tall narrow box, the one shape
+     the table has least room for. Desktop-only: below 1024px the ring
+     has no spare room at all (D24). */
+  .seat-zone { min-width: 14rem; max-width: 26rem; }
+  .seat-zone .card-row { flex-wrap: nowrap; overflow-x: auto; }
+}
+
+@media (min-width: 1440px) {
+  .table-surface { min-height: clamp(42rem, calc(var(--seat-count, 2) * 4.6rem), 64vh); }
+  #table-center { max-width: 54rem; }
+  #table-area { max-width: 40rem; max-height: 9rem; }
+  .seat-zone { min-width: 16rem; max-width: 30rem; }
+  .seat-zone .card-row { flex-wrap: nowrap; overflow-x: auto; }
+}
+
+/* US-34: deck-acting controls sit with the deck visual they act on.
+   Kept compact and left-aligned under the deck stack rather than
+   stretched across the surface - they're occasional setup actions, not
+   the per-turn path (which is why `Draw` deliberately stays by the
+   hand instead). */
+.deck-controls {
+  margin: 0.4rem 0 0;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.deck-controls button { font-size: 0.85rem; padding: 0.45rem 0.7rem; }
+.deck-controls input { width: 3.6rem; font-size: 0.85rem; padding: 0.4rem 0.5rem; }
+
+/* US-36 follow-through: with several zones (a Split makes N piles at
+   once) stacking them vertically buried everything past the first one
+   behind the pot's own scroll - you could create four piles and see one.
+   Flowing them side by side spends D24's new width on the thing that
+   needed it. Zones keep their own labels/borders, so this changes
+   arrangement only, not what a zone is (Smith Gate 1, US-19). */
+#table-area .zone {
+  flex: 1 1 auto;
+  min-width: 11rem;
+  margin-bottom: 0;
+}
+
+/* The armed play-visibility control (replaces the per-card icon pair). */
+.play-as-label {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.play-as-label select { font-size: 0.85rem; padding: 0.4rem 0.5rem; }
+
+/* One horizontal control row per zone card, rather than each control
+   stacked under the card. Two 44px rows per card made every zone about
+   twice the height of the card itself, which is exactly what pushed the
+   pot into the seat-zone ring (D24) and forced page scrolling. */
+.middle-card-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Wrap rather than widen: the controls are wider than the card they
+     belong to, and letting them set the card's width made each zone card
+     ~4x a card wide. At a large minimum font size that pushed the third
+     card in a zone onto a clipped second row - i.e. cards silently
+     vanished. Capping the wrapper keeps a zone a row of *cards*. */
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  max-width: 100%;
+}
+
+.middle-card .move-to-select { max-width: 100%; }
+
+/* Your hand sticks to the bottom of the viewport. The table can be as
+   tall as a big roster needs without ever pushing your own cards off
+   screen - which is what happened before: a mostly-empty table filled
+   the whole viewport and "YOUR HAND" sat below the fold. The one thing
+   you always need to see is now the one thing that can't scroll away. */
+#screen-game > .panel:last-of-type {
+  position: sticky;
+  bottom: 0;
+  z-index: 8;
+  background: var(--surface);
+  margin-bottom: 0;
+}
+
+/* Deck + its controls as one column in the centred cluster. */
+.deck-column { display: flex; flex-direction: column; align-items: flex-start; gap: 0.3rem; }
+
+/* D25: a card's actions appear on hover/focus rather than always taking
+   up room under every card. Keeping them out of flow means a zone is a
+   row of cards, not a row of button stacks - which is what let zones
+   become wide-and-short. */
+.middle-card-actions {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  gap: 0.25rem;
+  padding-top: 0.2rem;
+  z-index: 6;
+  white-space: nowrap;
+}
+
+.middle-card:hover .middle-card-actions,
+.middle-card:focus-within .middle-card-actions {
+  display: flex;
+}
+
+
+.action-btn {
+  font-size: 0.8rem;
+  padding: 0.35rem 0.55rem;
+  min-height: 2.2rem;
+  background: var(--surface-2);
+  border-color: var(--accent);
+  white-space: nowrap;
+}
+
+/* Every pile that can receive the chosen action lights up, so the valid
+   destinations are visible rather than guessed (Nielsen #1/#6). */
+.pile-target {
+  outline: 2px dashed var(--accent);
+  outline-offset: 3px;
+  background: rgba(79, 157, 255, 0.1);
+  cursor: pointer;
+}
+
+body.targeting .middle-card-actions { display: none !important; }
+
+/* The table code stays visible for the whole game - late arrivals and
+   rejoins always need it, and it used to live only on a screen you had
+   to leave the table to reach. */
+.game-code-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.game-code-bar code {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.25rem 0.6rem;
+}
+
+/* Icon-only buttons carry no text, so they need an explicit box - and it
+   has to clear the 44px floor from the UI Conventions in ARCHITECTURE.md,
+   which is exactly the rule an icon button is most likely to break. */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  line-height: 0;
+}
+
+.icon-btn svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.copy-link-btn { margin: 0 auto; }
+
+/* --- Touch drag (US-40, D28) ------------------------------------------
+   The dragged card stays where it is, dimmed, while a clone follows the
+   finger. Moving the real element would mean overwriting - and later
+   restoring - the inline `transform` the US-30 hand fan puts on every
+   card, and a drop into dead space re-renders nothing, so a card could
+   be stranded mid-air. A clone has no state to restore. */
+.card-dragging { opacity: 0.35; }
+
+/* Smith Gate 2 #3: the lift is the ONLY feedback in the whole gesture -
+   nothing marks the 250ms hold, so a user whose hold didn't take gets
+   silence and no way to tell a failed gesture from a broken app. It has
+   to be impossible to miss, not tasteful.
+
+   The pop animates `scale`, NOT `transform`: `transform` is written
+   inline on every move to follow the finger, and an animation on the
+   same property outranks the inline style, which would snap the ghost
+   back to the origin for the length of the animation. `scale` is its own
+   property and composes with the translate instead of fighting it. */
+@keyframes card-lift-pop {
+  from { scale: 1; }
+  to { scale: 1.12; }
+}
+
+.touch-drag-ghost {
+  position: fixed;
+  z-index: 30; /* above the modal layer (20) - nothing may cover the card you are holding */
+  pointer-events: none; /* so elementFromPoint never hit-tests the ghost as the card */
+  scale: 1.12;
+  opacity: 0.92;
+  outline: 2px solid var(--accent);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 45%);
+  animation: card-lift-pop 120ms ease-out;
+  /* Parked off-screen until the first move positions it. `left`/`top`,
+     never a transform translate: `scale` above composes OUTSIDE
+     `transform`, so a translate here would be multiplied by 1.12 and the
+     ghost would drift further from the finger the further it travelled
+     (Smith's Gate 2 #2 finding at sprint close). */
+  left: -9999px;
+  top: -9999px;
+}
+
+/* Smith Gate 1 #4: a gesture nobody is told about is not parity. */
+.touch-hint {
+  display: none;
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted, #9aa);
+  text-align: center;
+}
+
+@media (pointer: coarse) {
+  .touch-hint { display: block; }
+}
+
+/* --- Deck pile-level controls (US-41, D29) -----------------------------
+   A persistent strip, not the D25 hover row: these act on the deck, not
+   on a card, so they are always visible rather than revealed by pointing
+   at something. Sibling of `.deck-stack`, which is what lets the controls
+   survive an empty deck (Smith Gate 1 blocker). */
+.deck-controls-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.deck-controls-strip .deal-count {
+  width: 3.25rem;
+  min-height: 44px;
+  text-align: center;
+}
+
+.deck-controls-strip button {
+  min-height: 44px;
+  font-size: 0.8rem;
+  padding: 0.35rem 0.6rem;
+}
+
+/* An empty deck still occupies its slot, so the controls beside it don't
+   jump around the moment the last card is drawn. */
+.deck-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--card-w);
+  min-height: var(--card-h);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  color: var(--muted);
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+/* --- Restore: waiting for players (US-45) ------------------------------ */
+.restore-waiting { margin-top: 0.75rem; }
+
+.restore-waiting .waiting-summary {
+  font-weight: 600;
+  margin: 0 0 0.4rem;
+}
+
+.restore-waiting .waiting-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.6rem;
+  font-size: 0.85rem;
+}
+
+/* Named, and marked - "2 of 3" never tells a host whether to keep
+   waiting; "Bob is still disconnected" does. */
+.restore-waiting .returner-back { color: var(--muted); }
+.restore-waiting .returner-missing { font-weight: 600; }
+
+.restore-waiting .returner-back::before { content: "✓ "; }
+.restore-waiting .returner-missing::before { content: "… "; }
+
+#resume-anyway-btn { min-height: 44px; }

@@ -113,4 +113,45 @@ Nothing — groom is done, handing off now.
 - [ ] CHAT.md just reset - plenty of headroom before the next archive.
 
 ---
-*Last updated: 2026-08-15 22:48*
+
+## Sprint 5 ("desktop table width") groom
+
+### Progress
+- [x] `docs/DECISIONS.md`: added the D20 entry (context, decision,
+      consequences) — Morpheus's D20 in `docs/ARCHITECTURE.md` already
+      had the technical detail; this is the project-history-level
+      summary matching every prior sprint's pattern.
+- [x] `agents/oracle.docs/lessons.md`: 2 new lessons — (1) UAT must
+      check each AC bullet against actual test coverage, not just that
+      handed-off tests pass (Trin found an uncovered AC bullet despite
+      Neo's tests being green); (2) Fast-Track single-phase planning,
+      used for the first time this sprint, held up end-to-end with no
+      process friction.
+- [x] `agents/oracle.docs/memory.md`: decision table +1 row (D20).
+- [x] `agents/CHAT.md`: 24 messages — well under the 50-100 archive
+      threshold, no action needed.
+- [x] `README.md`: checked, no update needed — the existing "Known
+      limitations" mobile-density entry is still accurate (D20 didn't
+      touch it), and per the PRD's own "primitives, not polish" yardstick
+      a CSS breakpoint fix doesn't warrant a new Features-list bullet
+      (matches how Sprint 4's cursor-affordance fix also got no bullet).
+
+### Blockers
+None.
+
+## Next Steps
+### Immediate Next Action
+Hand to Smith for Stage 3 Step 8 (`*user test` + `*user feedback`) on
+Sprint 5's one feature — plus a general sanity pass that nothing else
+regressed, since this is a layout-wide CSS change even though scoped to
+one selector.
+
+### Waiting On
+Nothing — groom is done, handing off now.
+
+### Planned Work
+- [ ] If Smith finds anything, expect a Trin triage round before retro.
+- [ ] CHAT.md has headroom; no archive needed this sprint.
+
+---
+*Last updated: 2026-08-16 (Sprint 5 groom)*

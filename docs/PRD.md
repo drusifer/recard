@@ -208,6 +208,77 @@ best-effort, matching D4's existing reliable-state/best-effort-motion
 split. Need Morpheus to confirm the throttle rate used for cursor (US-22)
 is adequate for this too, or whether card-drag warrants its own rate.
 
+## Feasibility Flag → Morpheus (6): Card Stacking/Overlap Snap ("runs and sets")
+New requirement (2026-08-16, post-v1.4-launch, see `docs/USER_STORIES.md`
+US-32/US-33). Two related drop-target behaviors for cards within a zone,
+both extending the existing drag-and-drop mechanism (D19/US-28) rather
+than replacing it:
+
+**Stack** (US-32): drop a card onto a target card's "stack" region ->
+piles tightly on top (corner-index peek of what's underneath still
+visible). **Overlap** (US-33): drop onto the target's other region ->
+fans out beside it with a partial, fully-identifiable overlap. Both
+insert the dropped card adjacent to the target in the zone's underlying
+card order.
+
+Product-level proposal for Morpheus to evaluate/own the technical shape
+of:
+- `MOVE_CARD`'s current always-append, same-zone-is-a-no-op behavior
+  (`src/state.js`) needs to become position-aware: an optional
+  `beforeCardId`/insertion-point parameter, and same-zone moves need to
+  actually reorder instead of no-op'ing.
+- A new per-card visual hint (something like `stacked: boolean` on the
+  card, set only when it lands via the "stack" drop region) needs to be
+  **shared/authoritative state**, not per-viewer-local like hand order
+  (D14) — a table's card layout is genuinely shared game state every
+  player needs to see identically, unlike a private hand's internal
+  order which only its owner needs consistent.
+- Drop-target wiring is currently zone-level only (`renderZonePanel` in
+  `src/ui.js` — `opts.onDropCard(cardId, zoneId)` carries no target-card
+  or position info). Needs extending to detect which card (if any) was
+  under the drop point, and which of its two regions.
+- **Constraint carried over from US-28/Smith's own established
+  precedent**: no mid-drag popup/prompt to pick a mode — the mode must
+  be a spatial drop-target distinction on the card itself, discoverable
+  without a decision dialog interrupting the drag.
+
+Need Morpheus to confirm: (a) the state-layer authorization story is
+unchanged (stacking/overlapping a card should follow the exact same
+`MOVE_CARD` authorization already established, nothing new to add), and
+(b) whether the per-card `stacked` hint needs any interaction with the
+existing live card-drag broadcast (D19) mid-drag, or is purely a
+committed-state-on-drop concern.
+
+## Feasibility Flag → Morpheus (7): Deck Operations (Draw grouping, Shuffle, Split)
+New requirement (2026-08-16, added mid-Sprint-6 by the user directly, see
+`docs/USER_STORIES.md` US-34/35/36). Lower-risk than Flag 6 — proposed
+as two small, mostly-mechanical reducer additions plus a UI regroup:
+
+- **US-34** (Draw grouping): no state/reducer change at all, pure
+  `index.html`/`ui.js` placement.
+- **US-35** (Shuffle): proposed as one new reducer case, `SHUFFLE_DECK`
+  — `{ ...state, deck: shuffle(state.deck, rng) }`, reusing the existing
+  `shuffle()` helper `RESET` already calls, just without rebuilding the
+  deck or touching hands/zones/passed. Host-only, matching
+  `DEAL`/`DEAL_MORE`/`RESET`'s existing authorization pattern exactly —
+  no new authorization concept.
+- **US-36** (Split): proposed as one new reducer case, `SPLIT_DECK
+  { pileCount }` — creates `pileCount` new zones via the existing
+  `makeZone()` helper (D17's shared zone-construction logic), each
+  `faceDown: true`-carrying pile dealt round-robin via the same
+  card-distribution loop `dealCards()` already implements for
+  `DEAL`/`DEAL_MORE`, just writing into `zone.cards` instead of
+  `hands[playerId]`. Host-only, same pattern as above. Needs a "not
+  enough cards for N piles" guard mirroring `DEAL_MORE`'s existing one.
+
+Need Morpheus to confirm: (a) `SHUFFLE_DECK`/`SPLIT_DECK` as new
+reducer cases (vs. some other shape), (b) whether `dealCards()` should
+be generalized to accept an arbitrary list of destinations (zones OR
+hands) rather than duplicating its round-robin loop for zones, and (c)
+that per-pile face-down cards created by `SPLIT_DECK` correctly fall
+under the exact same redaction rule already governing every other
+face-down zone card (D7) with no new privacy logic needed.
+
 ## Open Questions
 1. Max players per table? (assume 2–8 until told otherwise). **Min
    players resolved 2026-08-15: 1 player must be supported**, for

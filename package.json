@@ -5,9 +5,13 @@
   "scripts": {
     "test": "node --test tests/*.test.js",
     "test:e2e": "node tests/e2e.smoke.mjs",
-    "dev": "python3 -m http.server 8000"
+    "dev": "node tools/devserver.mjs",
+    "lint": "stylelint style.css",
+    "lint:fix": "stylelint style.css --fix"
   },
   "devDependencies": {
-    "playwright": "^1.62.1"
+    "playwright": "^1.62.1",
+    "stylelint": "^17.14.1",
+    "stylelint-config-standard": "^40.0.0"
   }
 }
