@@ -261,6 +261,7 @@ VERDICT: Pass | Fail | Concern
 5. **Keep CHAT.md Short**: Post brief approvals/rejections in chat; put detailed test reports in `agents/smith.docs/`.
 
 ---
+6. **Post Decisions to Chat (summarized):** a gate verdict's *conditions* are the decision - approving "with amendments" and leaving the amendments in a document means the next persona acts on the approval alone. Post the verdict and its conditions together. See bob-protocol *Decision Broadcast*.
 
 ## Via Integration
 

@@ -275,4 +275,5 @@ bobp chat "*pm launch <sprint>. Sprint complete." --persona Cypher --cmd "pm lau
 - **Fix Bloop scope**: Fix Bloop targets the failing phase only — never restart the full sprint.
 - **State saves**: Every persona saves state before every handoff (see bob-protocol State Management).
 - **Chat first**: Post the handoff `bobp chat` call BEFORE switching. The next persona reads CHAT.md on entry.
+- **Decisions are posted, not just recorded**: any persona who decides something posts a summary to CHAT.md in the same turn — the outcome, the rejected alternative, and where the full text lives. Applies to scope cuts, gate conditions, and "we deliberately did not fix this", not only numbered architecture decisions (see bob-protocol *Decision Broadcast*).
 - **Retro is required**: Step 9 is not optional. Retro output is the input to the next sprint's backlog.

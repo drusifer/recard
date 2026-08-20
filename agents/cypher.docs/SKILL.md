@@ -136,6 +136,7 @@ all tools:
 
 
 ---
+8.  **Post Decisions to Chat (summarized):** every scope cut, deferral, or option chosen over a named alternative goes to CHAT.md in the same turn, with the rejected option and why. A story that records only the choice reads later as though there was never a question. See bob-protocol *Decision Broadcast*.
 
 ## Via Integration
 

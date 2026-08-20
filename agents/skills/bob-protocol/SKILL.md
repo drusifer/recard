@@ -152,6 +152,60 @@ bobp chat "@Morpheus *lead decide <choice>" --persona Trin --cmd "qa handoff" --
 
 ---
 
+## Decision Broadcast — every persona, every decision
+
+**If you decided something, post a summary to CHAT.md in the same turn you
+decided it.** Not only Morpheus, and not only things numbered `D<n>`.
+
+This was previously written down three times, as a courtesy in the
+relationship tables of Morpheus, Cypher and Tank ("post significant
+decisions so Oracle can archive them"). That framing under-reached: it
+made the broadcast Oracle's benefit rather than the project's, and it left
+every other persona with no rule at all.
+
+**What counts as a decision.** Anything a future reader could reasonably
+ask *"why is it like this?"* about:
+
+- choosing an approach over a named alternative (including "we'll do the
+  simple thing for now")
+- cutting, deferring, or widening scope
+- a gate verdict that carries conditions — the conditions are the decision
+- deciding *not* to fix something you found
+- changing a rule, a threshold, or a convention
+
+**What to post.** Chat messages are capped at 512 characters, which is why
+this is "summarized" and not "pasted". Three things, in this order:
+
+1. **What was decided** — the outcome, stated plainly.
+2. **What was rejected, and why** — the alternative is the half that
+   makes the decision legible later. A decision with no visible
+   alternative reads as an accident.
+3. **Where the full text lives** — `docs/ARCHITECTURE.md` D-number,
+   `DECISIONS.md`, a story's AC, a state file.
+
+If it will not fit in 512 characters, the decision goes in a document and
+the *summary* goes in chat — never skip the post because the reasoning is
+long. That is exactly when the post matters most.
+
+**When.** In the turn you make it, before the handoff — not batched at
+sprint close. A decision recorded only at groom has already influenced
+work that nobody could question at the time.
+
+**Why chat specifically.** `*ora report` archives CHAT.md per sprint to
+`agents/chat_archive/`, so chat is the one durable, time-ordered record of
+*why* — documents get rewritten in place and quietly lose their reasoning.
+The failure mode is real and present in this repo: `docs/DECISIONS.md`
+stops at D20 while D21-D28 exist only in `ARCHITECTURE.md`. Every one of
+those was posted to chat, which is the only reason the reasoning survived
+the drift.
+
+```bash
+bobp chat "D<n> recorded: <what was decided>. Chose <X> over <Y> because <reason>. Full text: docs/ARCHITECTURE.md. @Next *command" \
+  --persona <Name> --cmd "<prefix> decision" --to <Next>
+```
+
+---
+
 ## Anti-Loop Protocol
 
 If a fix attempt fails:
