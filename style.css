@@ -163,18 +163,20 @@ body {
 
 
 
-/* Desktop table width (US-31, D20): seat/zone geometry in
-   src/seating.js is already purely percentage-based, so widening this
-   container alone is sufficient to give seats, personal zones, and the
-   hand row more physical room - no JS change needed. Two tiers, capped
-   deliberately rather than unbounded, so an ultra-wide/4K monitor
-   doesn't just stretch the same layout thin. */
+/* Desktop table width (US-31, D20; widened further D51 per direct user
+   request - "make the UX expand to fill the window"): seat/zone
+   geometry in src/seating.js is already purely percentage-based, so
+   widening this container is sufficient on its own - no JS change
+   needed. D20's original fixed pixel caps (1240px/1600px) left visible
+   unused window on anything bigger than a laptop; `calc(100vw - Nrem)`
+   genuinely fills the window instead, with a small fixed margin so
+   content never touches the browser edge. */
 @media (min-width: 1024px) {
-  #screen-game { max-width: 1240px; }
+  #screen-game { max-width: calc(100vw - 3rem); }
 }
 
 @media (min-width: 1440px) {
-  #screen-game { max-width: 1600px; }
+  #screen-game { max-width: calc(100vw - 4rem); }
 }
 
 h1 {
@@ -1134,9 +1136,12 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
     display: flex;
     align-items: flex-start;
     gap: 1rem;
-    max-width: 42rem;
+    /* D51: widened from a fixed 42rem alongside #screen-game itself
+       filling the window - the inner content needs to actually reach
+       the wider outer container, not just leave it as blank margin. */
+    max-width: calc(100vw - 10rem);
   }
-  #table-area { margin: 0; max-width: 30rem; }
+  #table-area { margin: 0; max-width: calc(100vw - 24rem); }
   /* Wide and short: cards run across instead of wrapping downward, so a
      zone costs the table width (which it has) rather than height (which
      it doesn't). min-width matters as much as max - without it an empty
@@ -1149,8 +1154,8 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 @media (min-width: 1440px) {
   .table-surface { --table-min-h: 36rem; } /* D51: bigger cards need more ring clearance again */
-  #table-center { max-width: 54rem; }
-  #table-area { max-width: 40rem; }
+  #table-center { max-width: calc(100vw - 12rem); }
+  #table-area { max-width: calc(100vw - 28rem); }
   .seat-zone { min-width: 16rem; max-width: 30rem; }
   .seat-zone .card-row { flex-wrap: wrap; overflow: visible; }
 }
