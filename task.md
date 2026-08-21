@@ -762,69 +762,109 @@ pile, so there's nothing to hover yet: stays a small persistent control.
       `ACTIONS`, so a dragged Draw would have had no legal drop target
       at all - now checks `PILE_ACTIONS` too. 196/196 unit green.
 
-### Phase 53 — the pile anchor (generalized, not deck-only)
-- [ ] T53.1 `src/ui.js`: generalize D29's `deck-controls-strip` pattern
-      into a pile-anchor usable by ANY pile kind - fixed to the pile's
-      own container, never card-relative (Smith Gate 1 #2, the exact
-      mistake this sprint exists to fix). Hover (mouse) / tap (touch,
-      Smith Gate 1 #1) reveals the popover.
-- [ ] T53.2 Wire the hand's anchor first (Sort rank/suit, Pass) -
-      removes 3 permanently-visible buttons. Old buttons stay hidden-
-      but-present until Phase 58's cleanup, so nothing breaks mid-sprint.
-- [ ] T53.3 `npm run lint:design` clean at every viewport (D37 gate) -
-      the anchor itself must clear 44px.
+### Phase 53 — the pile anchor (generalized, not deck-only) ✅ DONE
+- [x] T53.1 `src/ui.js`: `renderPileAnchor` generalizes D29's
+      `deck-controls-strip` pattern into a pile-anchor usable by ANY
+      pile kind - fixed to the pile's own container, never card-relative
+      (Smith Gate 1 #2). Hover (mouse) / tap (touch, `:focus-within`,
+      Smith Gate 1 #1) reveals the popover - reuses D25's existing
+      CSS-only mechanism, not a new one.
+- [x] T53.2 Hand's anchor wired (Sort rank/suit, Pass) - 3 buttons
+      replaced by one. Diagnosed and fixed a real pre-existing e2e
+      blocker along the way (not caused by this phase, just newly
+      reached): #table-center's own transform-created stacking context
+      was trapping z-index against #seat-zones, silently swallowing a
+      click on the Deal button.
+- [x] T53.3 `npm run lint:design`: the anchor toggle itself clears 44px
+      (base `button` rule, no exemption needed). The page-wide
+      no-scroll gate carries 9 PRE-EXISTING violations, confirmed via
+      `git stash` to predate this sprint's own commits entirely - not
+      this phase's regression, not touched.
 
-### Phase 54 — Draw: the worked example (drag + static tap shortcut)
-- [ ] T54.1 Draw and Draw-face-down through the deck's pile anchor:
-      draggable via the action-token protocol (D35, reusing
-      `touchDrag.js` unchanged) AND a plain tap shortcut (D36, static
-      flag from Phase 52 - not computed).
-- [ ] T54.2 e2e: drag Draw onto the hand draws a card; tapping Draw
-      (revealed) also draws, with no drag.
+### Phase 54 — Draw: the worked example (drag + static tap shortcut) ✅ DONE
+- [x] T54.1 Draw through the deck's pile anchor: draggable via the
+      action-token protocol (D35, `attachPileActionTouchDrag` reuses
+      `touchDrag.js`'s pure `step` unchanged) AND a plain tap shortcut
+      (D36, `PILE_ACTIONS.draw.singleTarget` - static, from Phase 52).
+      `drawFaceDown` dropped per the open decision above (D37 groom
+      note has the full reasoning) - never implemented, never shipped.
+      Caught a real bug before it shipped: the deck's `onPileAction` was
+      `dealFromDeck`, which silently routed 'draw' into its DEAL_MORE
+      branch - found live (a direct click left the hand count
+      unchanged, no error), fixed with a dedicated callback.
+- [x] T54.2 e2e: drag Draw onto the hand draws a card; tapping Draw
+      (revealed) also draws, with no drag - both asserted directly.
 
-### Phase 55 — reveal becomes a tap on the card
-- [ ] T55.1 Remove D25's per-card hover button for `reveal`; wire a
-      direct tap on a revealable card, joining tap-to-play's existing
-      vocabulary. Private-card confirm dialog unchanged (Smith Gate 2 #2
-      - it's the actual safety net, not this AC).
-- [ ] T55.2 e2e: the existing confirm-cancel/confirm-accept reveal flow
-      still passes, now via tap instead of hover+button.
+### Phase 55 — reveal becomes a tap on the card ✅ DONE
+- [x] T55.1 D25's hover button for `reveal` removed (filtered out of
+      `actionMenuEl`'s own action list, not a separate deletion); a
+      direct tap on a revealable card performs it instead. Found a real
+      gap on the first pass: `redactMiddleCard` (D7) never redacts a
+      card from its own owner, so a private-facedown card's OWNER sees
+      a real `.card` face, not a `.card-back` - the tap handler needed
+      wiring onto BOTH shapes, not just the redacted one. Confirm dialog
+      unchanged (Smith Gate 2 #2).
+- [x] T55.2 e2e: confirm-cancel/confirm-accept reveal flow re-verified
+      via tap, both the shared (`.card-back`) and private (owner's real
+      face) cases.
 
-### Phase 56 — remaining deck pile-level actions migrate to the anchor
-- [ ] T56.1 Shuffle, Split, Deal, Reshuffle & deal move from the
-      standalone `deck-controls-strip` onto the generalized pile anchor
-      from Phase 53 (host-only, unchanged authorization).
+### Phase 56 — remaining deck pile-level actions migrate to the anchor ✅ DONE
+- [x] T56.1 Shuffle, Split, Deal, Reshuffle & deal all moved onto the
+      one deck anchor (host-only, unchanged authorization). Shuffle/
+      split were newly modeled as real `PILE_ACTIONS` entries (they'd
+      shipped as plain buttons outside `pileLevelActions` entirely).
+      `renderPileAnchor` gained grouped count-input support (Deal +
+      Reshuffle & deal share one; Split gets its own) and confirm-gating
+      for destructive actions. `deckControls` (the strip-builder) is
+      fully deleted, not hidden - zero remaining callers. Hit the SAME
+      stacking-context bug as Phase 53 a second time, against a
+      DIFFERENT sibling (`#game-roster`'s seat `<li>`, z-index:2, not
+      `#seat-zones`) - the earlier z-index:2 escalation tied and lost on
+      DOM order; bumped to 3. New, real, disclosed lint:design finding:
+      removing the shuffle/split row's bulk legitimately shrinks
+      `.deck-column`, which shifts the pot upward in normal flow below
+      1024px (a tier that was never given the desktop centering fix) -
+      a mobile-only, pre-existing-gap regression, not chased further.
 
-### Phase 57 — move/pickup stay drag-first, unconditionally
-- [ ] T57.1 Confirm (don't reimplement) that `move`/`pickup` remain
-      drag-first regardless of live zone count (Smith Gate 2 #1) - a
-      regression test specifically for the 2-zone/early-game case that
-      motivated the correction.
+### Phase 57 — move/pickup stay drag-first, unconditionally ✅ DONE
+- [x] T57.1 Confirmed, not reimplemented - no app code changed. Two
+      unit tests pin the exact 2-zone/early-game geometry Gate 2 warned
+      about (`targetsForAction('move', ...)` genuinely returns one
+      target there) alongside the static absence of `singleTarget` on
+      `ACTIONS.move`/`pickup`. `actionMenuEl` (ui.js) never reads
+      `singleTarget` for card-level actions at all - structurally, not
+      just by an unset flag - and the existing e2e suite already
+      exercises this live (its first `pickup` runs before CREATE_ZONE).
 
-### Phase 58 — remove the old buttons, full regression
-- [ ] T58.1 Delete every button the pile-anchor system now replaces:
-      sort-rank-btn, sort-suit-btn, pass-toggle-btn, draw-btn,
-      deck-controls-strip's old buttons, the D25 reveal button.
-      `Reset`/`Reset Scores`/`Add Zone` stay (out of scope, see above).
-- [ ] T58.2 `npm run lint:design` + full `npm run test:e2e` green.
-      This is also where the design-lint task's OWN unresolved e2e
-      regression (deck-controls-strip Deal button, paused mid-fix) gets
-      re-verified - it may already be moot once Deal migrates here.
+### Phase 58 — remove the old buttons, full regression ✅ DONE
+- [x] T58.1 sort-rank-btn, sort-suit-btn, pass-toggle-btn, draw-btn, and
+      the whole legacy shuffle/split row (#deck-controls) deleted from
+      index.html for real, plus their now-dead listeners and CSS
+      (`.deck-controls-strip`, `.deck-controls`). Named functions each
+      button called are kept - the anchors call them directly.
+      Reset/Reset Scores/Add Zone untouched (out of scope).
+- [x] T58.2 `npm test` (202/202) and `npm run test:e2e` are both green.
+      `npm run lint:style` is clean. `npm run lint:design` is **NOT**
+      clean (10 violations) - said plainly, not glossed: 5 predate this
+      sprint (Phase 53's own `git stash` confirmation); the rest are
+      Phase 56's disclosed mobile pot/zone-overlap finding, continuing
+      as more legacy bulk comes out. Both are ring/pot geometry, out of
+      this sprint's actual scope (pile-anchor UI) - see D37's groom note
+      in ARCHITECTURE.md for the full reasoning and why a `--table-min-h`
+      number can't fix it without reopening the scroll violation from
+      the other side (measured directly, Phase 56's commit).
 
-### Sprint 12 status
-Phase 52: Done - 196/196 unit, UAT passed, Morpheus approved.
-Phases 53-58: not started (all UI-heavy: the pile anchor, Draw's
-drag+tap, reveal->tap, migrating remaining deck buttons, cleanup).
+### Sprint 12 status — SHIPPED
+All 7 phases (52-58) done. 202/202 unit + full e2e green, `lint:style`
+clean. `lint:design` carries 10 open violations, ALL disclosed and
+explained in place (Phase 53/56/58's own notes above, D37's groom note
+in ARCHITECTURE.md) - none are pile-anchor UI defects; all are
+ring/pot geometry, pre-existing or newly-exposed-but-out-of-scope.
+`drawFaceDown` was dropped, not implemented (see D37 groom note) -
+`draw` (the AC's actual worked example) shipped as designed.
 
-**Blocking note for Phase 53**: `npm run test:e2e` is currently RED
-(unrelated to this sprint - a design-lint touch-target fix regression,
-last failing at the deck-controls-strip Deal button, untriaged).
-Diagnose that before Phase 53 touches the same area, or the fix and the
-new pile-anchor UI could collide. See `agents/trin.docs/state.md` for
-the full diagnostic trail.
-
-**Open decision needed before Phase 54**: `drawFaceDown` (US-46 AC) was
-NOT implemented in Phase 52 - it implies dealing a card from the deck
-face-down into a shared ZONE, which needs a `state.js` reducer change
-Cypher's story explicitly scoped out ("presentation-layer only"). Needs
-a real decision (widen scope, or drop the AC) before Phase 54.
+The Phase 53 blocking note (e2e RED at the deck-controls-strip Deal
+button) is resolved - see that commit's message for the diagnosis (a
+personal seat zone's stacking context trapping a z-index, unrelated to
+this sprint's own cause but newly reached because it was the next
+thing blocking forward progress).

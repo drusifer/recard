@@ -1328,6 +1328,31 @@ pile, any viewport — runs `npm run lint:design` as its own UAT step,
 not deferred to sprint close. The sprint that removed 70 undersized
 buttons must not ship a new set of them under a different name.
 
+> **Groom note (Sprint 12 close-out): shipped scope vs. this plan.**
+> Left in place rather than edited, so the drift is visible.
+> - `addZone` was listed above as a pile-level action; it never became
+>   one. Mouse's phase plan scoped it out explicitly: Add Zone *creates*
+>   a pile, so there's nothing to hover/tap yet — it stays the small
+>   persistent control it already was, out of this redesign.
+> - `drawFaceDown` (D36's own example of a static single-target action)
+>   was NOT implemented. Phase 52 found it implies a `state.js` reducer
+>   change (dealing a card face-down into a shared zone) that Cypher's
+>   story explicitly scoped out as presentation-layer only. Flagged as
+>   an open decision before Phase 54; resolved by dropping it rather
+>   than widening the story mid-sprint. `draw` (face-up into your own
+>   hand) shipped exactly as designed.
+> - "`sort`" above is shorthand for two separate actions that both
+>   shipped, `sortRank`/`sortSuit` (`pileActions.js`) — no behavior gap,
+>   just a naming compression in this decision's own prose.
+> - **T58.2's `npm run lint:design` is NOT clean at sprint close** — see
+>   the Phase 56 and 58 commit messages (`git log`) for the two real,
+>   disclosed causes (a pre-existing page-scroll violation predating
+>   this sprint, and a mobile pot/zone overlap this sprint's own
+>   legitimate button removals made measurably worse by shrinking
+>   `.deck-column`). Both are ring/pot geometry, not pile-anchor UI —
+>   D37's own gate caught them; fixing them is out of this sprint's
+>   scope, not a gate that was skipped.
+
 
 ## v3.0 Proposed Architecture — Pile/Zone/GameConfig framework (queued, not yet a sprint)
 

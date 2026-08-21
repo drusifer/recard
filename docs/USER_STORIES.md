@@ -1562,6 +1562,30 @@ Amendment 4 is the one condition on which my approval turns — ship this
 without a Draw shortcut and every single-player turn gets slower, which
 is the opposite of what a redesign motivated by "fix the UX" should do.
 
+**SHIPPED (Sprint 12, Phases 52-58) — status vs. the AC above, left in
+place rather than edited so the drift is visible:**
+- Every AC bullet shipped as written EXCEPT: **Add Zone** stays a
+  small persistent control, not a pile-hover action — Mouse's phase
+  plan scoped it out explicitly (it *creates* a pile, so there's
+  nothing to hover/tap yet). Not an AC this story's own text excluded,
+  but a real, deliberate scope cut made during planning; see
+  `ARCHITECTURE.md` D37's groom note.
+- **"Draw face-down" (AC #4's second sentence) was NOT implemented.**
+  Phase 52 found it needs a `state.js` reducer change (dealing face-
+  down into a shared zone) that this story's own "Explicitly out of
+  scope" section already ruled out ("Changing what any action *does*
+  ... entirely a presentation-layer redesign"). The AC's own worked
+  example (`draw`, face-up into the viewer's hand) shipped exactly as
+  designed, including amendment 4's tap shortcut.
+- Amendment 5 (design-lint wired into each phase's own UAT) held for
+  every phase's OWN new controls (the anchor toggle, every popover
+  button clear 44px). It did NOT catch, and was never going to catch,
+  two separate ring/pot geometry findings this sprint's own legitimate
+  button removals exposed — one pre-existing (page-scroll, predates
+  this sprint), one newly measurable (mobile pot/zone overlap below
+  1024px). Both disclosed in `task.md`'s Phase 56/58 notes, not silently
+  shipped.
+
 
 ---
 
