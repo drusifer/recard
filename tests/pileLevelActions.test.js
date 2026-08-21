@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PILE_ACTIONS, pileLevelActions, actionsForPileKind, ACTIONS, targetsForAction } from '../src/pileActions.js';
+import { PILE_ACTIONS, pileLevelActions, actionsForCard, ACTIONS, targetsForAction } from '../src/pileActions.js';
+
+const deck = { id: 'deck', kind: 'deck', ownerId: null };
 
 // UPDATED for D34 (Sprint 12): Draw generalized from a dead per-card
 // action to a pile-level one offered to EVERYONE, not just the host -
@@ -41,7 +43,7 @@ test('the per-card action table has nothing for the deck (D29/D34)', () => {
   // `deal`/`reshuffleDeal` never belonged here (D29); `draw` doesn't
   // either any more (D34) - the deck's per-card table is empty because
   // EVERY deck action is now pile-level, not card-level.
-  assert.deepEqual(actionsForPileKind('deck'), []);
+  assert.deepEqual(actionsForCard(deck, { id: 'c' }, 'me'), []);
 });
 
 test('every pile-level action declares a label and whether it destroys the round', () => {
@@ -111,7 +113,7 @@ test('D34: draw is no longer offered as a per-card action from the deck (moved t
   // never rendered a per-card hover row (it renders via renderDeck, a
   // separate D29 path), so this is a real architecture correction, not
   // a behaviour change anything currently depends on.
-  assert.deepEqual(actionsForPileKind('deck'), []);
+  assert.deepEqual(actionsForCard(deck, { id: 'c' }, 'me'), []);
 });
 
 // --- Phase 56 (Sprint 12, T56.1): shuffle/split join the deck's

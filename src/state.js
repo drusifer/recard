@@ -1,4 +1,5 @@
 import { buildDeck, shuffle } from './deck.js';
+import { PILE_TYPES } from './piles/pileTypes.js';
 
 const DEFAULT_ZONE_ID = 'table';
 const DECK_PILE_ID = 'deck';
@@ -24,12 +25,17 @@ const DECK_PILE_ID = 'deck';
  * `{owner, faceUp}`, so a zone is "open" when every card is face-up and
  * "mixed" when they differ — one mechanism covers both, exactly as it
  * has since D7, rather than needing a separate pile type per case.
+ *
+ * D42 (Sprint 13/US-47): the table above and `redactMiddleCard` used to
+ * live here as their own private table/function. They're now
+ * `src/piles/*.js`'s `visibility`/`redactCard` - this module reads
+ * through `PILE_TYPES[pile.kind]` instead of keeping a second,
+ * parallel copy of the same rule.
  */
-const PILE_VISIBILITY = { deck: 'hidden', hand: 'in-hand', zone: 'mixed' };
 
-/** The visibility rule a pile follows, derived from its type (D23). */
+/** The visibility rule a pile follows, derived from its type (D23/D42). */
 export function pileVisibility(pile) {
-  return PILE_VISIBILITY[pile.kind];
+  return PILE_TYPES[pile.kind]?.visibility;
 }
 
 function makePile(kind, { id, name, ownerId = null, cards = [] }) {
@@ -532,28 +538,15 @@ export function viewFor(state, playerId) {
           id: pile.id,
           name: pile.name,
           ownerId: pile.ownerId ?? null,
-          cards: pile.cards.map((card) => redactMiddleCard(card, playerId)),
+          // D42: `redactMiddleCard` moved to `PILE_TYPES.zone.redactCard`
+          // - dispatched by `pile.kind` rather than hardcoded to zone,
+          // so a future 'mixed'-visibility pile type redacts through
+          // its own rule, not zone's by accident.
+          cards: pile.cards.map((card) => PILE_TYPES[pile.kind].redactCard(card, playerId)),
         });
         break;
     }
   }
 
   return { myHand, otherHandCounts, zones, deckCount, players: state.players, scores: state.scores, passed: state.passed };
-}
-
-/**
- * D7: a viewer sees a middle card's identity if it's face-up, or they own
- * it. Otherwise they see only that it exists and (if applicable) whose it
- * is — never its rank/suit.
- */
-function redactMiddleCard(card, viewerId) {
-  if (card.faceUp || card.owner === viewerId) return card;
-  // `layout` (D21) survives redaction deliberately: it describes how the
-  // card is *arranged*, not what it is. Arrangement is shared state every
-  // player is meant to see identically (D21), and a face-down card's
-  // position in a pile leaks nothing about its rank or suit. Dropping it
-  // here silently un-stacked every face-down pile - including the ones
-  // SPLIT_DECK creates - for every viewer.
-  const redacted = { id: card.id, owner: card.owner, faceDown: true };
-  return card.layout ? { ...redacted, layout: card.layout } : redacted;
 }

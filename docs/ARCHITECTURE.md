@@ -1558,10 +1558,24 @@ Each module exports:
   here rather than silently diverging from what's written — the doc
   should match the code, not the other way around.
 
-`state.js`, `pileActions.js` (renamed call sites, same exported names
-where external callers depend on them — `ui.js`/`main.js` should not
-need to change), and `dropTarget.js`'s caller in `ui.js` all read
-through `PILE_TYPES[pile.kind]` instead of their own tables.
+`state.js` and `pileActions.js` (same exported function names and
+shapes external callers depend on — `ui.js`/`main.js` needed no
+changes) now read through `PILE_TYPES[pile.kind]` instead of their own
+tables.
+
+**`dropTarget.js`'s caller in `ui.js` does NOT read `dropRule` this
+sprint** - checked before wiring it and found the VIEW shape
+`renderZonePanel` receives (`{id, name, ownerId, cards}`, from
+`viewFor`) carries no `kind` at all; `viewFor` only ever produces this
+shape for `'mixed'`-visibility piles, so there is genuinely nothing at
+that call site to branch on yet. Making `dropRule` load-bearing there
+would mean adding pile-type info to the wire view - a real, separate
+design question (today's view deliberately omits it) that belongs to
+Tranche 2 (which already touches the wire/reducer), not this
+zero-behavior-change, read-side-only sprint. `dropRule` stays declared
+and unit-tested per type (`tests/piles.test.js`) as the documented hook
+for whenever a second pile type is ever rendered through this path -
+disclosed here rather than silently left unwired with no note.
 
 
 ## Module Layout

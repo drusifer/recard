@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ACTIONS, actionsForPileKind, actionsForCard, targetsForAction } from '../src/pileActions.js';
+import { ACTIONS, actionsForCard, targetsForAction } from '../src/pileActions.js';
 
 const deck = { id: 'deck', kind: 'deck', ownerId: null };
 const myHand = { id: 'hand:me', kind: 'hand', ownerId: 'me' };
@@ -9,15 +9,19 @@ const table = { id: 'table', kind: 'zone', ownerId: null };
 const myZone = { id: 'z:me', kind: 'zone', ownerId: 'me' };
 const ALL = [deck, myHand, theirHand, table, myZone];
 
-// UPDATED for D34 (Sprint 12): `draw` moved off the per-card table onto
-// the pile-level one (`pileLevelActions`, tested in
-// tests/pileLevelActions.test.js) - it was dead here anyway (grepped
-// ui.js/main.js: the deck has never rendered a per-card hover row).
-test('each pile type declares its own actions (D25/D34)', () => {
-  assert.deepEqual(actionsForPileKind('deck'), [], 'every deck action is pile-level now, D34');
-  assert.deepEqual(actionsForPileKind('hand'), ['play']);
-  assert.deepEqual(actionsForPileKind('zone'), ['reveal', 'pickup', 'move']);
-  assert.deepEqual(actionsForPileKind('nonsense'), [], 'an unknown kind offers nothing, it does not throw');
+// UPDATED for D42 (Sprint 13): `actionsForPileKind` (a kind-only,
+// pre-ownership-filter list) is gone - each pile TYPE's `cardActions`
+// now combines the kind check and the ownership/visibility filter in
+// one call (src/piles/*.js, tests/piles.test.js). This test now checks
+// the same three "what could this kind ever offer" facts through
+// actionsForCard directly, plus that an unknown kind offers nothing
+// rather than throwing.
+test('each pile type declares its own actions (D25/D34/D42)', () => {
+  assert.deepEqual(actionsForCard(deck, { id: 'c' }, 'me'), [], 'every deck action is pile-level now, D34');
+  assert.deepEqual(actionsForCard(myHand, { id: 'c' }, 'me'), ['play']);
+  assert.deepEqual(actionsForCard(table, { faceUp: true, owner: null }, 'me'), ['pickup', 'move']);
+  assert.deepEqual(actionsForCard({ id: 'x', kind: 'nonsense', ownerId: null }, { id: 'c' }, 'me'), [],
+    'an unknown kind offers nothing, it does not throw');
 });
 
 test('every action names a destination kind or explicitly none', () => {

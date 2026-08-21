@@ -1,3 +1,5 @@
+import { PILE_TYPES } from './piles/pileTypes.js';
+
 /**
  * What a card in a given Pile can *do*, and where it can go (D23/D25).
  *
@@ -15,6 +17,14 @@
  * the reducer's authorization checks (state.js) - the host still
  * validates every action it receives, exactly as before. This is the
  * presentation half; the reducer remains the source of truth.
+ *
+ * D42 (Sprint 13/US-47): `actionsForPileKind`'s per-kind switch and
+ * `actionsForCard`'s per-kind + visibility/ownership filtering used to
+ * live here as two functions. They're now `src/piles/*.js`'s
+ * `cardActions(pile, card, viewerId)` - one function per type instead
+ * of a shared switch. `actionsForPileKind` had no real caller outside
+ * its own tests (grepped first) - removed rather than kept as a second,
+ * now-redundant table; its coverage moved to `tests/piles.test.js`.
  */
 
 /**
@@ -29,35 +39,9 @@ export const ACTIONS = {
 };
 
 /**
- * The actions a card in `pile` could offer, before per-card visibility
- * and ownership are taken into account.
- * @param {{kind: 'deck'|'hand'|'zone'}} pile
- */
-export function actionsForPileKind(kind) {
-  switch (kind) {
-    case 'deck':
-      // D34: Draw moved to a PILE-level action (`PILE_ACTIONS.draw`) -
-      // confirmed dead here first (grepped ui.js/main.js: the deck has
-      // never rendered a per-card hover row, since it renders via the
-      // separate D29 `renderDeck` path), so this is a real architecture
-      // correction, not a behaviour change anything depends on today.
-      return [];
-    case 'hand':
-      return ['play'];
-    case 'zone':
-      return ['reveal', 'pickup', 'move'];
-    default:
-      return [];
-  }
-}
-
-/**
- * The actions actually offered for one card, applying the same
- * visibility/ownership rules the reducer enforces (D7/D12):
- * - a face-down card can be turned over by anyone if it's unowned, or by
- *   its owner; never by a non-owner.
- * - only a face-up card can be picked up.
- * - a still-hidden card can only be moved by its owner.
+ * The actions actually offered for one card - applying the same
+ * visibility/ownership rules the reducer enforces (D7/D12), owned by
+ * the card's pile TYPE (`src/piles/*.js`) rather than a switch here.
  *
  * @param {{kind: string}} pile the pile the card is currently in
  * @param {{faceUp?: boolean, faceDown?: boolean, owner?: string|null}} card
@@ -66,28 +50,7 @@ export function actionsForPileKind(kind) {
  * @returns {string[]} action ids, in the order they should be offered.
  */
 export function actionsForCard(pile, card, viewerId) {
-  const possible = actionsForPileKind(pile.kind);
-  if (pile.kind !== 'zone') {
-    // A hand pile only offers its own owner anything.
-    if (pile.kind === 'hand' && pile.ownerId !== viewerId) return [];
-    return possible;
-  }
-
-  // In a view, a card the viewer may not see arrives redacted as
-  // `{faceDown: true}` with no `faceUp` field - treat both spellings.
-  const hidden = card.faceDown === true || card.faceUp === false;
-  const owned = card.owner != null;
-  const mine = card.owner === viewerId;
-
-  return possible.filter((action) => {
-    if (action === 'reveal') return hidden && (!owned || mine);
-    if (action === 'pickup') return !hidden;
-    // Move mirrors MOVE_CARD's own rule exactly: a still-hidden card is
-    // movable only by its owner; anything visible, or face-down but
-    // unowned ("put or take is open to all", US-19), is movable by all.
-    if (action === 'move') return !hidden || !owned || mine;
-    return false;
-  });
+  return PILE_TYPES[pile.kind]?.cardActions(pile, card, viewerId) ?? [];
 }
 
 /**
@@ -151,8 +114,8 @@ export const PILE_ACTIONS = {
     destructive: true,
     hint: 'Gather every card back, reshuffle, and deal a fresh hand to each player.',
   },
-  // D34/D35: Draw generalized from a per-card action (dead - see
-  // actionsForPileKind) to a pile-level one, matching how the user
+  // D34/D35: Draw generalized from a per-card action (dead - deck's
+  // `cardActions` always returns []) to a pile-level one, matching how the user
   // actually described it: hover the DECK, not a specific hidden card.
   // `target`/`from` mirror ACTIONS' shape so `targetsForAction` can
   // drive drop-target highlighting for a dragged Draw the same way it
@@ -190,29 +153,18 @@ export const PILE_ACTIONS = {
 };
 
 /**
- * The pile-level actions `kind` offers this viewer.
- *
- * Host-only, exactly as dealing already is — this story moves the
- * control, it does not widen who may use it.
+ * The pile-level actions `kind` offers this viewer - owned by the
+ * pile TYPE (`src/piles/*.js`)'s `pileActions(ctx)` rather than a
+ * switch here (D42, Sprint 13/US-47). Kept at this exact call shape
+ * (`kind` string + `{isHost, isOwner}` ctx) rather than `(pile,
+ * viewerId, ctx)` - checked both real call sites (`ui.js`/`main.js`)
+ * first and neither has a real pile object or viewerId in scope, only
+ * a kind string and a precomputed boolean (see ARCHITECTURE.md D42).
  *
  * @param {'deck'|'hand'|'zone'} kind
- * @param {{isHost: boolean}} ctx
+ * @param {{isHost?: boolean, isOwner?: boolean}} ctx
  * @returns {string[]} action ids
  */
-export function pileLevelActions(kind, { isHost, isOwner } = {}) {
-  if (kind === 'deck') {
-    // Draw is open to everyone; every other deck action stays host-only,
-    // exactly as deal/reshuffleDeal already were (D29) and shuffle/split
-    // already were as a standalone button row (US-35/36) - Phase 56
-    // moves WHERE they live, not WHO may use them.
-    return isHost ? ['draw', 'deal', 'reshuffleDeal', 'shuffle', 'split'] : ['draw'];
-  }
-  if (kind === 'hand') {
-    // Matches actionsForCard's existing rule: a hand only offers
-    // anything to its own owner. Sorting or passing on someone else's
-    // behalf was never possible before this generalization and isn't
-    // now either.
-    return isOwner ? ['sortRank', 'sortSuit', 'pass'] : [];
-  }
-  return [];
+export function pileLevelActions(kind, ctx = {}) {
+  return PILE_TYPES[kind]?.pileActions(ctx) ?? [];
 }
