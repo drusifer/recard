@@ -2,6 +2,16 @@
 
 Recorded by Oracle. Format: Context, Decision, Consequences.
 
+**Superseded as of 2026-08-21 (Sprint 14 groom).** This narrative log
+stops at D20 (Sprint 5) — D21 onward were recorded directly in
+`docs/ARCHITECTURE.md`'s per-sprint "## vX.Y Decisions" sections instead
+and never backfilled here, a gap flagged twice (Sprint 12 and Sprint 13
+groom notes) with no action taken until now. Rather than a
+lower-confidence retroactive backfill of 23 decisions' worth of
+narrative, this file is now explicitly superseded: **`docs/ARCHITECTURE.md`
+is the single source of truth for every decision from D21 onward.**
+D1-D20 below remain accurate and are not being rewritten.
+
 ## 2026-08-15 — v1 architecture (D1-D6)
 
 **Context:** Cypher's PRD required a same-room, peer-to-peer card game app

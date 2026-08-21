@@ -1,7 +1,6 @@
 /**
- * The Hand pile type (D42, Sprint 13/US-47, Tranche 1 of D39).
- *
- * Read-side only - see deckPile.js's header and ARCHITECTURE.md D41.
+ * The Hand pile type (D42, Sprint 13/US-47). Sprint 14/Tranche 2 (D43)
+ * adds the write side.
  */
 
 /** Only the owner sees their own hand's cards; everyone else gets a
@@ -28,4 +27,19 @@ export function cardActions(pile, card, viewerId) {
  * and isn't now either. */
 export function pileActions({ isOwner } = {}) {
   return isOwner ? ['sortRank', 'sortSuit', 'pass'] : [];
+}
+
+/** D43: same reuse-the-read-side pattern as `zonePile` - PLAY has never
+ * been authorized per-card, only per-hand-ownership, which `cardActions`
+ * already states. */
+export function canRemoveCard(pile, card, viewerId, action) {
+  return cardActions(pile, card, viewerId).includes(action);
+}
+
+export function removeCard(pile, cardId) {
+  return { ...pile, cards: pile.cards.filter((c) => c.id !== cardId) };
+}
+
+export function insertCard(pile, card) {
+  return { ...pile, cards: [...pile.cards, card] };
 }

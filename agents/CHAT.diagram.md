@@ -96,4 +96,6 @@ sequenceDiagram
     Note right of Smith: "Smith retro: no UX gaps<br/>this sprint - genuinely<br/>zero user-visible<br/>surface to gate,<br/>confirmed rather than<br/>assumed (git stash diff<br/>on CSS/DOM…"
     Cypher->>All: "pm launch"
     Note right of Cypher: "*pm launch recard-<br/>sprint-13. Pile is now a<br/>real type (D42): visibil<br/>ity/redactCard/dropRule/<br/>cardActions/pileActions<br/>live one-per-kind in<br/>src…"
+    Morpheus->>Cypher: "lead decide"
+    Note right of Morpheus: "Sprint 14 (US-48,<br/>Tranche 2 of D39)<br/>SHIPPED. PLAY/PICKUP/MOV<br/>E_CARD/DRAW dispatch<br/>through canRemoveCard/re<br/>moveCard/insertCard per<br/>pile type…"
 ```

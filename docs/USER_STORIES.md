@@ -1721,24 +1721,31 @@ exists and is wired into `state.js`/`pileActions.js`. See
 `docs/ARCHITECTURE.md`'s "v3.1 Decisions" (D41-D42) and its groom note
 for the full record.
 
-### Backlog: Tranche 2 (unscheduled) — Pile write-side + dropRule wiring
+### US-48: Tranche 2 (Pile write-side) — SHIPPED (2026-08-21)
 
-From Sprint 13's own D41 deferral. Real design work, not a mechanical
-follow-on to Tranche 1:
-- Resolve the in-place-action gap: `REVEAL` mutates a card in place,
-  `SHUFFLE_DECK` reorders one pile, `SPLIT_DECK` creates new piles,
-  `SORT`/`TOGGLE_PASS` touch no card identity — none fit `canAccept`/
-  `insert`/`canRemove`/`remove`'s move-between-piles shape. Needs a
-  real decision (an `apply(pile, action)` capability alongside the
-  four move-shaped ones? something else?), not an assumption.
-- Once resolved: dispatch `state.js`'s reducer bodies (`PLAY`/`PICKUP`/
-  `MOVE_CARD`/`DRAW`/`DEAL`) through the Pile interface on both ends of
-  the replicated protocol — this is what makes a new Pile type (D38's
-  Discard/Run/Set) addable without a `state.js` change.
-- Wire `dropRule` into `ui.js`'s `dropTarget.js` caller — needs the
-  view shape (`viewFor`'s output) to carry pile-type info, which it
-  deliberately doesn't today (a wire-format change, scoped here rather
-  than snuck into Tranche 1).
+Resolved D41's deferred design question: `PLAY`/`PICKUP`/`MOVE_CARD`/
+`DRAW` (the four actions that genuinely move a card between two piles)
+now dispatch through `canRemoveCard`/`removeCard`/`insertCard` on both
+the source and destination pile type (`src/piles/*.js`) instead of
+`state.js` branching on `kind`. Full design and the real finding (the
+write-side authorization check IS the read-side `cardActions` offer
+check, reused rather than duplicated) in `docs/ARCHITECTURE.md` D43.
+225/225 unit + full e2e green, independently re-verified; the reducer
+wiring itself was mutation-tested (not just the new pile-module
+functions), catching real pre-existing privacy tests when broken.
+
+**Still open (named, not silently dropped — see D43 for the reasoning
+on each):**
+- `DEAL`/`DEAL_MORE` — a bulk one-source/many-destination distribution,
+  deliberately NOT forced into the transfer shape. Stays a direct
+  `state.js` case. Adding a new Pile type still requires no change
+  here regardless (deal only ever targets hand piles).
+- `dropRule` wiring into `ui.js`'s `dropTarget.js` caller — still
+  blocked on a second pile type (Discard/Run/Set, D38) actually
+  rendering through that path; wiring it with only `zone` in existence
+  would be dead code with nothing to verify it against.
+- `docs/DECISIONS.md`'s D20 ceiling — resolved this sprint (see its own
+  header note), no longer a backlog item.
 
 
 ---
@@ -1749,9 +1756,3 @@ follow-on to Tranche 1:
 - In-app text chat or reactions.
 - Custom card backs/themes.
 - Reconnect-to-session after refresh/drop.
-- **`docs/DECISIONS.md` reconciliation**: its narrative log stops at
-  D20; `docs/ARCHITECTURE.md` is at D42. Flagged at Sprint 12 AND
-  Sprint 13 close (Oracle retro, both times) without being actioned -
-  a real backlog item now, not a recurring note. Likely a straight
-  narrative-writeup pass over ARCHITECTURE.md's existing per-sprint "##
-  vX.Y Decisions" sections, D21 onward.

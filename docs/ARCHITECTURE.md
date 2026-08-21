@@ -1590,6 +1590,99 @@ disclosed here rather than silently left unwired with no note.
 > in `docs/USER_STORIES.md` if picking it up next.
 
 
+## v3.2 Decisions (Sprint 14, US-48 — Tranche 2 of D39)
+
+### D43. Transfer-shaped actions dispatch through the Pile write side; in-place and bulk actions deliberately don't
+
+D41 named the gap and floated one candidate (a generic `apply(pile,
+action)` capability for in-place mutations) without deciding it. Sizing
+it for real: only four actions actually move a card between two
+piles - `PLAY` (hand→zone), `PICKUP` (zone→hand), `MOVE_CARD`
+(zone→zone), `DRAW` (deck→hand). Those four, and only those four, get
+the write-side interface:
+
+- `canRemoveCard(pile, card, viewerId, action)` — authorization.
+- `removeCard(pile, cardId)` / `insertCard(pile, card, placement)` —
+  the pure transforms.
+
+**Rejected: a fourth `canAccept` function**, the other half of D39's
+originally-floated four-function shape. No existing action has ever
+authorization-checked the INSERT side (a zone accepts any card handed
+to it; a hand accepts any card drawn/picked-up into it) - a
+`canAccept` nobody would call is exactly the unearned-abstraction
+pattern this project's retros keep flagging. Three functions, not
+four.
+
+**A real finding, not just a decision:** sizing `canRemoveCard`
+surfaced that it's identical to the READ-side `cardActions` table
+already checking "is this action offered" — every inline reducer
+authorization check this sprint replaced (`REVEAL`'s owner check,
+`PICKUP`'s face-up check, `MOVE_CARD`'s hidden/owner check) was
+provably the same rule as `cardActions(...).includes(action)`,
+verified action-by-action against the pre-refactor code before
+deleting it, not assumed. So `canRemoveCard` for `zonePile`/`handPile`
+is one line: `cardActions(pile, card, viewerId).includes(action)`. One
+source of truth for "what's offered" and "what's authorized" instead
+of two copies that could drift - a real class of bug this eliminates
+structurally, not just tidies.
+
+**Deliberately NOT generalized, each for a specific reason (not a
+blanket "later"):**
+- **`REVEAL`** — mutates a card in place (flips `faceUp`), never moves
+  it between piles. Stays a direct `state.js` case; only its
+  authorization check now reuses `canRemoveCard` (see above), the
+  mutation itself is untouched.
+- **`SHUFFLE_DECK`/`SPLIT_DECK`** — deck-specific pile-level
+  operations (reorder one pile's cards; fan one pile into N new ones).
+  No second pile type has ever needed to shuffle or split, so there is
+  no cross-type behavior to buy by generalizing them - genericizing a
+  single-implementer operation is complexity with no payoff.
+- **`DEAL`/`DEAL_MORE`** — one source (deck) to MANY destinations (every
+  seated player's hand) in a single action. This is a bulk
+  distribution, not a transfer; forcing it into `canRemoveCard`/
+  `removeCard`/`insertCard`'s single-source/single-destination shape
+  was considered and rejected during planning, not silently skipped -
+  exactly the "don't force everything into one shape" lesson D41 itself
+  taught, applied a second time rather than only once.
+
+**`dropRule` wire-format wiring (also from the Sprint 13 backlog):
+still deliberately deferred**, now for a sharper reason than Sprint
+13's "not this sprint" - there is still only ONE pile type (`zone`)
+that ever renders through `dropTarget.js`'s `resolveDropTarget`, so
+wiring `dropRule` into `ui.js` today would be code with no test that
+could ever fail if it were wrong (nothing produces a `'STACK'` or
+`'NONE'`-dropRule pile at that call site to verify against). Wiring it
+now would be unverifiable-by-construction, not just premature. Real
+prerequisite: a second pile type (Discard/Run/Set, D38) actually
+reaching that render path.
+
+**Consequences:** `state.js`'s reducer no longer has hand/zone/deck
+`kind` checks inside `PLAY`/`PICKUP`/`MOVE_CARD`/`DRAW` - a new pile
+type implementing the three write-side functions is a legal source or
+destination for all four without a `state.js` change, on both ends of
+the replicated protocol (every client runs the same `reduce`). D21's
+`placeCard`/`withLayout` relocated from `state.js` to `zonePile.js`
+(arrangement is a zone concept, not a reducer concept) - same
+zero-behavior-change discipline as Tranche 1's move.
+
+> **Groom note (Sprint 14 close-out).** 225/225 unit (218 carried +
+> `tests/piles.test.js`'s new write-side coverage) and the full e2e
+> suite (real WebRTC), both re-verified independently. Mutation-tested
+> the actual wiring, not just the new module functions: forcing
+> `zonePile.canRemoveCard` to always return `true` fails 6 real,
+> pre-existing privacy/authorization tests (not new ones written to
+> pass); forcing `handPile.canRemoveCard` to always return `false`
+> fails 38 (nearly the whole suite deals a hand first) - both are load-
+> bearing, not decorative. `docs/DECISIONS.md`'s D20 ceiling (flagged,
+> unactioned, at Sprint 12 and Sprint 13 groom) is resolved this sprint
+> - see its own new header note rather than a risky backfill under
+> time pressure. Tranche 2's own two explicit non-generalizations
+> (DEAL/DEAL_MORE, `dropRule` wiring) are real, disclosed scope
+> boundaries, not silently dropped work - see D43 above and the updated
+> `docs/USER_STORIES.md` backlog entry for what, if anything, is left
+> to schedule.
+
+
 ## Module Layout
 ```
 index.html              entry page, host/join screens, game screen

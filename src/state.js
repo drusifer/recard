@@ -166,45 +166,6 @@ function dealRoundRobin(deck, destinationCount, cardsPerDestination, describeSho
   return { remaining, dealt };
 }
 
-/**
- * D21: `layout` describes how a card renders *relative to whatever
- * immediately precedes it* in its zone — `'stack'` (tight pile, corner
- * peek), `'overlap'` (fanned, every card still readable), or absent
- * (normal flat spacing). Passing no layout strips any stale one, which
- * is what makes dragging a card back out to open space un-stack it.
- */
-function withLayout(card, layout) {
-  const { layout: _previous, ...rest } = card;
-  return layout ? { ...rest, layout } : rest;
-}
-
-/**
- * D21: places `card` into a zone's `cards`, honoring an optional
- * "drop relative to an existing card" request. One helper so `PLAY` and
- * `MOVE_CARD` can't drift apart on placement or on the layout rule.
- *
- * **Smith's Gate 2 rule, implemented in one place:** `layout` always
- * belongs to whichever card of the newly-adjacent pair ends up *second*.
- * Dropping after the target, that's the dropped card; dropping before
- * it, the dropped card becomes the target's new predecessor, so it is
- * the **target** that now sits second and carries the layout. Getting
- * this backwards would visually join the wrong pair of cards.
- */
-function placeCard(cards, card, { targetCardId, side = 'after', layout } = {}) {
-  if (!targetCardId) return [...cards, withLayout(card, layout)];
-
-  const index = cards.findIndex((c) => c.id === targetCardId);
-  if (index === -1) {
-    throw new Error(`Target card ${targetCardId} is not in the destination zone`);
-  }
-
-  if (side === 'before') {
-    const placed = [...cards.slice(0, index), withLayout(card, null), ...cards.slice(index)];
-    return placed.map((c) => (c.id === targetCardId ? withLayout(c, layout) : c));
-  }
-  return [...cards.slice(0, index + 1), withLayout(card, layout), ...cards.slice(index + 1)];
-}
-
 /** The subset of an action describing where/how a dropped card lands (D21). */
 function placementOf(action) {
   return { targetCardId: action.targetCardId, side: action.side, layout: action.layout };
@@ -240,6 +201,53 @@ function middleCardVisibility(visibility, playerId) {
     default:
       throw new Error(`Unknown visibility: ${visibility}`);
   }
+}
+
+/**
+ * D43 (Sprint 14/Tranche 2 of D39): the shared shape behind PLAY/
+ * PICKUP/MOVE_CARD/DRAW - remove one card from a pile, run it through
+ * pile-type dispatch on both ends, insert it into another. A new pile
+ * type only has to implement `canRemoveCard`/`removeCard`/`insertCard`
+ * (`src/piles/*.js`) to become a legal source or destination for these
+ * four actions - this function, and therefore `state.js`, gains no new
+ * `case` for it.
+ *
+ * Deliberately NOT used for REVEAL (mutates a card in place, never
+ * moves it - see the REVEAL case, which reuses `canRemoveCard`'s
+ * read-the-offer-table pattern directly instead), SHUFFLE_DECK/
+ * SPLIT_DECK (deck-specific pile-level operations with no cross-type
+ * behavior to generalize), or DEAL/DEAL_MORE (one source to MANY
+ * destinations in a single action - a bulk distribution, not a
+ * transfer; forcing it into this two-pile shape was considered and
+ * rejected - see ARCHITECTURE.md D43).
+ *
+ * `action` is the action id `canRemoveCard` authorizes against (e.g.
+ * `'pickup'`) and appears in the error message on failure.
+ */
+function transferCard(state, { fromPileId, toPileId, cardId, viewerId, action, placement, transform }) {
+  const fromPile = state.piles.find((p) => p.id === fromPileId);
+  if (!fromPile) throw new Error(`Pile ${fromPileId} does not exist`);
+  const card = fromPile.cards.find((c) => c.id === cardId);
+  if (!card) throw new Error(`Card ${cardId} is not in pile ${fromPileId}`);
+
+  const fromType = PILE_TYPES[fromPile.kind];
+  if (!fromType.canRemoveCard(fromPile, card, viewerId, action)) {
+    throw new Error(`Player ${viewerId} is not authorized to ${action} ${cardId}`);
+  }
+
+  const toPile = state.piles.find((p) => p.id === toPileId);
+  if (!toPile) throw new Error(`Pile ${toPileId} does not exist`);
+  const toType = PILE_TYPES[toPile.kind];
+  const movedCard = transform ? transform(card) : card;
+
+  // Two passes, remove-then-insert, exactly like the pre-D43 PLAY/
+  // MOVE_CARD code did: this is what makes fromPileId === toPileId (a
+  // same-zone reorder) work correctly without a special case - the
+  // second pass inserts into the pile the first pass already removed
+  // the card from.
+  const withoutCard = state.piles.map((p) => (p.id === fromPileId ? fromType.removeCard(p, cardId) : p));
+  const piles = withoutCard.map((p) => (p.id === toPileId ? toType.insertCard(p, movedCard, placement) : p));
+  return { ...state, piles };
 }
 
 /**
@@ -350,38 +358,36 @@ export function reduce(state, action) {
     }
 
     case 'PLAY': {
-      const hand = handOf(state, action.playerId);
-      const card = hand.find((c) => c.id === action.cardId);
-      if (!card) {
-        throw new Error(`Card ${action.cardId} is not in ${action.playerId}'s hand`);
-      }
       const zoneId = action.zoneId ?? DEFAULT_ZONE_ID;
       if (!zonesOf(state).some((z) => z.id === zoneId)) {
         throw new Error(`Zone ${zoneId} does not exist`);
       }
       const { owner, faceUp } = middleCardVisibility(action.visibility ?? 'public', action.playerId);
-      return {
-        ...state,
-        piles: state.piles.map((p) => {
-          if (p.kind === 'hand' && p.ownerId === action.playerId) {
-            return withCards(p, p.cards.filter((c) => c.id !== action.cardId));
-          }
-          if (p.id === zoneId) {
-            return withCards(p, placeCard(p.cards, { ...card, owner, faceUp }, placementOf(action)));
-          }
-          return p;
-        }),
-      };
+      return transferCard(state, {
+        fromPileId: handPileId(action.playerId),
+        toPileId: zoneId,
+        cardId: action.cardId,
+        viewerId: action.playerId,
+        action: 'play',
+        placement: placementOf(action),
+        transform: (card) => ({ ...card, owner, faceUp }),
+      });
     }
 
     case 'REVEAL': {
+      // Mutates a card in place (flips `faceUp`) rather than moving it
+      // between piles, so this is NOT `transferCard` (D43) - but the
+      // authorization check is the same reuse-the-offer-table pattern:
+      // `cardActions` already states whether 'reveal' is offered, no
+      // second copy of the rule inline.
       const found = findZoneAndCard(state, action.cardId);
       if (!found) {
         throw new Error(`Card ${action.cardId} is not in any zone`);
       }
       const { zoneId, card } = found;
       if (card.faceUp) return state;
-      if (card.owner !== null && card.owner !== action.playerId) {
+      const zone = state.piles.find((p) => p.id === zoneId);
+      if (!PILE_TYPES[zone.kind].canRemoveCard(zone, card, action.playerId, 'reveal')) {
         throw new Error(`Player ${action.playerId} is not authorized to reveal ${action.cardId}`);
       }
       return replacePile(state, zoneId, (z) =>
@@ -394,23 +400,22 @@ export function reduce(state, action) {
       if (!found) {
         throw new Error(`Card ${action.cardId} is not in any zone`);
       }
-      const { zoneId, card } = found;
-      if (!card.faceUp) {
-        throw new Error(`Cannot pick up a face-down card: ${action.cardId}`);
-      }
-      // A hand pile's cards are plain - its own `kind`/`ownerId` already
-      // carry the visibility rule (D23), so the zone-only D7 fields come
-      // back off on the way in. `layout` (D21) is zone-only for the same
-      // reason: a hand has no adjacency rendering to describe.
-      const { owner, faceUp, layout, ...plainCard } = card;
-      const piles = ensureHandPile(state.piles, action.playerId).map((p) => {
-        if (p.id === zoneId) return withCards(p, p.cards.filter((c) => c.id !== action.cardId));
-        if (p.kind === 'hand' && p.ownerId === action.playerId) {
-          return withCards(p, [...p.cards, plainCard]);
-        }
-        return p;
+      // Ensured up front, not inside `transferCard`: the destination
+      // hand pile must exist before dispatch can look it up by id.
+      const withHand = { ...state, piles: ensureHandPile(state.piles, action.playerId) };
+      return transferCard(withHand, {
+        fromPileId: found.zoneId,
+        toPileId: handPileId(action.playerId),
+        cardId: action.cardId,
+        viewerId: action.playerId,
+        action: 'pickup',
+        // A hand pile's cards are plain - its own `kind`/`ownerId`
+        // already carry the visibility rule (D23), so the zone-only D7
+        // fields come back off on the way in. `layout` (D21) is
+        // zone-only for the same reason: a hand has no adjacency
+        // rendering to describe.
+        transform: ({ owner, faceUp, layout, ...plainCard }) => plainCard,
       });
-      return { ...state, piles };
     }
 
     case 'MOVE_CARD': {
@@ -421,25 +426,17 @@ export function reduce(state, action) {
       if (!zonesOf(state).some((z) => z.id === action.toZoneId)) {
         throw new Error(`Zone ${action.toZoneId} does not exist`);
       }
-      const { zoneId: fromZoneId, card } = found;
-      if (!card.faceUp && card.owner !== null && card.owner !== action.playerId) {
-        throw new Error(`Player ${action.playerId} is not authorized to move ${action.cardId}`);
-      }
-      // D21: no same-zone early return any more — a move within one zone
-      // is now a real reorder. Removing first and inserting second means
-      // the same-zone and cross-zone cases share one code path, and
-      // index math is computed against the array the card has already
-      // left (otherwise inserting relative to a card that sits after the
-      // moved one would be off by one).
-      const withoutCard = state.piles.map((p) =>
-        p.id === fromZoneId ? withCards(p, p.cards.filter((c) => c.id !== action.cardId)) : p,
-      );
-      return {
-        ...state,
-        piles: withoutCard.map((p) =>
-          p.id === action.toZoneId ? withCards(p, placeCard(p.cards, card, placementOf(action))) : p,
-        ),
-      };
+      // D21: no same-zone early return - a move within one zone is a
+      // real reorder, and `transferCard`'s remove-then-insert passes
+      // handle `fromPileId === toPileId` correctly by construction.
+      return transferCard(state, {
+        fromPileId: found.zoneId,
+        toPileId: action.toZoneId,
+        cardId: action.cardId,
+        viewerId: action.playerId,
+        action: 'move',
+        placement: placementOf(action),
+      });
     }
 
     case 'DRAW': {
@@ -447,15 +444,14 @@ export function reduce(state, action) {
       if (deck.length === 0) {
         throw new Error('Cannot draw: deck is empty');
       }
-      const [card, ...rest] = deck;
-      const piles = ensureHandPile(state.piles, action.playerId).map((p) => {
-        if (p.kind === 'deck') return withCards(p, rest);
-        if (p.kind === 'hand' && p.ownerId === action.playerId) {
-          return withCards(p, [...p.cards, card]);
-        }
-        return p;
+      const withHand = { ...state, piles: ensureHandPile(state.piles, action.playerId) };
+      return transferCard(withHand, {
+        fromPileId: DECK_PILE_ID,
+        toPileId: handPileId(action.playerId),
+        cardId: deck[0].id,
+        viewerId: action.playerId,
+        action: 'draw',
       });
-      return { ...state, piles };
     }
 
     case 'ADJUST_SCORE': {

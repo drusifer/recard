@@ -103,3 +103,69 @@ test('hand pileActions: sort/pass, owner only', () => {
 test('zone pileActions: none today - no pile-level action has ever targeted a shared zone', () => {
   assert.deepEqual(zonePile.pileActions({}), []);
 });
+
+// --- Write-side (D43, Sprint 14/Tranche 2): canRemoveCard/removeCard/
+// insertCard - the transfer half of the interface. Deliberately just
+// these three, not the four-function canAccept/insert/canRemove/remove
+// shape D39 originally floated: no existing action has ever
+// authorization-checked the INSERT side, so a canAccept nobody would
+// ever call is exactly the kind of unearned abstraction the project's
+// own retros warn against.
+
+test('zone canRemoveCard: reuses cardActions - same rule, one source of truth, not a second copy', () => {
+  const faceUp = { id: 'c', faceUp: true, owner: null };
+  const hiddenUnowned = { id: 'c', faceDown: true, owner: null };
+  const hiddenMine = { id: 'c', faceDown: true, owner: 'me' };
+  const hiddenTheirs = { id: 'c', faceDown: true, owner: 'you' };
+  assert.equal(zonePile.canRemoveCard(table, faceUp, 'me', 'pickup'), true);
+  assert.equal(zonePile.canRemoveCard(table, faceUp, 'me', 'reveal'), false, 'already face-up, nothing to reveal');
+  assert.equal(zonePile.canRemoveCard(table, hiddenUnowned, 'me', 'reveal'), true, 'unowned face-down - anyone may reveal');
+  assert.equal(zonePile.canRemoveCard(table, hiddenMine, 'anyone-else', 'move'), false, 'a non-owner cannot move a still-hidden private card');
+  assert.equal(zonePile.canRemoveCard(table, hiddenMine, 'me', 'move'), true, 'the owner can move their own still-hidden card');
+  assert.equal(zonePile.canRemoveCard(table, hiddenTheirs, 'me', 'pickup'), false, 'a still-hidden card cannot be picked up by anyone');
+});
+
+test('zone removeCard/insertCard: pure, round-trips a card', () => {
+  const pile = { id: 'z', kind: 'zone', cards: [{ id: 'a' }, { id: 'b' }] };
+  const removed = zonePile.removeCard(pile, 'a');
+  assert.deepEqual(removed.cards.map((c) => c.id), ['b']);
+  const reinserted = zonePile.insertCard(removed, { id: 'a' });
+  assert.deepEqual(reinserted.cards.map((c) => c.id), ['b', 'a'], 'no placement - appends');
+});
+
+test('zone insertCard: placement before/after a target, layout on the correct card (Smith Gate 2 direction rule)', () => {
+  const pile = { id: 'z', kind: 'zone', cards: [{ id: 'a' }, { id: 'b' }] };
+  const before = zonePile.insertCard(pile, { id: 'x' }, { targetCardId: 'b', side: 'before', layout: 'overlap' });
+  assert.deepEqual(before.cards.map((c) => c.id), ['a', 'x', 'b']);
+  assert.equal(before.cards.find((c) => c.id === 'b').layout, 'overlap', 'before-drop: layout lands on the TARGET, not the dropped card');
+  assert.equal(before.cards.find((c) => c.id === 'x').layout, undefined);
+
+  const after = zonePile.insertCard(pile, { id: 'x' }, { targetCardId: 'a', side: 'after', layout: 'stack' });
+  assert.deepEqual(after.cards.map((c) => c.id), ['a', 'x', 'b']);
+  assert.equal(after.cards.find((c) => c.id === 'x').layout, 'stack');
+});
+
+test('hand canRemoveCard: true - PLAY has never been authorized per-card, only per-hand-ownership', () => {
+  assert.equal(handPile.canRemoveCard(myHand, { id: 'c' }, 'me', 'play'), true);
+  assert.equal(handPile.canRemoveCard(theirHand, { id: 'c' }, 'me', 'play'), false, 'not your hand');
+});
+
+test('hand removeCard/insertCard: pure, appends on insert', () => {
+  const pile = { id: 'hand:me', kind: 'hand', ownerId: 'me', cards: [{ id: 'a' }] };
+  const removed = handPile.removeCard(pile, 'a');
+  assert.deepEqual(removed.cards, []);
+  const inserted = handPile.insertCard(removed, { id: 'b' });
+  assert.deepEqual(inserted.cards.map((c) => c.id), ['b']);
+});
+
+test('deck canRemoveCard: always true - DRAW has never been per-card authorized (deck cards have no owner)', () => {
+  assert.equal(deckPile.canRemoveCard(deck, { id: 'c' }, 'anyone', 'draw'), true);
+});
+
+test('deck removeCard/insertCard: pure', () => {
+  const pile = { id: 'deck', kind: 'deck', cards: [{ id: 'a' }, { id: 'b' }] };
+  const removed = deckPile.removeCard(pile, 'a');
+  assert.deepEqual(removed.cards.map((c) => c.id), ['b']);
+  const inserted = deckPile.insertCard(removed, { id: 'c' });
+  assert.deepEqual(inserted.cards.map((c) => c.id), ['c', 'b'], 'unexercised by any current action - DRAW only ever removes, never inserts, into a deck');
+});

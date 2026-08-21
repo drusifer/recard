@@ -1,10 +1,12 @@
 /**
- * The Deck pile type (D42, Sprint 13/US-47, Tranche 1 of D39).
+ * The Deck pile type (D42, Sprint 13/US-47).
  *
- * Read-side only: `visibility`, `dropRule`, and offered actions. The
- * reducer's actual DRAW/DEAL/SHUFFLE_DECK/SPLIT_DECK mutations stay in
- * `state.js` untouched this sprint - see ARCHITECTURE.md D41 for why
- * (none of them fit a plain remove-from-A/insert-into-B shape).
+ * Sprint 14/Tranche 2 (D43) wires DRAW's transfer (deck -> hand) through
+ * `canRemoveCard`/`removeCard`/`insertCard` below. DEAL/DEAL_MORE (one
+ * source, MANY destinations at once) and SHUFFLE_DECK/SPLIT_DECK
+ * (pile-level, deck-specific, no cross-type behavior to generalize)
+ * stay direct `state.js` cases - see ARCHITECTURE.md D43 for why
+ * forcing them into this shape was rejected, not just skipped.
  */
 
 /** Nobody sees a deck's cards - only its count (state.js's `viewFor`). */
@@ -36,4 +38,24 @@ export function cardActions() {
  */
 export function pileActions({ isHost } = {}) {
   return isHost ? ['draw', 'deal', 'reshuffleDeal', 'shuffle', 'split'] : ['draw'];
+}
+
+/** DRAW has never been per-card authorized - deck cards carry no
+ * owner, so unlike `zonePile`/`handPile` there is no `cardActions`
+ * entry to reuse (deck's `cardActions` is intentionally always empty,
+ * above - draw is a PILE-level action, not a card-level one). */
+export function canRemoveCard() {
+  return true;
+}
+
+export function removeCard(pile, cardId) {
+  return { ...pile, cards: pile.cards.filter((c) => c.id !== cardId) };
+}
+
+/** Unexercised by any current action - DRAW only ever removes from the
+ * deck, never inserts into it. Present for interface completeness, same
+ * spirit as `redactCard`/`cardActions` above. Adds to the top,
+ * matching a physical deck. */
+export function insertCard(pile, card) {
+  return { ...pile, cards: [card, ...pile.cards] };
 }

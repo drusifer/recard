@@ -1,8 +1,9 @@
 /**
- * The Zone pile type (D42, Sprint 13/US-47, Tranche 1 of D39) - the
- * general case: a shared or personal table zone whose cards each carry
- * their own `{owner, faceUp}` (D7). Read-side only - see deckPile.js's
- * header and ARCHITECTURE.md D41.
+ * The Zone pile type (D42, Sprint 13/US-47) - the general case: a
+ * shared or personal table zone whose cards each carry their own
+ * `{owner, faceUp}` (D7). Sprint 14/Tranche 2 (D43) adds the write
+ * side: `canRemoveCard`/`removeCard`/`insertCard`, the shape
+ * `state.js`'s PICKUP/MOVE_CARD/PLAY-into-a-zone dispatch through.
  */
 
 /** Per-card `{owner, faceUp}` visibility, not a pile-level rule -
@@ -54,4 +55,55 @@ export function cardActions(pile, card, viewerId) {
  * drawing act on the deck, sorting/passing act on a hand. */
 export function pileActions() {
   return [];
+}
+
+/**
+ * D43: the write-side authorization check is the READ-side offer check
+ * - `cardActions` already states exactly which actions a card offers to
+ * a viewer, and every existing reducer case (`REVEAL`/`PICKUP`/
+ * `MOVE_CARD`) enforced precisely that same rule, just written out a
+ * second time inline. One source of truth instead of two copies that
+ * could drift.
+ */
+export function canRemoveCard(pile, card, viewerId, action) {
+  return cardActions(pile, card, viewerId).includes(action);
+}
+
+export function removeCard(pile, cardId) {
+  return { ...pile, cards: pile.cards.filter((c) => c.id !== cardId) };
+}
+
+/**
+ * D21, relocated from state.js's private `placeCard`/`withLayout`
+ * (Tranche 2): arrangement is a ZONE concept - a hand has no adjacency
+ * rendering to describe, so this belongs on the pile type that actually
+ * uses it, not in the reducer.
+ *
+ * Smith's Gate 2 rule, implemented in exactly one place: `layout`
+ * always belongs to whichever card of the newly-adjacent pair ends up
+ * *second*. Dropping after the target, that's the dropped card;
+ * dropping before it, the dropped card becomes the target's new
+ * predecessor, so it is the TARGET that now sits second and carries the
+ * layout. Getting this backwards would visually join the wrong pair.
+ */
+function withLayout(card, layout) {
+  const { layout: _previous, ...rest } = card;
+  return layout ? { ...rest, layout } : rest;
+}
+
+export function insertCard(pile, card, placement = {}) {
+  const { targetCardId, side = 'after', layout } = placement;
+  if (!targetCardId) return { ...pile, cards: [...pile.cards, withLayout(card, layout)] };
+
+  const { cards } = pile;
+  const index = cards.findIndex((c) => c.id === targetCardId);
+  if (index === -1) {
+    throw new Error(`Target card ${targetCardId} is not in the destination zone`);
+  }
+
+  if (side === 'before') {
+    const placed = [...cards.slice(0, index), withLayout(card, null), ...cards.slice(index)];
+    return { ...pile, cards: placed.map((c) => (c.id === targetCardId ? withLayout(c, layout) : c)) };
+  }
+  return { ...pile, cards: [...cards.slice(0, index + 1), withLayout(card, layout), ...cards.slice(index + 1)] };
 }
