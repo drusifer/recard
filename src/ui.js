@@ -760,8 +760,34 @@ export function renderDeck(container, count, opts = {}) {
   container.appendChild(stack);
 
   const actions = pileLevelActions('deck', { isHost: opts.isHost === true });
-  if (!actions.length || !opts.onPileAction) return;
-  container.appendChild(deckControls(actions, count, opts));
+  if (!actions.length) return;
+
+  // Sprint 12 (T54.1): draggable/tap-shortcut actions (`target` set -
+  // today, only `draw`) move onto the deck's own pile anchor; the rest
+  // (deal/reshuffleDeal) stay on the legacy strip until Phase 56
+  // migrates them too. Two containers, not one re-styled - `deckControls`
+  // still owns the deal-count input those two need and `draw` doesn't.
+  //
+  // `onDraw` is deliberately its OWN callback, not routed through
+  // `opts.onPileAction` (which the strip's deal/reshuffleDeal use): that
+  // callback is `dealFromDeck` in main.js, and `dealFromDeck('draw', …)`
+  // would silently fall into its DEAL_MORE branch instead of drawing -
+  // a real bug, caught live (join's hand count stayed put after a
+  // direct in-page click, no error thrown) before it shipped.
+  const anchorActions = actions.filter((id) => PILE_ACTIONS[id].target);
+  const stripActions = actions.filter((id) => !PILE_ACTIONS[id].target);
+
+  if (anchorActions.length && opts.onDraw) {
+    const anchorSlot = document.createElement('div');
+    renderPileAnchor(anchorSlot, anchorActions, {
+      pileLabel: 'Deck',
+      onPileAction: (id) => { if (id === 'draw') opts.onDraw(); },
+    });
+    container.appendChild(anchorSlot);
+  }
+  if (stripActions.length && opts.onPileAction) {
+    container.appendChild(deckControls(stripActions, count, opts));
+  }
 }
 
 /**
@@ -773,14 +799,19 @@ export function renderDeck(container, count, opts = {}) {
  * D25's existing `:hover`/`:focus-within` CSS-only reveal (style.css
  * `.pile-anchor-popover`) rather than inventing a second mechanism.
  *
- * Draggable/tap-shortcut actions (Draw, Phase 54) are wired by the
- * caller through `opts` once that phase lands; this function only knows
- * about plain click actions today (sortRank/sortSuit/pass, Phase 53).
+ * Draggable actions (`target` set in PILE_ACTIONS - today, only `draw`)
+ * get the same action-token drag protocol a card gets (D35): native
+ * drag on mouse, the same press-and-hold recognizer on touch
+ * (`touchDrag.js`, unchanged - a new, smaller DOM wiring function below
+ * calls the same pure `step`). `singleTarget` actions (D36) ALSO get
+ * the plain click handler every action gets - Smith Gate 1 #4 ruled the
+ * project's highest-frequency action out from being drag-only.
  *
  * @param {HTMLElement} container rebuilt wholesale each call, like every
  *   other render* function here.
  * @param {string[]} actions ids from `pileLevelActions()`.
- * @param {{onPileAction: (id: string) => void, pileLabel?: string}} opts
+ * @param {{onPileAction: (id: string) => void, pileLabel?: string,
+ *   labels?: Record<string,string>}} opts
  */
 export function renderPileAnchor(container, actions, opts = {}) {
   container.innerHTML = '';
@@ -808,10 +839,100 @@ export function renderPileAnchor(container, actions, opts = {}) {
     btn.title = spec.hint;
     if (spec.destructive) btn.classList.add('btn-danger');
     btn.addEventListener('click', () => opts.onPileAction?.(id));
+    if (spec.target) {
+      btn.draggable = true;
+      btn.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', pileActionToken(id));
+      });
+      attachPileActionTouchDrag(btn, id, () => opts.onPileAction?.(id));
+    }
     popover.appendChild(btn);
   }
   anchor.appendChild(popover);
   container.appendChild(anchor);
+}
+
+const PILE_ACTION_TOKEN_PREFIX = 'pile-action:';
+
+/** The dataTransfer payload a draggable pile-action button carries. */
+function pileActionToken(actionId) {
+  return `${PILE_ACTION_TOKEN_PREFIX}${actionId}`;
+}
+
+/**
+ * Reads a drop's raw `text/plain` payload and returns the pile-action id
+ * it carries, or `null` if this drop isn't one (an ordinary card, most
+ * likely). Only meaningful at `drop` time - real browsers don't expose
+ * `dataTransfer` values during `dragover`, only `.types` (D35 note: this
+ * is why the drop target below always calls `preventDefault()` on
+ * dragover unconditionally rather than trying to distinguish there).
+ */
+export function pileActionFromDrop(dataTransfer) {
+  const raw = dataTransfer.getData('text/plain');
+  return raw.startsWith(PILE_ACTION_TOKEN_PREFIX) ? raw.slice(PILE_ACTION_TOKEN_PREFIX.length) : null;
+}
+
+/**
+ * Touch drag for one pile-action button (Draw, Phase 54/D35) - the same
+ * press-and-hold recognizer `attachTouchDrag` uses for cards, wired
+ * smaller: there's no card identity to broadcast mid-drag (US-29 doesn't
+ * apply - nothing has been drawn yet), just a ghost and a drop check.
+ */
+function attachPileActionTouchDrag(sourceEl, actionId, onDrop) {
+  let state = null;
+  let timer = null;
+  let ghost = null;
+
+  const teardown = () => {
+    clearTimeout(timer);
+    ghost?.remove();
+    ghost = null;
+  };
+
+  const handle = {
+    lift: (ev) => {
+      ghost = sourceEl.cloneNode(true);
+      ghost.classList.add('touch-drag-ghost');
+      document.body.appendChild(ghost);
+      moveDragGhost(ghost, ev.x, ev.y);
+    },
+    move: (ev) => { if (ghost) moveDragGhost(ghost, ev.x, ev.y); },
+    drop: (ev) => {
+      teardown();
+      if (document.elementFromPoint(ev.x, ev.y)?.closest('#hand-area')) onDrop();
+    },
+    cancel: teardown,
+  };
+
+  const feed = (sample) => {
+    const out = touchDragStep(state, sample);
+    state = out.state;
+    for (const e of out.events) handle[e.type](e);
+  };
+
+  sourceEl.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse') return;
+    feed({ type: 'down', x: e.clientX, y: e.clientY, t: performance.now() });
+    clearTimeout(timer);
+    timer = setTimeout(() => feed({ type: 'tick', t: performance.now() }), HOLD_MS);
+    sourceEl.setPointerCapture(e.pointerId);
+  });
+  sourceEl.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'mouse') return;
+    feed({ type: 'move', x: e.clientX, y: e.clientY, t: performance.now() });
+  });
+  sourceEl.addEventListener('pointerup', (e) => {
+    if (e.pointerType === 'mouse') return;
+    clearTimeout(timer);
+    feed({ type: 'up', x: e.clientX, y: e.clientY, t: performance.now() });
+  });
+  sourceEl.addEventListener('pointercancel', () => {
+    clearTimeout(timer);
+    feed({ type: 'cancel', t: performance.now() });
+  });
+  sourceEl.addEventListener('touchmove', (e) => {
+    if (state?.phase === 'dragging') e.preventDefault();
+  }, { passive: false });
 }
 
 /**

@@ -171,7 +171,12 @@
            something you have to already know about to find. -->
       <p class="touch-hint">Tap a card to play it &mdash; or hold a card briefly, then drag it where you want.</p>
       <div class="btn-row">
-        <button id="draw-btn" type="button" class="btn-primary">Draw</button>
+        <!-- Sprint 12 (D34/D35/D36, T54.1): Draw moved onto the deck's
+             own pile anchor - draggable AND (Smith Gate 1 #4: the
+             project's own highest-frequency action) still one tap.
+             Hidden-but-present, not deleted, per the same pattern as
+             Phase 53's hand buttons - see #hand-pile-anchor above. -->
+        <button id="draw-btn" type="button" class="btn-primary" hidden>Draw</button>
         <button id="reset-btn" type="button" class="btn-danger" hidden>Reshuffle &amp; Reset</button>
         <button id="reset-scores-btn" type="button" class="btn-danger" hidden>Reset Scores</button>
       </div>

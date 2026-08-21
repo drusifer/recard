@@ -17,6 +17,7 @@ import {
   updateCardDragGhost,
   removeCardDragGhost,
   renderPileAnchor,
+  pileActionFromDrop,
 } from './ui.js';
 import { pileLevelActions } from './pileActions.js';
 import { PRESETS } from './presets.js';
@@ -874,6 +875,7 @@ function renderRosterOnly() {
     dealCount: lastDealCount,
     onDealCountChange: (n) => { lastDealCount = n; },
     onPileAction: (action, count) => dealFromDeck(action, count),
+    onDraw: performDraw,
   });
   passToggleBtn.textContent = view.passed?.[myId] ? 'Unpass' : 'Pass';
   // Sprint 12 (D34/D37, T53.2): the hand's own pile anchor replaces the
@@ -1001,10 +1003,27 @@ document.getElementById('split-btn').addEventListener('click', () => {
   }
 });
 
-drawBtn.addEventListener('click', () => {
+// Sprint 12 (D34/D35/D36, T54.1): named so the deck's pile anchor - both
+// its click/tap shortcut and its drag-onto-hand drop - calls the same
+// implementation the legacy button did, rather than a second one.
+function performDraw() {
   if (sessionEnded) return;
   if (role === 'host') dispatch({ type: 'DRAW', playerId: myId });
   else session.send({ type: 'action', action: { type: 'DRAW' } });
+}
+drawBtn.addEventListener('click', performDraw);
+
+// D35: the hand is Draw's one static, legal drop target (D36's whole
+// point - it never needs computing). `preventDefault` is unconditional
+// here because real browsers don't expose `dataTransfer` values during
+// `dragover`, only at `drop` (see `pileActionFromDrop`'s own note) - so
+// there is nothing to branch on yet; an ordinary card dropped on empty
+// hand space (not on a reorder target) already falls through to a safe
+// no-op the same way it did before this listener existed.
+handAreaEl.addEventListener('dragover', (e) => e.preventDefault());
+handAreaEl.addEventListener('drop', (e) => {
+  e.preventDefault();
+  if (pileActionFromDrop(e.dataTransfer) === 'draw') performDraw();
 });
 
 // --- Hand sort (US-23, D14): local-only, never broadcast. Writes into

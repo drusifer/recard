@@ -159,12 +159,36 @@ try {
     { timeout: 10000 },
   );
 
-  await join.click('#draw-btn');
+  // Sprint 12 (T54.1/T54.2): Draw moved onto the deck's own pile anchor
+  // - the legacy `#draw-btn` is `hidden` now. Two ways in, both tested:
+  // drag onto the hand (D35's action-token protocol) first, since that's
+  // the one path this sprint added; then the tap shortcut (D36) below,
+  // via the hover-then-click path a mouse user actually takes.
+  const joinHandBeforeDrag = await join.evaluate(() => document.querySelectorAll('#hand-area .card').length);
+  await join.evaluate(() => {
+    const btn = document.querySelector('#game-deck-area [data-pile-action="draw"]');
+    const hand = document.getElementById('hand-area');
+    const dt = new DataTransfer();
+    dt.setData('text/plain', 'pile-action:draw');
+    btn.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
+    hand.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }));
+    hand.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+  });
+  await join.waitForFunction(
+    (before) => document.querySelectorAll('#hand-area .card').length === before + 1,
+    joinHandBeforeDrag,
+    { timeout: 10000 },
+  );
+  console.log('US-46/D35: dragging Draw onto the hand draws a card, through the action-token protocol');
+
+  await join.hover('#game-deck-area .pile-anchor-toggle');
+  await join.click('#game-deck-area [data-pile-action="draw"]');
   await host.waitForFunction(
-    () => [...document.querySelectorAll('#game-roster li')].some((li) => li.textContent.includes('6 cards')),
+    () => [...document.querySelectorAll('#game-roster li')].some((li) => li.textContent.includes('7 cards')),
     undefined,
     { timeout: 10000 },
   );
+  console.log('US-46/D36: tapping Draw (revealed) also draws, with no drag - the static singleTarget shortcut');
 
   // --- Middle-zone visibility (US-12/13/14, D7/D8) ---
 
@@ -428,18 +452,18 @@ try {
   // from where the cards are. ---
   const dealStrip = host.locator('#game-deck-area .deck-controls-strip');
   assert(await dealStrip.count() === 1, 'the host must get pile-level controls on the deck (US-41/D29)');
-  // D34/D35 (Sprint 12): Draw generalized to a pile-level action open to
-  // EVERYONE, not just the host - so the guest now legitimately gets a
-  // strip too (pileLevelActions('deck', {isHost:false}) === ['draw']).
-  // What must stay host-only is dealing itself, not the strip's mere
-  // presence.
-  const guestDeckStrip = join.locator('#game-deck-area .deck-controls-strip');
-  assert(await guestDeckStrip.count() === 1,
-    'Draw is open to everyone (D34) - a guest must still see the deck strip');
-  assert(await guestDeckStrip.locator('button[data-pile-action="deal"]').count() === 0,
-    'dealing stays host-only - a guest must not get the Deal button');
-  assert(await guestDeckStrip.locator('button[data-pile-action="reshuffleDeal"]').count() === 0,
-    'dealing stays host-only - a guest must not get the Reshuffle & deal button');
+  // Sprint 12, Phase 54 (D35): Draw moved OFF the strip onto the deck's
+  // own pile anchor - open to everyone (D34), unlike deal/reshuffleDeal,
+  // which stay host-only and stay on the strip until Phase 56. So a
+  // guest now gets the anchor (with Draw) but NOT the strip at all -
+  // the strip has nothing left to offer them.
+  const guestDeckAnchor = join.locator('#game-deck-area .pile-anchor');
+  assert(await guestDeckAnchor.count() === 1,
+    'Draw is open to everyone (D34) - a guest must still see the deck pile anchor');
+  assert(await guestDeckAnchor.locator('[data-pile-action="draw"]').count() === 1,
+    'the guest deck anchor must offer Draw');
+  assert(await join.locator('#game-deck-area .deck-controls-strip').count() === 0,
+    'dealing stays host-only - a guest must not get the deal strip at all now Draw has moved off it');
   const hostHandIdsBeforeDealMore = await host.evaluate(() =>
     [...document.querySelectorAll('#hand-area .card')].map((c) => c.dataset.cardId),
   );
@@ -528,7 +552,8 @@ try {
   await handAnchorToggle.hover();
   await join.click('#hand-pile-anchor [data-pile-action="sortRank"]');
   const joinSortedIds = await join.evaluate(() => [...document.querySelectorAll('#hand-area .card')].map((c) => c.dataset.cardId));
-  await join.click('#draw-btn'); // triggers a fresh state broadcast
+  await join.hover('#game-deck-area .pile-anchor-toggle');
+  await join.click('#game-deck-area [data-pile-action="draw"]'); // triggers a fresh state broadcast
   await join.waitForFunction(
     (before) => document.querySelectorAll('#hand-area .card').length === before + 1,
     joinSortedIds.length,
