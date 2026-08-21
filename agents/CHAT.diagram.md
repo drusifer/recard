@@ -13,7 +13,8 @@ sequenceDiagram
     participant Morpheus
     participant Smith
     participant Mouse
-    Note over Cypher,Mouse: 📅 2026-08-20
+    participant Oracle
+    Note over Cypher,Oracle: 📅 2026-08-20
     Cypher->>All: "pm launch"
     Note right of Cypher: "*pm launch recard-<br/>sprint-11. A host reload<br/>no longer costs anyone<br/>their game. Hands are<br/>saved and come back to<br/>their owners, players'<br/>clien…"
     Neo->>Trin: "swe handoff"
@@ -50,4 +51,31 @@ sequenceDiagram
     Note right of Trin: "Sprint 12 retro: real<br/>find was that automated<br/>tests<br/>(unit+e2e+lint:design)<br/>never open a<br/>hovered/tapped popover<br/>and look at it - two<br/>real bu…"
     Cypher->>All: "pm launch"
     Note right of Cypher: "*pm launch recard-<br/>sprint-12. Piles are the<br/>interaction now: every<br/>pile (hand, deck)<br/>hovers/taps to a fixed<br/>anchor popover instead<br/>of scatte…"
+    Cypher->>Smith: "pm handoff"
+    Note right of Cypher: "*pm plan sprint. US-47:<br/>Pile kind becomes a real<br/>per-type module<br/>(visibility/redact,<br/>dropRule, offered-<br/>actions), not a kind-<br/>string switch s…"
+    Smith->>Morpheus: "user approve"
+    Note right of Smith: "*user approve US-47.<br/>Deferring reducer-<br/>dispatch (write-side) is<br/>the right call, not a<br/>cop-out - the story<br/>names WHY<br/>(Reveal/Shuffle/Split/P…"
+    Morpheus->>Smith: "lead handoff"
+    Note right of Morpheus: "Architecture done: D41<br/>(splits D39 into read-<br/>side now / write-side<br/>deferred, names the in-<br/>place-action gap: Reveal<br/>/Shuffle/Split/Pass<br/>don't…"
+    Smith->>Mouse: "user approve"
+    Note right of Smith: "*user approve D41-D42.<br/>Naming the exact gap (Re<br/>veal/Shuffle/Split/Pass<br/>don't fit remove/insert)<br/>instead of hand-waving<br/>it is the right call…"
+    Mouse->>Morpheus: "sm handoff"
+    Note right of Mouse: "Sprint 13 planned: 3<br/>phases. 59: src/piles/{p<br/>ileTypes,deckPile,handPi<br/>le,zonePile}.js pure<br/>modules + own unit<br/>tests, no wiring yet<br/>(mirrors…"
+    Morpheus->>Neo: "lead handoff"
+    Note right of Morpheus: "Sprint plan approved -<br/>59/60 boundary is right:<br/>build+verify the new<br/>modules in isolation<br/>before anything touches<br/>the replicated<br/>reducer's…"
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "Phase 59 done, TDD. src/<br/>piles/{deckPile,handPile<br/>,zonePile}.js: visibilit<br/>y/dropRule/cardActions/p<br/>ileActions per type. 16<br/>new tests + an exha…"
+    Trin->>Morpheus: "qa handoff"
+    Note right of Trin: "UAT phase 59 PASSED,<br/>independently re-run<br/>(218/218) + mutation<br/>check: stripped<br/>handPile's isOwner<br/>guard, exactly 1 test<br/>failed on purpose (…"
+    Morpheus->>Neo: "lead handoff"
+    Note right of Morpheus: "Phase 59 review<br/>APPROVED. Clean, exactly<br/>the shape D42 called for<br/>- pure modules, zero<br/>DOM, characterization-<br/>tested against the<br/>still-live…"
+    Note over Cypher,Oracle: 📅 2026-08-21
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "Phase 60 done.<br/>state.js/pileActions.js<br/>read PILE_TYPES now, old<br/>parallel tables deleted <br/>(PILE_VISIBILITY/redactM<br/>iddleCard/actionsForPile<br/>Kin…"
+    Trin->>Morpheus: "qa handoff"
+    Note right of Trin: "UAT phase 60 PASSED,<br/>independently re-run<br/>(218/218 + full e2e).<br/>Mutation check on the<br/>WIRING itself, not just<br/>the new modules: broke<br/>viewFo…"
+    Morpheus->>Neo: "lead handoff"
+    Note right of Morpheus: "Phase 60 review<br/>APPROVED. Exactly D42's<br/>shape - one source of<br/>truth per concern, no<br/>parallel tables left.<br/>The pileLevelActions<br/>signature co…"
+    Neo->>Oracle: "swe handoff"
+    Note right of Neo: "Phase 61 (reserved bug-<br/>fix): nothing to fix.<br/>Full regression clean -<br/>218/218 unit, full e2e,<br/>lint:style clean.<br/>lint:design shows the<br/>same 1…"
 ```

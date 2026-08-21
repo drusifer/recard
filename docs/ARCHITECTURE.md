@@ -1577,6 +1577,18 @@ and unit-tested per type (`tests/piles.test.js`) as the documented hook
 for whenever a second pile type is ever rendered through this path -
 disclosed here rather than silently left unwired with no note.
 
+> **Groom note (Sprint 13 close-out): shipped scope vs. this plan.**
+> Matches the plan exactly - no drift to record, unlike Sprint 12.
+> `actionsForPileKind` (`pileActions.js`) was removed rather than kept
+> as a redundant third table; not mentioned in the original D42 draft
+> above, decided during implementation once it was confirmed to have no
+> real caller (grepped first). `lint:design` shows the same 10
+> violations Sprint 12 already disclosed as pre-existing/out-of-scope -
+> confirmed unchanged (this sprint touched zero CSS/DOM/rendering).
+> Tranche 2 (write-side reducer dispatch + the `dropRule`/wire-view
+> question above) remains unscheduled - see the Sprint 13 backlog entry
+> in `docs/USER_STORIES.md` if picking it up next.
+
 
 ## Module Layout
 ```
@@ -1609,7 +1621,21 @@ tests/state.test.js                  node:test unit tests for state.js reducer (
                                       v1.2: D12 zones/CREATE_ZONE/MOVE_CARD, D15 DEAL_MORE, D16 pass)
 tests/handOrder.test.js               v1.2: node:test unit tests for handOrder.js (D14)
 tests/seating.test.js                 v1.3: node:test unit tests for seating.js (D18)
+src/piles/{pileTypes,deckPile,handPile,zonePile}.js
+                                       v3.1 (Sprint 13, D42): one module per pile TYPE -
+                                       visibility/redactCard/dropRule/cardActions/pileActions -
+                                       instead of a kind-string switch. state.js/pileActions.js
+                                       read through PILE_TYPES; ui.js/main.js unchanged.
+tests/piles.test.js                   v3.1: node:test unit tests for the pile-type modules,
+                                       incl. exhaustive characterization against pre-Sprint-13
+                                       behavior (D42)
 ```
+
+**Groom note (2026-08-21): this list is stale beyond the Sprint 13 entry
+just added** - `dropTarget.js`, `persistence.js`, `identity.js`, and
+several newer test files (Sprints 4-12) are missing. Not backfilled
+here - out of scope for a Sprint 13 groom pass, flagged so it isn't
+mistaken for complete. Worth its own small groom-only pass.
 
 ## Testing Strategy
 Pure logic (`deck.js`, `state.js`, `protocol.js`) is unit-tested with

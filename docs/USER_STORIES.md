@@ -1714,6 +1714,32 @@ pile-type code, not another `case`.
 - `GameConfig`/`Zone` typing, `DeckDefinition`, `Card.orientation`,
   the builder screen (all D38/D40 — untouched, later sprints).
 
+**Sprint 13 status — SHIPPED (2026-08-21).** 3 phases (59-61), zero
+user-visible behavior change, 218/218 unit + full e2e green
+independently re-verified at every phase. `src/piles/` module contract
+exists and is wired into `state.js`/`pileActions.js`. See
+`docs/ARCHITECTURE.md`'s "v3.1 Decisions" (D41-D42) and its groom note
+for the full record.
+
+### Backlog: Tranche 2 (unscheduled) — Pile write-side + dropRule wiring
+
+From Sprint 13's own D41 deferral. Real design work, not a mechanical
+follow-on to Tranche 1:
+- Resolve the in-place-action gap: `REVEAL` mutates a card in place,
+  `SHUFFLE_DECK` reorders one pile, `SPLIT_DECK` creates new piles,
+  `SORT`/`TOGGLE_PASS` touch no card identity — none fit `canAccept`/
+  `insert`/`canRemove`/`remove`'s move-between-piles shape. Needs a
+  real decision (an `apply(pile, action)` capability alongside the
+  four move-shaped ones? something else?), not an assumption.
+- Once resolved: dispatch `state.js`'s reducer bodies (`PLAY`/`PICKUP`/
+  `MOVE_CARD`/`DRAW`/`DEAL`) through the Pile interface on both ends of
+  the replicated protocol — this is what makes a new Pile type (D38's
+  Discard/Run/Set) addable without a `state.js` change.
+- Wire `dropRule` into `ui.js`'s `dropTarget.js` caller — needs the
+  view shape (`viewFor`'s output) to carry pile-type info, which it
+  deliberately doesn't today (a wire-format change, scoped here rather
+  than snuck into Tranche 1).
+
 
 ---
 

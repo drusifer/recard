@@ -868,3 +868,49 @@ button) is resolved - see that commit's message for the diagnosis (a
 personal seat zone's stacking context trapping a z-index, unrelated to
 this sprint's own cause but newly reached because it was the next
 thing blocking forward progress).
+
+---
+
+## Sprint 13 ("Pile becomes a real type" — v3.1) — SHIPPED
+
+US-47, Tranche 1 of D39 (queued at Sprint 12 close from a user/Morpheus
+architecture sidebar - see ARCHITECTURE.md's v3.0/v3.1 sections for the
+full design). Architecture: D41 (splits D39 into read-side now /
+write-side deferred), D42 (the pile-type module contract).
+
+### Phase 59 — pile-type modules (pure, no wiring) ✅ DONE
+- [x] `src/piles/{deckPile,handPile,zonePile,pileTypes}.js`:
+      visibility/dropRule/cardActions/pileActions per type. 16 new
+      tests + an exhaustive characterization matrix (every kind/owner/
+      card/viewer combo) against the still-live originals - 0 drift.
+      218/218 unit green (202 + 16 new).
+
+### Phase 60 — wire state.js/pileActions.js through the registry ✅ DONE
+- [x] `state.js`'s `pileVisibility()`/`viewFor()` and `pileActions.js`'s
+      `actionsForCard()`/`pileLevelActions()` now read `PILE_TYPES`
+      instead of their own tables (`PILE_VISIBILITY`, `redactMiddleCard`,
+      `actionsForPileKind` all deleted - no orphaned duplicates).
+      `pileLevelActions()` deliberately kept its exact `(kind, ctx)` call
+      shape rather than the `(pile, viewerId, ctx)` first drafted in
+      ARCHITECTURE.md - checked both real call sites first and neither
+      had a pile object in scope; doc corrected to match the code.
+      `dropTarget.js`'s caller in `ui.js` is NOT wired to `dropRule` -
+      the view shape has no `kind` field, a Tranche-2/wire-format
+      question, disclosed rather than silently skipped.
+- [x] Mutation-verified the wiring itself, not just the new modules:
+      broke `viewFor`'s redaction dispatch, the PRE-EXISTING D7 privacy
+      test caught it immediately (real regression protection).
+      218/218 unit + full e2e (real WebRTC) both green.
+
+### Phase 61 — reserved bug-fix ✅ DONE, nothing found
+- [x] Full regression clean. `lint:design` unchanged at 10 violations -
+      the exact set Sprint 12 already disclosed as pre-existing/
+      out-of-scope ring/pot geometry - confirmed via `git stash`
+      comparison that this sprint (zero CSS/DOM touched) didn't move it.
+
+### Sprint 13 status — SHIPPED
+Zero user-visible behavior change, as specified. Tranche 2 (reducer
+mutation dispatch through canAccept/insert/canRemove/remove, plus the
+in-place-action gap D41 named: Reveal/Shuffle/Split/Pass don't fit that
+shape) is unscheduled - see the Sprint 13 backlog entry in
+`docs/USER_STORIES.md`.
