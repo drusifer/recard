@@ -1981,3 +1981,18 @@ necessary rather than at every phase).
 - In-app text chat or reactions.
 - Custom card backs/themes.
 - Reconnect-to-session after refresh/drop.
+- **Radial action menu, pointer-centered** (user proposal, post-D51):
+  on hovering an actionable card/pile, show its actions as a radial
+  menu around the pointer instead of the current edge-anchored row;
+  clicking an action makes the card follow the mouse with valid drop
+  targets highlighted, click to confirm. Real merit (distance-based,
+  pointer-centered avoids the exact hover-blocks-interaction bug D51
+  just fixed) but needs real scoping before building: (1) this app has
+  no icon language today - every action is a text button, and radial
+  layouts don't hold long text labels well, so an icon set is likely a
+  prerequisite, not a follow-on; (2) pointer-centered means edge-of-
+  screen clamping math, a class of bug this project has paid for
+  repeatedly this session; (3) touches the same machinery
+  (`touchDrag.js`, `beginTargeting`, `dropTarget.js`) D51 just
+  stabilized. Needs a real Cypher story + Smith gate (icons vs. text,
+  touch equivalent) before implementation, not a rushed bolt-on.
