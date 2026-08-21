@@ -48,6 +48,23 @@ test('CREATE_ZONE: a snapshot with no gameConfig at all (pre-D46) defaults to al
   assert.doesNotThrow(() => reduce(preD46State, { type: 'CREATE_ZONE', name: 'x' }));
 });
 
+// --- D50: allowsPlayerZones reaches the view, so ui.js can hide the
+// control instead of only rejecting the click ---
+
+test('viewFor: carries gameConfig.allowsPlayerZones through, both true and false', () => {
+  const allowed = createInitialState({}, () => 0.5);
+  assert.equal(viewFor(allowed, 'anyone').gameConfig.allowsPlayerZones, true);
+  const disallowed = createInitialState({}, () => 0.5, { allowsPlayerZones: false });
+  assert.equal(viewFor(disallowed, 'anyone').gameConfig.allowsPlayerZones, false);
+});
+
+test('viewFor: a pre-D46 snapshot with no gameConfig still produces a view that defaults to allowed', () => {
+  const state = createInitialState({}, () => 0.5);
+  const { gameConfig, ...preD46State } = state;
+  const view = viewFor(preD46State, 'anyone');
+  assert.equal(view.gameConfig.allowsPlayerZones, true);
+});
+
 test('JOIN: adds a player to the roster with connecting state', () => {
   const state = reduce(createInitialState({}, () => 0.5), {
     type: 'JOIN',

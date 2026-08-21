@@ -1935,6 +1935,43 @@ independently re-verified.
 short of the builder screen - which remains its own later, separate
 story, exactly as scoped from the start.
 
+## Sprint 20 ("Hide Add Zone when disallowed") — US-54
+
+### US-54: Add Zone disappears for a game that disallows it, instead of only rejecting the click
+
+**As** a player, **I want** the Add Zone control to simply not appear
+when the game doesn't allow player-added zones, **so that** I don't
+have to try it and get an error to learn that - closing D46's own
+disclosed gap (`GameConfig` was gating the action but never reached
+the view at all).
+
+**AC:**
+- `viewFor` carries `gameConfig.allowsPlayerZones` (only that field).
+- `#add-zone-row` hides when it's false, for every role uniformly (not
+  a host/guest split - a property of the game itself).
+- Defaults to allowed for a pre-D46 snapshot with no `gameConfig`,
+  matching `CREATE_ZONE`'s own existing default.
+
+**Sprint 20 status — SHIPPED (2026-08-21).** Full design in
+`docs/ARCHITECTURE.md` D50. Replaced the old D46 e2e coverage (click
+the control, see a real error) with an assertion that the control is
+genuinely absent - the old flow is no longer reachable through the UI
+by construction. The reducer-level guard itself stays covered directly
+by `tests/state.test.js`. 260/260 unit (4 new, mutation-verified) +
+full e2e green, independently re-verified (one full-suite run at
+close, per the user's standing preference to run it only when
+necessary rather than at every phase).
+
+**Still open (the whole original framework sidebar, now):**
+- Full landscape-aware layout (D48's own disclosed first-cut
+  limitation) — belongs to whichever pile type/mechanic (D38's Run/Set,
+  most likely) actually needs it. No current caller.
+- **Builder screen** — the only piece of the original framework
+  sidebar left. Deliberately out of scope for autonomous sprinting:
+  needs real product/UX decisions (what it looks like, how much of the
+  schema it exposes) from the user, not an implementation judgment
+  call.
+
 
 ---
 

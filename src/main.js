@@ -932,6 +932,14 @@ function renderGameFromView(view) {
   renderSeatZones(document.getElementById('seat-zones'), personalZones, view.zones, seatedOrder(view.players, myId), zoneOpts);
   resetBtn.hidden = role !== 'host';
   resetScoresBtn.hidden = role !== 'host';
+  // D50: hides the control instead of only rejecting the click - D46
+  // already gated the ACTION (CREATE_ZONE throws when disallowed), but
+  // `GameConfig` never reached the view until now, so every player saw
+  // Add Zone regardless of the game's own config. Applies to every
+  // role, not just guests - unlike resetBtn above, this isn't a
+  // host/guest split, it's a per-GAME capability the host themselves
+  // set up, so they get no special exemption from their own choice.
+  document.getElementById('add-zone-row').hidden = !view.gameConfig.allowsPlayerZones;
   // Sprint 12 (T56.1): shuffle/split moved onto the deck's own pile
   // anchor - this legacy row stays permanently hidden (not deleted)
   // per the same pattern as Phase 53/54/55's own migrated controls.

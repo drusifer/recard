@@ -2046,6 +2046,51 @@ growth - both remain explicitly separate, later stories per the
 original framework sidebar.
 
 
+## v3.4 Decisions (Sprint 20, US-54) — closing D46's own disclosed gap
+
+### D50. `viewFor` carries `gameConfig.allowsPlayerZones`; Add Zone hides instead of only rejecting
+
+D46 gated the *action* (`CREATE_ZONE` throws when disallowed) but
+never exposed `GameConfig` to the view at all, so the *control* stayed
+visible to everyone regardless of the game's own config - a host
+(or guest) could only discover the restriction by trying and getting
+an error. D50 closes that, matching this app's own established
+convention for a categorical capability gap: hide, don't
+disable-with-explanation (`resetBtn.hidden = role !== 'host'` already
+does this for role; this is the same pattern for a per-*game*
+capability instead of a per-*role* one).
+
+**Decision:** `viewFor` (`state.js`) gains one new field:
+`gameConfig: { allowsPlayerZones }` - only that one field, not the
+whole `GameConfig` object, since it's the only thing any client-side
+rendering needs today. Same `?? true` default as `CREATE_ZONE`'s own
+guard, for the same reason: a pre-D46 restored snapshot has no
+`gameConfig` at all and must default to "allowed," not crash or
+silently flip to disallowed. `main.js`'s `renderGameFromView` hides
+`#add-zone-row` (index.html; the whole name/kind/button group, given
+an id for exactly this) when `view.gameConfig.allowsPlayerZones` is
+false - applies to every role uniformly, unlike the host-only
+`resetBtn` pattern it otherwise mirrors, since this is a property of
+the game the host themselves configured, not a role split.
+
+**Rejected: disabling the button with a tooltip instead of hiding the
+row.** Smith's gate reasoning: this is a categorical, stable fact
+about the game for its entire duration, not a momentary/recoverable
+state - the established convention for that shape (host-only controls)
+is silence, not an explanation nobody asked for.
+
+**Consequences:** The existing D46 e2e coverage (attempt the click,
+see a real error) no longer describes reachable behavior - the control
+it clicked is now hidden by construction, so `.click()` on it would
+itself fail as not-actionable. Replaced with an assertion that the
+control is genuinely absent for a disallowed game; the reducer-level
+guard itself stays covered directly by `tests/state.test.js` (unit
+level), not re-proven a second time at the e2e layer. 260/260 unit (4
+new: `viewFor` carries the field both true/false, defaults correctly
+for a pre-D46 snapshot; mutation-verified - hardcoding the view's
+field to `true` fails exactly the `false`-case test) + full e2e green.
+
+
 ## Module Layout
 ```
 index.html              entry page, host/join screens, game screen

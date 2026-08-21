@@ -639,5 +639,18 @@ export function viewFor(state, playerId) {
     }
   }
 
-  return { myHand, otherHandCounts, zones, deckCount, players: state.players, scores: state.scores, passed: state.passed };
+  return {
+    myHand, otherHandCounts, zones, deckCount, players: state.players, scores: state.scores, passed: state.passed,
+    // D50: only `allowsPlayerZones`, not the whole `GameConfig` object -
+    // it's the only field any client-side rendering needs today, and
+    // `?? true` mirrors CREATE_ZONE's own `state.gameConfig?.allowsPlayerZones
+    // === false` default (a pre-D46 restored snapshot has no `gameConfig`
+    // at all, and must default to "allowed" the same way here as there).
+    // D50: only `allowsPlayerZones`, not the whole `GameConfig` object -
+    // it's the only field any client-side rendering needs today, and
+    // `?? true` mirrors CREATE_ZONE's own `state.gameConfig?.allowsPlayerZones
+    // === false` default (a pre-D46 restored snapshot has no `gameConfig`
+    // at all, and must default to "allowed" the same way here as there).
+    gameConfig: { allowsPlayerZones: state.gameConfig?.allowsPlayerZones ?? true },
+  };
 }

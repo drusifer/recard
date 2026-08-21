@@ -1287,10 +1287,13 @@ try {
 
   await join.close();
 
-  // --- GameConfig.allowsPlayerZones (D46): a host can disallow player-
-  // added zones entirely; CREATE_ZONE is then rejected with a real
-  // error, not an uncaught throw straight out of the click handler
-  // (the exact gap US-41 named for Deal, before that story fixed it).
+  // --- GameConfig.allowsPlayerZones (D46/D50): a host can disallow
+  // player-added zones entirely. D46 shipped the reducer-level guard
+  // (CREATE_ZONE throws, covered directly by tests/state.test.js - not
+  // re-proven here); D50 closed the gap D46 disclosed at the time -
+  // the CONTROL itself is now hidden rather than present-but-rejecting,
+  // so this checks the real integration point: the view reaching a
+  // client actually hides Add Zone, not just that a click would fail.
   // Fresh context, deliberately after the main table tears down. ---
   const noZonesHost = await (await browser.newContext()).newPage();
   await noZonesHost.goto(BASE);
@@ -1306,16 +1309,9 @@ try {
     undefined,
     { timeout: 15000 },
   );
-
-  const zonesBeforeAttempt = await noZonesHost.evaluate(() => document.querySelectorAll('#table-area .zone').length);
-  await noZonesHost.fill('#new-zone-name', 'Rejected');
-  await noZonesHost.click('#create-zone-btn');
-  await noZonesHost.waitForSelector('#zone-error:not([hidden])', { timeout: 5000 });
-  const zoneErrorText = (await noZonesHost.locator('#zone-error').textContent()).trim();
-  assert(/does not allow/.test(zoneErrorText), `the error must explain why, got ${JSON.stringify(zoneErrorText)}`);
-  const zonesAfterAttempt = await noZonesHost.evaluate(() => document.querySelectorAll('#table-area .zone').length);
-  assert(zonesAfterAttempt === zonesBeforeAttempt, 'a rejected CREATE_ZONE must not create anything');
-  console.log('GameConfig.allowsPlayerZones (D46): a game can disallow player-added zones, with a real error message, not an uncaught throw');
+  assert(await noZonesHost.locator('#add-zone-row').isHidden(),
+    'Add Zone must be hidden entirely when GameConfig.allowsPlayerZones is false (D50)');
+  console.log('GameConfig.allowsPlayerZones (D46/D50): a game that disallows player-added zones hides the control, not just rejects the click');
   await noZonesHost.close();
 
   // --- DeckDefinition (D47): a real second deck type, host-reachable. --
