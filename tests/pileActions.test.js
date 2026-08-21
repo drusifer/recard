@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ACTIONS, actionsForCard, targetsForAction, dropRuleFor } from '../src/pileActions.js';
+import { ACTION_SPECS, actionsForCard, targetsForAction, dropRuleFor } from '../src/pileActions.js';
 
 const deck = { id: 'deck', kind: 'deck', ownerId: null };
 const myHand = { id: 'hand:me', kind: 'hand', ownerId: 'me' };
@@ -25,10 +25,10 @@ test('each pile type declares its own actions (D25/D34/D42)', () => {
     'an unknown kind offers nothing, it does not throw');
 });
 
-test('every action names a destination kind or explicitly none', () => {
-  for (const [id, spec] of Object.entries(ACTIONS)) {
+test('every action (card-level and pile-level, ACTION_SPECS - D51) names a destination kind or explicitly none', () => {
+  for (const [id, spec] of Object.entries(ACTION_SPECS)) {
     assert.ok(spec.label, `${id} needs a label`);
-    assert.ok(spec.target === null || ['hand', 'zone'].includes(spec.target), `${id} target`);
+    assert.ok(spec.target === null || spec.target === undefined || ['hand', 'zone'].includes(spec.target), `${id} target`);
   }
 });
 
@@ -63,11 +63,12 @@ test('targets: play and move light up every table-side pile (zones AND discard, 
     "never another player's hand");
 });
 
-// D35: draw's spec now lives in PILE_ACTIONS, not ACTIONS - this proves
-// targetsForAction actually checks both tables rather than silently
-// returning no targets for a pile-level action (which would mean a
-// dragged Draw could never light up anywhere to drop it).
-test('targets: draw (now pile-level, D34) still lights up your own hand via targetsForAction', () => {
+// D35/D51: draw is a pile-level action (no card to hover) - this proves
+// targetsForAction resolves it through the same ACTION_SPECS lookup a
+// card-level action gets, rather than silently returning no targets
+// (which would mean a dragged Draw could never light up anywhere to
+// drop it).
+test('targets: draw (pile-level, D34) still lights up your own hand via targetsForAction', () => {
   assert.deepEqual(targetsForAction('draw', ALL, { viewerId: 'me' }), ['hand:me']);
 });
 

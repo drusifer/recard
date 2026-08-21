@@ -192,7 +192,7 @@ try {
   );
   console.log('US-46/D35: dragging Draw onto the hand draws a card, through the action-token protocol');
 
-  await join.hover('#game-deck-area .pile-anchor-toggle');
+  await join.hover('#game-deck-area');
   await join.click('#game-deck-area [data-pile-action="draw"]');
   await host.waitForFunction(
     () => [...document.querySelectorAll('#game-roster li')].some((li) => li.textContent.includes('7 cards')),
@@ -274,7 +274,7 @@ try {
     document.querySelector('#table-area .action-btn[data-action="pickup"]').closest('.middle-card').dataset.cardId);
   await cardAction(join, pickupId, 'pickup');
   assert((await litTargets(join)) === 1, 'Pick up must light up exactly one destination: your own hand');
-  await join.locator('#hand-area').click();
+  await join.locator('#hand-zone').click();
   await join.waitForFunction(
     (before) => document.querySelectorAll('#hand-area .card').length === before + 1,
     joinHandSizeBefore,
@@ -338,7 +338,14 @@ try {
     return zone.querySelector('.middle-card').dataset.cardId;
   });
   await cardAction(host, discardCardId, 'pickup');
-  await host.locator('#hand-area').click();
+  // D51: the hand highlights (and is clicked to choose) as `#hand-zone`
+  // now - the whole bordered zone, matching every other pile-target -
+  // not the inner `#hand-area` card row (see `pileElement` in ui.js).
+  // `.hand-zone-name` specifically (the heading): a plain click on the
+  // zone can otherwise land on a real hand `<button class="card">`
+  // underneath (Play), consuming the click before it bubbles to
+  // `#hand-zone`'s own `beginTargeting` listener.
+  await host.locator('#hand-zone-name').click();
   await host.waitForFunction(
     (before) => document.querySelectorAll('#hand-area .card').length === before + 1,
     hostHandSizeBeforeZonePickup,
@@ -424,9 +431,9 @@ try {
   // by several earlier tests, and this test needs 2 spendable cards
   // without starving the hand-cursor-affordance check right after it.
   const handSizeBeforeTopUp = await host.evaluate(() => document.querySelectorAll('#hand-area .card').length);
-  await host.hover('#game-deck-area .pile-anchor-toggle');
+  await host.hover('#game-deck-area');
   await host.click('#game-deck-area [data-pile-action="draw"]');
-  await host.hover('#game-deck-area .pile-anchor-toggle');
+  await host.hover('#game-deck-area');
   await host.click('#game-deck-area [data-pile-action="draw"]');
   await host.waitForFunction(
     (before) => document.querySelectorAll('#hand-area .card').length === before + 2,
@@ -550,24 +557,28 @@ try {
   // from where the cards are. Phase 56 (T56.1): the legacy
   // `.deck-controls-strip` is gone entirely now - every deck action,
   // deal included, lives on the ONE anchor `renderDeck` builds. ---
-  const hostDeckAnchor = host.locator('#game-deck-area .pile-anchor');
-  assert(await hostDeckAnchor.count() === 1, 'the host must get the deck pile anchor (US-41/D29)');
+  // D51: the anchor is gone as a separate wrapper - hovering the deck's
+  // own container (`#game-deck-area`, marked `.pile-hover-host` by
+  // `renderActionRow`) reveals its actions directly, the same mechanism
+  // a card's hover row already used.
+  assert(await host.locator('#game-deck-area.pile-hover-host').count() === 1,
+    'the host must get the deck pile-hover host (US-41/D29, D51)');
   assert(await join.locator('#game-deck-area .deck-controls-strip').count() === 0,
-    'the legacy deck strip is gone (Phase 56) - every deck action now lives on the anchor');
+    'the legacy deck strip is gone (Phase 56) - every deck action now lives on the deck itself');
   // D34: Draw is open to everyone, unlike deal/reshuffleDeal/shuffle/
-  // split, which stay host-only - so a guest gets the anchor too, just
-  // with fewer actions in it.
-  const guestDeckAnchor = join.locator('#game-deck-area .pile-anchor');
-  assert(await guestDeckAnchor.count() === 1,
-    'Draw is open to everyone (D34) - a guest must still see the deck pile anchor');
-  assert(await guestDeckAnchor.locator('[data-pile-action="draw"]').count() === 1,
-    'the guest deck anchor must offer Draw');
-  assert(await guestDeckAnchor.locator('[data-pile-action="deal"]').count() === 0,
+  // split, which stay host-only - so a guest gets the hover host too,
+  // just with fewer actions revealed.
+  assert(await join.locator('#game-deck-area.pile-hover-host').count() === 1,
+    'Draw is open to everyone (D34) - a guest must still see the deck pile-hover host');
+  await join.hover('#game-deck-area');
+  assert(await join.locator('#game-deck-area [data-pile-action="draw"]').count() === 1,
+    'the guest deck hover row must offer Draw');
+  assert(await join.locator('#game-deck-area [data-pile-action="deal"]').count() === 0,
     'dealing stays host-only - a guest must not get the Deal button');
   const hostHandIdsBeforeDealMore = await host.evaluate(() =>
     [...document.querySelectorAll('#hand-area .card')].map((c) => c.dataset.cardId),
   );
-  await host.hover('#game-deck-area .pile-anchor-toggle');
+  await host.hover('#game-deck-area');
   await host.fill('#deck-deal-count', '2');
   await host.click('#game-deck-area [data-pile-action="deal"]');
   await host.waitForFunction(
@@ -593,22 +604,22 @@ try {
   console.log('DEAL_MORE: hand grew without discarding existing cards, propagated to the other client');
 
   // --- Pass marker (US-25, D16): self-toggle only, visible to everyone.
-  // Sprint 12 (T53.2): now reached through the hand's own pile anchor
-  // (#hand-pile-anchor), not a permanently-visible button - the old
-  // #pass-toggle-btn is deleted now (Phase 58), so this exercises the
-  // hover-then-click path a real mouse user takes, same pattern the
-  // existing `cardAction` helper above already uses for D25's row. ---
-  const handAnchorToggle = join.locator('#hand-pile-anchor .pile-anchor-toggle');
-  await handAnchorToggle.hover();
-  await join.click('#hand-pile-anchor [data-pile-action="pass"]');
+  // Sprint 12 (T53.2), unified D51: reached by hovering the hand zone
+  // itself (#hand-zone, `.pile-hover-host`) - the old #pass-toggle-btn
+  // is deleted (Phase 58), and D51 removed the separate small anchor
+  // toggle too, so this exercises the hover-then-click path a real
+  // mouse user takes, same pattern the existing `cardAction` helper
+  // above already uses for D25's row. ---
+  await join.hover('#hand-zone');
+  await join.click('#hand-zone [data-pile-action="pass"]');
   await host.waitForFunction(
     () => [...document.querySelectorAll('#game-roster li')].some((li) => li.textContent.includes('Bob') && li.textContent.includes('Passed')),
     undefined,
     { timeout: 10000 },
   );
   console.log('TOGGLE_PASS: pass marker propagated to the other client');
-  await handAnchorToggle.hover();
-  await join.click('#hand-pile-anchor [data-pile-action="pass"]');
+  await join.hover('#hand-zone');
+  await join.click('#hand-zone [data-pile-action="pass"]');
   await host.waitForFunction(
     () => ![...document.querySelectorAll('#game-roster li')].some((li) => li.textContent.includes('Bob') && li.textContent.includes('Passed')),
     undefined,
@@ -650,10 +661,10 @@ try {
   // proof for Sprint 1's retro backlog item - a sorted (or dragged) order
   // must survive the NEXT state broadcast instead of being silently wiped
   // like the old drag-reorder-only behavior was. ---
-  await handAnchorToggle.hover();
-  await join.click('#hand-pile-anchor [data-pile-action="sortRank"]');
+  await join.hover('#hand-zone');
+  await join.click('#hand-zone [data-pile-action="sortRank"]');
   const joinSortedIds = await join.evaluate(() => [...document.querySelectorAll('#hand-area .card')].map((c) => c.dataset.cardId));
-  await join.hover('#game-deck-area .pile-anchor-toggle');
+  await join.hover('#game-deck-area');
   await join.click('#game-deck-area [data-pile-action="draw"]'); // triggers a fresh state broadcast
   await join.waitForFunction(
     (before) => document.querySelectorAll('#hand-area .card').length === before + 1,
@@ -765,7 +776,7 @@ try {
   // native HTML5 DnD doesn't fire from synthetic input headless), so this
   // exercises the actual drop-region geometry against actually-rendered
   // card rects, not a stubbed hit test.
-  await host.hover('#game-deck-area .pile-anchor-toggle');
+  await host.hover('#game-deck-area');
   await host.fill('#deck-deal-count', '3');
   await host.locator('#game-deck-area button[data-pile-action="deal"]').click();
   await host.waitForFunction(() => document.querySelectorAll('#hand-area .card').length >= 3, undefined, { timeout: 10000 });
@@ -898,6 +909,12 @@ try {
 
   // 2. Hold, then drag onto a zone: the card plays, and the host sees it.
   //    Same `performZoneDrop` the mouse path uses - that is the point.
+  // D51: the hand now repositions itself (`positionHandZone`) on every
+  // roster-affecting render, unlike the old static "Your hand" panel -
+  // a real behavior change worth a settle wait here so the coordinates
+  // measured below match where the card is BY THE TIME the touch event
+  // actually dispatches, not a stale position from mid-reflow.
+  await join.waitForTimeout(200);
   const touchCardId = await join.locator('#hand-area .card').first().getAttribute('data-card-id');
   const [cx, cy] = await centreOf(join.locator(`#hand-area [data-card-id="${touchCardId}"]`));
   const [zx, zy] = await centreOf(join.locator('#table-area .zone').first());
@@ -972,7 +989,7 @@ try {
   const deckCountOn = (page) => page.evaluate(() =>
     Number(document.querySelector('.deck-count-badge')?.textContent ?? -1));
   const beforeShuffle = await deckCountOn(host);
-  await host.hover('#game-deck-area .pile-anchor-toggle');
+  await host.hover('#game-deck-area');
   await host.click('#game-deck-area [data-pile-action="shuffle"]');
   await host.waitForTimeout(300);
   assert((await deckCountOn(host)) === beforeShuffle,
@@ -1025,7 +1042,7 @@ try {
   await host.setViewportSize({ width: 1280, height: 900 });
 
   const zonesBeforeSplit = await join.locator('#table-area .zone').count();
-  await host.hover('#game-deck-area .pile-anchor-toggle');
+  await host.hover('#game-deck-area');
   await host.fill('#deck-split-count', '3');
   await host.click('#game-deck-area [data-pile-action="split"]');
   await join.waitForFunction(
@@ -1269,7 +1286,7 @@ try {
   // other action in the app; a click on the anchor's Draw must be a
   // behavioral no-op.
   const joinHandBeforeEndedDraw = await join.evaluate(() => document.querySelectorAll('#hand-area .card').length);
-  await join.hover('#game-deck-area .pile-anchor-toggle');
+  await join.hover('#game-deck-area');
   await join.click('#game-deck-area [data-pile-action="draw"]');
   await join.waitForTimeout(300);
   assert(
@@ -1399,7 +1416,7 @@ try {
   // US-41: Reshuffle & deal is the "re-deal" that had no single control.
   let confirmMessage = null;
   autoHost.once('dialog', (d) => { confirmMessage = d.message(); d.accept(); });
-  await autoHost.hover('#game-deck-area .pile-anchor-toggle');
+  await autoHost.hover('#game-deck-area');
   await autoHost.fill('#deck-deal-count', '6');
   await autoHost.locator('#game-deck-area button[data-pile-action="reshuffleDeal"]').click();
   await autoHost.waitForFunction(() => document.querySelectorAll('#hand-area .card').length === 6, undefined, { timeout: 15000 });
@@ -1431,8 +1448,9 @@ try {
     }
   });
   await autoHost.waitForSelector('#game-deck-area .deck-empty', { timeout: 20000 });
-  assert(await autoHost.locator('#game-deck-area .pile-anchor').count() === 1,
+  assert(await autoHost.locator('#game-deck-area.pile-hover-host').count() === 1,
     'an empty deck must KEEP its controls - hiding them is the dead-end this story exists to fix');
+  await autoHost.hover('#game-deck-area');
   assert(await autoHost.locator('#game-deck-area button[data-pile-action="deal"]').isDisabled(),
     'Deal has nothing to deal from on an empty deck, so it must be disabled rather than throwing');
   assert(await autoHost.locator('#game-deck-area button[data-pile-action="reshuffleDeal"]').isEnabled(),

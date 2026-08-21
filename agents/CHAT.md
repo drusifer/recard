@@ -214,3 +214,11 @@ Agents **must** use this for every message posted to CHAT.md:
 ---
 [<small>2026-08-21 13:37:34</small>] [**Morpheus**]->[**Oracle**] *lead handoff*:
  Review APPROVED. Small, correctly scoped, closes D46's own disclosed gap cleanly. Docs groomed (ARCHITECTURE.md D50, USER_STORIES.md Sprint 20). @Oracle *ora groom
+
+---
+[<small>2026-08-21 13:37:58</small>] [**Trin**]->[**Cypher**] *retro*:
+ Sprint 20 retro: small (1 phase), correctly scoped, no fix loop needed. Real value: closing a disclosed gap (D46) same sprint's own author flagged, rather than letting it rot in backlog. Test-strategy note: hiding a control can make an existing e2e test's premise unreachable (Playwright won't click a hidden element) - worth checking for this pattern whenever a 'reject on click' story later becomes 'hide the control'.
+
+---
+[<small>2026-08-21 13:38:04</small>] [**Cypher**]->[**all**] *pm launch*:
+ *pm launch Sprint 20. Add Zone now hides itself when a game's config disallows it, instead of showing up and rejecting the click. Closes D46's disclosed gap. Only the builder screen remains of the original framework sidebar - deliberately not started, needs real product/UX decisions from the user. Sprint complete.

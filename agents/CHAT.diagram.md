@@ -108,4 +108,8 @@ sequenceDiagram
     Note right of Trin: "UAT US-54 PASSED.<br/>Independently re-ran npm<br/>test (260/260) after<br/>Morpheus's report.<br/>Confirmed the mutation<br/>claim myself: hardcoding<br/>view's f…"
     Morpheus->>Oracle: "lead handoff"
     Note right of Morpheus: "Review APPROVED. Small,<br/>correctly scoped, closes<br/>D46's own disclosed gap<br/>cleanly. Docs groomed<br/>(ARCHITECTURE.md D50,<br/>USER_STORIES.md Sprint…"
+    Trin->>Cypher: "retro"
+    Note right of Trin: "Sprint 20 retro: small<br/>(1 phase), correctly<br/>scoped, no fix loop<br/>needed. Real value:<br/>closing a disclosed gap<br/>(D46) same sprint's own<br/>author…"
+    Cypher->>All: "pm launch"
+    Note right of Cypher: "*pm launch Sprint 20.<br/>Add Zone now hides<br/>itself when a game's<br/>config disallows it,<br/>instead of showing up<br/>and rejecting the click.<br/>Closes D4…"
 ```

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PILE_ACTIONS, pileLevelActions, actionsForCard, ACTIONS, targetsForAction } from '../src/pileActions.js';
+import { ACTION_SPECS, pileLevelActions, actionsForCard, targetsForAction } from '../src/pileActions.js';
 
 const deck = { id: 'deck', kind: 'deck', ownerId: null };
 
@@ -48,7 +48,7 @@ test('the per-card action table has nothing for the deck (D29/D34)', () => {
 
 test('every pile-level action declares a label and whether it destroys the round', () => {
   for (const id of ['deal', 'reshuffleDeal']) {
-    const spec = PILE_ACTIONS[id];
+    const spec = ACTION_SPECS[id];
     assert.ok(spec, `${id} must be declared`);
     assert.ok(spec.label?.length > 0, `${id} needs a label`);
     assert.equal(typeof spec.destructive, 'boolean', `${id} must say whether it is destructive`);
@@ -59,8 +59,8 @@ test('reshuffleDeal is marked destructive and deal is not', () => {
   // This flag is what drives the confirm and the danger styling (Smith
   // Gate 2 #1). Getting it backwards would put a confirm on the harmless
   // action and none on the one that wipes every hand.
-  assert.equal(PILE_ACTIONS.reshuffleDeal.destructive, true);
-  assert.equal(PILE_ACTIONS.deal.destructive, false);
+  assert.equal(ACTION_SPECS.reshuffleDeal.destructive, true);
+  assert.equal(ACTION_SPECS.deal.destructive, false);
 });
 
 // --- Sprint 12 (US-46, D34/D36) ---------------------------------------
@@ -95,17 +95,17 @@ test('D36: draw is a STATIC single-target action, not computed from live pile co
   // Smith Gate 2 #1: this must be a fact about the action's definition,
   // never something derived from how many piles currently exist - that
   // is exactly what would make `move` flip behaviour mid-game.
-  assert.equal(PILE_ACTIONS.draw.singleTarget, true);
-  assert.equal(PILE_ACTIONS.draw.target, 'hand');
-  assert.equal(PILE_ACTIONS.draw.from, 'deck');
+  assert.equal(ACTION_SPECS.draw.singleTarget, true);
+  assert.equal(ACTION_SPECS.draw.target, 'hand');
+  assert.equal(ACTION_SPECS.draw.from, 'deck');
 });
 
 test('D36 BLOCKER: move and pickup never carry singleTarget, under any circumstance', () => {
   // The regression Smith's Gate 2 correction exists to prevent: these two
   // must stay drag-first even when - especially when - a live count
   // would say "only one target right now".
-  assert.equal(ACTIONS.move.singleTarget, undefined);
-  assert.equal(ACTIONS.pickup.singleTarget, undefined);
+  assert.equal(ACTION_SPECS.move.singleTarget, undefined);
+  assert.equal(ACTION_SPECS.pickup.singleTarget, undefined);
 });
 
 test('D34: draw is no longer offered as a per-card action from the deck (moved to pile-level)', () => {
@@ -134,7 +134,7 @@ test('Phase 56: shuffle/split stay host-only, exactly like deal/reshuffleDeal', 
 
 test('Phase 56: shuffle and split are declared with a label and hint, and neither is destructive', () => {
   for (const id of ['shuffle', 'split']) {
-    const spec = PILE_ACTIONS[id];
+    const spec = ACTION_SPECS[id];
     assert.ok(spec, `${id} must be declared`);
     assert.ok(spec.label?.length > 0, `${id} needs a label`);
     assert.ok(spec.hint?.length > 0, `${id} needs a hint`);
@@ -144,8 +144,8 @@ test('Phase 56: shuffle and split are declared with a label and hint, and neithe
 
 test('Phase 56: shuffle/split are never draggable - they act on the deck itself, in place', () => {
   for (const id of ['shuffle', 'split']) {
-    assert.equal(PILE_ACTIONS[id].target, undefined);
-    assert.equal(PILE_ACTIONS[id].singleTarget, undefined);
+    assert.equal(ACTION_SPECS[id].target, undefined);
+    assert.equal(ACTION_SPECS[id].singleTarget, undefined);
   }
 });
 
@@ -177,6 +177,6 @@ test('Phase 57: move stays unmarked even in that exact one-target shape - no sho
   // has none. Nothing in this file (or `actionMenuEl`, ui.js - it never
   // reads `singleTarget` for card-level actions at all) can make move
   // skip `beginTargeting`, no matter how few zones exist right now.
-  assert.equal(ACTIONS.move.singleTarget, undefined);
-  assert.equal(ACTIONS.pickup.singleTarget, undefined);
+  assert.equal(ACTION_SPECS.move.singleTarget, undefined);
+  assert.equal(ACTION_SPECS.pickup.singleTarget, undefined);
 });

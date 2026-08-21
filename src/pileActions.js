@@ -28,10 +28,28 @@ import { PILE_TYPES } from './piles/pileTypes.js';
  */
 
 /**
- * Every action a card can carry, and what kind of destination it needs.
- * `target: null` means it happens in place, with no destination to pick.
+ * D51 (Actionable interface): the user's explicit direction is ONE
+ * interface, fully pruned - no `ACTIONS`/`PILE_ACTIONS` split kept
+ * around for compatibility. What used to be two tables (a card's
+ * actions, a pile's actions) were always the same shape
+ * (`{label, hint?, target, from?, destructive?, singleTarget?}`) -
+ * "what can this ACTOR (card or pile) do, and where can it go" is one
+ * question, not two, once you don't care which kind of actor is asking.
+ * `ACTION_SPECS` below is that one table. What's still genuinely
+ * separate, correctly so - this does NOT try to unify it - is
+ * *offering* (`actionsForCard` vs. `pileLevelActions`: a card's
+ * authorization and a pile's are real, different computations, not the
+ * same rule wearing two names) and *rendering* (`ui.js`'s card hover-row
+ * can open a "choose a destination" mode for a clicked `target`-bearing
+ * action; `renderActionRow`, the shared piece both now go through,
+ * handles the drag/tap-shortcut/label/hint/danger-styling identically
+ * either way - see its own doc comment). One spec, two offer-rules, one
+ * renderer.
  */
-export const ACTIONS = {
+export const ACTION_SPECS = {
+  // Card-level: act on the card under the cursor, offered in its hover
+  // row. `target: null` means it happens in place, with no destination
+  // to pick.
   play: { label: 'Play', target: 'zone', from: 'hand' },
   pickup: { label: 'Pick up', target: 'hand', from: 'zone' },
   move: { label: 'Move', target: 'zone', from: 'zone' },
@@ -41,6 +59,58 @@ export const ACTIONS = {
   // conversion (Sprint 12/Phase 55) was its own dedicated Smith-gated
   // story, not a default every in-place action inherits.
   rotate: { label: 'Rotate', target: null, from: 'zone' },
+
+  // Pile-level (D29): act on the whole pile, not the hovered card -
+  // dealing does not act on the hovered card at all, it acts on the
+  // whole deck. `destructive` drives the confirm and the danger
+  // styling; reshuffle & deal ends the round for everyone, and the
+  // players whose hands it clears never see the control that did it.
+  deal: {
+    label: 'Deal',
+    destructive: false,
+    hint: 'Deal from the deck as it stands, without disturbing anyone\'s existing cards.',
+  },
+  reshuffleDeal: {
+    label: 'Reshuffle & deal',
+    destructive: true,
+    hint: 'Gather every card back, reshuffle, and deal a fresh hand to each player.',
+  },
+  // D34/D35: Draw generalized from a per-card action (dead - deck's
+  // `cardActions` always returns []) to a pile-level one, matching how
+  // the user actually described it: hover the DECK, not a specific
+  // hidden card. `target`/`from` mirror the card-level shape so
+  // `targetsForAction` can drive drop-target highlighting for a dragged
+  // Draw the same way it already does for a dragged card.
+  //
+  // `singleTarget: true` (D36, Smith Gate 2 #1) is a STATIC fact about
+  // this action's definition - the deck has exactly one legal
+  // destination (the viewer's own hand) by the rules of the game
+  // itself, never something computed from how many piles currently
+  // exist. This is what makes Draw safe to also offer as a plain tap
+  // shortcut (Smith Gate 1 #4: the project's own highest-frequency
+  // action must not become drag-only) without opening the door to
+  // `move`/`pickup` silently doing the same the moment a game happens
+  // to have few zones.
+  draw: {
+    label: 'Draw',
+    destructive: false,
+    hint: 'Draw the top card into your hand.',
+    target: 'hand',
+    from: 'deck',
+    singleTarget: true,
+  },
+  // Hand pile-level actions (D34). No `target`/`singleTarget` - these
+  // happen in place, so they are never draggable, matching how `reveal`
+  // (target: null) already works above.
+  sortRank: { label: 'Sort by rank', destructive: false, hint: 'Sort your hand by rank.' },
+  sortSuit: { label: 'Sort by suit', destructive: false, hint: 'Sort your hand by suit.' },
+  pass: { label: 'Pass', destructive: false, hint: 'Toggle your own passed marker.' },
+  // Phase 56 (Sprint 12, T56.1): shuffle/split move onto the deck's own
+  // pile anchor alongside deal/reshuffleDeal/draw, joining a table they
+  // were never part of before (US-35/36 shipped as a standalone button
+  // row, not through `pileLevelActions` at all).
+  shuffle: { label: 'Shuffle', destructive: false, hint: 'Shuffle the deck stock in place.' },
+  split: { label: 'Split into piles', destructive: false, hint: 'Split the deck into face-down draw piles.' },
 };
 
 /**
@@ -68,14 +138,13 @@ export function actionsForCard(pile, card, viewerId) {
  * @returns {string[]} pile ids
  */
 export function targetsForAction(action, piles, { viewerId, fromPileId } = {}) {
-  // D34/D35: `draw` moved to PILE_ACTIONS, but drop-target highlighting
-  // for a dragged Draw needs the same lookup card-level actions already
-  // get - checking only ACTIONS would silently light up nothing for it.
-  // ACTIONS is checked first: no id currently exists in both tables, but
-  // if one ever did, a per-card action should win over a pile-level one
-  // sharing its name, since this function's other parameter shapes
-  // (fromPileId, move's self-exclusion) assume a card-level caller.
-  const spec = ACTIONS[action] ?? PILE_ACTIONS[action];
+  // D34/D35/D51: `draw` is a pile-level action, but drop-target
+  // highlighting for a dragged Draw needs the same lookup card-level
+  // actions already get - one merged spec table (`ACTION_SPECS`) means
+  // this never has to remember to check two tables (the D34/D35-era
+  // risk this comment used to warn about no longer exists - there's
+  // only one table to look in).
+  const spec = ACTION_SPECS[action];
   if (!spec || spec.target === null || spec.target === undefined) return [];
 
   return piles
@@ -94,71 +163,6 @@ export function targetsForAction(action, piles, { viewerId, fromPileId } = {}) {
     })
     .map((pile) => pile.id);
 }
-
-/**
- * Pile-LEVEL actions (D29) — deliberately a separate table from
- * `ACTIONS` above, because they answer a different question.
- *
- * `ACTIONS`/`actionsForCard` answer *"what can this CARD do"*: they act
- * on the card under the cursor and are offered on that card, in the
- * hover row. Dealing does not act on the hovered card at all — it acts on
- * the whole pile. Folding it into the card table would offer an
- * irreversible action on every back in the deck stack, reachable by
- * passing a cursor over a card, one row from the harmless Draw (Smith
- * Gate 1). Two questions, two tables, two rendering mechanisms.
- *
- * `destructive` is not decoration: it drives the confirm and the danger
- * styling. Reshuffle & deal ends the round for everyone, and the players
- * whose hands it clears never see the control that did it.
- */
-export const PILE_ACTIONS = {
-  deal: {
-    label: 'Deal',
-    destructive: false,
-    hint: 'Deal from the deck as it stands, without disturbing anyone\'s existing cards.',
-  },
-  reshuffleDeal: {
-    label: 'Reshuffle & deal',
-    destructive: true,
-    hint: 'Gather every card back, reshuffle, and deal a fresh hand to each player.',
-  },
-  // D34/D35: Draw generalized from a per-card action (dead - deck's
-  // `cardActions` always returns []) to a pile-level one, matching how the user
-  // actually described it: hover the DECK, not a specific hidden card.
-  // `target`/`from` mirror ACTIONS' shape so `targetsForAction` can
-  // drive drop-target highlighting for a dragged Draw the same way it
-  // already does for a dragged card.
-  //
-  // `singleTarget: true` (D36, Smith Gate 2 #1) is a STATIC fact about
-  // this action's definition - the deck has exactly one legal
-  // destination (the viewer's own hand) by the rules of the game
-  // itself, never something computed from how many piles currently
-  // exist. This is what makes Draw safe to also offer as a plain tap
-  // shortcut (Smith Gate 1 #4: the project's own highest-frequency
-  // action must not become drag-only) without opening the door to
-  // `move`/`pickup` silently doing the same the moment a game happens
-  // to have few zones.
-  draw: {
-    label: 'Draw',
-    destructive: false,
-    hint: 'Draw the top card into your hand.',
-    target: 'hand',
-    from: 'deck',
-    singleTarget: true,
-  },
-  // Hand pile-level actions (D34). No `target`/`singleTarget` - these
-  // happen in place, so they are never draggable, matching how `reveal`
-  // (target: null) already works in the card-level table.
-  sortRank: { label: 'Sort by rank', destructive: false, hint: 'Sort your hand by rank.' },
-  sortSuit: { label: 'Sort by suit', destructive: false, hint: 'Sort your hand by suit.' },
-  pass: { label: 'Pass', destructive: false, hint: 'Toggle your own passed marker.' },
-  // Phase 56 (Sprint 12, T56.1): shuffle/split move onto the deck's own
-  // pile anchor alongside deal/reshuffleDeal/draw, joining a table they
-  // were never part of before (US-35/36 shipped as a standalone button
-  // row, not through `pileLevelActions` at all).
-  shuffle: { label: 'Shuffle', destructive: false, hint: 'Shuffle the deck stock in place.' },
-  split: { label: 'Split into piles', destructive: false, hint: 'Split the deck into face-down draw piles.' },
-};
 
 /**
  * The pile-level actions `kind` offers this viewer - owned by the

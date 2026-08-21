@@ -18,6 +18,7 @@ import {
   removeCardDragGhost,
   renderPileAnchor,
   pileActionFromDrop,
+  positionHandZone,
 } from './ui.js';
 import { pileLevelActions } from './pileActions.js';
 import { PRESETS } from './presets.js';
@@ -39,7 +40,8 @@ const screens = {
 const bannerEl = document.getElementById('banner');
 
 const handAreaEl = document.getElementById('hand-area');
-const handAnchorEl = document.getElementById('hand-pile-anchor');
+const handZoneEl = document.getElementById('hand-zone');
+const handZoneNameEl = document.getElementById('hand-zone-name');
 const tableAreaEl = document.getElementById('table-area');
 const gameRosterEl = document.getElementById('game-roster');
 const resetBtn = document.getElementById('reset-btn');
@@ -869,11 +871,20 @@ function renderRosterOnly() {
     // semantics is worse than the one badly-placed control we started with.
     renderDeck(document.getElementById('host-deck-area'), view.deckCount);
   }
-  renderRoster(gameRosterEl, seatedOrder(players, myId), { ...opts, seated: true });
+  const seated = seatedOrder(players, myId);
+  renderRoster(gameRosterEl, seated, { ...opts, seated: true });
   // Scales the table surface's size with player count (style.css) so
   // seats have room to spread out - confirmed necessary at 8 players,
   // not just a theoretical density concern (Phase 26 T26.3 finding).
   document.getElementById('table-surface').style.setProperty('--seat-count', players.length);
+  // D51: the hand zone sits at the VIEWER's own seat - always index 0
+  // in `seatedOrder`'s per-viewer rotation (D18: "the viewer always
+  // lands at the bottom"). Repositioned here (not only on full game
+  // re-renders) since this runs on every roster change too, and player
+  // count changing the ring's radius/spacing is exactly when the hand's
+  // own seat position needs to move with it.
+  positionHandZone(handZoneEl, 0, seated.length);
+  handZoneNameEl.textContent = `Hand (${view.myHand.length})`;
   // US-41/D29: dealing lives on the deck, where the cards are - the whole
   // point of the story. Host-only; `pileLevelActions` enforces that.
   renderDeck(document.getElementById('game-deck-area'), view.deckCount, {
@@ -885,9 +896,11 @@ function renderRosterOnly() {
     onPileAction: (action, count) => dealFromDeck(action, count),
   });
   // Sprint 12 (D34/D37, T53.2/T58.1): the hand's own pile anchor - Sort
-  // by rank/suit and Pass, one control instead of three.
-  renderPileAnchor(handAnchorEl, pileLevelActions('hand', { isOwner: true }), {
-    pileLabel: 'Hand',
+  // by rank/suit and Pass, one control instead of three. D51: hosted on
+  // `handZoneEl` itself (the hand zone's own container) rather than a
+  // separate small anchor slot - hovering the hand zone reveals it, the
+  // same mechanism a card's hover row already used.
+  renderPileAnchor(handZoneEl, pileLevelActions('hand', { isOwner: true }), {
     labels: { pass: view.passed?.[myId] ? 'Unpass' : 'Pass' },
     onPileAction: (id) => {
       if (id === 'sortRank') sortHandByRank();
@@ -911,6 +924,7 @@ function renderGameFromView(view) {
     // hand never needed this. A touch drag is captured by the source
     // element, so the hand card is the one that has to dispatch it.
     onDropCard: (cardId, toZoneId, placement) => dropCardOnZone(cardId, toZoneId, placement),
+    zones: view.zones,
   });
   const zoneOpts = {
     viewerId: myId,
@@ -1073,6 +1087,23 @@ handAreaEl.addEventListener('dragover', (e) => e.preventDefault());
 handAreaEl.addEventListener('drop', (e) => {
   e.preventDefault();
   if (pileActionFromDrop(e.dataTransfer) === 'draw') performDraw();
+});
+
+// D51: the hand is now a real drop target for a dragged TABLE card too
+// (`pickup`'s `target: 'hand'`, `ACTION_SPECS` - always existed as a
+// click-menu action, never as something you could drag a card onto
+// until the hand became a zone with its own container to drop on).
+// Bound on `handZoneEl` (the whole bordered zone, not just the inner
+// `#hand-area` card row) so dropping anywhere in the zone works, the
+// same as any other zone's drop area. `handAreaEl`'s own listener above
+// still owns the Draw pile-action-token case unchanged.
+handZoneEl.addEventListener('dragover', (e) => e.preventDefault());
+handZoneEl.addEventListener('drop', (e) => {
+  e.preventDefault();
+  const cardId = e.dataTransfer.getData('text/plain');
+  if (!cardId || pileActionFromDrop(e.dataTransfer)) return; // a pile-action token, or nothing real
+  const view = currentView();
+  if (view && !view.myHand.some((c) => c.id === cardId)) pickupCard(cardId);
 });
 
 // --- Hand sort (US-23, D14): local-only, never broadcast. Writes into

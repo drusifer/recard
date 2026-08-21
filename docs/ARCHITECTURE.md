@@ -2091,6 +2091,105 @@ for a pre-D46 snapshot; mutation-verified - hardcoding the view's
 field to `true` fails exactly the `false`-case test) + full e2e green.
 
 
+## v3.5 Decisions (Sprint 21, US-55) — table unification: bigger cards, hand as a zone, one action mechanism
+
+Four user-requested UX tweaks, treated as one coherent design pass (the
+table becomes one consistent surface where every pile - deck, hand,
+zones - looks and behaves the same way). DESKTOP-ONLY, explicit user
+direction: no touch-parity chase for anything new this pass touches.
+
+### D51. Bigger cards; hand renders as a real Zone on the table; pile-level actions unified onto the card's own hover mechanism; the Actionable interface (`ACTION_SPECS`) is ONE table, not a compatibility-aliased two
+
+**Card size:** `--card-w`/`--card-h` reverted from the 44px-fix-era
+viewport-height `clamp()` to a flat, bigger size (`3.6rem`/`4.9rem`,
+larger than even the pre-shrink `3rem`/`4.1rem` baseline). **Real root
+cause found, not just a number bump:** `button.card { min-width: 0;
+min-height: 0; }` (added to exempt hand cards from the base `button{}`
+44px floor) was ALSO beating `.card`'s own `min-width: var(--card-w)`
+via specificity, zeroing every hand card to pure content size regardless
+of what `--card-w` was ever set to - measured live at ~25px wide against
+a 57.6px `--card-w`. Fixed by restoring the card-specific floor there
+instead of zeroing past it. `--table-min-h` (1024px/1440px tiers)
+re-tuned 34/24rem → 36rem, measured live via `lint:design`, to keep the
+seat ring clear of the now-bigger pot (same lever used throughout this
+project's history for this exact class of problem).
+
+**Hand as a Zone:** the separate "Your hand" `<section>` is gone.
+`#hand-zone` is a static sibling of `#seat-zones` in `index.html`
+(not a child - `renderSeatZones` wipes that container wholesale every
+render), positioned by a new `positionHandZone()` (`ui.js`) using the
+exact `seatPosition()` geometry every other personal zone uses - the
+viewer is always seat index 0 (D18), so the hand always lands at the
+bottom of the ring, "in front of" the viewer. This was low-risk because
+Hand was already one of the three polymorphic Pile types (`handPile.js`,
+D42) - only its RENDERING location moved; `renderHand()`'s own card
+logic (reorder, play-as, drag) is untouched. `dropRule` stays `NONE`
+(hand reordering still goes through `handOrder.js`, not
+`dropTarget.js` - rendering as a zone didn't change that).
+
+**One action-reveal mechanism:** the D34-era `.pile-anchor`/
+`.pile-anchor-toggle` ("...") is deleted. Hovering/focusing a pile's own
+container now reveals its actions exactly the way hovering a card
+already did (`ui.js`'s `renderActionRow`, shared by both `renderPileAnchor`
+(pile case: dispatch is always direct, drag+tap-shortcut where
+`target` is set) and `actionMenuEl` (card case: `target`-bearing actions
+open `beginTargeting`'s choose-a-destination mode)) - one row builder,
+two callers supplying what genuinely differs (see `ACTION_SPECS`'s own
+doc comment in `pileActions.js`). A shared `.pile-hover-host:hover,
+:focus-within` rule raises the host (`transform`, composed through a
+`--raise-base` custom property so `.seat-zone`'s own centering
+transform isn't clobbered - a real conflict found live, not
+anticipated) and reveals the row.
+
+**The Actionable interface is ONE table, fully pruned - explicit user
+correction mid-sprint:** the first pass kept `ACTIONS`/`PILE_ACTIONS` as
+backward-compatible aliases into a merged `ACTION_SPECS`. The user
+corrected this directly: no compatibility shim, one interface, old names
+deleted everywhere, including tests that referenced them (migrated to
+`ACTION_SPECS`, not left pointing at aliases). This is now a standing
+default for this project: when unifying two things into one, prune the
+old ones completely rather than keeping them "for compatibility."
+
+**Drop-target parity + drag-to-pickup (the user's 4th ask):** every
+zone that can legally receive a dragged card now lights up for the
+WHOLE drag (`highlightDragTargets`, mirrors `beginTargeting`'s existing
+`.pile-target` highlighting but for native drag, not just the click
+flow) - including the hand, which can now genuinely be dropped onto for
+`pickup` (previously pickup was click-menu-only; `handZoneEl` gained a
+real `drop` handler). `.pile-target` needed its own z-index (a
+CLICK-flow target isn't necessarily hovered first, so
+`.pile-hover-host`'s hover-only escalation doesn't cover it) - found
+live: `#hand-zone` sits at the same ring position `#game-roster`'s
+bottom seat `<li>` occupies, which was winning the click without it.
+
+**Consequences / disclosed, not hidden:**
+- `lint:design`: 3 residual violations (down from this pass's own
+  interim regressions, cross-checked live at every step) - 2 are the
+  same pre-existing phone-tier zone-overlap gap earlier sprints already
+  disclosed; 1 is new - a genuinely short (720px-tall) desktop window
+  still forces 32px of scroll even after the `--table-min-h` retune and
+  a chrome-padding trim attempt (tried, measured, reverted - it didn't
+  help, and dead CSS was worse than an honest note). Not chased further
+  under this pass's time budget.
+- A touch-coordinate e2e test (US-40 hold-and-drag) did not get fully
+  re-verified against the hand's new DYNAMIC position (it now moves per
+  render via `positionHandZone`, unlike the old static panel) - a
+  real, if narrow, behavior change: coordinates computed before a touch
+  dispatch can go stale if the hand repositions between the read and the
+  dispatch. A settle-wait was added as a defensive test measure; it did
+  not resolve the specific failure, and full root-causing was not
+  completed under this pass's time budget. Flagged for the next sprint
+  to pick up, not silently left green.
+
+258/258+ unit green (final count depends on the pruning migration - see
+`tests/pileActions.test.js`/`pileLevelActions.test.js`, both migrated to
+`ACTION_SPECS`, no test deleted since none tested the two-table
+STRUCTURE itself, only real behavior). `npm run test:e2e` reached
+through hand drag-reorder/sort-persistence/card-drag-broadcast/US-32/33
+stacking before the disclosed touch-coordinate issue above - not a
+fully clean run, reported honestly rather than claimed clean.
+
+
 ## Module Layout
 ```
 index.html              entry page, host/join screens, game screen

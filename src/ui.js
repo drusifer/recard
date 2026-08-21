@@ -1,6 +1,6 @@
 import { resolveDropTarget } from './dropTarget.js';
 import { step as touchDragStep, HOLD_MS } from './touchDrag.js';
-import { ACTIONS, PILE_ACTIONS, actionsForCard, pileLevelActions, targetsForAction, dropRuleFor } from './pileActions.js';
+import { ACTION_SPECS, actionsForCard, pileLevelActions, targetsForAction, dropRuleFor } from './pileActions.js';
 import { seatPosition } from './seating.js';
 
 const SUIT_SYMBOL = { clubs: '♣', diamonds: '♦', hearts: '♥', spades: '♠' };
@@ -288,7 +288,7 @@ function performHandReorder(container, draggedId, beforeEl, onReorder) {
  * buttons write to (D14) - sorting and dragging share one source of
  * truth instead of fighting each other (Smith Gate 1).
  */
-export function renderHand(container, cards, { onPlay, onHandMotion, onReorder, onCardDrag, onDropCard } = {}) {
+export function renderHand(container, cards, { onPlay, onHandMotion, onReorder, onCardDrag, onDropCard, zones } = {}) {
   container.innerHTML = '';
   cards.forEach((card, i) => {
     const wrapper = document.createElement('div');
@@ -305,6 +305,11 @@ export function renderHand(container, cards, { onPlay, onHandMotion, onReorder, 
     wrapper.addEventListener('dragstart', (e) => {
       e.dataTransfer.setData('text/plain', card.id);
       onHandMotion?.(true);
+      // D51: every table-side zone lights up as a legal `play` target
+      // for the whole drag - same "compatible drop targets must appear
+      // droppable while holding a card" mechanism the zone-card dragstart
+      // above uses, applied to the hand's own side of it.
+      if (zones) highlightDragTargets(['play'], zones.map((z) => ({ id: z.id, kind: z.kind, ownerId: z.ownerId ?? null })), {});
     });
     // US-29/D19: live position while actually dragging (not just the
     // start/end boolean onHandMotion already sends) - card is a plain
@@ -314,6 +319,7 @@ export function renderHand(container, cards, { onPlay, onHandMotion, onReorder, 
     wrapper.addEventListener('dragend', () => {
       onHandMotion?.(false);
       onCardDrag?.(null, 0, 0); // signals "stopped" - see main.js's onCardDrag
+      clearPileTargets();
     });
     wrapper.addEventListener('dragover', (e) => e.preventDefault());
     wrapper.addEventListener('drop', (e) => {
@@ -389,10 +395,32 @@ export function clearPileTargets() {
   }
 }
 
-/** The element standing in for a pile id, for highlighting/clicking. */
+/** The element standing in for a pile id, for highlighting/clicking.
+ * D51: the hand highlights as its own zone-styled container
+ * (`#hand-zone`, not the inner `#hand-area` card row) now that it has
+ * one, the same visual `.pile-target` every other zone gets. */
 function pileElement(pileId) {
-  if (pileId === HAND_PILE_ID) return document.getElementById('hand-area');
+  if (pileId === HAND_PILE_ID) return document.getElementById('hand-zone');
   return document.querySelector(`.zone[data-zone-id="${CSS.escape(pileId)}"]`);
+}
+
+/**
+ * D51: highlights every pile a card COULD go to for the duration of a
+ * native drag, mirroring `beginTargeting`'s click-flow highlighting
+ * (same `.pile-target` class, same `pileElement` lookup) but for the
+ * drag gesture itself rather than a click-then-choose menu - "every
+ * compatible drop target must appear droppable while holding a card"
+ * (the user's own wording). `actionIds` is usually more than one: a
+ * zone card being dragged is a legal `move` AND, if it's pickup-
+ * eligible, a legal `pickup` too - both light up together, since a
+ * native drag doesn't commit to which action until the drop.
+ */
+function highlightDragTargets(actionIds, piles, ctx) {
+  const ids = new Set();
+  for (const action of actionIds) {
+    for (const id of targetsForAction(action, piles, ctx)) ids.add(id);
+  }
+  for (const id of ids) pileElement(id)?.classList.add('pile-target');
 }
 
 const HAND_PILE_ID = '__hand__';
@@ -412,7 +440,7 @@ function beginTargeting(action, targetIds, onChoose) {
     const el = e.currentTarget;
     e.preventDefault();
     e.stopPropagation();
-    const id = el.id === 'hand-area' ? HAND_PILE_ID : el.dataset.zoneId;
+    const id = el.id === 'hand-zone' ? HAND_PILE_ID : el.dataset.zoneId;
     clearPileTargets();
     onChoose(id);
   };
@@ -451,41 +479,38 @@ function performReveal(card, viewerId, onReveal) {
 }
 
 /**
- * The hover-revealed action row for one card in a zone. `reveal` is
- * deliberately excluded (Phase 55 moved it to a direct tap on the card -
- * see `performReveal` and its call site in `renderZoneCards`).
+ * The hover-revealed action row for one card in a zone - `renderActionRow`
+ * (D51) wired for the card case: a `target`-bearing action opens a
+ * "choose a destination" mode (`beginTargeting`) since a card may have
+ * several legal destinations (`move` among zones); an in-place action
+ * (`target: null` - today just `rotate`) dispatches directly. `reveal`
+ * is deliberately excluded (Phase 55 moved it to a direct tap on the
+ * card - see `performReveal` and its call site in `renderZoneCards`).
+ *
+ * @param {HTMLElement} wrapper the card's own `.middle-card` element -
+ *   the host `renderActionRow` raises on hover and appends the row to.
  */
-function actionMenuEl(zone, card, allZones, opts) {
+function actionMenuEl(wrapper, zone, card, allZones, opts) {
   const { viewerId, onPickup, onMoveCard, onRotate } = opts;
   // D45: both were hardcoded `kind: 'zone'` - real bugs the moment a
   // second table-side type exists, same class as `renderZoneCards`'s.
   const pile = { id: zone.id, kind: zone.kind, ownerId: zone.ownerId ?? null };
   const available = actionsForCard(pile, card, viewerId).filter((a) => a !== 'reveal');
-  if (available.length === 0) return null;
+  if (available.length === 0) return;
 
   const piles = [
     ...allZones.map((z) => ({ id: z.id, kind: z.kind, ownerId: z.ownerId ?? null })),
     { id: HAND_PILE_ID, kind: 'hand', ownerId: viewerId },
   ];
 
-  const row = document.createElement('div');
-  row.className = 'middle-card-actions';
-
-  for (const action of available) {
-    const spec = ACTIONS[action];
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'action-btn';
-    btn.dataset.action = action;
-    btn.textContent = spec.label;
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      // D48: an in-place action (`target: null` - today just `rotate`;
-      // `reveal` never reaches this row at all, see the doc comment
-      // above) has no destination to pick, so it dispatches directly
-      // rather than going through `targetsForAction`/`beginTargeting` -
-      // those return `[]` for a null-target action, which is a no-op
-      // click, not a bug in either of them.
+  renderActionRow(wrapper, available, {
+    rowClass: 'middle-card-actions',
+    buttonClass: 'action-btn',
+    onAction: (action, spec) => {
+      // D48: an in-place action has no destination to pick, so it
+      // dispatches directly rather than going through
+      // `targetsForAction`/`beginTargeting` - those return `[]` for a
+      // null-target action, which is a no-op click, not a bug in either.
       if (spec.target === null) {
         if (action === 'rotate') onRotate?.(card.id);
         return;
@@ -495,10 +520,8 @@ function actionMenuEl(zone, card, allZones, opts) {
         if (action === 'pickup') onPickup?.(card.id);
         else if (action === 'move') onMoveCard?.(card.id, targetId);
       });
-    });
-    row.appendChild(btn);
-  }
-  return row;
+    },
+  });
 }
 
 function renderZoneCards(container, zone, allZones, opts = {}) {
@@ -554,11 +577,27 @@ function renderZoneCards(container, zone, allZones, opts = {}) {
     // server-side. Reading the real offer table instead is what D34/D42
     // already promised: "the hover affordances... can't drift apart"
     // from the reducer's own authorization.
-    if (onMoveCard && actionsForCard(pile, card, opts.viewerId).length > 0) {
+    const cardActions = actionsForCard(pile, card, opts.viewerId);
+    if (onMoveCard && cardActions.length > 0) {
       wrapper.draggable = true;
+      const piles = [
+        ...allZones.map((z) => ({ id: z.id, kind: z.kind, ownerId: z.ownerId ?? null })),
+        { id: HAND_PILE_ID, kind: 'hand', ownerId: opts.viewerId },
+      ];
       wrapper.addEventListener('dragstart', (e) => {
         e.dataTransfer.setData('text/plain', card.id);
+        // D51: every zone (and the hand, if this card is pickup-eligible)
+        // that could legally receive this SPECIFIC card lights up for the
+        // whole drag - not just whichever one the pointer happens to be
+        // over mid-drag (`showZoneDragOver`'s existing per-hover cue,
+        // unchanged, still layers on top of this once you're over one).
+        highlightDragTargets(
+          cardActions.filter((a) => a === 'move' || a === 'pickup'),
+          piles,
+          { viewerId: opts.viewerId, fromPileId: zone.id },
+        );
       });
+      wrapper.addEventListener('dragend', clearPileTargets);
       // US-29/D19: live position while dragging. A redacted placeholder
       // (`card.faceDown: true`) has no `faceUp` field either, so
       // `cardDragPayload` correctly treats it the same as hidden - even
@@ -613,8 +652,7 @@ function renderZoneCards(container, zone, allZones, opts = {}) {
       }
     }
 
-    const actions = actionMenuEl(zone, card, allZones, opts);
-    if (actions) wrapper.appendChild(actions);
+    actionMenuEl(wrapper, zone, card, allZones, opts);
 
     container.appendChild(wrapper);
   }
@@ -794,6 +832,29 @@ export function renderSeatZones(container, personalZones, allZones, seatedPlayer
 }
 
 /**
+ * D51 (table-unification pass): positions the hand zone at the VIEWER's
+ * own seat - same `seatPosition()` geometry `renderSeatZones` uses for
+ * every other personal zone, at the same radius, so the hand visually
+ * belongs to the same ring. The viewer is always seat index 0 (D18's
+ * per-viewer rotation - "the viewer always lands at the bottom"), so
+ * this is always `seatPosition(0, seatCount, 26)`, but takes an explicit
+ * `seatIndex` rather than hardcoding 0 so a future caller isn't forced
+ * to agree with that assumption silently.
+ *
+ * A plain positioning helper, not a `render*` function: `#hand-zone`
+ * lives as a *static* sibling of `#seat-zones` in `index.html` (that
+ * container is wiped wholesale every render by `renderSeatZones` - a
+ * child would be destroyed each call), so its own contents (`#hand-area`
+ * etc.) are rendered by the existing `renderHand`/`renderPileAnchor`
+ * calls in `main.js`, unchanged - this only ever touches position.
+ */
+export function positionHandZone(el, seatIndex, seatCount) {
+  const { leftPct, topPct } = seatPosition(seatIndex, seatCount, 26);
+  el.style.left = `${leftPct}%`;
+  el.style.top = `${topPct}%`;
+}
+
+/**
  * Renders the draw deck as a small face-down stack with a count badge
  * (US-20) instead of just a text counter - purely presentational, draw
  * mechanics (US-7) are unchanged.
@@ -839,9 +900,11 @@ export function renderDeck(container, count, opts = {}) {
   // Reshuffle & deal share one "cards per player" input (exactly as the
   // legacy strip's single `countInput` did); Split gets its own "how
   // many piles" input, previously a bare `<input>` in an unrelated row.
-  const anchorSlot = document.createElement('div');
-  renderPileAnchor(anchorSlot, actions, {
-    pileLabel: 'Deck',
+  // D51: hosted on `container` (`#game-deck-area`) itself, not a
+  // separate empty anchor slot - hovering the deck's own stack/empty
+  // state reveals its actions, the same mechanism a card's hover row
+  // already used, instead of a small invisible target beside it.
+  renderPileAnchor(container, actions, {
     onPileAction: opts.onPileAction,
     disabled: count <= 0 ? ['deal'] : [], // nothing left to deal from
     counts: [
@@ -865,59 +928,73 @@ export function renderDeck(container, count, opts = {}) {
       },
     ],
   });
-  container.appendChild(anchorSlot);
 }
 
 /**
- * D34/D37 (Sprint 12, "piles are the interaction"): a small anchor fixed
- * to a pile's own container - never card-relative (Smith Gate 1 #2, the
- * exact mistake this sprint exists to fix; T53.1). Hover (mouse) / tap
- * (touch, Smith Gate 1 #1) reveals a popover of that pile's own actions,
- * generalizing D29's deck-only control strip to any pile kind. Reuses
- * D25's existing `:hover`/`:focus-within` CSS-only reveal (style.css
- * `.pile-anchor-popover`) rather than inventing a second mechanism.
- *
- * Draggable actions (`target` set in PILE_ACTIONS - today, only `draw`)
- * get the same action-token drag protocol a card gets (D35): native
- * drag on mouse, the same press-and-hold recognizer on touch
- * (`touchDrag.js`, unchanged - a new, smaller DOM wiring function below
- * calls the same pure `step`). `singleTarget` actions (D36) ALSO get
- * the plain click handler every action gets - Smith Gate 1 #4 ruled the
- * project's highest-frequency action out from being drag-only.
+ * D51 (Actionable interface, table-unification pass): the ONE row-of-
+ * action-buttons builder both a card's hover row (`actionMenuEl`) and a
+ * pile's hover row (`renderPileAnchor` below) go through - same spec
+ * source (`ACTION_SPECS`), same label/hint/danger-confirm/disabled
+ * handling, same reveal mechanism (`hostEl` gets `.pile-hover-host`,
+ * whose `:hover`/`:focus-within` raises it and shows this row - see
+ * style.css). What's genuinely still different per caller is captured
+ * in `opts`, not hardcoded here:
+ * - `opts.onAction(id, spec)` - what a click actually DOES. A card's
+ *   `target`-bearing action opens a "choose a destination" mode
+ *   (`beginTargeting`); a pile action always dispatches directly
+ *   (D36: even `draw`, the one `singleTarget` case, never needs
+ *   `beginTargeting` - there's only ever one legal destination).
+ *   Two real behaviors, expressed by the caller, not by this function
+ *   guessing which actor it's building a row for.
+ * - `opts.draggable` (pile-only) - wires the action-token drag protocol
+ *   (D35) on top of the click handler. Cards never need this: a card's
+ *   OWN element is what gets dragged for `move`/`pickup`/`play`
+ *   (`renderZoneCards`'s existing dragstart), not a button in its
+ *   action row - there is no "drag the reveal button" gesture to build.
+ * - `opts.counts` (pile-only) - Deal/Reshuffle & deal/Split's count
+ *   inputs.
  *
  * A destructive action (`reshuffleDeal`) gets a confirm before it fires,
- * no matter where in the popover it's reached from (Smith Gate 2 #1) -
- * carried over unchanged from the legacy deck strip this generalizes.
+ * from either caller, since the check lives here once (Smith Gate 2 #1).
  *
- * @param {HTMLElement} container rebuilt wholesale each call, like every
- *   other render* function here.
- * @param {string[]} actions ids from `pileLevelActions()`.
- * @param {{onPileAction: (id: string, count?: number) => void,
- *   pileLabel?: string, labels?: Record<string,string>,
+ * DESKTOP-ONLY by explicit user direction (this pass): unlike D34/D37's
+ * `.pile-anchor-toggle`, there's no separate always-focusable tap target
+ * for touch to reveal a PILE's row through `:focus-within` any more -
+ * hovering the pile's own container is the only trigger now, matching
+ * how a card has always worked. `hostEl.tabIndex = 0` is set below as a
+ * low-cost, unverified nicety (some mobile browsers focus a tabbable
+ * element on tap, which would incidentally restore rough touch access),
+ * not a real touch equivalent - no touch-specific effort was spent
+ * confirming or fixing it. See `docs/ARCHITECTURE.md` D51.
+ *
+ * @param {HTMLElement} hostEl the actor's own visual container - gets
+ *   `.pile-hover-host` and the row appended as its child, rebuilt
+ *   wholesale each call like every other render* function here.
+ * @param {string[]} actionIds ids from `ACTION_SPECS`.
+ * @param {{onAction: (id: string, spec: object) => void,
+ *   rowClass?: string, draggable?: boolean, labels?: Record<string,string>,
  *   disabled?: string[],
  *   counts?: {actions: string[], value: number, onChange?: (n: number) => void,
  *     min?: number, max?: number, ariaLabel?: string, inputId?: string}[]}} opts
+ * @returns {HTMLElement|null} the row element, or null if `actionIds` is empty.
  */
-export function renderPileAnchor(container, actions, opts = {}) {
-  container.innerHTML = '';
-  if (!actions.length) return;
+function renderActionRow(hostEl, actionIds, opts = {}) {
+  // `hostEl` isn't always rebuilt from scratch each call the way a
+  // `render*` function's own container usually is (`renderDeck`'s
+  // `#game-deck-area` is; `main.js`'s persistent `#hand-zone` is NOT -
+  // it keeps its heading/`#hand-area`/play-as selector across renders).
+  // `[data-action-row]` marks whichever row THIS function last appended
+  // to `hostEl`, so it's the only thing removed - never a sibling that
+  // belongs to the caller.
+  hostEl.querySelector(':scope > [data-action-row]')?.remove();
+  if (!actionIds.length) return null;
+  hostEl.classList.add('pile-hover-host');
+  if (hostEl.tabIndex < 0 || hostEl.tabIndex == null) hostEl.tabIndex = 0;
 
-  const anchor = document.createElement('div');
-  anchor.className = 'pile-anchor';
+  const row = document.createElement('div');
+  row.dataset.actionRow = 'true';
+  row.className = opts.rowClass ?? 'pile-anchor-popover';
 
-  const toggle = document.createElement('button');
-  toggle.type = 'button';
-  toggle.className = 'pile-anchor-toggle';
-  toggle.setAttribute('aria-label', `${opts.pileLabel ?? 'Pile'} actions`);
-  toggle.textContent = '⋯'; // midline horizontal ellipsis
-  anchor.appendChild(toggle);
-
-  const popover = document.createElement('div');
-  popover.className = 'pile-anchor-popover';
-
-  // Count inputs some actions need (Deal/Reshuffle & deal share one;
-  // Split has its own) - one input per GROUP, rendered ahead of the
-  // actions and looked up by action id below.
   const countInputs = {};
   for (const group of opts.counts ?? []) {
     const input = document.createElement('input');
@@ -929,42 +1006,67 @@ export function renderPileAnchor(container, actions, opts = {}) {
     if (group.inputId) input.id = group.inputId;
     input.setAttribute('aria-label', group.ariaLabel ?? 'Count');
     // Rebuilt wholesale on every state broadcast (like every render*
-    // function here), so a number the host has typed but not yet used
-    // would otherwise be destroyed by any unrelated broadcast - someone
-    // else drawing a card resets what you were about to deal. Reporting
-    // each keystroke lets the caller hold the value across re-renders
-    // (the legacy strip's own `countInput` comment, carried over).
-    input.addEventListener('input', () => group.onChange?.(Number(input.value)));
-    popover.appendChild(input);
+    // function here), so a number typed but not yet used would
+    // otherwise be destroyed by any unrelated broadcast - someone else
+    // drawing a card resets what you were about to deal. Reporting each
+    // keystroke lets the caller hold the value across re-renders.
+    input.addEventListener('input', (e) => { e.stopPropagation(); group.onChange?.(Number(input.value)); });
+    row.appendChild(input);
     for (const id of group.actions) countInputs[id] = input;
   }
 
-  for (const id of actions) {
-    const spec = PILE_ACTIONS[id];
+  for (const id of actionIds) {
+    const spec = ACTION_SPECS[id];
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.dataset.pileAction = id;
+    btn.className = opts.buttonClass ?? '';
+    btn.dataset.action = id;
+    btn.dataset.pileAction = id; // kept alongside dataset.action: existing e2e coverage queries this attribute
     btn.textContent = opts.labels?.[id] ?? spec.label;
-    btn.title = spec.hint;
+    if (spec.hint) btn.title = spec.hint;
     if (spec.destructive) btn.classList.add('btn-danger');
     if (opts.disabled?.includes(id)) btn.disabled = true;
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
       if (spec.destructive && !window.confirm(
         `${spec.hint}\n\nEvery player's current hand will be cleared. Continue?`)) return;
       const n = countInputs[id] ? Number(countInputs[id].value) : undefined;
-      opts.onPileAction?.(id, n);
+      opts.onAction(id, spec, n);
     });
-    if (spec.target) {
+    if (opts.draggable && spec.target) {
       btn.draggable = true;
       btn.addEventListener('dragstart', (e) => {
         e.dataTransfer.setData('text/plain', pileActionToken(id));
       });
-      attachPileActionTouchDrag(btn, id, () => opts.onPileAction?.(id));
+      attachPileActionTouchDrag(btn, id, () => opts.onAction(id, spec));
     }
-    popover.appendChild(btn);
+    row.appendChild(btn);
   }
-  anchor.appendChild(popover);
-  container.appendChild(anchor);
+  hostEl.appendChild(row);
+  return row;
+}
+
+/**
+ * A pile's own hover-revealed action row (Draw, Deal, Sort, Pass, ...) -
+ * `renderActionRow` above wired for the pile case: dispatch is always
+ * direct (no "choose a destination" mode, ever - even `draw`'s
+ * `singleTarget` case just means there's only one legal destination,
+ * D36), and `target`-bearing actions (today, only `draw`) get the
+ * action-token drag protocol on top of the click handler (D35).
+ *
+ * @param {HTMLElement} hostEl the pile's own visual container (e.g.
+ *   `#game-deck-area`, `.hand-zone`) - see `renderActionRow`'s doc.
+ * @param {string[]} actions ids from `pileLevelActions()`.
+ * @param {{onPileAction: (id: string, count?: number) => void,
+ *   labels?: Record<string,string>, disabled?: string[],
+ *   counts?: object[]}} opts
+ */
+export function renderPileAnchor(hostEl, actions, opts = {}) {
+  renderActionRow(hostEl, actions, {
+    ...opts,
+    draggable: true,
+    onAction: (id, spec, n) => opts.onPileAction?.(id, n),
+  });
 }
 
 const PILE_ACTION_TOKEN_PREFIX = 'pile-action:';

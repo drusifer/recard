@@ -131,6 +131,36 @@
           <div id="table-area"></div>
         </div>
         <div id="seat-zones"></div>
+        <!-- D51 (table-unification pass): the hand is a Pile like any
+             other (`src/piles/handPile.js`, D39/D42) - it now RENDERS
+             like one too, as a zone on the table at the viewer's own
+             seat, instead of a separate "Your hand" section below it.
+             Sibling of #seat-zones rather than a child: renderSeatZones
+             wipes that container wholesale every render
+             (`container.innerHTML = ''`), which would destroy this
+             element if it lived inside. Positioned by JS
+             (`positionHandZone`, src/ui.js) using the same
+             `seatPosition()` geometry every other seat zone uses -
+             viewer is always seat index 0 (D18), i.e. the bottom of the
+             ring, matching "my hand is right in front of me." -->
+        <div id="hand-zone" class="zone seat-zone hand-zone">
+          <div class="zone-name" id="hand-zone-name">Hand</div>
+          <div id="hand-area" class="card-row"></div>
+          <div class="btn-row hand-zone-controls">
+            <!-- Sprint 12 (D34/D37): Sort by rank/suit and Pass live on
+                 the hand's own pile-hover actions now. D51: the "..."
+                 anchor toggle is gone - hovering the hand zone itself
+                 (like hovering a card) reveals them; see
+                 `renderPileAnchor`'s `hostEl` param. -->
+            <label class="play-as-label" for="play-as">Play as
+              <select id="play-as">
+                <option value="public">face-up</option>
+                <option value="shared-facedown">face-down (hidden from all)</option>
+                <option value="private-facedown">face-down (only you)</option>
+              </select>
+            </label>
+          </div>
+        </div>
         <ul id="game-roster" class="roster"></ul>
       </div>
       <div class="btn-row" id="add-zone-row">
@@ -152,37 +182,10 @@
            false) - transient, beside the control that caused it, same
            pattern as #deck-error (US-41). -->
       <p id="zone-error" class="error-text" hidden></p>
-    </section>
-    <section class="panel">
-      <h2>Your hand</h2>
+      <!-- D51: host-only table utilities, relocated out of the now-
+           removed "Your hand" section - unrelated to the hand, always
+           were table/game-level resets. -->
       <div class="btn-row">
-        <!-- Sprint 12 (D34/D37, T53.2/T58.1): Sort by rank/suit and Pass
-             live on the hand's own pile anchor now - three permanently-
-             visible buttons replaced by one. -->
-        <div id="hand-pile-anchor"></div>
-        <!-- Replaces the two icon buttons that used to sit under every
-             hand card (US-34 follow-up). Stated once instead of 2xN
-             times, and always visible so the armed mode can't be
-             forgotten - it labels itself. -->
-        <label class="play-as-label" for="play-as">Play as
-          <select id="play-as">
-            <option value="public">face-up</option>
-            <option value="shared-facedown">face-down (hidden from all)</option>
-            <option value="private-facedown">face-down (only you)</option>
-          </select>
-        </label>
-      </div>
-      <div id="hand-area" class="card-row"></div>
-      <!-- US-40 / Smith Gate 1 #4: shown only on touch devices
-           (`@media (pointer: coarse)`). Tapping and the "Move to..."
-           menu still work; this exists so the drag gesture isn't
-           something you have to already know about to find. -->
-      <p class="touch-hint">Tap a card to play it &mdash; or hold a card briefly, then drag it where you want.</p>
-      <div class="btn-row">
-        <!-- Sprint 12 (D34/D35/D36, T54.1/T58.1): Draw lives on the
-             deck's own pile anchor now - draggable AND (Smith Gate 1
-             #4: the project's own highest-frequency action) still one
-             tap. -->
         <button id="reset-btn" type="button" class="btn-danger" hidden>Reshuffle &amp; Reset</button>
         <button id="reset-scores-btn" type="button" class="btn-danger" hidden>Reset Scores</button>
       </div>

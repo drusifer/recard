@@ -17,22 +17,17 @@
      stack and the card itself can't drift apart. `--card-w` is a
      *minimum*: a card grows past it if the browser enlarges its text
      (e.g. a user's minimum-font-size setting), rather than clipping. */
-  /* Responsive to available HEIGHT, not a fixed size: the whole point of
-     this fix is "shrink the cards before you force a scrollbar". `100svh`
-     rather than `100vh` so mobile browser chrome (the address bar) is
-     accounted for, not just desktop. The three numbers are a floor
-     (never illegibly small), a fluid term keyed to viewport height (most
-     of what actually varies), and a ceiling (don't grow cards pointlessly
-     on a very tall, narrow window - width is the usual limiter there). */
-  --card-w: clamp(2.1rem, 6.5svh, 3rem);
-  /* Floor for the seat ring; the surface otherwise takes what's left.
-     Re-tuned 2026-08-20 (design-lint 44px button fix): live-bisected
-     against the real single-card-in-pot test scenario at 390x844 -
-     28rem still lets the ring touch the pot, 30rem clears it. The
-     narrower max-height:700px tier below trims this further for very
-     short viewports and compensates with heavier padding cuts. */
+  /* D51 (table-unification pass): reverted the viewport-height-adaptive
+     `clamp(...svh...)` sizing from the 44px touch-target fix (D-entries
+     around 2026-08-20) back to a flat size, and bigger than the
+     pre-shrink baseline (3rem/4.1rem) too - explicit user direction,
+     this pass is DESKTOP-ONLY (no mobile-fit chase), so the whole reason
+     for shrinking cards on short viewports no longer applies here. If a
+     real mobile pass ever resumes, this needs its own reasoned re-visit,
+     not just re-adding the old clamp. */
+  --card-w: 3.6rem;
   --table-min-h: 30rem;
-  --card-h: clamp(2.9rem, 9svh, 4.1rem);
+  --card-h: 4.9rem;
   --card-gap: 0.5rem;
   --card-peek: 0.85rem;
   --radius-sm: 0.45rem;
@@ -102,11 +97,17 @@ body {
      to every btn-row, reopening page scroll specifically in the
      720-850px WINDOW-height range common on laptops with browser
      chrome/taskbars eating vertical space - real sizes, not synthetic
-     (1280x800, 1024x768). --table-min-h is NOT trimmed here: at
-     min-width:1024px it needs its full 34rem to keep the ring clear of
-     the pot regardless of window height (verified live - lowering it at
-     1024x768 specifically reopens the overlap this whole re-tune exists
-     to close). Chrome padding is the only lever left. */
+     (1280x800, 1024x768). D51: bigger cards (--card-w/--card-h) raised
+     the base desktop floor from 34rem to 36rem to keep the ring clear of
+     the bigger pot (measured live via lint:design). A genuinely short
+     window (720px) still overflows by 32px even at this tier's trimmed
+     chrome padding - tried lowering `--table-min-h` back down for this
+     tier specifically, measured live that it does NOT help (the overflow
+     isn't floor-bound at this exact height, something else is the
+     binding constraint) and reverted that attempt rather than leave dead
+     CSS. Disclosed, not chased further: real but narrow (a 720px-tall
+     desktop window specifically), same "disclose, don't force" precedent
+     as this project's other residual design-lint items. */
   #screen-game { padding: 0.2rem 1rem; }
   #screen-game > .panel { padding: 0.3rem 0.5rem; }
   #screen-game h2 { margin: 0 0 0.2rem; font-size: 0.9rem; }
@@ -263,9 +264,22 @@ button {
   font-weight: 600;
 }
 
+/* D51 finding: this exempted `<button class="card">` (hand cards -
+   `cardEl()` in ui.js) from the base `button{}` rule's 44px touch-target
+   floor (design-lint fix, 2026-08-20) - correct, cards are authorized
+   to be smaller than a button's minimum touch target. But zeroing
+   min-width/min-height to 0 didn't just remove the 44px floor, it beat
+   `.card`'s OWN `min-width: var(--card-w)` / `min-height: var(--card-h)`
+   too (`button.card`'s element+class specificity outranks plain
+   `.card`), leaving every hand card purely content-sized - shrunk to
+   whatever its corner/pip text needed, nowhere near `--card-w`/`--card-h`.
+   This is the actual root cause of "tiny cards" the user flagged, not
+   the `--card-w` value itself (measured live: cards rendered ~25px wide
+   with `--card-w` set to 57.6px). Restoring the card-specific size here
+   - still opted OUT of the 44px button floor, just not zeroed past it. */
 button.card {
-  min-height: 0;
-  min-width: 0;
+  min-height: var(--card-h);
+  min-width: var(--card-w);
   display: block;
 }
 
@@ -468,10 +482,58 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    hovered/focused card onto a new stacking layer is the general fix:
    it now outranks every sibling zone regardless of DOM order, not just
    its own popup relative to its own card. */
+/* D51 (table-unification pass): "raise it off the table" - the user's
+   own description of what hovering an actionable card/pile should look
+   like, shared by every `.pile-hover-host` (cards, the deck, the hand
+   zone - see `ui.js`'s `renderActionRow`) via one rule below, layered
+   on top of this existing z-index escalation rather than replacing it.
+   Built on `--raise-base` (defaults to `none`) rather than a bare
+   `transform: translateY(...)`: `.seat-zone` (the hand zone included -
+   D51 gave it that class too) already uses `transform` for its OWN
+   positioning (`translate(-50%, -50%)`, centering it on its `left`/`top`
+   percentage anchor). A second rule setting `transform` outright doesn't
+   compose with that - it replaces it outright, which would make the
+   hand zone visibly JUMP to the wrong spot on hover. Composing through
+   one custom property is what lets a positioned element and a raised
+   element be the same element. */
+.middle-card:hover,
+.middle-card:focus-within,
+.pile-hover-host:hover,
+.pile-hover-host:focus-within {
+  transform: var(--raise-base, none) translateY(-0.35rem) scale(1.02);
+  box-shadow: 0 12px 22px rgba(0, 0, 0, 0.5);
+}
+
 .middle-card:hover,
 .middle-card:focus-within {
   position: relative;
   z-index: 7;
+}
+
+.pile-hover-host {
+  position: relative;
+}
+
+.pile-hover-host:hover,
+.pile-hover-host:focus-within {
+  z-index: 8;
+}
+
+/* Discoverability (user's own finding): a hoverable pile needs a visual
+   cue that it's a thing you can act on, not just empty table space -
+   without this, "hover the deck to see Draw" is invisible until you
+   stumble onto it. A subtle border, not a button-like fill: piles are
+   the surface, not controls sitting on it. */
+.pile-hover-host {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.3rem;
+  transition: border-color 0.15s ease;
+}
+
+.pile-hover-host:hover,
+.pile-hover-host:focus-within {
+  border-color: var(--accent);
 }
 
 /* The card's own z-index above is scoped to #table-center's LOCAL
@@ -487,24 +549,22 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   z-index: 7;
 }
 
-/* Sprint 12: the deck's pile anchor (originally `.deck-controls-strip`,
-   D29; the anchor absorbed it - Phase 53/56) is PERSISTENT, not hover-
-   revealed - unlike a card's popup, its toggle AND its open popover
-   must stay clickable unconditionally. Same trapped-stacking-context
-   cause as above (`#table-center`'s transform vs. `#seat-zones`'s AND
-   `#game-roster`'s sibling z-indexes), same `:has()` fix - but always-
-   on rather than conditional, since there's no hover moment to key off.
-   Confirmed live, TWICE, at the 2-player seat geometry (`seatPosition`'s
-   already-documented pot/seat overlap above): first a personal zone's
-   empty `.card-row` (z-index:1) swallowed a click, then - after beating
-   that one - a roster seat `<li>` (z-index:2, `.roster li.seat`) did the
-   same thing at a DIFFERENT popover position. 3 clears both (not 2,
-   which only ties the seat and loses on DOM order - `#game-roster`
-   comes later in the markup). `.pile-anchor` generically (not deck-
-   specific): the hand's own anchor lives outside `#table-center`
-   entirely, so this only ever matches the deck's. */
-#table-center:has(.pile-anchor) {
-  z-index: 3;
+/* Sprint 12 established this fix for the deck's pile-level controls
+   (originally `.deck-controls-strip`, D29) getting swallowed by a
+   sibling's z-index inside #table-center's trapped stacking context
+   (`transform`, D24) - a personal zone's empty `.card-row` (z-index:1),
+   then a roster seat `<li>` (z-index:2, `.roster li.seat`) at a
+   different popover position, both confirmed live. D51: retargeted from
+   `.pile-anchor` (removed - the deck's action row is hover-revealed now,
+   same mechanism a card's popup already used) to the same
+   `:hover`/`:focus-within` condition the row's own reveal uses -
+   correct since the row (and the click-interception risk) only exists
+   while it's open, not permanently the way the old persistent anchor
+   was. z-index 8 matches `.pile-hover-host`'s own raised z-index
+   (both need to win against the same z-index:1/2 siblings). */
+#table-center:has(.pile-hover-host:hover),
+#table-center:has(.pile-hover-host:focus-within) {
+  z-index: 8;
 }
 
 /* Drag cursor affordance (US-28, Smith Sprint 4 close-out finding #1):
@@ -795,13 +855,29 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .seat-zone {
   position: absolute;
-  transform: translate(-50%, -50%);
+  /* D51: `--raise-base` is what the shared `.pile-hover-host:hover` rule
+     (above) composes its raise transform onto, so the hand zone
+     (`.seat-zone.hand-zone`) doesn't lose its own centering transform on
+     hover - see that rule's own comment. */
+  --raise-base: translate(-50%, -50%);
+  transform: var(--raise-base);
   width: max-content;
   max-width: 9rem;
   margin: 0;
   z-index: 1;
   pointer-events: auto;
 }
+
+/* D51: the hand needs real room - a full hand of cards plus its own
+   controls - unlike a typical personal zone (a handful of played
+   cards). Overrides `.seat-zone`'s 9rem cap, which was sized for that
+   smaller case. */
+.hand-zone {
+  max-width: min(92vw, 44rem);
+  width: max-content;
+}
+
+.hand-zone-controls { margin-top: 0.4rem; }
 
 /* Visual deck stack (US-20) instead of a bare "N cards left" line. */
 .deck-area {
@@ -1036,7 +1112,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
      not a CSS tuning problem - the actual fix is shrinking that
      footprint (fewer permanently-reserved per-card controls), which is
      the pile-actions redesign already flagged as separate, larger work. */
-  .table-surface { --table-min-h: 34rem; }
+  .table-surface { --table-min-h: 36rem; } /* D51: bigger cards need more ring clearance again */
   /* Centred *in the surface* rather than left in normal flow. The pot
      had been flowing just under the deck area near the top, while
      personal zones ring the surface's true centre
@@ -1072,7 +1148,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 
 @media (min-width: 1440px) {
-  .table-surface { --table-min-h: 24rem; }
+  .table-surface { --table-min-h: 36rem; } /* D51: bigger cards need more ring clearance again */
   #table-center { max-width: 54rem; }
   #table-area { max-width: 40rem; }
   .seat-zone { min-width: 16rem; max-width: 30rem; }
@@ -1182,11 +1258,29 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* Every pile that can receive the chosen action lights up, so the valid
    destinations are visible rather than guessed (Nielsen #1/#6). */
+/* D51 finding: a click-to-choose target (`beginTargeting`) needs to be
+   clickable WITHOUT hovering it first - unlike `.pile-hover-host`'s
+   z-index escalation (only active on hover), `.pile-target` is applied
+   BEFORE any hover happens. Confirmed live: `#hand-zone` sits at the
+   same seat position `#game-roster`'s bottom seat `<li>` occupies
+   (z-index:2) - without its own z-index, a targeted-but-unhovered hand
+   zone lost the click to the roster row sitting on top of it. */
 .pile-target {
   outline: 2px dashed var(--accent);
   outline-offset: 3px;
   background: rgba(79, 157, 255, 0.1);
   cursor: pointer;
+  position: relative;
+  z-index: 4;
+}
+
+/* Same trapped-stacking-context cause the deck's own escalation exists
+   for (`#table-center`'s `transform`, D24): a `.pile-target` INSIDE
+   `#table-center` (a shared zone in `#table-area`) still can't outrank
+   `#seat-zones`/`#game-roster` siblings without promoting the ancestor
+   too - `.pile-target`'s own z-index above only wins locally. */
+#table-center:has(.pile-target) {
+  z-index: 4;
 }
 
 body.targeting .middle-card-actions { display: none !important; }
@@ -1288,36 +1382,16 @@ body.targeting .middle-card-actions { display: none !important; }
   .touch-hint { display: block; }
 }
 
-/* --- Deck pile-level controls (US-41, D29) -----------------------------
-   A persistent strip, not the D25 hover row: these act on the deck, not
-   on a card, so they are always visible rather than revealed by pointing
-   at something. Sibling of `.deck-stack`, which is what lets the controls
-   survive an empty deck (Smith Gate 1 blocker). */
-/* Sprint 12 (D34/D37): the generalized pile anchor - fixed to the
-   pile's own container, never card-relative (T53.1). Reveal is the same
-   CSS-only `:hover`/`:focus-within` mechanism D25's `.middle-card-actions`
-   already uses (not a new one): a tap focuses `.pile-anchor-toggle`,
-   which keeps the popover open via `:focus-within` for exactly as long
-   as focus stays inside it - same as a card's hover row on touch. */
-.pile-anchor {
-  position: relative;
-  display: inline-block;
-  /* Smith close-out finding, live on a real touch viewport: below
-     1024px, `#table-center` (the deck's ancestor) is never positioned
-     at all - the desktop-only `#table-center:has(.pile-anchor)` z-index
-     escalation above has nothing to escalate FROM, so a roster seat
-     `<li>` (`.roster li.seat`, z-index:2) still intercepted a tap on
-     the deck's own toggle. Giving the anchor its own z-index fixes it
-     at the source, for every viewport, rather than adding a second
-     conditional escalation for the mobile case specifically. */
-  z-index: 5;
-}
-
-.pile-anchor-toggle {
-  font-size: 1.1rem;
-  padding: 0.4rem 0.7rem;
-}
-
+/* --- Pile-level controls (US-41, D29; generalized D34/D37; unified D51)
+   D51 (table-unification pass, explicit user direction): the deck's
+   action row is no longer a persistent strip nor a small "..." anchor
+   toggle - it's revealed by hovering/focusing the PILE ITSELF
+   (`.pile-hover-host`, `ui.js`'s `renderActionRow`), the exact same
+   mechanism a card's `.middle-card-actions` row already used, so
+   pile-level and card-level actions finally read as one system instead
+   of two. `.pile-anchor`/`.pile-anchor-toggle` are gone; see D51's own
+   ARCHITECTURE.md entry for why this pass is DESKTOP-ONLY (no touch-
+   parity chase for the lost `:focus-within`-via-tap trigger). */
 .pile-anchor-popover {
   position: absolute;
   top: 100%;
@@ -1345,8 +1419,8 @@ body.targeting .middle-card-actions { display: none !important; }
   box-shadow: 0 8px 20px rgb(0 0 0 / 45%);
 }
 
-.pile-anchor:hover .pile-anchor-popover,
-.pile-anchor:focus-within .pile-anchor-popover {
+.pile-hover-host:hover > .pile-anchor-popover,
+.pile-hover-host:focus-within > .pile-anchor-popover {
   display: flex;
 }
 
