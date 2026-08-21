@@ -900,7 +900,14 @@ function renderRosterOnly() {
   // `handZoneEl` itself (the hand zone's own container) rather than a
   // separate small anchor slot - hovering the hand zone reveals it, the
   // same mechanism a card's hover row already used.
-  renderPileAnchor(handZoneEl, pileLevelActions('hand', { isOwner: true }), {
+  // D51 fix: hosted on the heading (`handZoneNameEl`), not the whole
+  // zone - hovering ANY card to interact with it also counts as
+  // hovering `#hand-zone`, which raised the whole zone (shifting cards
+  // under the cursor) and popped the Sort/Pass row over them, blocking
+  // normal card interaction (direct user report). The heading has no
+  // competing interactive content, so it's a safe, discoverable,
+  // narrower hover target instead.
+  renderPileAnchor(handZoneNameEl, pileLevelActions('hand', { isOwner: true }), {
     labels: { pass: view.passed?.[myId] ? 'Unpass' : 'Pass' },
     onPileAction: (id) => {
       if (id === 'sortRank') sortHandByRank();

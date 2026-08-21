@@ -610,7 +610,7 @@ try {
   // toggle too, so this exercises the hover-then-click path a real
   // mouse user takes, same pattern the existing `cardAction` helper
   // above already uses for D25's row. ---
-  await join.hover('#hand-zone');
+  await join.hover('#hand-zone-name');
   await join.click('#hand-zone [data-pile-action="pass"]');
   await host.waitForFunction(
     () => [...document.querySelectorAll('#game-roster li')].some((li) => li.textContent.includes('Bob') && li.textContent.includes('Passed')),
@@ -618,7 +618,7 @@ try {
     { timeout: 10000 },
   );
   console.log('TOGGLE_PASS: pass marker propagated to the other client');
-  await join.hover('#hand-zone');
+  await join.hover('#hand-zone-name');
   await join.click('#hand-zone [data-pile-action="pass"]');
   await host.waitForFunction(
     () => ![...document.querySelectorAll('#game-roster li')].some((li) => li.textContent.includes('Bob') && li.textContent.includes('Passed')),
@@ -661,7 +661,7 @@ try {
   // proof for Sprint 1's retro backlog item - a sorted (or dragged) order
   // must survive the NEXT state broadcast instead of being silently wiped
   // like the old drag-reorder-only behavior was. ---
-  await join.hover('#hand-zone');
+  await join.hover('#hand-zone-name');
   await join.click('#hand-zone [data-pile-action="sortRank"]');
   const joinSortedIds = await join.evaluate(() => [...document.querySelectorAll('#hand-area .card')].map((c) => c.dataset.cardId));
   await join.hover('#game-deck-area');
