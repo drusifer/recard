@@ -1749,3 +1749,9 @@ follow-on to Tranche 1:
 - In-app text chat or reactions.
 - Custom card backs/themes.
 - Reconnect-to-session after refresh/drop.
+- **`docs/DECISIONS.md` reconciliation**: its narrative log stops at
+  D20; `docs/ARCHITECTURE.md` is at D42. Flagged at Sprint 12 AND
+  Sprint 13 close (Oracle retro, both times) without being actioned -
+  a real backlog item now, not a recurring note. Likely a straight
+  narrative-writeup pass over ARCHITECTURE.md's existing per-sprint "##
+  vX.Y Decisions" sections, D21 onward.
