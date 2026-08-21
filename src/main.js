@@ -72,10 +72,14 @@ let latestView = null; // last view received from host, join only
 let sessionEnded = false;
 let selectedPreset = null; // US-15: applied to cards-per-player once host-share is shown
 
-function describeDeckConfig({ numDecks, jokers }) {
+function describeDeckConfig({ type, numDecks, jokers }) {
   const deckWord = numDecks === 1 ? 'deck' : 'decks';
   const jokerWord = jokers === 1 ? 'joker' : 'jokers';
-  return `${numDecks} ${deckWord}, ${jokers} ${jokerWord}`;
+  // D49: named only when it's not the (unstated) default - "1 deck, 0
+  // jokers" already means standard, every existing preset's preview
+  // text is unchanged by this.
+  const typePrefix = type && type !== 'standard' ? `${type} ` : '';
+  return `${numDecks} ${typePrefix}${deckWord}, ${jokers} ${jokerWord}`;
 }
 
 // --- Rules reference (US-18): a toggleable overlay, not a showScreen()
@@ -104,6 +108,12 @@ presetSelect.addEventListener('change', () => {
     previewEl.hidden = true;
     return;
   }
+  // D49: `type` is optional on a preset ('standard' by omission, same
+  // default createInitialState/buildDeck already use) - most presets
+  // never set it, so this must not clobber a host's own manual
+  // deck-type choice with 'standard' every time they merely preview a
+  // preset that doesn't care.
+  if (preset.type) document.getElementById('host-deck-type').value = preset.type;
   document.getElementById('host-num-decks').value = String(preset.numDecks);
   document.getElementById('host-jokers').value = String(preset.jokers);
   const cardsWord = preset.cardsPerPlayer === 1 ? 'card' : 'cards';

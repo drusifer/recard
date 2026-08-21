@@ -2002,6 +2002,49 @@ hover row, confirm `data-orientation` propagates live, rotate back.
 Mutation-verified: bypassing the authorization check fails the one
 test written for it.
 
+### D49. The preset schema extends to `DeckDefinition`, proven with a real "Pinochle" quick-start preset
+
+Closes the epic's last queued item (short of the builder screen,
+explicitly still out of scope). `presets.js`'s flat objects gain an
+optional `type` field, matching `deck.js`'s own field name exactly
+(not a `deckType` alias needing translation at the boundary - found
+and fixed a real naming mismatch while wiring this: the runtime
+`deckConfig` object has always used `type`, and a first draft of this
+field used `deckType`, which would have silently failed to show up in
+`describeDeckConfig`'s post-creation text since that reads the
+runtime object, not the preset). Omitted (every preset except
+Pinochle) means `'standard'`, the existing default - zero behavior
+change for every prior preset.
+
+**A real "Pinochle" preset, not a placeholder:** 48-card deck (via
+`type: 'pinochle'`), 12 cards to each of 4 players (the standard
+single-deck partnership deal), plus a genuine `RULES_REFERENCE` entry
+(goal/setup/turns) - the existing `presets.test.js` suite already
+requires every preset have one, so this couldn't be added without
+writing real, correct pinochle rules.
+
+**Rejected: assigning `allowsPlayerZones: false` to any preset**
+(the schema supports it, but no preset sets it). Which real games
+"should" disallow player-added zones is a genuine game-design
+judgment call this project has no researched basis for making per
+preset - guessing would be exactly the "asserted rather than verified"
+mistake this project's own retros warn against repeatedly. The field
+is proven wired end-to-end by D46's own direct `state.gameConfig`
+tests, not by a preset asserting something unresearched.
+
+**Consequences:** 258/258 unit (2 new: `type` validated against the
+real deck-type registry, Pinochle's own preset proven to actually
+build a 48-card deck without over-dealing) + full e2e green, including
+a new end-to-end block: select the Pinochle preset, confirm the deck-
+type selector and preview text both update, create the table, confirm
+48 cards - proving the preset reaches `DeckDefinition`, not just
+`cardsPerPlayer`.
+
+**This closes the Pile/Zone/GameConfig framework epic** (D38-D49),
+short of the builder screen and any further prebuilt-preset library
+growth - both remain explicitly separate, later stories per the
+original framework sidebar.
+
 
 ## Module Layout
 ```

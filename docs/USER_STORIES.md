@@ -1653,9 +1653,9 @@ collection onto one `piles` array) and this very sprint's D29/D34-D36
   behavior informally; this gives it a real type.
 - ~~`Card.orientation` (portrait/landscape, D40) as replicated state~~ —
   **SHIPPED**, Sprint 18 (D48, US-52).
-- A config-driven preset schema (extends `presets.js`) covering the
-  full GameConfig shape, and — later, separate story — a builder screen
-  as a form over the same schema.
+- ~~A config-driven preset schema (extends `presets.js`)~~ —
+  **SHIPPED**, Sprint 19 (D49, US-53). A builder screen as a form over
+  the same schema remains later, separate story.
 
 **Sequencing note (Morpheus):** deliberately not started mid-Sprint-12
 — a background implementation was actively landing the *current*
@@ -1897,9 +1897,43 @@ place) + full e2e green, independently re-verified. Mutation-verified.
 - Full landscape-aware layout (D48's own disclosed first-cut
   limitation) — belongs to whichever pile type/mechanic (D38's Run/Set,
   most likely) actually needs it.
-- A config-driven preset schema tying `GameConfig`/`DeckDefinition`
-  into `presets.js`, and the builder screen — both still later,
-  separate stories, explicitly out of scope for this run of sprints.
+- ~~A config-driven preset schema tying `GameConfig`/`DeckDefinition`
+  into `presets.js`~~ — **SHIPPED**, Sprint 19 (D49, US-53). The
+  builder screen remains its own later, separate story.
+
+## Sprint 19 ("Preset schema — closing the epic") — US-53
+
+### US-53: A quick-start preset can reach DeckDefinition, not just deal count
+
+**As** a host, **I want** a "Pinochle" quick-start preset, **so that**
+starting a non-standard-deck game is one click, not five manual field
+changes — and so `presets.js`'s schema actually covers what the
+framework epic built (D45-D48), not just the pre-epic deck-size/deal-
+count fields.
+
+**AC:**
+- `presets.js` entries gain an optional `type` field (matching
+  `deck.js`'s own field name, not a second name needing translation),
+  defaulting to `'standard'` when absent.
+- A real "Pinochle" preset: 48-card deck, 12 cards to 4 players, with
+  a genuine rules-reference entry (required by the existing
+  `presets.test.js` suite already, not new for this story).
+- Selecting a preset that names a `type` updates the deck-type selector
+  too, not just decks/jokers/cards-per-player.
+
+**Explicitly not done:** assigning `allowsPlayerZones` to any preset —
+a genuine game-design call this project has no researched basis for
+making per game, see D49's "Rejected" for the full reasoning.
+
+**Sprint 19 status — SHIPPED (2026-08-21).** Full design in
+`docs/ARCHITECTURE.md` D49, including a real naming-mismatch bug found
+and fixed while wiring it (`deckType` vs. the runtime `deckConfig`'s
+actual `type` field). 258/258 unit (2 new) + full e2e green,
+independently re-verified.
+
+**This closes the Pile/Zone/GameConfig framework epic (D38-D49)**,
+short of the builder screen - which remains its own later, separate
+story, exactly as scoped from the start.
 
 
 ---

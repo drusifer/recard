@@ -1339,6 +1339,26 @@ try {
   console.log('DeckDefinition (D47): a pinochle table deals from a real 48-card deck, reachable from host setup');
   await pinochleHost.close();
 
+  // --- Preset schema (D49): the "Pinochle" quick-start preset actually
+  // applies deck TYPE, not just numDecks/jokers/cardsPerPlayer. ---
+  const presetHost = await (await browser.newContext()).newPage();
+  await presetHost.goto(BASE);
+  await presetHost.click('#show-host');
+  await presetHost.fill('#host-name', 'Gil');
+  await presetHost.selectOption('#host-deck-type', 'standard'); // starts non-pinochle, so the preset must be what changes it
+  await presetHost.selectOption('#host-preset', 'Pinochle');
+  const presetDeckType = await presetHost.inputValue('#host-deck-type');
+  assert(presetDeckType === 'pinochle', `selecting the Pinochle preset must set the deck type, got ${JSON.stringify(presetDeckType)}`);
+  const presetPreviewText = (await presetHost.locator('#host-preset-preview').textContent()).trim();
+  assert(/pinochle/.test(presetPreviewText), `the preview must name the deck type, got ${JSON.stringify(presetPreviewText)}`);
+  await presetHost.click('#create-table');
+  await presetHost.waitForSelector('#host-share:not([hidden])', { timeout: 20000 });
+  const presetDeckCount = await presetHost.evaluate(() =>
+    Number(document.querySelector('.deck-count-badge')?.textContent ?? -1));
+  assert(presetDeckCount === 48, `the Pinochle preset must actually deal a 48-card deck, got ${presetDeckCount}`);
+  console.log('Preset schema (D49): the Pinochle quick-start preset reaches DeckDefinition end to end, not just deal count');
+  await presetHost.close();
+
   // --- Auto-start at the expected player count (US-42, D30) ----------
   // A FRESH pair, deliberately after the main table is torn down: a third
   // live player would permanently reshape the seat ring that the D24/US-31

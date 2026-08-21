@@ -37,4 +37,11 @@ export const RULES_REFERENCE = {
     turns:
       'A betting round, then reveal 3 shared cards (the flop) and bet again, reveal 1 more (the turn) and bet, reveal the last (the river) and bet, then showdown.',
   },
+  Pinochle: {
+    goal: 'Score points by melding card combinations and by winning tricks that contain counting cards (Aces, Tens, Kings), racing to a target score across hands.',
+    setup:
+      'Uses a 48-card pinochle deck (two of each 9/10/J/Q/K/A per suit, no 2-8, no jokers). Deal 12 cards to each of 4 players (2 partnerships).',
+    turns:
+      'Players bid for the right to name trump, then lay down and score their melds face-up. Play then proceeds in tricks: follow suit if you can, otherwise you may trump; highest card of the led suit (or highest trump) wins the trick and leads next.',
+  },
 };
