@@ -42,4 +42,6 @@ sequenceDiagram
     Note right of Trin: "UAT phase 52 PASSED,<br/>independent re-run + my<br/>own mutation check<br/>(hand-ownership guard -<br/>removing isOwner fails 2<br/>tests). Reviewed the 3<br/>upd…"
     Morpheus->>Neo: "lead handoff"
     Note right of Morpheus: "Phase 52 review<br/>APPROVED. Clean pure-<br/>logic phase, exactly the<br/>shape D34/D35 called<br/>for: zero DOM touched,<br/>both real architecture<br/>points (dr…"
+    Trin->>Neo: "qa diagnose"
+    Note right of Trin: "Diagnosed RED e2e: not a<br/>bug, stale assertion.<br/>e2e.smoke.mjs:431<br/>asserts guest must NOT<br/>see .deck-controls-strip<br/>- true pre-Phase-52,<br/>false…"
 ```

@@ -487,6 +487,20 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   z-index: 7;
 }
 
+/* Sprint 12: the deck's pile-level controls (.deck-controls-strip, D29)
+   are PERSISTENT, not hover-revealed - unlike a card's popup, they must
+   stay clickable unconditionally. Same trapped-stacking-context cause as
+   above (`#table-center`'s transform vs. `#seat-zones`'s sibling z-index:
+   1), same `:has()` fix - but always-on rather than conditional, since
+   there's no hover moment to key off. Confirmed live at the 2-player
+   seat geometry (`seatPosition`'s already-documented pot/seat overlap
+   above): a personal zone's empty `.card-row` was silently swallowing
+   clicks meant for the Deal button underneath it - not a hover
+   collision, a permanent one, because the strip is always there. */
+#table-center:has(.deck-controls-strip) {
+  z-index: 2;
+}
+
 /* Drag cursor affordance (US-28, Smith Sprint 4 close-out finding #1):
    the only visual hint a mouse user has that a card is draggable at all
    - hand cards are always draggable, middle-cards only where MOVE_CARD's
@@ -1264,6 +1278,44 @@ body.targeting .middle-card-actions { display: none !important; }
    on a card, so they are always visible rather than revealed by pointing
    at something. Sibling of `.deck-stack`, which is what lets the controls
    survive an empty deck (Smith Gate 1 blocker). */
+/* Sprint 12 (D34/D37): the generalized pile anchor - fixed to the
+   pile's own container, never card-relative (T53.1). Reveal is the same
+   CSS-only `:hover`/`:focus-within` mechanism D25's `.middle-card-actions`
+   already uses (not a new one): a tap focuses `.pile-anchor-toggle`,
+   which keeps the popover open via `:focus-within` for exactly as long
+   as focus stays inside it - same as a card's hover row on touch. */
+.pile-anchor {
+  position: relative;
+  display: inline-block;
+}
+
+.pile-anchor-toggle {
+  font-size: 1.1rem;
+  padding: 0.4rem 0.7rem;
+}
+
+.pile-anchor-popover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  display: none;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-top: 0.2rem;
+  z-index: 6;
+  white-space: nowrap;
+}
+
+.pile-anchor:hover .pile-anchor-popover,
+.pile-anchor:focus-within .pile-anchor-popover {
+  display: flex;
+}
+
+.pile-anchor-popover button {
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
 .deck-controls-strip {
   display: flex;
   align-items: center;

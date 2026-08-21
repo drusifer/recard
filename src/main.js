@@ -16,7 +16,9 @@ import {
   setCardLifted,
   updateCardDragGhost,
   removeCardDragGhost,
+  renderPileAnchor,
 } from './ui.js';
+import { pileLevelActions } from './pileActions.js';
 import { PRESETS } from './presets.js';
 import { RULES_REFERENCE } from './rulesReference.js';
 import { reconcileOrder, sortByRank, sortBySuit } from './handOrder.js';
@@ -36,6 +38,7 @@ const screens = {
 const bannerEl = document.getElementById('banner');
 
 const handAreaEl = document.getElementById('hand-area');
+const handAnchorEl = document.getElementById('hand-pile-anchor');
 const tableAreaEl = document.getElementById('table-area');
 const gameRosterEl = document.getElementById('game-roster');
 const drawBtn = document.getElementById('draw-btn');
@@ -873,6 +876,17 @@ function renderRosterOnly() {
     onPileAction: (action, count) => dealFromDeck(action, count),
   });
   passToggleBtn.textContent = view.passed?.[myId] ? 'Unpass' : 'Pass';
+  // Sprint 12 (D34/D37, T53.2): the hand's own pile anchor replaces the
+  // three buttons above it - same actions, one control instead of three.
+  renderPileAnchor(handAnchorEl, pileLevelActions('hand', { isOwner: true }), {
+    pileLabel: 'Hand',
+    labels: { pass: view.passed?.[myId] ? 'Unpass' : 'Pass' },
+    onPileAction: (id) => {
+      if (id === 'sortRank') sortHandByRank();
+      else if (id === 'sortSuit') sortHandBySuit();
+      else if (id === 'pass') togglePass();
+    },
+  });
 }
 
 function renderGameFromView(view) {
@@ -995,19 +1009,22 @@ drawBtn.addEventListener('click', () => {
 
 // --- Hand sort (US-23, D14): local-only, never broadcast. Writes into
 // the same handOrderIds that manual drag-reorder writes into, so the two
-// never fight (Smith Gate 1). ---
-sortRankBtn.addEventListener('click', () => {
+// never fight (Smith Gate 1). Named functions so both the hidden legacy
+// buttons and the pile anchor (Sprint 12, T53.2) call one implementation. ---
+function sortHandByRank() {
   const view = currentView();
   if (!view) return;
   handOrderIds = sortByRank(view.myHand);
   renderGameFromView(view);
-});
-sortSuitBtn.addEventListener('click', () => {
+}
+function sortHandBySuit() {
   const view = currentView();
   if (!view) return;
   handOrderIds = sortBySuit(view.myHand);
   renderGameFromView(view);
-});
+}
+sortRankBtn.addEventListener('click', sortHandByRank);
+sortSuitBtn.addEventListener('click', sortHandBySuit);
 
 // --- Deal More (US-24): host-only, adds to existing hands without a
 // reset. Deliberately a different label/section/style than "Deal &
@@ -1052,11 +1069,12 @@ function showDeckError(message) {
 }
 
 // --- Pass marker (US-25): self-toggle only, like US-13's precedent. ---
-passToggleBtn.addEventListener('click', () => {
+function togglePass() {
   if (sessionEnded) return;
   if (role === 'host') dispatch({ type: 'TOGGLE_PASS', playerId: myId });
   else session.send({ type: 'action', action: { type: 'TOGGLE_PASS' } });
-});
+}
+passToggleBtn.addEventListener('click', togglePass);
 
 // --- Motion (US-11): best-effort, cosmetic only. See protocol.js/ARCHITECTURE.md D4. ---
 function markMoving(playerId, active) {

@@ -140,9 +140,18 @@
     <section class="panel">
       <h2>Your hand</h2>
       <div class="btn-row">
-        <button id="sort-rank-btn" type="button">Sort by rank</button>
-        <button id="sort-suit-btn" type="button">Sort by suit</button>
-        <button id="pass-toggle-btn" type="button">Pass</button>
+        <!-- Sprint 12 (D34/D37, T53.2): Sort by rank/suit and Pass moved
+             onto the hand's own pile anchor (#hand-pile-anchor, rendered
+             by main.js) - three permanently-visible buttons replaced by
+             one. Kept hidden-but-present (not deleted) until Phase 58's
+             cleanup, so main.js's existing listeners keep working
+             mid-sprint if anything still reaches them. -->
+        <button id="sort-rank-btn" type="button" hidden>Sort by rank</button>
+        <button id="sort-suit-btn" type="button" hidden>Sort by suit</button>
+        <button id="pass-toggle-btn" type="button" hidden>Pass</button>
+        <!-- In-flow with `play-as-label` (not a new row before #hand-area):
+             the 3 hidden buttons above freed up room in THIS row for it. -->
+        <div id="hand-pile-anchor"></div>
         <!-- Replaces the two icon buttons that used to sit under every
              hand card (US-34 follow-up). Stated once instead of 2xN
              times, and always visible so the armed mode can't be

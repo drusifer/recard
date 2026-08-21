@@ -765,6 +765,56 @@ export function renderDeck(container, count, opts = {}) {
 }
 
 /**
+ * D34/D37 (Sprint 12, "piles are the interaction"): a small anchor fixed
+ * to a pile's own container - never card-relative (Smith Gate 1 #2, the
+ * exact mistake this sprint exists to fix; T53.1). Hover (mouse) / tap
+ * (touch, Smith Gate 1 #1) reveals a popover of that pile's own actions,
+ * generalizing D29's deck-only control strip to any pile kind. Reuses
+ * D25's existing `:hover`/`:focus-within` CSS-only reveal (style.css
+ * `.pile-anchor-popover`) rather than inventing a second mechanism.
+ *
+ * Draggable/tap-shortcut actions (Draw, Phase 54) are wired by the
+ * caller through `opts` once that phase lands; this function only knows
+ * about plain click actions today (sortRank/sortSuit/pass, Phase 53).
+ *
+ * @param {HTMLElement} container rebuilt wholesale each call, like every
+ *   other render* function here.
+ * @param {string[]} actions ids from `pileLevelActions()`.
+ * @param {{onPileAction: (id: string) => void, pileLabel?: string}} opts
+ */
+export function renderPileAnchor(container, actions, opts = {}) {
+  container.innerHTML = '';
+  if (!actions.length) return;
+
+  const anchor = document.createElement('div');
+  anchor.className = 'pile-anchor';
+
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'pile-anchor-toggle';
+  toggle.setAttribute('aria-label', `${opts.pileLabel ?? 'Pile'} actions`);
+  toggle.textContent = '⋯'; // midline horizontal ellipsis
+  anchor.appendChild(toggle);
+
+  const popover = document.createElement('div');
+  popover.className = 'pile-anchor-popover';
+
+  for (const id of actions) {
+    const spec = PILE_ACTIONS[id];
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.dataset.pileAction = id;
+    btn.textContent = opts.labels?.[id] ?? spec.label;
+    btn.title = spec.hint;
+    if (spec.destructive) btn.classList.add('btn-danger');
+    btn.addEventListener('click', () => opts.onPileAction?.(id));
+    popover.appendChild(btn);
+  }
+  anchor.appendChild(popover);
+  container.appendChild(anchor);
+}
+
+/**
  * The persistent pile-level control strip (D29) - not the D25 hover row.
  * These act on the deck, not on a card, so they are always visible rather
  * than revealed by pointing at something.
