@@ -1594,6 +1594,54 @@ mechanical lint-fix.
 
 ---
 
+## Backlog: Pile/Zone/GameConfig framework (queued for Sprint 13+, 2026-08-20)
+
+From a user/Morpheus architecture sidebar during Sprint 12 — full
+design in `docs/ARCHITECTURE.md` D38-D40. **Not yet scoped as stories**;
+this entry queues it for Cypher once Sprint 12 (v2.0) closes, so it
+isn't lost, not so it gets built from this summary alone.
+
+**The pitch:** turn Recard from "one hardcoded game" into a framework —
+a fixed catalog of composable primitives (GameConfig, DeckDefinition,
+Zone, Pile) that any concrete card game is assembled from via config,
+with pre-built presets and eventually a builder screen for new ones.
+This isn't a new direction so much as finishing a generalization the
+project has been doing incrementally since D23 (unify every card
+collection onto one `piles` array) and this very sprint's D29/D34-D36
+(pile-level actions as a real per-kind table).
+
+**Candidate stories for Cypher to shape, not commitments yet:**
+- Replace `kind` (a string switched on in `state.js`/`pileActions.js`/
+  `ui.js`) with a real Pile interface (5 methods — see D39): `actions`,
+  `canAccept`/`insert`, `canRemove`/`remove`, `dropRule`, `redact`.
+- Make US-19 ("Add Zone") a per-`GameConfig` capability
+  (`allowsPlayerZones`) instead of an always-on global feature — some
+  games have a fixed table, some allow host-added zones mid-game.
+- `DeckDefinition` as its own concept (deck type incl. pinochle, N
+  decks, joker count) — generalizes `deck.js` past its current single
+  hardcoded 52+joker shape. Explicitly NOT the same axis as Pile type
+  (D38's rejected alternative).
+- New Pile types beyond Deck/Hand/zone-as-catch-all: Discard
+  (stack, drop-only), Run/Set (fan, aligned sequence) — US-32/33
+  already sketch this behavior informally; this gives it a real type.
+- `Card.orientation` (portrait/landscape, D40) as replicated state
+  alongside `faceUp`, for pile types/mechanics that need a rotated-card
+  concept (confirmed game state, not derived presentation).
+- A config-driven preset schema (extends `presets.js`) covering the
+  full GameConfig shape, and — later, separate story — a builder screen
+  as a form over the same schema.
+
+**Sequencing note (Morpheus):** deliberately not started mid-Sprint-12
+— a background implementation was actively landing the *current*
+`kind`-string model in `ui.js`/`state.js` while this was being
+designed, and redesigning the replacement against a moving foundation
+is exactly the pattern (architecture-stage defect caught late) this
+project's own retros have flagged repeatedly (D21 params-vs-rule drift,
+D24 premises). Sprint 12 closes first; this starts clean after.
+
+
+---
+
 ## Deferred / Stretch
 - Scannable QR code image for joining (v1 ships join-code + Copy Link
   instead; descoped 2026-08-15, see CHAT.md Neo→Cypher).

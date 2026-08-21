@@ -44,4 +44,6 @@ sequenceDiagram
     Note right of Morpheus: "Phase 52 review<br/>APPROVED. Clean pure-<br/>logic phase, exactly the<br/>shape D34/D35 called<br/>for: zero DOM touched,<br/>both real architecture<br/>points (dr…"
     Trin->>Neo: "qa diagnose"
     Note right of Trin: "Diagnosed RED e2e: not a<br/>bug, stale assertion.<br/>e2e.smoke.mjs:431<br/>asserts guest must NOT<br/>see .deck-controls-strip<br/>- true pre-Phase-52,<br/>false…"
+    Morpheus->>Cypher: "lead decide"
+    Note right of Morpheus: "D38-D40 recorded<br/>(docs/ARCHITECTURE.md,<br/>proposed, NOT started):<br/>Pile/Zone/GameConfig<br/>framework. 4 primitives<br/>- DeckDefinition(cards)/<br/>Zone(t…"
 ```

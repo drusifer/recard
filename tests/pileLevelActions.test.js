@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PILE_ACTIONS, pileLevelActions, actionsForPileKind, ACTIONS } from '../src/pileActions.js';
+import { PILE_ACTIONS, pileLevelActions, actionsForPileKind, ACTIONS, targetsForAction } from '../src/pileActions.js';
 
 // UPDATED for D34 (Sprint 12): Draw generalized from a dead per-card
 // action to a pile-level one offered to EVERYONE, not just the host -
@@ -145,4 +145,36 @@ test('Phase 56: shuffle/split are never draggable - they act on the deck itself,
     assert.equal(PILE_ACTIONS[id].target, undefined);
     assert.equal(PILE_ACTIONS[id].singleTarget, undefined);
   }
+});
+
+// --- Phase 57 (T57.1): confirm, don't reimplement - move/pickup stay
+// drag-first (`beginTargeting`, ui.js's `actionMenuEl`) even in the
+// EXACT early-game shape (2 zones total) that would have tempted a
+// live-computed singleTarget to misfire (Smith Gate 2 #1). D36's own
+// BLOCKER test already locks the static field; this locks the live
+// geometry that made the risk concrete, not hypothetical. ---
+
+test('Phase 57: a 2-zone early game gives move exactly ONE legal target - the exact shape Gate 2 warned about', () => {
+  // Two zones total (the minimum any real game has - a shared zone plus
+  // one player's own), moving a card OUT of one of them: only the other
+  // zone can legally receive it, so `targetsForAction` genuinely returns
+  // a single-element list here - this is not a contrived edge case.
+  const piles = [
+    { id: 'table', kind: 'zone', ownerId: null },
+    { id: 'alice-personal', kind: 'zone', ownerId: 'alice' },
+  ];
+  const targets = targetsForAction('move', piles, { viewerId: 'alice', fromPileId: 'table' });
+  assert.deepEqual(targets, ['alice-personal'],
+    'exactly one target - the live shape that would tempt a computed shortcut');
+});
+
+test('Phase 57: move stays unmarked even in that exact one-target shape - no shortcut, drag/beginTargeting only', () => {
+  // The point of D36: `singleTarget` is never computed from `targets`
+  // above, or from `piles.length`, or from anything live - it is a
+  // static fact about the ACTION's definition, and move's definition
+  // has none. Nothing in this file (or `actionMenuEl`, ui.js - it never
+  // reads `singleTarget` for card-level actions at all) can make move
+  // skip `beginTargeting`, no matter how few zones exist right now.
+  assert.equal(ACTIONS.move.singleTarget, undefined);
+  assert.equal(ACTIONS.pickup.singleTarget, undefined);
 });

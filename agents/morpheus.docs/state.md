@@ -519,3 +519,59 @@ Phase 29 approved. Neo to start Phase 30 (position-aware
       to Smith at close-out for a UX read on the two candidate
       directions (tighter peek for face-down piles vs. rendering a
       face-down pile as a single back + count, like the deck stack).
+
+---
+*Last updated: 2026-08-20 (Pile/Zone/GameConfig framework sidebar, mid-Sprint-12)*
+
+## D38-D40: Pile/Zone/GameConfig framework (proposed, queued for Sprint 13+)
+
+### Context
+User-initiated architecture sidebar during Sprint 12, while a
+background implementation was actively landing Phases 53+ on the
+*current* `kind`-string model. Deliberately did not touch code or the
+in-flight sprint - recorded the design in writing (full text:
+`docs/ARCHITECTURE.md` "v3.0 Proposed Architecture" section, right
+after D37) and queued it in `docs/USER_STORIES.md` for Cypher, rather
+than letting it live only in chat/memory.
+
+### Decisions
+- **D38**: four primitives, kept strictly separate - GameConfig (the
+  composition: players, DeckDefinition, Zone list, Zone->Pile bindings,
+  `allowsPlayerZones` flag), DeckDefinition (what cards exist - deck
+  type incl. pinochle, N decks, jokers - pure data), Zone (a typed slot
+  from a fixed catalog: PlayerZone/TableZone/HandZone/DeckZone), Pile
+  (behavior - D39). Rejected folding DeckDefinition into Pile: deck
+  type and pile behavior are different axes: a pinochle Deck and a
+  standard Deck are the same pile type with a different DeckDefinition.
+- **D39**: Pile as a 5-method interface (`actions`, `canAccept`/
+  `insert`, `canRemove`/`remove`, `dropRule`, `redact`). Card actions
+  are double-dispatched, not single-dispatched - every action crosses
+  two piles (leaves one, enters another), so the DESTINATION pile
+  decides how a card lands (stack-onto-top vs. spliced into a fan),
+  independent of the source. This replaces `state.js`/`pileActions.js`/
+  `ui.js`'s current `p.kind ===` string-switch (in ~10 places) with
+  real polymorphism, on BOTH ends of the replicated protocol, not just
+  in rendering. `dropTarget.js` keys its halo-vs-stack behavior off
+  `dropRule()` instead of applying one universal algorithm to every
+  non-deck/non-hand pile (today's implicit behavior).
+- **D40**: `Card.orientation` (portrait/landscape) is REPLICATED STATE,
+  confirmed with the user - not derived presentation. Lives next to
+  `faceUp`; redaction decides per-viewer visibility like any other
+  field. Pile types that don't use it simply never touch it.
+
+### Why this belongs in D-numbering (D38, following D37 from this
+sprint) even though nothing is implemented: it's a binding architecture
+decision about SHAPE (same authority as any other D-entry), just gated
+on Cypher scoping it as real stories before code starts - not a lesser
+kind of decision, an earlier-stage one.
+
+### Next Steps
+Sequencing is explicit in both docs: Sprint 12 (v2.0) closes first: no
+implementation starts against this section alone. @Cypher scopes real
+stories from the `docs/USER_STORIES.md` backlog entry once Sprint 12
+launches. Oracle should archive D38-D40 into `docs/DECISIONS.md`
+alongside the rest of the v2.0 sprint's decisions during groom (note:
+`docs/DECISIONS.md`'s narrative log currently stops at D20 - the D21+
+sprints only got recorded in `ARCHITECTURE.md`'s per-sprint sections;
+worth flagging to Oracle as a real gap, not assuming it's already
+synced).

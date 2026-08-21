@@ -1329,6 +1329,130 @@ not deferred to sprint close. The sprint that removed 70 undersized
 buttons must not ship a new set of them under a different name.
 
 
+## v3.0 Proposed Architecture — Pile/Zone/GameConfig framework (queued, not yet a sprint)
+
+**PROPOSED. Nothing below is implemented.** Recorded now, from a
+user/Morpheus design sidebar during Sprint 12, so the shape exists in
+writing before Cypher turns it into real stories. Do not build against
+this without a story + AC — this is the "what" and "why", not a task
+list.
+
+**Context:** Recard has always shipped one hardcoded game (a generic
+deck + configurable zones). The user wants Recard to become a
+**framework**: a fixed catalog of composable primitives that any
+concrete card game (poker, hearts, gin rummy, pinochle, ...) is
+assembled from via config, with a builder screen eventually letting a
+host define new ones. Critically, this is not a new direction — it is
+the completion of a generalization this project has been doing
+incrementally for three sprints running (D23 unified every card
+collection onto one `piles` array; D29/D34-D36, this very sprint,
+turned "what can this pile do" into a real per-kind table instead of
+one-off per-feature code). What's proposed here finishes that: replace
+the `kind` *string*, switched on in ~10 places across `state.js`,
+`pileActions.js`, and `ui.js`, with `kind` as a real polymorphic
+*interface*.
+
+### D38. Four primitives, cleanly separated: GameConfig, DeckDefinition, Zone, Pile
+
+Four different questions were getting folded into one ("what is a
+pile") in the original pitch. Keeping them separate is the whole
+point — it's what makes adding a new game or a new pile type additive
+instead of a cross-cutting change:
+
+- **DeckDefinition** — *what cards exist*: deck type (standard,
+  pinochle, ...), number of decks, joker count. Pure data, no behavior.
+  Feeds `buildDeck()` (today's `deck.js`, generalized past its current
+  single hardcoded 52+joker shape).
+- **Zone** — *a typed slot on the table*: `PlayerZone` (one per
+  seated player), `TableZone` (shared), `HandZone`, `DeckZone`, etc.
+  Zones are a **fixed catalog**, not a data type a game invents freely.
+  A `GameConfig` enumerates which zone types a game uses and how many
+  (today's personal-zone-per-seat and shared-default-zone are both
+  already instances of this, just not named as such).
+- **Pile** — *a collection of cards with type-specific behavior*: Deck
+  (stack, draw-from-top), Hand (fan, sort, insert-between), Discard
+  (stack, drop-only), Run/Set (aligned sequence), etc. A `GameConfig`
+  binds a Pile type into a Zone (`DeckPile` → the `DeckZone`,
+  `DiscardPile` → each `PlayerZone`, `Hand` → `HandZone`). This is the
+  interface D39 specifies.
+- **GameConfig** — *the composition*: player count, a `DeckDefinition`,
+  the Zone list, the Zone→Pile bindings, and one capability flag:
+  `allowsPlayerZones: boolean` (US-19's "Add Zone" becomes a per-game
+  capability, not a global always-on feature — some games have a fixed
+  table, some let a host add ad-hoc zones mid-game; the same schema
+  covers both, no separate code path). Presets (`presets.js`, already
+  data-driven for deck/deal config) extend to cover the full schema; the
+  builder screen is a form over the same schema, not a second format.
+
+**Rejected:** folding DeckDefinition into Pile ("a Deck pile knows its
+own card set"). Wrong axis — deck type answers "what cards", pile type
+answers "how do cards already in me behave". A pinochle Deck and a
+standard Deck are the *same* pile type (stack, draw-top) with a
+*different* DeckDefinition. Conflating them means every new deck
+variant would need its own pile type.
+
+### D39. Pile is a five-method interface; card actions are double-dispatched, not single-dispatched
+
+Every card action crosses **two** piles — leaves one, enters another
+(`PLAY` is Hand→Zone, `MOVE_CARD` is Zone→Zone). So a Pile type cannot
+own a single "handle this command" method; it needs an outbound half
+and an inbound half, and the *destination* pile decides how a card
+lands, independent of what the source was:
+
+- `actions(pile, viewerId)` — which pile-level and card-level actions
+  this pile offers, and to whom. Generalizes today's
+  `pileLevelActions()`/`actionsForCard()`.
+- `canAccept(pile, card, point)` / `insert(pile, card, point)` — the
+  inbound half: can this card land here, and where (top of stack vs.
+  spliced into a fan at a halo position).
+- `canRemove(pile, card)` / `remove(pile, card)` — the outbound half.
+- `dropRule(pile)` — `STACK` (onto-top only: Deck, Discard) or `FAN`
+  (before/onto/after halo: Hand, Run, Set). `dropTarget.js`'s
+  `resolveDropTarget` keys off this instead of applying one universal
+  algorithm to every non-deck/non-hand pile, which is the current
+  (implicit, undocumented) behavior.
+- `redact(pile, card, viewerId)` — per-viewer visibility. Generalizes
+  the deck/hand/zone redaction table `state.js` already documents
+  inline (deck: count only; hand: owner-count; zone: per-card
+  owner/faceUp).
+
+**This is not a UI refactor.** `state.js`'s reducer branches on
+`p.kind ===` exactly like `pileActions.js`/`ui.js` do. Real
+polymorphism means the reducer dispatches PLAY/MOVE_CARD/DRAW through
+`canRemove`/`remove`/`canAccept`/`insert` on both ends of the wire —
+host and every guest run the identical dispatch, since state is
+replicated (D2/D9's authoritative-host model doesn't change, but what
+each command means is no longer hardcoded once per verb, it's owned by
+the pile types on both sides of the transfer). Each new Pile type
+becomes a new file implementing these five functions — Open/Closed in
+practice, not aspiration: adding a pinochle meld pile touches zero
+existing pile-type code, the same way adding `seating.js`/
+`handOrder.js`/`dropTarget.js` as pure modules (D14/D18/D21) never
+required touching each other.
+
+**Protocol identifiers follow the same split, deliberately left open
+for whoever scopes the implementing story:** whether each Pile type
+also owns its own wire command names (vs. one generic
+`PILE_ACTION {pileId, action}` envelope routed by lookup) is an
+implementation choice inside D39, not decided here — it doesn't change
+the interface shape above either way.
+
+### D40. Card gains a replicated `orientation` field (portrait/landscape), alongside `faceUp`
+
+Confirmed with the user: orientation is **game state**, not rendering —
+some pile types (a "tapped"/rotated-card mechanic, a landscape fan
+strip) need it to persist and sync exactly like `faceUp` does, not be
+derived fresh from pile type + position on each render. Lives on `Card`
+next to `faceUp`; redaction (`redact()`, D39) decides whether a
+non-owner's view includes it, same as any other card field. Pile types
+that don't use orientation (Deck, Discard) simply never read or set it
+— no schema branching needed, an unused field on a card is free.
+
+**Next step:** Cypher scopes this as Sprint 13+ stories once Sprint 12
+(v2.0) closes. Do not start implementation from this section alone —
+it's the shape, not the plan.
+
+
 ## Module Layout
 ```
 index.html              entry page, host/join screens, game screen
