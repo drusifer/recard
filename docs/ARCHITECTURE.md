@@ -1788,6 +1788,57 @@ into `ui.js`'s drop handling, and a way to actually create a discard
 pile from the Add Zone control) is a separate phase within this same
 sprint - see below.
 
+### D45 (continued). UI wiring, and two real bugs found doing it
+
+`pileActions.js`'s `targetsForAction` had its own hardcoded `pile.kind
+!== 'zone'` (a second copy of the exact assumption `zonesOf` had) -
+generalized off `tableSide` too, so a dragged play/move correctly
+lights up a discard pile as a legal destination. New `dropRuleFor(kind)`
+accessor (mirrors `pileLevelActions`'s shape) is what `ui.js` reads
+instead of importing `PILE_TYPES` directly - `showZoneDragOver`/
+`performZoneDrop` skip `dropTarget.js`'s halo geometry entirely for
+anything that isn't `'FAN'`, resolving to a plain top-of-pile insert.
+The zone element carries `dataset.kind` so the touch-drag path (which
+only has the DOM node at drop time, not the view object) can look up
+the same rule. `CREATE_ZONE` gains a `kind` selector next to the
+existing name input (defaults to plain `'zone'`).
+
+**Two real, pre-existing bugs found wiring this, not introduced by
+it:**
+1. `renderZoneCards` and `actionMenuEl` both built a `pile` object with
+   **hardcoded `kind: 'zone'`** rather than reading the view's actual
+   `kind` field - harmless while `zone` was the only `'mixed'`-
+   visibility type in existence (every card would have gotten the
+   right rule by coincidence), a real bug the instant `discard` exists:
+   a discard pile's own cards would have been evaluated against
+   `zonePile`'s `cardActions` instead of `discardPile`'s always-empty
+   one. Fixed at all three call sites to read the pile/zone's real
+   `kind`.
+2. **`draggable` was decided by an ad-hoc condition** (`!card.faceDown
+   || card.owner === null`) that never consulted the pile type at all.
+   For `zonePile` this happens to be exactly equivalent to `actionsForCard(...).length
+   > 0` (verified case-by-case: face-up, shared face-down, owner's-own-
+   hidden, non-owner-hidden, hidden-viewed-by-its-own-owner - all five
+   match) - but a discard pile's cards would have shown as draggable
+   with the mouse cursor and everything, even though `discardPile`'s
+   always-empty `cardActions` means the resulting drop is rejected by
+   the reducer every time. Replaced with the real offer-table check,
+   which is exactly what D34/D42 already promised ("the hover
+   affordances... can't drift apart" from the reducer) and now
+   generalizes correctly to any future pile type for free.
+
+**Consequences:** 239/239 unit (238 carried + `dropRuleFor`
+characterization; `targetsForAction`'s existing play/move tests updated
+in place to assert the discard pile now lights up too, not just added
+alongside) + a new e2e block: create a discard pile, drag two cards
+onto it, confirm the second lands on top with no halo classes ever
+set, confirm the resulting card is NOT draggable. Full e2e
+suite re-verified green end to end, including every pre-existing
+drag/drop/reveal/move test - the two bug fixes above changed zero
+observable behavior for `zone`/`hand`/`deck` (proven case-by-case
+before changing the code, then confirmed by the unmodified existing
+suite passing unchanged).
+
 
 ## Module Layout
 ```

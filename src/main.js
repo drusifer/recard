@@ -975,8 +975,12 @@ document.getElementById('create-zone-btn').addEventListener('click', () => {
   const nameInput = document.getElementById('new-zone-name');
   const name = nameInput.value.trim();
   if (!name) return; // Smith Gate 1: zones need a real name, no silent auto-numbering
-  if (role === 'host') dispatch({ type: 'CREATE_ZONE', name });
-  else session.send({ type: 'action', action: { type: 'CREATE_ZONE', name } });
+  // D45: kind travels with the request - CREATE_ZONE (state.js) is the
+  // actual authority on which kinds are legal, this is just what's on
+  // the wire.
+  const kind = document.getElementById('new-zone-kind').value;
+  if (role === 'host') dispatch({ type: 'CREATE_ZONE', name, kind });
+  else session.send({ type: 'action', action: { type: 'CREATE_ZONE', name, kind } });
   nameInput.value = '';
 });
 

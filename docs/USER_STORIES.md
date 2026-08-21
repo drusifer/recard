@@ -1635,19 +1635,24 @@ collection onto one `piles` array) and this very sprint's D29/D34-D36
 (pile-level actions as a real per-kind table).
 
 **Candidate stories for Cypher to shape, not commitments yet:**
-- Replace `kind` (a string switched on in `state.js`/`pileActions.js`/
-  `ui.js`) with a real Pile interface (5 methods — see D39): `actions`,
-  `canAccept`/`insert`, `canRemove`/`remove`, `dropRule`, `redact`.
+- ~~Replace `kind` (a string switched on in `state.js`/`pileActions.js`/
+  `ui.js`) with a real Pile interface~~ — **SHIPPED**, Sprint 13/14
+  (D39, Tranches 1+2, US-47/48).
 - Make US-19 ("Add Zone") a per-`GameConfig` capability
   (`allowsPlayerZones`) instead of an always-on global feature — some
   games have a fixed table, some allow host-added zones mid-game.
+  Still open: Sprint 15/D45 shipped a real `kind` selector on the
+  existing Add Zone control (any table-side pile type is creatable),
+  but that's still a global always-on capability, not yet gated per
+  `GameConfig` — `GameConfig` itself doesn't exist yet.
 - `DeckDefinition` as its own concept (deck type incl. pinochle, N
   decks, joker count) — generalizes `deck.js` past its current single
   hardcoded 52+joker shape. Explicitly NOT the same axis as Pile type
   (D38's rejected alternative).
-- New Pile types beyond Deck/Hand/zone-as-catch-all: Discard
-  (stack, drop-only), Run/Set (fan, aligned sequence) — US-32/33
-  already sketch this behavior informally; this gives it a real type.
+- ~~New Pile types beyond Deck/Hand/zone-as-catch-all: Discard
+  (stack, drop-only)~~ — **SHIPPED**, Sprint 15 (D45, US-49). Run/Set
+  (fan, aligned sequence) remains open — US-32/33 already sketch this
+  behavior informally; this gives it a real type.
 - `Card.orientation` (portrait/landscape, D40) as replicated state
   alongside `faceUp`, for pile types/mechanics that need a rotated-card
   concept (confirmed game state, not derived presentation).
@@ -1740,12 +1745,55 @@ on each):**
   deliberately NOT forced into the transfer shape. Stays a direct
   `state.js` case. Adding a new Pile type still requires no change
   here regardless (deal only ever targets hand piles).
-- `dropRule` wiring into `ui.js`'s `dropTarget.js` caller — still
-  blocked on a second pile type (Discard/Run/Set, D38) actually
-  rendering through that path; wiring it with only `zone` in existence
-  would be dead code with nothing to verify it against.
+- ~~`dropRule` wiring into `ui.js`'s `dropTarget.js` caller~~ —
+  **SHIPPED**, Sprint 15 (D45), once a second pile type existed to
+  verify it against.
 - `docs/DECISIONS.md`'s D20 ceiling — resolved this sprint (see its own
   header note), no longer a backlog item.
+
+## Sprint 15 ("Discard pile — the first new Pile type") — US-49
+
+### US-49: A real Discard pile type, proving Open/Closed for the Pile interface
+
+**As** the codebase (continuing US-47/48's "no player-facing change
+required" framing, though this one adds a genuinely new player-facing
+capability as a side effect), **I want** a second Pile type to actually
+exist, **so that** D39/D42's "a new Pile type costs one module, not a
+`case` in three files" claim is proven against real code, not just
+argued in a doc comment — and so the `dropRule`/`tableSide` generalization
+work Sprint 14 deferred has something real to verify against.
+
+**AC:**
+- `src/piles/discardPile.js`: `visibility: 'mixed'`, `dropRule:
+  'STACK'` (new — every drop lands on top, no before/after halo),
+  `cardActions` always `[]` ("drop-only" — a card that lands in a
+  discard pile cannot be moved/picked-up/revealed back out).
+- A host can create one via the existing Add Zone control (a new
+  `kind` selector, defaulting to plain `'zone'`).
+- Dragging a card onto a discard pile plays/moves it there, on top,
+  with no halo geometry shown during the drag.
+- A card in a discard pile is not draggable and offers no hover/tap
+  action row.
+- `state.js`'s zone-only assumptions (`zonesOf`, `CREATE_ZONE`'s
+  existence checks, `pileActions.js`'s `targetsForAction`) generalize
+  off a new `tableSide` flag instead of gaining a second hardcoded
+  `'zone'`/`'discard'` check each.
+
+**Sprint 15 status — SHIPPED (2026-08-21).** 2 phases (data/reducer
+layer, then UI wiring), 239/239 unit + full e2e green, independently
+re-verified at both phases. Full design in `docs/ARCHITECTURE.md` D45,
+including two real pre-existing bugs (hardcoded `kind: 'zone'` in two
+`ui.js` call sites, and a draggable-condition that never consulted the
+pile type) found and fixed while wiring `dropRule` through — not
+introduced by this sprint, but only surfaced once a second pile type
+existed to expose them.
+
+**Still open:**
+- Run/Set (fan, aligned sequence) — the other D38 pile type candidate,
+  not started.
+- `GameConfig`'s `allowsPlayerZones` capability gate — Add Zone (with
+  its new kind selector) is still a global always-on control, not
+  gated per game config (no `GameConfig` exists yet to gate it with).
 
 
 ---

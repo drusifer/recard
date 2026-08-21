@@ -389,6 +389,73 @@ try {
   );
   console.log('US-28: dragging a table card onto another zone MOVE_CARDs it there');
 
+  // --- Discard pile (D45, Sprint 15): the first new Pile type built
+  // after D42's interface existed. "Stack, drop-only" - every drop
+  // lands on top with no halo, and once a card is in it, it stays. ---
+  await host.fill('#new-zone-name', 'My Discard');
+  await host.selectOption('#new-zone-kind', 'discard');
+  await host.click('#create-zone-btn');
+  await join.waitForFunction(
+    () => document.querySelector('#table-area .zone[data-kind="discard"]') !== null,
+    undefined,
+    { timeout: 10000 },
+  );
+  console.log('CREATE_ZONE with kind: "discard" propagated to the other client, as a real discard pile');
+
+  // Top up the host's hand first (Draw, via the deck's own pile anchor,
+  // D34/D35) - by this point in the suite the hand has been drawn down
+  // by several earlier tests, and this test needs 2 spendable cards
+  // without starving the hand-cursor-affordance check right after it.
+  const handSizeBeforeTopUp = await host.evaluate(() => document.querySelectorAll('#hand-area .card').length);
+  await host.hover('#game-deck-area .pile-anchor-toggle');
+  await host.click('#game-deck-area [data-pile-action="draw"]');
+  await host.hover('#game-deck-area .pile-anchor-toggle');
+  await host.click('#game-deck-area [data-pile-action="draw"]');
+  await host.waitForFunction(
+    (before) => document.querySelectorAll('#hand-area .card').length === before + 2,
+    handSizeBeforeTopUp,
+    { timeout: 10000 },
+  );
+
+  const [discard1, discard2] = await host.evaluate(() =>
+    [...document.querySelectorAll('#hand-area .card')].slice(0, 2).map((c) => c.dataset.cardId));
+  const dragOntoDiscard = (cardId) => host.evaluate((id) => {
+    const source = document.querySelector(`#hand-area [data-card-id="${id}"]`).closest('.hand-card');
+    const target = document.querySelector('#table-area .zone[data-kind="discard"]');
+    const dt = new DataTransfer();
+    dt.setData('text/plain', id);
+    source.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
+    // STACK never computes halo geometry - a plain dragover/drop on the
+    // zone itself (no card-relative point) is the whole gesture.
+    target.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }));
+    target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+  }, cardId);
+
+  await dragOntoDiscard(discard1);
+  await join.waitForFunction(
+    (id) => document.querySelector(`#table-area .zone[data-kind="discard"] [data-card-id="${id}"]`) !== null,
+    discard1,
+    { timeout: 10000 },
+  );
+  await dragOntoDiscard(discard2);
+  await join.waitForFunction(
+    (id) => document.querySelector(`#table-area .zone[data-kind="discard"] [data-card-id="${id}"]`) !== null,
+    discard2,
+    { timeout: 10000 },
+  );
+
+  const discardOrder = await host.evaluate(() =>
+    [...document.querySelectorAll('#table-area .zone[data-kind="discard"] .middle-card')].map((el) => el.dataset.cardId));
+  assert(JSON.stringify(discardOrder) === JSON.stringify([discard2, discard1]),
+    `the second card played lands ON TOP (index 0) - a physical discard pile, not an append-only list, got ${JSON.stringify(discardOrder)}`);
+
+  const discardedDraggable = await host.evaluate((id) =>
+    document.querySelector(`#table-area .zone[data-kind="discard"] [data-card-id="${id}"]`).closest('.middle-card').draggable,
+    discard1);
+  assert(discardedDraggable === false,
+    'drop-only: a card in a discard pile must not itself be draggable back out - discardPile.cardActions is always []');
+  console.log('Discard pile (D45): drops land on top with no halo, and a discarded card cannot be dragged back out');
+
   // --- Cursor affordance (US-28, Smith Sprint 4 close-out finding #1):
   // a draggable card must visually hint that it's draggable on a
   // mouse-driven client, or a desktop user has no way to discover the

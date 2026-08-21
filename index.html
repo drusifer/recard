@@ -121,6 +121,13 @@
       </div>
       <div class="btn-row">
         <input id="new-zone-name" type="text" placeholder="New zone name" maxlength="24" />
+        <!-- D45: kind defaults to a plain zone - CREATE_ZONE's own
+             validation is the source of truth for what's legal here,
+             this list is just its two current table-side options. -->
+        <select id="new-zone-kind" aria-label="New zone type">
+          <option value="zone">Zone</option>
+          <option value="discard">Discard pile</option>
+        </select>
         <button id="create-zone-btn" type="button">Add Zone</button>
         <!-- US-41: "Deal More (no reset)" and its orphaned number input
              used to live here, in a row about zones, named for something

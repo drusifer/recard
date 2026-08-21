@@ -1,6 +1,6 @@
 import { resolveDropTarget } from './dropTarget.js';
 import { step as touchDragStep, HOLD_MS } from './touchDrag.js';
-import { ACTIONS, PILE_ACTIONS, actionsForCard, pileLevelActions, targetsForAction } from './pileActions.js';
+import { ACTIONS, PILE_ACTIONS, actionsForCard, pileLevelActions, targetsForAction, dropRuleFor } from './pileActions.js';
 import { seatPosition } from './seating.js';
 
 const SUIT_SYMBOL = { clubs: '♣', diamonds: '♦', hearts: '♥', spades: '♠' };
@@ -175,7 +175,7 @@ function attachTouchDrag(sourceEl, card, ctx) {
       const target = touchTargetAt(ev.x, ev.y);
       if (hinted && (target?.kind !== 'zone' || target.el !== hinted.el)) clearHint();
       if (target?.kind === 'zone') {
-        showZoneDragOver(target.el, target.row, { x: ev.x, y: ev.y });
+        showZoneDragOver(target.el, target.row, { x: ev.x, y: ev.y }, dropRuleFor(target.el.dataset.kind));
         hinted = target;
       }
     },
@@ -193,7 +193,7 @@ function attachTouchDrag(sourceEl, card, ctx) {
         performHandReorder(target.el.parentElement, card.id, target.el, ctx.onReorder);
       } else if (ctx.onDropCard) {
         performZoneDrop(target.el, target.row, target.el.dataset.zoneId, card.id,
-          { x: ev.x, y: ev.y }, ctx.onDropCard);
+          { x: ev.x, y: ev.y }, ctx.onDropCard, dropRuleFor(target.el.dataset.kind));
       }
     },
     cancel: () => {
@@ -457,12 +457,14 @@ function performReveal(card, viewerId, onReveal) {
  */
 function actionMenuEl(zone, card, allZones, opts) {
   const { viewerId, onPickup, onMoveCard } = opts;
-  const pile = { id: zone.id, kind: 'zone', ownerId: zone.ownerId ?? null };
+  // D45: both were hardcoded `kind: 'zone'` - real bugs the moment a
+  // second table-side type exists, same class as `renderZoneCards`'s.
+  const pile = { id: zone.id, kind: zone.kind, ownerId: zone.ownerId ?? null };
   const available = actionsForCard(pile, card, viewerId).filter((a) => a !== 'reveal');
   if (available.length === 0) return null;
 
   const piles = [
-    ...allZones.map((z) => ({ id: z.id, kind: 'zone', ownerId: z.ownerId ?? null })),
+    ...allZones.map((z) => ({ id: z.id, kind: z.kind, ownerId: z.ownerId ?? null })),
     { id: HAND_PILE_ID, kind: 'hand', ownerId: viewerId },
   ];
 
@@ -492,6 +494,12 @@ function actionMenuEl(zone, card, allZones, opts) {
 function renderZoneCards(container, zone, allZones, opts = {}) {
   const { resolveOwnerName, onMoveCard, onCardLift, onCardDrag } = opts;
   container.innerHTML = '';
+  // D45: was hardcoded `kind: 'zone'` below - harmless while zone was
+  // the only 'mixed'-visibility pile type, a real bug the moment a
+  // second one (discard) exists: every card-level authorization check
+  // in this function would have been evaluated against ZONE's rules
+  // even for a discard pile's own cards.
+  const pile = { id: zone.id, kind: zone.kind, ownerId: zone.ownerId ?? null };
   for (const card of zone.cards) {
     const wrapper = document.createElement('div');
     wrapper.className = 'middle-card';
@@ -523,7 +531,17 @@ function renderZoneCards(container, zone, allZones, opts = {}) {
     // (shared face-down, movable by anyone per US-19 "put or take").
     // Someone else's still-hidden private card gets no controls at all
     // today (see below) and stays non-draggable to match.
-    if (onMoveCard && (!card.faceDown || card.owner === null)) {
+    //
+    // D45: was the ad-hoc `!card.faceDown || card.owner === null` check
+    // - equivalent for zone cards (verified case-by-case against
+    // `zonePile.cardActions` before changing this), but it never
+    // consulted the pile TYPE, so a discard pile's cards (drop-only -
+    // `discardPile.cardActions` is always `[]`) would have shown as
+    // draggable even though every resulting drop is rejected
+    // server-side. Reading the real offer table instead is what D34/D42
+    // already promised: "the hover affordances... can't drift apart"
+    // from the reducer's own authorization.
+    if (onMoveCard && actionsForCard(pile, card, opts.viewerId).length > 0) {
       wrapper.draggable = true;
       wrapper.addEventListener('dragstart', (e) => {
         e.dataTransfer.setData('text/plain', card.id);
@@ -552,7 +570,7 @@ function renderZoneCards(container, zone, allZones, opts = {}) {
     // never set on it - only `card.faceUp: false`), while everyone else
     // gets the redacted `{faceDown: true}` back. A tap-to-reveal needs
     // wiring onto whichever one actually renders for this viewer.
-    const pile = { id: zone.id, kind: 'zone', ownerId: zone.ownerId ?? null };
+    // `pile` is the one hoisted to the top of this function (D45).
     const canReveal = Boolean(opts.onReveal) && actionsForCard(pile, card, opts.viewerId).includes('reveal');
 
     if (card.faceDown) {
@@ -636,10 +654,17 @@ function showDropHint(rowEl, placement) {
  * code. See `performHandReorder` for why this matters more than it
  * looks: if touch computed placement separately it would drift from
  * mouse, and only mouse is covered by the e2e suite.
+ *
+ * D45: `dropRule` gates whether `dropTarget.js`'s halo geometry runs at
+ * all. `'FAN'` (zone) keeps the existing before/onto/after behavior;
+ * anything else (`'STACK'`, discard - or the `undefined` an unrecognized
+ * kind would produce) skips it entirely and always resolves to a plain
+ * append, matching "every drop lands on top, no positional choice" with
+ * no geometry computed for a pile that has none to offer.
  */
-function showZoneDragOver(zoneEl, row, point) {
+function showZoneDragOver(zoneEl, row, point, dropRule) {
   zoneEl.classList.add('zone-drag-over');
-  showDropHint(row, resolveDropTarget(cardBoxesIn(row), point));
+  showDropHint(row, dropRule === 'FAN' ? resolveDropTarget(cardBoxesIn(row), point) : {});
 }
 
 function clearZoneDragOver(zoneEl, row) {
@@ -647,17 +672,16 @@ function clearZoneDragOver(zoneEl, row) {
   clearDropHints(row);
 }
 
-function performZoneDrop(zoneEl, row, zoneId, cardId, point, onDropCard) {
+function performZoneDrop(zoneEl, row, zoneId, cardId, point, onDropCard, dropRule) {
   clearZoneDragOver(zoneEl, row);
   if (!cardId) return;
   // US-32/33: the drop point decides stack vs. overlap vs. plain
   // append. Aiming at the card being dragged itself is meaningless
   // (it's about to leave that position), so it's treated as open
   // space rather than a self-referential placement.
-  const placement = resolveDropTarget(
-    cardBoxesIn(row).filter((b) => b.cardId !== cardId),
-    point,
-  );
+  const placement = dropRule === 'FAN'
+    ? resolveDropTarget(cardBoxesIn(row).filter((b) => b.cardId !== cardId), point)
+    : {};
   onDropCard(cardId, zoneId, placement);
 }
 
@@ -682,6 +706,11 @@ function renderZonePanel(zone, allZones, opts) {
   const zoneEl = document.createElement('div');
   zoneEl.className = 'zone';
   zoneEl.dataset.zoneId = zone.id; // D25: addressable as a drop target
+  // D45: the kind travels with the element so the touch-drag path
+  // (which only has the DOM node, not the view object, at drop time)
+  // can look up its dropRule too - see touchTargetAt/attachTouchDrag.
+  zoneEl.dataset.kind = zone.kind;
+  const dropRule = dropRuleFor(zone.kind);
 
   const heading = document.createElement('div');
   heading.className = 'zone-name';
@@ -696,13 +725,13 @@ function renderZonePanel(zone, allZones, opts) {
   if (opts.onDropCard) {
     zoneEl.addEventListener('dragover', (e) => {
       e.preventDefault();
-      showZoneDragOver(zoneEl, row, { x: e.clientX, y: e.clientY });
+      showZoneDragOver(zoneEl, row, { x: e.clientX, y: e.clientY }, dropRule);
     });
     zoneEl.addEventListener('dragleave', () => clearZoneDragOver(zoneEl, row));
     zoneEl.addEventListener('drop', (e) => {
       e.preventDefault();
       performZoneDrop(zoneEl, row, zone.id, e.dataTransfer.getData('text/plain'),
-        { x: e.clientX, y: e.clientY }, opts.onDropCard);
+        { x: e.clientX, y: e.clientY }, opts.onDropCard, dropRule);
     });
   }
 

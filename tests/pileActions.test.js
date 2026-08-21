@@ -1,13 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ACTIONS, actionsForCard, targetsForAction } from '../src/pileActions.js';
+import { ACTIONS, actionsForCard, targetsForAction, dropRuleFor } from '../src/pileActions.js';
 
 const deck = { id: 'deck', kind: 'deck', ownerId: null };
 const myHand = { id: 'hand:me', kind: 'hand', ownerId: 'me' };
 const theirHand = { id: 'hand:you', kind: 'hand', ownerId: 'you' };
 const table = { id: 'table', kind: 'zone', ownerId: null };
 const myZone = { id: 'z:me', kind: 'zone', ownerId: 'me' };
-const ALL = [deck, myHand, theirHand, table, myZone];
+const discard = { id: 'discard', kind: 'discard', ownerId: null };
+const ALL = [deck, myHand, theirHand, table, myZone, discard];
 
 // UPDATED for D42 (Sprint 13): `actionsForPileKind` (a kind-only,
 // pre-ownership-filter list) is gone - each pile TYPE's `cardActions`
@@ -56,8 +57,8 @@ test("someone else's still-hidden private card offers nothing (matches the reduc
     'but its owner can do both');
 });
 
-test('targets: play and move light up zones, pickup lights up your own hand', () => {
-  assert.deepEqual(targetsForAction('play', ALL, { viewerId: 'me' }), ['table', 'z:me']);
+test('targets: play and move light up every table-side pile (zones AND discard, D45), pickup lights up your own hand', () => {
+  assert.deepEqual(targetsForAction('play', ALL, { viewerId: 'me' }), ['table', 'z:me', 'discard']);
   assert.deepEqual(targetsForAction('pickup', ALL, { viewerId: 'me' }), ['hand:me'],
     "never another player's hand");
 });
@@ -73,7 +74,7 @@ test('targets: draw (now pile-level, D34) still lights up your own hand via targ
 test('move excludes the pile the card already sits in', () => {
   assert.deepEqual(
     targetsForAction('move', ALL, { viewerId: 'me', fromPileId: 'table' }),
-    ['z:me'],
+    ['z:me', 'discard'],
     'lighting up the pile it is already in would offer a no-op',
   );
 });
@@ -81,4 +82,12 @@ test('move excludes the pile the card already sits in', () => {
 test('an in-place action has no targets to highlight', () => {
   assert.deepEqual(targetsForAction('reveal', ALL, { viewerId: 'me' }), []);
   assert.deepEqual(targetsForAction('not-an-action', ALL, { viewerId: 'me' }), []);
+});
+
+test('dropRuleFor (D45): FAN for zone, STACK for discard, NONE for deck/hand, undefined for an unknown kind', () => {
+  assert.equal(dropRuleFor('zone'), 'FAN');
+  assert.equal(dropRuleFor('discard'), 'STACK');
+  assert.equal(dropRuleFor('deck'), 'NONE');
+  assert.equal(dropRuleFor('hand'), 'NONE');
+  assert.equal(dropRuleFor('nonsense'), undefined);
 });

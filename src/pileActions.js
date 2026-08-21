@@ -77,7 +77,10 @@ export function targetsForAction(action, piles, { viewerId, fromPileId } = {}) {
     .filter((pile) => {
       if (spec.target === 'hand') return pile.kind === 'hand' && pile.ownerId === viewerId;
       if (spec.target === 'zone') {
-        if (pile.kind !== 'zone') return false;
+        // D45: was `pile.kind !== 'zone'` - generalized the same way
+        // state.js's `zonesOf` was, so a dragged play/move correctly
+        // lights up a Discard pile too, not just plain zones.
+        if (!PILE_TYPES[pile.kind]?.tableSide) return false;
         // Moving a card to the pile it's already in is a no-op offer, so
         // don't light it up. Playing from hand has no such exclusion.
         return action === 'move' ? pile.id !== fromPileId : true;
@@ -167,4 +170,19 @@ export const PILE_ACTIONS = {
  */
 export function pileLevelActions(kind, ctx = {}) {
   return PILE_TYPES[kind]?.pileActions(ctx) ?? [];
+}
+
+/**
+ * D45: which drop geometry `ui.js` should use for a pile of this kind -
+ * `'FAN'` (before/onto/after halo, `dropTarget.js`) or `'STACK'` (every
+ * drop lands on top, no geometry to compute at all). Kept as its own
+ * accessor rather than having `ui.js` import `PILE_TYPES` directly, the
+ * same reasoning as `pileLevelActions` above: callers go through this
+ * module's narrow surface, not the registry's internals.
+ *
+ * @param {string} kind
+ * @returns {'NONE'|'FAN'|'STACK'|undefined}
+ */
+export function dropRuleFor(kind) {
+  return PILE_TYPES[kind]?.dropRule;
 }
