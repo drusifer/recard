@@ -250,254 +250,277 @@ function transferCard(state, { fromPileId, toPileId, cardId, viewerId, action, p
   return { ...state, piles };
 }
 
+// --- Action registry (D44) --------------------------------------------
+// `reduce()` used to be one large `switch (action.type)`, exactly the
+// shape D42/D43 just replaced for `pile.kind` - so it gets the same
+// prescription. Unlike Pile types (a multi-method contract: visibility/
+// dropRule/cardActions/canRemoveCard/removeCard/insertCard), an action
+// type shares only ONE thing across every kind - "take state + this
+// action, return new state" - so this is the plain Command pattern
+// (one `apply(state, action)` per entry), not a second `src/piles/`-
+// shaped module family. Kept as one object literal IN this file, not
+// split into `src/actions/*.js`: every handler closes over this
+// module's private helpers (`transferCard`, `findZoneAndCard`,
+// `ensureHandPile`, `dealRoundRobin`, `DECK_PILE_ID`, ...) - exporting
+// all of them just to satisfy separate files would leak internals
+// nothing else should touch, and importing them back INTO those files
+// from `state.js` would be circular (this module would import the
+// registry, which would import from this module). Real per-file
+// extraction makes sense specifically if/when D38's GameConfig
+// framework needs per-game PLUGGABLE actions - not before; this file
+// already has the isolation that matters (unit-tested as a whole,
+// same as before this change).
+const ACTIONS = {
+  JOIN(state, action) {
+    // D17: a returning player (SET_CONNECTION reconnect-of-same-id
+    // case) already has a personal zone - only create one the first
+    // time this playerId is seen, same "preserved on re-join" spirit
+    // as scores/passed below.
+    const alreadyHasPersonalZone = zonesOf(state).some((z) => z.ownerId === action.playerId);
+    return {
+      ...state,
+      players: [
+        ...state.players.filter((p) => p.id !== action.playerId),
+        { id: action.playerId, name: action.name, connection: 'connected' },
+      ],
+      piles: alreadyHasPersonalZone
+        ? state.piles
+        : [...state.piles, makeZonePile(action.name, action.playerId)],
+      scores: { [action.playerId]: 0, ...state.scores },
+      passed: { [action.playerId]: false, ...state.passed },
+    };
+  },
+
+  SET_CONNECTION(state, action) {
+    return {
+      ...state,
+      players: state.players.map((p) =>
+        p.id === action.playerId ? { ...p, connection: action.connection } : p,
+      ),
+    };
+  },
+
+  // D15: identical distribution, differing only in whether existing
+  // hands are cleared first - one function, assigned to both keys
+  // below, rather than two call paths that could drift apart.
+  DEAL(state, action) {
+    const fresh = action.type === 'DEAL';
+    const players = state.players;
+    const { remaining, dealt } = dealRoundRobin(
+      deckOf(state),
+      players.length,
+      action.cardsPerPlayer,
+      (left) =>
+        `Cannot deal ${action.cardsPerPlayer} cards to ${players.length} players: only ${left} left`,
+    );
+
+    let piles = state.piles;
+    for (const player of players) piles = ensureHandPile(piles, player.id);
+    piles = piles.map((p) => {
+      if (p.kind === 'deck') return withCards(p, remaining);
+      if (p.kind !== 'hand') return p;
+      const index = players.findIndex((pl) => pl.id === p.ownerId);
+      if (index === -1) return fresh ? withCards(p, []) : p;
+      return withCards(p, [...(fresh ? [] : p.cards), ...dealt[index]]);
+    });
+    return { ...state, piles };
+  },
+
+  CREATE_ZONE(state, action) {
+    return { ...state, piles: [...state.piles, makeZonePile(action.name)] };
+  },
+
+  SHUFFLE_DECK(state, action) {
+    // D22/US-35: reorders the stock and nothing else - the one thing
+    // `RESET` can't do, since it also rebuilds the deck and wipes
+    // hands/zones/pass markers. Everything else flows through
+    // untouched via the spread, so there's no field to forget.
+    const rng = action.rng ?? Math.random;
+    return replacePile(state, DECK_PILE_ID, (deck) => withCards(deck, shuffle(deck.cards, rng)));
+  },
+
+  SPLIT_DECK(state, action) {
+    // D22/US-36: turn the remaining stock into N independent draw
+    // piles (solitaire-style layouts want several, not just two).
+    const { pileCount } = action;
+    if (!Number.isInteger(pileCount) || pileCount < 2) {
+      throw new Error(`Split needs at least 2 piles, got ${pileCount}`);
+    }
+    const deck = deckOf(state);
+    // Smith Gate 1 guard: every pile must get at least one card, which
+    // covers "deck is empty" and "too many piles" as one condition.
+    const { remaining, dealt } = dealRoundRobin(deck, pileCount, null, () => '', {
+      atLeastOneEach: true,
+      describeShortfall: (left) => `Cannot split into ${pileCount} piles: only ${left} cards left`,
+    });
+    const piles = dealt.map((cards, i) => {
+      const pile = makeZonePile(`Pile ${i + 1}`);
+      // Face-down and unowned: a draw pile hidden from everyone, which
+      // is the redaction case D7 already covers - no new privacy rule.
+      // Every card after the first carries D21's `stack` layout, so a
+      // pile renders as an actual pile rather than N loose card-backs
+      // each with its own controls. This is exactly what the layout
+      // field is for - no new rendering concept, just reuse.
+      return withCards(pile, cards.map((card, i) => ({
+        ...card, owner: null, faceUp: false, ...(i > 0 ? { layout: 'stack' } : {}),
+      })));
+    });
+    // D24 invariant: the deck pile stays, now empty. Removing it would
+    // break every later DRAW/DEAL with an opaque undefined error.
+    return {
+      ...state,
+      piles: [...state.piles.map((p) => (p.kind === 'deck' ? withCards(p, remaining) : p)), ...piles],
+    };
+  },
+
+  PLAY(state, action) {
+    const zoneId = action.zoneId ?? DEFAULT_ZONE_ID;
+    if (!zonesOf(state).some((z) => z.id === zoneId)) {
+      throw new Error(`Zone ${zoneId} does not exist`);
+    }
+    const { owner, faceUp } = middleCardVisibility(action.visibility ?? 'public', action.playerId);
+    return transferCard(state, {
+      fromPileId: handPileId(action.playerId),
+      toPileId: zoneId,
+      cardId: action.cardId,
+      viewerId: action.playerId,
+      action: 'play',
+      placement: placementOf(action),
+      transform: (card) => ({ ...card, owner, faceUp }),
+    });
+  },
+
+  REVEAL(state, action) {
+    // Mutates a card in place (flips `faceUp`) rather than moving it
+    // between piles, so this is NOT `transferCard` (D43) - but the
+    // authorization check is the same reuse-the-offer-table pattern:
+    // `cardActions` already states whether 'reveal' is offered, no
+    // second copy of the rule inline.
+    const found = findZoneAndCard(state, action.cardId);
+    if (!found) {
+      throw new Error(`Card ${action.cardId} is not in any zone`);
+    }
+    const { zoneId, card } = found;
+    if (card.faceUp) return state;
+    const zone = state.piles.find((p) => p.id === zoneId);
+    if (!PILE_TYPES[zone.kind].canRemoveCard(zone, card, action.playerId, 'reveal')) {
+      throw new Error(`Player ${action.playerId} is not authorized to reveal ${action.cardId}`);
+    }
+    return replacePile(state, zoneId, (z) =>
+      withCards(z, z.cards.map((c) => (c.id === action.cardId ? { ...c, faceUp: true } : c))),
+    );
+  },
+
+  PICKUP(state, action) {
+    const found = findZoneAndCard(state, action.cardId);
+    if (!found) {
+      throw new Error(`Card ${action.cardId} is not in any zone`);
+    }
+    // Ensured up front, not inside `transferCard`: the destination
+    // hand pile must exist before dispatch can look it up by id.
+    const withHand = { ...state, piles: ensureHandPile(state.piles, action.playerId) };
+    return transferCard(withHand, {
+      fromPileId: found.zoneId,
+      toPileId: handPileId(action.playerId),
+      cardId: action.cardId,
+      viewerId: action.playerId,
+      action: 'pickup',
+      // A hand pile's cards are plain - its own `kind`/`ownerId`
+      // already carry the visibility rule (D23), so the zone-only D7
+      // fields come back off on the way in. `layout` (D21) is
+      // zone-only for the same reason: a hand has no adjacency
+      // rendering to describe.
+      transform: ({ owner, faceUp, layout, ...plainCard }) => plainCard,
+    });
+  },
+
+  MOVE_CARD(state, action) {
+    const found = findZoneAndCard(state, action.cardId);
+    if (!found) {
+      throw new Error(`Card ${action.cardId} is not in any zone`);
+    }
+    if (!zonesOf(state).some((z) => z.id === action.toZoneId)) {
+      throw new Error(`Zone ${action.toZoneId} does not exist`);
+    }
+    // D21: no same-zone early return - a move within one zone is a
+    // real reorder, and `transferCard`'s remove-then-insert passes
+    // handle `fromPileId === toPileId` correctly by construction.
+    return transferCard(state, {
+      fromPileId: found.zoneId,
+      toPileId: action.toZoneId,
+      cardId: action.cardId,
+      viewerId: action.playerId,
+      action: 'move',
+      placement: placementOf(action),
+    });
+  },
+
+  DRAW(state, action) {
+    const deck = deckOf(state);
+    if (deck.length === 0) {
+      throw new Error('Cannot draw: deck is empty');
+    }
+    const withHand = { ...state, piles: ensureHandPile(state.piles, action.playerId) };
+    return transferCard(withHand, {
+      fromPileId: DECK_PILE_ID,
+      toPileId: handPileId(action.playerId),
+      cardId: deck[0].id,
+      viewerId: action.playerId,
+      action: 'draw',
+    });
+  },
+
+  ADJUST_SCORE(state, action) {
+    if (action.delta !== 1 && action.delta !== -1) {
+      throw new Error(`Score delta must be +1 or -1, got ${action.delta}`);
+    }
+    const current = state.scores[action.targetPlayerId] ?? 0;
+    return {
+      ...state,
+      scores: { ...state.scores, [action.targetPlayerId]: current + action.delta },
+    };
+  },
+
+  TOGGLE_PASS(state, action) {
+    const current = state.passed[action.playerId] ?? false;
+    return { ...state, passed: { ...state.passed, [action.playerId]: !current } };
+  },
+
+  RESET_SCORES(state) {
+    const scores = {};
+    for (const player of state.players) scores[player.id] = 0;
+    return { ...state, scores };
+  },
+
+  RESET(state, action) {
+    const rng = action.rng ?? Math.random;
+    return {
+      ...state,
+      piles: [
+        // Hand piles are dropped outright rather than emptied, so
+        // `handsOf()` is `{}` again exactly as pre-D23 `hands: {}` was.
+        makeDeckPile(state.deckConfig, rng),
+        // Zone structure (player-created zones included) survives a
+        // reset - only the cards inside each zone clear. A round reset
+        // shouldn't force players to recreate their table layout.
+        ...zonesOf(state).map((z) => withCards(z, [])),
+      ],
+      // Passing is round-scoped (D16, unlike scores) - explicitly
+      // rezeroed here, not left to fall through via `...state`.
+      passed: Object.fromEntries(state.players.map((p) => [p.id, false])),
+    };
+  },
+};
+ACTIONS.DEAL_MORE = ACTIONS.DEAL;
+
 /**
  * @param {ReturnType<typeof createInitialState>} state
  * @param {{type: string, [key: string]: any}} action
  */
 export function reduce(state, action) {
-  switch (action.type) {
-    case 'JOIN': {
-      // D17: a returning player (SET_CONNECTION reconnect-of-same-id
-      // case) already has a personal zone - only create one the first
-      // time this playerId is seen, same "preserved on re-join" spirit
-      // as scores/passed below.
-      const alreadyHasPersonalZone = zonesOf(state).some((z) => z.ownerId === action.playerId);
-      return {
-        ...state,
-        players: [
-          ...state.players.filter((p) => p.id !== action.playerId),
-          { id: action.playerId, name: action.name, connection: 'connected' },
-        ],
-        piles: alreadyHasPersonalZone
-          ? state.piles
-          : [...state.piles, makeZonePile(action.name, action.playerId)],
-        scores: { [action.playerId]: 0, ...state.scores },
-        passed: { [action.playerId]: false, ...state.passed },
-      };
-    }
-
-    case 'SET_CONNECTION':
-      return {
-        ...state,
-        players: state.players.map((p) =>
-          p.id === action.playerId ? { ...p, connection: action.connection } : p,
-        ),
-      };
-
-    case 'DEAL':
-    case 'DEAL_MORE': {
-      // D15: identical distribution, differing only in whether existing
-      // hands are cleared first. Post-D23 that difference is one flag on
-      // otherwise-shared code, not two separate call paths.
-      const fresh = action.type === 'DEAL';
-      const players = state.players;
-      const { remaining, dealt } = dealRoundRobin(
-        deckOf(state),
-        players.length,
-        action.cardsPerPlayer,
-        (left) =>
-          `Cannot deal ${action.cardsPerPlayer} cards to ${players.length} players: only ${left} left`,
-      );
-
-      let piles = state.piles;
-      for (const player of players) piles = ensureHandPile(piles, player.id);
-      piles = piles.map((p) => {
-        if (p.kind === 'deck') return withCards(p, remaining);
-        if (p.kind !== 'hand') return p;
-        const index = players.findIndex((pl) => pl.id === p.ownerId);
-        if (index === -1) return fresh ? withCards(p, []) : p;
-        return withCards(p, [...(fresh ? [] : p.cards), ...dealt[index]]);
-      });
-      return { ...state, piles };
-    }
-
-    case 'CREATE_ZONE':
-      return { ...state, piles: [...state.piles, makeZonePile(action.name)] };
-
-    case 'SHUFFLE_DECK': {
-      // D22/US-35: reorders the stock and nothing else - the one thing
-      // `RESET` can't do, since it also rebuilds the deck and wipes
-      // hands/zones/pass markers. Everything else flows through
-      // untouched via the spread, so there's no field to forget.
-      const rng = action.rng ?? Math.random;
-      return replacePile(state, DECK_PILE_ID, (deck) => withCards(deck, shuffle(deck.cards, rng)));
-    }
-
-    case 'SPLIT_DECK': {
-      // D22/US-36: turn the remaining stock into N independent draw
-      // piles (solitaire-style layouts want several, not just two).
-      const { pileCount } = action;
-      if (!Number.isInteger(pileCount) || pileCount < 2) {
-        throw new Error(`Split needs at least 2 piles, got ${pileCount}`);
-      }
-      const deck = deckOf(state);
-      // Smith Gate 1 guard: every pile must get at least one card, which
-      // covers "deck is empty" and "too many piles" as one condition.
-      const { remaining, dealt } = dealRoundRobin(deck, pileCount, null, () => '', {
-        atLeastOneEach: true,
-        describeShortfall: (left) => `Cannot split into ${pileCount} piles: only ${left} cards left`,
-      });
-      const piles = dealt.map((cards, i) => {
-        const pile = makeZonePile(`Pile ${i + 1}`);
-        // Face-down and unowned: a draw pile hidden from everyone, which
-        // is the redaction case D7 already covers - no new privacy rule.
-        // Every card after the first carries D21's `stack` layout, so a
-        // pile renders as an actual pile rather than N loose card-backs
-        // each with its own controls. This is exactly what the layout
-        // field is for - no new rendering concept, just reuse.
-        return withCards(pile, cards.map((card, i) => ({
-          ...card, owner: null, faceUp: false, ...(i > 0 ? { layout: 'stack' } : {}),
-        })));
-      });
-      // D24 invariant: the deck pile stays, now empty. Removing it would
-      // break every later DRAW/DEAL with an opaque undefined error.
-      return {
-        ...state,
-        piles: [...state.piles.map((p) => (p.kind === 'deck' ? withCards(p, remaining) : p)), ...piles],
-      };
-    }
-
-    case 'PLAY': {
-      const zoneId = action.zoneId ?? DEFAULT_ZONE_ID;
-      if (!zonesOf(state).some((z) => z.id === zoneId)) {
-        throw new Error(`Zone ${zoneId} does not exist`);
-      }
-      const { owner, faceUp } = middleCardVisibility(action.visibility ?? 'public', action.playerId);
-      return transferCard(state, {
-        fromPileId: handPileId(action.playerId),
-        toPileId: zoneId,
-        cardId: action.cardId,
-        viewerId: action.playerId,
-        action: 'play',
-        placement: placementOf(action),
-        transform: (card) => ({ ...card, owner, faceUp }),
-      });
-    }
-
-    case 'REVEAL': {
-      // Mutates a card in place (flips `faceUp`) rather than moving it
-      // between piles, so this is NOT `transferCard` (D43) - but the
-      // authorization check is the same reuse-the-offer-table pattern:
-      // `cardActions` already states whether 'reveal' is offered, no
-      // second copy of the rule inline.
-      const found = findZoneAndCard(state, action.cardId);
-      if (!found) {
-        throw new Error(`Card ${action.cardId} is not in any zone`);
-      }
-      const { zoneId, card } = found;
-      if (card.faceUp) return state;
-      const zone = state.piles.find((p) => p.id === zoneId);
-      if (!PILE_TYPES[zone.kind].canRemoveCard(zone, card, action.playerId, 'reveal')) {
-        throw new Error(`Player ${action.playerId} is not authorized to reveal ${action.cardId}`);
-      }
-      return replacePile(state, zoneId, (z) =>
-        withCards(z, z.cards.map((c) => (c.id === action.cardId ? { ...c, faceUp: true } : c))),
-      );
-    }
-
-    case 'PICKUP': {
-      const found = findZoneAndCard(state, action.cardId);
-      if (!found) {
-        throw new Error(`Card ${action.cardId} is not in any zone`);
-      }
-      // Ensured up front, not inside `transferCard`: the destination
-      // hand pile must exist before dispatch can look it up by id.
-      const withHand = { ...state, piles: ensureHandPile(state.piles, action.playerId) };
-      return transferCard(withHand, {
-        fromPileId: found.zoneId,
-        toPileId: handPileId(action.playerId),
-        cardId: action.cardId,
-        viewerId: action.playerId,
-        action: 'pickup',
-        // A hand pile's cards are plain - its own `kind`/`ownerId`
-        // already carry the visibility rule (D23), so the zone-only D7
-        // fields come back off on the way in. `layout` (D21) is
-        // zone-only for the same reason: a hand has no adjacency
-        // rendering to describe.
-        transform: ({ owner, faceUp, layout, ...plainCard }) => plainCard,
-      });
-    }
-
-    case 'MOVE_CARD': {
-      const found = findZoneAndCard(state, action.cardId);
-      if (!found) {
-        throw new Error(`Card ${action.cardId} is not in any zone`);
-      }
-      if (!zonesOf(state).some((z) => z.id === action.toZoneId)) {
-        throw new Error(`Zone ${action.toZoneId} does not exist`);
-      }
-      // D21: no same-zone early return - a move within one zone is a
-      // real reorder, and `transferCard`'s remove-then-insert passes
-      // handle `fromPileId === toPileId` correctly by construction.
-      return transferCard(state, {
-        fromPileId: found.zoneId,
-        toPileId: action.toZoneId,
-        cardId: action.cardId,
-        viewerId: action.playerId,
-        action: 'move',
-        placement: placementOf(action),
-      });
-    }
-
-    case 'DRAW': {
-      const deck = deckOf(state);
-      if (deck.length === 0) {
-        throw new Error('Cannot draw: deck is empty');
-      }
-      const withHand = { ...state, piles: ensureHandPile(state.piles, action.playerId) };
-      return transferCard(withHand, {
-        fromPileId: DECK_PILE_ID,
-        toPileId: handPileId(action.playerId),
-        cardId: deck[0].id,
-        viewerId: action.playerId,
-        action: 'draw',
-      });
-    }
-
-    case 'ADJUST_SCORE': {
-      if (action.delta !== 1 && action.delta !== -1) {
-        throw new Error(`Score delta must be +1 or -1, got ${action.delta}`);
-      }
-      const current = state.scores[action.targetPlayerId] ?? 0;
-      return {
-        ...state,
-        scores: { ...state.scores, [action.targetPlayerId]: current + action.delta },
-      };
-    }
-
-    case 'TOGGLE_PASS': {
-      const current = state.passed[action.playerId] ?? false;
-      return { ...state, passed: { ...state.passed, [action.playerId]: !current } };
-    }
-
-    case 'RESET_SCORES': {
-      const scores = {};
-      for (const player of state.players) scores[player.id] = 0;
-      return { ...state, scores };
-    }
-
-    case 'RESET': {
-      const rng = action.rng ?? Math.random;
-      return {
-        ...state,
-        piles: [
-          // Hand piles are dropped outright rather than emptied, so
-          // `handsOf()` is `{}` again exactly as pre-D23 `hands: {}` was.
-          makeDeckPile(state.deckConfig, rng),
-          // Zone structure (player-created zones included) survives a
-          // reset - only the cards inside each zone clear. A round reset
-          // shouldn't force players to recreate their table layout.
-          ...zonesOf(state).map((z) => withCards(z, [])),
-        ],
-        // Passing is round-scoped (D16, unlike scores) - explicitly
-        // rezeroed here, not left to fall through via `...state`.
-        passed: Object.fromEntries(state.players.map((p) => [p.id, false])),
-      };
-    }
-
-    default:
-      throw new Error(`Unknown action type: ${action.type}`);
-  }
+  const apply = ACTIONS[action.type];
+  if (!apply) throw new Error(`Unknown action type: ${action.type}`);
+  return apply(state, action);
 }
 
 /**

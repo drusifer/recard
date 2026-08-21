@@ -1682,6 +1682,49 @@ zero-behavior-change discipline as Tranche 1's move.
 > `docs/USER_STORIES.md` backlog entry for what, if anything, is left
 > to schedule.
 
+### D44. `reduce()`'s action-type `switch` becomes an object-map registry (same-turn follow-on, user request)
+
+Raised live, mid-Sprint-14: `reduce()`'s top-level `switch
+(action.type)` is the same shape D42/D43 just replaced for
+`pile.kind` - one more string dispatching sixteen `case` bodies.
+
+**Decision:** `ACTIONS = { JOIN(state, action) {...}, PLAY(state,
+action) {...}, ... }`; `reduce()` becomes `ACTIONS[action.type](state,
+action)`, throwing the same "Unknown action type" if the lookup misses.
+`DEAL_MORE` is assigned the same function reference as `DEAL`
+(`ACTIONS.DEAL_MORE = ACTIONS.DEAL`), replacing the `case 'DEAL': case
+'DEAL_MORE':` fallthrough - the body still reads `action.type ===
+'DEAL'` to pick fresh-vs-append, unchanged.
+
+**Rejected: splitting each action into its own file under
+`src/actions/`, mirroring `src/piles/`.** Two reasons, not one:
+1. **Different shape.** Pile types share a real multi-method contract
+   (visibility/dropRule/cardActions/canRemoveCard/removeCard/
+   insertCard) - that's what makes a dedicated module family pay for
+   itself. Action types share exactly one thing: `apply(state, action)
+   -> state`. This is the plain Command pattern, not the richer
+   interface D39 needed - correctly using a simpler tool for a simpler
+   problem, not under-building.
+2. **Real circularity risk.** Every handler closes over this module's
+   private helpers (`transferCard`, `findZoneAndCard`, `ensureHandPile`,
+   `dealRoundRobin`, `middleCardVisibility`, `handPileId`,
+   `DECK_PILE_ID`, `DEFAULT_ZONE_ID`, ...). Per-file extraction means
+   either exporting all of them (leaking reducer internals nothing else
+   should touch) or a circular import (`state.js` importing the
+   registry, the registry importing helpers back from `state.js`). An
+   in-module object literal needs neither.
+
+**When file-per-action WOULD be worth it:** if/when D38's GameConfig
+framework needs actions that are genuinely pluggable per game (a
+custom game defining its own action beyond this project's fixed set) -
+a real, different requirement from "stop switching on a string,"
+not assumed to arrive with it.
+
+**Consequences:** Zero behavior change - 225/225 unit + full e2e
+green, independently re-verified. `reduce()` itself shrinks from a
+~250-line switch to a 4-line dispatcher; every handler is independently
+readable without scanning past sibling `case` bodies.
+
 
 ## Module Layout
 ```
