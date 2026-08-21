@@ -56,6 +56,17 @@ async function cardAction(page, cardId, action) {
   await actionBtn(page, cardId, action).first().click();
 }
 
+// Phase 55 (T55.1): reveal moved off the hover row onto a direct tap on
+// the card itself, joining tap-to-play's vocabulary - no hover needed.
+// `.revealable` (not `.revealable.card-back`): a shared face-down card
+// redacts to a `.card-back` for everyone, but D7's `redactMiddleCard`
+// never redacts a card from its own OWNER, so a private-facedown card's
+// owner sees their card's real `.card` face, revealable-tap and all.
+const revealableEl = (page, cardId) => page.locator(`.revealable[data-card-id="${cardId}"]`);
+async function tapReveal(page, cardId) {
+  await revealableEl(page, cardId).click();
+}
+
 /** Count of piles currently lit up as valid destinations. */
 const litTargets = (page) => page.locator('.pile-target').count();
 
@@ -199,7 +210,7 @@ try {
   await host.locator('#hand-area .card').first().click();
   await host.selectOption('#play-as', 'public');
   await join.waitForFunction(
-    () => document.querySelectorAll('#table-area .action-btn[data-action="reveal"]').length === 1,
+    () => document.querySelectorAll('#table-area .card-back.revealable').length === 1,
     undefined,
     { timeout: 10000 },
   );
@@ -208,8 +219,8 @@ try {
 
   // Join reveals it (anyone may reveal a shared card, no confirm needed).
   const sharedFdId = await join.evaluate(() =>
-    document.querySelector('#table-area .action-btn[data-action="reveal"]').closest('.middle-card').dataset.cardId);
-  await cardAction(join, sharedFdId, 'reveal');
+    document.querySelector('#table-area .card-back.revealable').dataset.cardId);
+  await tapReveal(join, sharedFdId);
   await host.waitForFunction(
     () => document.querySelectorAll('#table-area .action-btn[data-action="pickup"]').length === 2,
     undefined,
@@ -233,12 +244,15 @@ try {
     undefined,
     { timeout: 10000 },
   );
-  const joinReactCanReveal = await join.evaluate(() => document.querySelectorAll('#table-area .action-btn[data-action="reveal"]').length);
+  const joinReactCanReveal = await join.evaluate(() => document.querySelectorAll('#table-area .revealable').length);
   assert(joinReactCanReveal === 0, "join must not be able to reveal another player's private card");
 
+  // The owner's own private-facedown card renders as a real `.card` face
+  // (D7 never redacts from the owner), not a `.card-back` - see the
+  // `revealableEl` comment above.
   const privateId = await host.evaluate(() =>
-    document.querySelector('#table-area .action-btn[data-action="reveal"]').closest('.middle-card').dataset.cardId);
-  await cardAction(host, privateId, 'reveal'); // dismissed above, must still be hidden
+    document.querySelector('#table-area .revealable').dataset.cardId);
+  await tapReveal(host, privateId); // dismissed above, must still be hidden
   await host.waitForTimeout(200);
   const stillHiddenAfterDismiss = await host.evaluate(
     () => [...document.querySelectorAll('#table-area .owner-tag')].some((el) => el.textContent.includes('hidden from others')),
@@ -246,7 +260,7 @@ try {
   assert(stillHiddenAfterDismiss, 'dismissing the reveal confirm must leave the private card hidden');
 
   host.once('dialog', (d) => d.accept()); // second attempt: accept, must reveal
-  await cardAction(host, privateId, 'reveal');
+  await tapReveal(host, privateId);
   await join.waitForFunction(
     () => document.querySelectorAll('#table-area .action-btn[data-action="pickup"]').length === 3,
     undefined,

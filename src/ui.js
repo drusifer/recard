@@ -435,12 +435,30 @@ function beginTargeting(action, targetIds, onChoose) {
 }
 
 /**
- * The hover-revealed action row for one card in a zone.
+ * Reveal a still-hidden card (Sprint 12, Phase 55, T55.1): a direct tap
+ * on the card itself, joining tap-to-play's existing vocabulary, rather
+ * than a separate hover-revealed button. The confirm gate is unchanged
+ * (Smith Gate 2 #2 - it's the actual safety net, not the AC this phase
+ * touches): revealing your OWN private card is irreversible and only
+ * you can undo the decision by not making it; a shared face-down card
+ * is nobody's, so it stays a single tap.
+ */
+function performReveal(card, viewerId, onReveal) {
+  clearPileTargets();
+  const mine = card.owner != null && card.owner === viewerId;
+  if (mine && !window.confirm('Reveal this card to everyone? This cannot be undone.')) return;
+  onReveal?.(card.id);
+}
+
+/**
+ * The hover-revealed action row for one card in a zone. `reveal` is
+ * deliberately excluded (Phase 55 moved it to a direct tap on the card -
+ * see `performReveal` and its call site in `renderZoneCards`).
  */
 function actionMenuEl(zone, card, allZones, opts) {
-  const { viewerId, onReveal, onPickup, onMoveCard } = opts;
+  const { viewerId, onPickup, onMoveCard } = opts;
   const pile = { id: zone.id, kind: 'zone', ownerId: zone.ownerId ?? null };
-  const available = actionsForCard(pile, card, viewerId);
+  const available = actionsForCard(pile, card, viewerId).filter((a) => a !== 'reveal');
   if (available.length === 0) return null;
 
   const piles = [
@@ -460,17 +478,6 @@ function actionMenuEl(zone, card, allZones, opts) {
     btn.textContent = spec.label;
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (action === 'reveal') {
-        clearPileTargets();
-        // Revealing your *own* private card is irreversible and only you
-        // can undo the decision by not making it - so it stays
-        // confirm-gated, exactly as before D25. Turning over a shared
-        // face-down card is not owned by anyone and stays a single tap.
-        const mine = card.owner != null && card.owner === viewerId;
-        if (mine && !window.confirm('Reveal this card to everyone? This cannot be undone.')) return;
-        onReveal?.(card.id);
-        return;
-      }
       const targets = targetsForAction(action, piles, { viewerId, fromPileId: zone.id });
       beginTargeting(action, targets, (targetId) => {
         if (action === 'pickup') onPickup?.(card.id);
@@ -536,15 +543,36 @@ function renderZoneCards(container, zone, allZones, opts = {}) {
     // used to render unconditionally. Those made every zone about twice
     // the height of the cards in it, and each site re-derived its own
     // "may this card do this" condition inline.
+    // Phase 55 (T55.1): tap the card itself to reveal it - joining
+    // tap-to-play's vocabulary instead of a separate hover button. Same
+    // authorization `actionMenuEl` already used (`actionsForCard`), and
+    // computed once here since it applies to TWO different elements
+    // below depending on who's looking: `redactMiddleCard` (state.js
+    // D7) sends the OWNER their card's real face (`card.faceDown` is
+    // never set on it - only `card.faceUp: false`), while everyone else
+    // gets the redacted `{faceDown: true}` back. A tap-to-reveal needs
+    // wiring onto whichever one actually renders for this viewer.
+    const pile = { id: zone.id, kind: 'zone', ownerId: zone.ownerId ?? null };
+    const canReveal = Boolean(opts.onReveal) && actionsForCard(pile, card, opts.viewerId).includes('reveal');
+
     if (card.faceDown) {
-      wrapper.appendChild(cardBackEl(card.id));
+      const back = cardBackEl(card.id);
+      if (canReveal) {
+        back.classList.add('revealable');
+        back.addEventListener('click', () => performReveal(card, opts.viewerId, opts.onReveal));
+      }
+      wrapper.appendChild(back);
       if (card.owner !== null && card.owner !== opts.viewerId) {
         // Someone else's still-hidden card: no visibility, no authority,
         // so no actions - just the anonymous back and whose it is.
         wrapper.appendChild(ownerTag(resolveOwnerName?.(card.owner) ?? card.owner));
       }
     } else {
-      wrapper.appendChild(cardEl(card, { disabled: true }));
+      const face = cardEl(card, canReveal
+        ? { onClick: () => performReveal(card, opts.viewerId, opts.onReveal) }
+        : { disabled: true });
+      if (canReveal) face.classList.add('revealable');
+      wrapper.appendChild(face);
       if (card.owner) wrapper.appendChild(ownerTag(resolveOwnerName?.(card.owner) ?? card.owner));
       if (!card.faceUp) {
         const hiddenTag = document.createElement('div');

@@ -516,6 +516,17 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   cursor: grabbing;
 }
 
+/* Phase 55 (T55.1): same affordance rule as the drag cursor above - a
+   revealable card's own class already tracks its authorization exactly
+   (`actionsForCard`), so this needs no separate condition either.
+   Applies to BOTH shapes a still-hidden card can render as: a redacted
+   `.card-back` (everyone else's view of a shared face-down card) or the
+   owner's own real `.card` face (`redactMiddleCard`, D7, never redacts
+   a card from its own owner - see the T55.1 comment in ui.js). */
+.revealable {
+  cursor: pointer;
+}
+
 /* Stacked / overlapped cards (US-32/33, D21). The negative margin has to
    swallow `.card-row`'s own 0.6rem gap as well as the intended overlap,
    which is why these aren't simply "card width minus what shows".
