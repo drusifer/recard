@@ -906,6 +906,7 @@ function renderGameFromView(view) {
     viewerId: myId,
     resolveOwnerName: (ownerId) => nameById.get(ownerId) ?? ownerId,
     onReveal: (cardId) => revealCard(cardId),
+    onRotate: (cardId) => rotateCard(cardId),
     onPickup: (cardId) => pickupCard(cardId),
     onMoveCard: (cardId, toZoneId) => moveCard(cardId, toZoneId),
     onCardLift: (cardId, active) => motionThrottler.schedule('card-lift', { cardId, active }),
@@ -938,6 +939,12 @@ function revealCard(cardId) {
   if (sessionEnded) return;
   if (role === 'host') dispatch({ type: 'REVEAL', playerId: myId, cardId });
   else session.send({ type: 'action', action: { type: 'REVEAL', cardId } });
+}
+
+function rotateCard(cardId) {
+  if (sessionEnded) return;
+  if (role === 'host') dispatch({ type: 'ROTATE_CARD', playerId: myId, cardId });
+  else session.send({ type: 'action', action: { type: 'ROTATE_CARD', cardId } });
 }
 
 function pickupCard(cardId) {

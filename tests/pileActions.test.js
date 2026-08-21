@@ -20,7 +20,7 @@ const ALL = [deck, myHand, theirHand, table, myZone, discard];
 test('each pile type declares its own actions (D25/D34/D42)', () => {
   assert.deepEqual(actionsForCard(deck, { id: 'c' }, 'me'), [], 'every deck action is pile-level now, D34');
   assert.deepEqual(actionsForCard(myHand, { id: 'c' }, 'me'), ['play']);
-  assert.deepEqual(actionsForCard(table, { faceUp: true, owner: null }, 'me'), ['pickup', 'move']);
+  assert.deepEqual(actionsForCard(table, { faceUp: true, owner: null }, 'me'), ['pickup', 'move', 'rotate']);
   assert.deepEqual(actionsForCard({ id: 'x', kind: 'nonsense', ownerId: null }, { id: 'c' }, 'me'), [],
     'an unknown kind offers nothing, it does not throw');
 });
@@ -39,13 +39,13 @@ test('a hand offers actions only to its own owner', () => {
 });
 
 test('a face-up zone card can be picked up or moved, but not turned over', () => {
-  assert.deepEqual(actionsForCard(table, { faceUp: true, owner: null }, 'me'), ['pickup', 'move']);
+  assert.deepEqual(actionsForCard(table, { faceUp: true, owner: null }, 'me'), ['pickup', 'move', 'rotate']);
 });
 
 test('a shared face-down card: anyone may turn it over or move it, nobody may pick it up', () => {
   const card = { faceDown: true, owner: null };
-  assert.deepEqual(actionsForCard(table, card, 'me'), ['reveal', 'move']);
-  assert.deepEqual(actionsForCard(table, card, 'someone-else'), ['reveal', 'move'],
+  assert.deepEqual(actionsForCard(table, card, 'me'), ['reveal', 'move', 'rotate']);
+  assert.deepEqual(actionsForCard(table, card, 'someone-else'), ['reveal', 'move', 'rotate'],
     '"put or take is open to all" (US-19) applies to unowned face-down cards');
 });
 
@@ -53,7 +53,7 @@ test("someone else's still-hidden private card offers nothing (matches the reduc
   const card = { faceDown: true, owner: 'you' };
   assert.deepEqual(actionsForCard(table, card, 'me'), [],
     'a non-owner can neither reveal nor move it - offering either would be a lie');
-  assert.deepEqual(actionsForCard(table, card, 'you'), ['reveal', 'move'],
+  assert.deepEqual(actionsForCard(table, card, 'you'), ['reveal', 'move', 'rotate'],
     'but its owner can do both');
 });
 

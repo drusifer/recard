@@ -456,7 +456,7 @@ function performReveal(card, viewerId, onReveal) {
  * see `performReveal` and its call site in `renderZoneCards`).
  */
 function actionMenuEl(zone, card, allZones, opts) {
-  const { viewerId, onPickup, onMoveCard } = opts;
+  const { viewerId, onPickup, onMoveCard, onRotate } = opts;
   // D45: both were hardcoded `kind: 'zone'` - real bugs the moment a
   // second table-side type exists, same class as `renderZoneCards`'s.
   const pile = { id: zone.id, kind: zone.kind, ownerId: zone.ownerId ?? null };
@@ -480,6 +480,16 @@ function actionMenuEl(zone, card, allZones, opts) {
     btn.textContent = spec.label;
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
+      // D48: an in-place action (`target: null` - today just `rotate`;
+      // `reveal` never reaches this row at all, see the doc comment
+      // above) has no destination to pick, so it dispatches directly
+      // rather than going through `targetsForAction`/`beginTargeting` -
+      // those return `[]` for a null-target action, which is a no-op
+      // click, not a bug in either of them.
+      if (spec.target === null) {
+        if (action === 'rotate') onRotate?.(card.id);
+        return;
+      }
       const targets = targetsForAction(action, piles, { viewerId, fromPileId: zone.id });
       beginTargeting(action, targets, (targetId) => {
         if (action === 'pickup') onPickup?.(card.id);
@@ -510,6 +520,9 @@ function renderZoneCards(container, zone, allZones, opts = {}) {
     // could drift out of sync with it.
     wrapper.dataset.cardId = card.id;
     if (card.layout) wrapper.dataset.layout = card.layout;
+    // D48/D40: same "state drives the visual" reasoning as `layout` -
+    // style.css rotates the card face when this is 'landscape'.
+    if (card.orientation) wrapper.dataset.orientation = card.orientation;
 
     // Card-lift cue (US-22, D13): press-and-hold broadcasts motion.
     // Safe for redacted cards too - only the id (already known to every

@@ -282,6 +282,23 @@ try {
   );
   console.log('pickup: face-up middle card moved into the picking player\'s hand');
 
+  // --- Card.orientation (D48/D40): a hover-row button, not a tap
+  // gesture (unlike reveal) - rotates the now-face-up privateId card
+  // (revealed above), propagated live to the other client. ---
+  await cardAction(host, privateId, 'rotate');
+  await join.waitForFunction(
+    (id) => document.querySelector(`#table-area [data-card-id="${id}"]`)?.closest('.middle-card')?.dataset.orientation === 'landscape',
+    privateId,
+    { timeout: 10000 },
+  );
+  await cardAction(host, privateId, 'rotate');
+  await join.waitForFunction(
+    (id) => document.querySelector(`#table-area [data-card-id="${id}"]`)?.closest('.middle-card')?.dataset.orientation === 'portrait',
+    privateId,
+    { timeout: 10000 },
+  );
+  console.log('Card.orientation (D48): rotate toggles portrait/landscape via the hover row, propagated live');
+
   // --- Zones (US-19, D12): create a new zone, move a card into it, then
   // pick it up from that NON-default zone - exercises D12's "REVEAL/
   // PICKUP search all zones by id", not just the default one. ---

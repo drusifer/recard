@@ -248,6 +248,60 @@ test('REVEAL: revealing an already-face-up card is a no-op, not an error', () =>
   assert.equal(zonesOf(result)[0].cards[0].faceUp, true);
 });
 
+// --- D48/D40 (Sprint 18): Card.orientation as replicated state ---
+
+test('ROTATE_CARD: toggles a face-up card between portrait (default/absent) and landscape', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = withPlayers(state, ['p1']);
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
+  const cardId = handOf(state, 'p1')[0].id;
+  state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId });
+  assert.equal(zonesOf(state)[0].cards[0].orientation, undefined, 'a newly played card has no orientation set - implies portrait');
+
+  state = reduce(state, { type: 'ROTATE_CARD', playerId: 'p1', cardId });
+  assert.equal(zonesOf(state)[0].cards[0].orientation, 'landscape');
+
+  state = reduce(state, { type: 'ROTATE_CARD', playerId: 'p1', cardId });
+  assert.equal(zonesOf(state)[0].cards[0].orientation, 'portrait');
+});
+
+test('ROTATE_CARD: follows move\'s authorization rule, not reveal\'s - a shared face-down card may be rotated by anyone', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = withPlayers(state, ['p1', 'p2']);
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
+  const cardId = handOf(state, 'p1')[0].id;
+  state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId, visibility: 'shared-facedown' });
+
+  const rotated = reduce(state, { type: 'ROTATE_CARD', playerId: 'p2', cardId });
+  assert.equal(zonesOf(rotated)[0].cards[0].orientation, 'landscape', 'unowned face-down cards are rotatable by anyone, per US-19');
+});
+
+test('ROTATE_CARD: a non-owner cannot rotate someone else\'s still-hidden private card', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = withPlayers(state, ['p1', 'p2']);
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
+  const cardId = handOf(state, 'p1')[0].id;
+  state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId, visibility: 'private-facedown' });
+
+  assert.throws(() => reduce(state, { type: 'ROTATE_CARD', playerId: 'p2', cardId }), /not authorized/);
+  const rotated = reduce(state, { type: 'ROTATE_CARD', playerId: 'p1', cardId });
+  assert.equal(zonesOf(rotated)[0].cards[0].orientation, 'landscape', 'but the owner can rotate their own');
+});
+
+test('ROTATE_CARD: orientation survives redaction, exactly like layout - arrangement, not identity', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = withPlayers(state, ['p1', 'p2']);
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
+  const cardId = handOf(state, 'p1')[0].id;
+  state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId, visibility: 'shared-facedown' });
+  state = reduce(state, { type: 'ROTATE_CARD', playerId: 'p1', cardId });
+
+  const otherView = viewFor(state, 'p2');
+  const redactedCard = otherView.zones[0].cards[0];
+  assert.equal(redactedCard.faceDown, true, 'still redacted - identity is not leaked');
+  assert.equal(redactedCard.orientation, 'landscape', 'but orientation is visible to everyone, same as layout');
+});
+
 test('PICKUP: moves a face-up middle card into the picking player\'s hand', () => {
   let state = createInitialState({}, () => 0.5);
   state = withPlayers(state, ['p1', 'p2']);

@@ -36,6 +36,11 @@ export const ACTIONS = {
   pickup: { label: 'Pick up', target: 'hand', from: 'zone' },
   move: { label: 'Move', target: 'zone', from: 'zone' },
   reveal: { label: 'Turn over', target: null, from: 'zone' },
+  // D48/D40: in-place like `reveal` (no destination to pick), but stays
+  // a hover-row button rather than a tap gesture - `reveal`'s tap
+  // conversion (Sprint 12/Phase 55) was its own dedicated Smith-gated
+  // story, not a default every in-place action inherits.
+  rotate: { label: 'Rotate', target: null, from: 'zone' },
 };
 
 /**

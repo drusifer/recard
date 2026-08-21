@@ -452,6 +452,31 @@ const ACTIONS = {
     );
   },
 
+  // D48/D40 (Sprint 18): Card.orientation as replicated state. Same
+  // shape as REVEAL - an in-place mutation, not a `transferCard` (D43),
+  // authorization read from `cardActions`'s offer table rather than a
+  // second copy of the rule. Unlike REVEAL, authorized by the same
+  // condition as `move` (a still-hidden card only by its owner,
+  // anything visible or face-down-and-unowned by anyone) - orientation
+  // doesn't reveal identity, so it follows `layout`'s own precedent
+  // ("arrangement, not identity... survives redaction"), not `reveal`'s
+  // stricter privacy rule.
+  ROTATE_CARD(state, action) {
+    const found = findZoneAndCard(state, action.cardId);
+    if (!found) {
+      throw new Error(`Card ${action.cardId} is not in any zone`);
+    }
+    const { zoneId, card } = found;
+    const zone = state.piles.find((p) => p.id === zoneId);
+    if (!PILE_TYPES[zone.kind].canRemoveCard(zone, card, action.playerId, 'rotate')) {
+      throw new Error(`Player ${action.playerId} is not authorized to rotate ${action.cardId}`);
+    }
+    const orientation = card.orientation === 'landscape' ? 'portrait' : 'landscape';
+    return replacePile(state, zoneId, (z) =>
+      withCards(z, z.cards.map((c) => (c.id === action.cardId ? { ...c, orientation } : c))),
+    );
+  },
+
   PICKUP(state, action) {
     const found = findZoneAndCard(state, action.cardId);
     if (!found) {

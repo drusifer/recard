@@ -575,6 +575,18 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   display: revert;
 }
 
+/* D48/D40: Card.orientation as a visible rotation. A first cut, not a
+   full landscape-aware layout - the wrapper's own box doesn't resize to
+   the rotated footprint, so a landscape card can visually lean into a
+   neighbour at tight spacing. Disclosed rather than chased further:
+   real layout math for this belongs to whichever pile type/mechanic
+   actually needs landscape cards for real (D38's Run/Set is the
+   likely first), not to this sprint's "does the state exist and
+   render at all" scope. */
+.middle-card[data-orientation='landscape'] > .card {
+  transform: rotate(90deg);
+}
+
 /* Live drop-mode affordance (Smith Gate 1, Nielsen #1/#6): native
    drag-and-drop shows nothing until release, so which mode a drop is
    about to use has to be visible mid-drag or it can't be discovered. */

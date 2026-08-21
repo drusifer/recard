@@ -30,13 +30,15 @@ export const dropRule = 'STACK';
  * `kind === 'zone'` string (D45). */
 export const tableSide = true;
 
-/** Identical rule to `zonePile.redactCard` (D7). Duplicated rather than
- * imported: each pile-type module stays self-contained, matching how
- * `deckPile`/`handPile` never import each other either. */
+/** Identical rule to `zonePile.redactCard` (D7/D48). Duplicated rather
+ * than imported: each pile-type module stays self-contained, matching
+ * how `deckPile`/`handPile` never import each other either. */
 export function redactCard(card, viewerId) {
   if (card.faceUp || card.owner === viewerId) return card;
-  const redacted = { id: card.id, owner: card.owner, faceDown: true };
-  return card.layout ? { ...redacted, layout: card.layout } : redacted;
+  let redacted = { id: card.id, owner: card.owner, faceDown: true };
+  if (card.layout) redacted = { ...redacted, layout: card.layout };
+  if (card.orientation) redacted = { ...redacted, orientation: card.orientation };
+  return redacted;
 }
 
 /** Drop-only: nothing is ever offered on a card once it's discarded. */

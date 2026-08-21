@@ -23,14 +23,16 @@ export const tableSide = true;
 /**
  * D7: a viewer sees a card's identity if it's face-up, or they own it.
  * Otherwise they see only that it exists and (if applicable) whose it
- * is - never its rank/suit. `layout` (D21) survives redaction
- * deliberately: it describes arrangement, not identity, and every
- * viewer is meant to see it identically.
+ * is - never its rank/suit. `layout` (D21) and `orientation` (D48/D40)
+ * both survive redaction deliberately: they describe arrangement, not
+ * identity, and every viewer is meant to see them identically.
  */
 export function redactCard(card, viewerId) {
   if (card.faceUp || card.owner === viewerId) return card;
-  const redacted = { id: card.id, owner: card.owner, faceDown: true };
-  return card.layout ? { ...redacted, layout: card.layout } : redacted;
+  let redacted = { id: card.id, owner: card.owner, faceDown: true };
+  if (card.layout) redacted = { ...redacted, layout: card.layout };
+  if (card.orientation) redacted = { ...redacted, orientation: card.orientation };
+  return redacted;
 }
 
 /**
@@ -39,20 +41,23 @@ export function redactCard(card, viewerId) {
  * - a face-down card can be turned over by anyone if it's unowned, or
  *   by its owner; never by a non-owner.
  * - only a face-up card can be picked up.
- * - a still-hidden card can only be moved by its owner.
+ * - a still-hidden card can only be moved OR rotated (D48/D40 -
+ *   orientation follows `move`'s rule, not `reveal`'s: it doesn't
+ *   reveal identity) by its owner.
  */
 export function cardActions(pile, card, viewerId) {
   const hidden = card.faceDown === true || card.faceUp === false;
   const owned = card.owner != null;
   const mine = card.owner === viewerId;
 
-  return ['reveal', 'pickup', 'move'].filter((action) => {
+  return ['reveal', 'pickup', 'move', 'rotate'].filter((action) => {
     if (action === 'reveal') return hidden && (!owned || mine);
     if (action === 'pickup') return !hidden;
     // Mirrors MOVE_CARD's own rule exactly: a still-hidden card is
     // movable only by its owner; anything visible, or face-down but
     // unowned ("put or take is open to all", US-19), is movable by all.
-    if (action === 'move') return !hidden || !owned || mine;
+    // `rotate` shares this rule rather than `reveal`'s stricter one.
+    if (action === 'move' || action === 'rotate') return !hidden || !owned || mine;
     return false;
   });
 }

@@ -1951,6 +1951,57 @@ block: create a pinochle table, confirm the deck badge reads 48, deal
 default) `'standard'` type - proven by the full existing suite passing
 unmodified.
 
+### D48. `Card.orientation` (D40) ships as replicated state, with a real `rotate` action
+
+Confirmed back in the original framework sidebar: orientation is game
+state, not derived presentation - it needed a reducer action, not just
+a field.
+
+**Decision:**
+- `ROTATE_CARD` toggles `card.orientation` between `'portrait'`
+  (absent/default) and `'landscape'`. Shaped exactly like `REVEAL` - an
+  in-place mutation via `replacePile`, not `transferCard` (D43),
+  authorization read from `cardActions`'s offer table.
+- **Authorization follows `move`'s rule, not `reveal`'s.** Orientation
+  doesn't reveal a card's identity, so it belongs with `layout`'s
+  established precedent ("arrangement, not identity... every viewer is
+  meant to see it identically") rather than `reveal`'s stricter
+  owner-or-unowned gate. `rotate` joins `move` in `zonePile.cardActions`
+  under the identical filter condition - a still-hidden card is
+  rotatable only by its owner, anything visible or face-down-unowned by
+  anyone.
+- `orientation` survives redaction the same way `layout` does (both
+  `zonePile.redactCard` and `discardPile.redactCard`) - visible to
+  every viewer regardless of whether the card's rank/suit is.
+- **UI: a hover-row button (`ACTIONS.rotate`), not a tap gesture.**
+  `reveal`'s tap conversion (Phase 55, Sprint 12) was its own dedicated,
+  Smith-gated story about a specific discoverability problem - not a
+  default every future in-place action inherits. Surfaced a real, small
+  gap in `actionMenuEl`'s click handler while wiring it: it always
+  routed through `targetsForAction`/`beginTargeting`, which silently
+  no-op on a `target: null` action's empty target list. `reveal` never
+  hit this because it left the hover row entirely in Phase 55 - `rotate`
+  is the row's first `target: null` action, so the handler now checks
+  `spec.target === null` and dispatches directly for in-place actions
+  instead of routing every click through targeting machinery built for
+  actions that need a destination.
+- A first visual cut, not full landscape-aware layout: `transform:
+  rotate(90deg)` on the card face. The wrapper's own box doesn't resize
+  to the rotated footprint, so a landscape card can visually lean into
+  a tightly-spaced neighbour - disclosed, not chased further, since
+  real layout math belongs to whichever pile type/mechanic (D38's
+  Run/Set, most likely) actually needs it, not to this sprint's "does
+  the state exist and render at all" scope.
+
+**Consequences:** 256/256 unit (252 carried + 4 new `ROTATE_CARD`
+tests, plus 8 existing `pileActions.js`/`piles.test.js` characterization
+tests updated in place - `rotate` now legitimately joins `move`
+everywhere `move` was already offered, not a separate addition) + full
+e2e green, including a new end-to-end block: rotate a card via the
+hover row, confirm `data-orientation` propagates live, rotate back.
+Mutation-verified: bypassing the authorization check fails the one
+test written for it.
+
 
 ## Module Layout
 ```

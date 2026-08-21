@@ -1651,9 +1651,8 @@ collection onto one `piles` array) and this very sprint's D29/D34-D36
   (stack, drop-only)~~ — **SHIPPED**, Sprint 15 (D45, US-49). Run/Set
   (fan, aligned sequence) remains open — US-32/33 already sketch this
   behavior informally; this gives it a real type.
-- `Card.orientation` (portrait/landscape, D40) as replicated state
-  alongside `faceUp`, for pile types/mechanics that need a rotated-card
-  concept (confirmed game state, not derived presentation).
+- ~~`Card.orientation` (portrait/landscape, D40) as replicated state~~ —
+  **SHIPPED**, Sprint 18 (D48, US-52).
 - A config-driven preset schema (extends `presets.js`) covering the
   full GameConfig shape, and — later, separate story — a builder screen
   as a form over the same schema.
@@ -1858,13 +1857,49 @@ independently re-verified. Zero behavior change for the default
 `'standard'` type.
 
 **Still open:**
-- `Card.orientation` (D40) — replicated portrait/landscape state, not
-  started.
+- ~~`Card.orientation` (D40)~~ — **SHIPPED**, Sprint 18 (D48, US-52).
 - Proactively hiding Add Zone when disallowed (D46's own disclosed gap)
   — unchanged by this sprint.
 - A config-driven preset schema tying `GameConfig`/`DeckDefinition`
   into `presets.js` (e.g. a "Pinochle" quick-start preset), and the
   builder screen — both still later, separate stories.
+
+## Sprint 18 ("Card.orientation — the last framework primitive") — US-52
+
+### US-52: A card can be rotated (portrait/landscape), and it's real game state
+
+**As** a player, **I want** to rotate a card on the table, **so that**
+games/mechanics needing a rotated-card concept (a run laid sideways, a
+tapped/used marker) have real, synced state to build on, not just a
+visual trick.
+
+**AC:**
+- `card.orientation` (`'portrait'` default/absent, `'landscape'`) is
+  replicated - every viewer sees the same orientation, it survives
+  redaction (visible even on a still-hidden card, same as `layout`),
+  and it round-trips through save/restore (part of `piles`, already
+  persisted).
+- A `Rotate` action in the existing hover-action row, authorized the
+  same way `Move` is (not `Reveal`'s stricter rule - rotating doesn't
+  expose identity).
+- Visibly rotates the card face on rotate.
+
+**Sprint 18 status — SHIPPED (2026-08-21).** Full design in
+`docs/ARCHITECTURE.md` D48, including a real small bug found while
+wiring the hover-row button generically for the first `target: null`
+action to actually use that row (`reveal` left it in Sprint 12).
+256/256 unit (4 new + 8 existing characterization tests updated in
+place) + full e2e green, independently re-verified. Mutation-verified.
+
+**Still open (the whole original framework sidebar, now):**
+- Proactively hiding Add Zone when disallowed (D46's own disclosed
+  gap).
+- Full landscape-aware layout (D48's own disclosed first-cut
+  limitation) — belongs to whichever pile type/mechanic (D38's Run/Set,
+  most likely) actually needs it.
+- A config-driven preset schema tying `GameConfig`/`DeckDefinition`
+  into `presets.js`, and the builder screen — both still later,
+  separate stories, explicitly out of scope for this run of sprints.
 
 
 ---

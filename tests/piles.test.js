@@ -60,11 +60,11 @@ test('hand cardActions: play, owner only', () => {
 });
 
 test('zone cardActions: face-up card offers pickup/move, not reveal', () => {
-  assert.deepEqual(zonePile.cardActions(table, { faceUp: true, owner: null }, 'me'), ['pickup', 'move']);
+  assert.deepEqual(zonePile.cardActions(table, { faceUp: true, owner: null }, 'me'), ['pickup', 'move', 'rotate']);
 });
 
 test('zone cardActions: shared face-down card - anyone may reveal or move, nobody may pick up', () => {
-  assert.deepEqual(zonePile.cardActions(table, { faceDown: true, owner: null }, 'me'), ['reveal', 'move']);
+  assert.deepEqual(zonePile.cardActions(table, { faceDown: true, owner: null }, 'me'), ['reveal', 'move', 'rotate']);
 });
 
 test('zone cardActions: a non-owner gets nothing on someone else\'s still-hidden private card', () => {
@@ -76,7 +76,7 @@ test('zone cardActions: a non-owner gets nothing on someone else\'s still-hidden
 });
 
 test('zone cardActions: the owner of a still-hidden private card can reveal or move their own', () => {
-  assert.deepEqual(zonePile.cardActions(table, { faceDown: true, owner: 'me' }, 'me'), ['reveal', 'move']);
+  assert.deepEqual(zonePile.cardActions(table, { faceDown: true, owner: 'me' }, 'me'), ['reveal', 'move', 'rotate']);
 });
 
 // --- redactCard: characterized against state.js's redactMiddleCard ---
