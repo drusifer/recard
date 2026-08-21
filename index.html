@@ -113,15 +113,6 @@
                  click that caused it happened. Outside #game-deck-area
                  because renderDeck rebuilds that wholesale. -->
             <p id="deck-error" class="error-text" hidden></p>
-            <!-- US-34: deck-acting controls live with the deck. `Draw` is
-                 deliberately NOT here - it stays beside your hand, where
-                 its effect lands (Smith Gate 1 reversal of US-34's first
-                 draft: it's the highest-frequency action in the app). -->
-            <div id="deck-controls" class="btn-row deck-controls" hidden>
-              <button id="shuffle-btn" type="button">Shuffle deck</button>
-              <input id="split-count" type="number" min="2" max="20" value="2" aria-label="Number of piles" />
-              <button id="split-btn" type="button">Split into piles</button>
-            </div>
           </div>
           <div id="table-area"></div>
         </div>
@@ -140,17 +131,9 @@
     <section class="panel">
       <h2>Your hand</h2>
       <div class="btn-row">
-        <!-- Sprint 12 (D34/D37, T53.2): Sort by rank/suit and Pass moved
-             onto the hand's own pile anchor (#hand-pile-anchor, rendered
-             by main.js) - three permanently-visible buttons replaced by
-             one. Kept hidden-but-present (not deleted) until Phase 58's
-             cleanup, so main.js's existing listeners keep working
-             mid-sprint if anything still reaches them. -->
-        <button id="sort-rank-btn" type="button" hidden>Sort by rank</button>
-        <button id="sort-suit-btn" type="button" hidden>Sort by suit</button>
-        <button id="pass-toggle-btn" type="button" hidden>Pass</button>
-        <!-- In-flow with `play-as-label` (not a new row before #hand-area):
-             the 3 hidden buttons above freed up room in THIS row for it. -->
+        <!-- Sprint 12 (D34/D37, T53.2/T58.1): Sort by rank/suit and Pass
+             live on the hand's own pile anchor now - three permanently-
+             visible buttons replaced by one. -->
         <div id="hand-pile-anchor"></div>
         <!-- Replaces the two icon buttons that used to sit under every
              hand card (US-34 follow-up). Stated once instead of 2xN
@@ -171,12 +154,10 @@
            something you have to already know about to find. -->
       <p class="touch-hint">Tap a card to play it &mdash; or hold a card briefly, then drag it where you want.</p>
       <div class="btn-row">
-        <!-- Sprint 12 (D34/D35/D36, T54.1): Draw moved onto the deck's
-             own pile anchor - draggable AND (Smith Gate 1 #4: the
-             project's own highest-frequency action) still one tap.
-             Hidden-but-present, not deleted, per the same pattern as
-             Phase 53's hand buttons - see #hand-pile-anchor above. -->
-        <button id="draw-btn" type="button" class="btn-primary" hidden>Draw</button>
+        <!-- Sprint 12 (D34/D35/D36, T54.1/T58.1): Draw lives on the
+             deck's own pile anchor now - draggable AND (Smith Gate 1
+             #4: the project's own highest-frequency action) still one
+             tap. -->
         <button id="reset-btn" type="button" class="btn-danger" hidden>Reshuffle &amp; Reset</button>
         <button id="reset-scores-btn" type="button" class="btn-danger" hidden>Reset Scores</button>
       </div>

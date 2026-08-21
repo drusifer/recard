@@ -42,11 +42,8 @@ const handAreaEl = document.getElementById('hand-area');
 const handAnchorEl = document.getElementById('hand-pile-anchor');
 const tableAreaEl = document.getElementById('table-area');
 const gameRosterEl = document.getElementById('game-roster');
-const drawBtn = document.getElementById('draw-btn');
 const resetBtn = document.getElementById('reset-btn');
 const resetScoresBtn = document.getElementById('reset-scores-btn');
-const splitCountEl = document.getElementById('split-count');
-const passToggleBtn = document.getElementById('pass-toggle-btn');
 const playAsEl = document.getElementById('play-as');
 
 /** US-34 follow-up: what the next play/drop does, armed once in the hand
@@ -54,8 +51,6 @@ const playAsEl = document.getElementById('play-as');
 function selectedVisibility() {
   return playAsEl.value;
 }
-const sortRankBtn = document.getElementById('sort-rank-btn');
-const sortSuitBtn = document.getElementById('sort-suit-btn');
 
 let handOrderIds = []; // D14: persists hand display order across state updates
 
@@ -811,7 +806,6 @@ function endSessionForGood(message, { retryable = false } = {}) {
   forgetSession(window.localStorage);
   renderBanner(bannerEl, retryable ? `${message} Reload to try again.` : message);
   sessionEnded = true;
-  drawBtn.disabled = true;
   resetScoresBtn.disabled = true;
   // Re-render with no action handlers so every control (hand cards,
   // reveal/pickup buttons) is inert, and force the roster to reflect
@@ -877,9 +871,8 @@ function renderRosterOnly() {
     onSplitCountChange: (n) => { lastSplitCount = n; },
     onPileAction: (action, count) => dealFromDeck(action, count),
   });
-  passToggleBtn.textContent = view.passed?.[myId] ? 'Unpass' : 'Pass';
-  // Sprint 12 (D34/D37, T53.2): the hand's own pile anchor replaces the
-  // three buttons above it - same actions, one control instead of three.
+  // Sprint 12 (D34/D37, T53.2/T58.1): the hand's own pile anchor - Sort
+  // by rank/suit and Pass, one control instead of three.
   renderPileAnchor(handAnchorEl, pileLevelActions('hand', { isOwner: true }), {
     pileLabel: 'Hand',
     labels: { pass: view.passed?.[myId] ? 'Unpass' : 'Pass' },
@@ -1003,9 +996,6 @@ function performSplit(pileCount) {
     window.alert(err.message);
   }
 }
-document.getElementById('shuffle-btn').addEventListener('click', performShuffle);
-document.getElementById('split-btn').addEventListener('click', () => performSplit(Number(splitCountEl.value)));
-
 // Sprint 12 (D34/D35/D36, T54.1): named so the deck's pile anchor - both
 // its click/tap shortcut and its drag-onto-hand drop - calls the same
 // implementation the legacy button did, rather than a second one.
@@ -1014,7 +1004,6 @@ function performDraw() {
   if (role === 'host') dispatch({ type: 'DRAW', playerId: myId });
   else session.send({ type: 'action', action: { type: 'DRAW' } });
 }
-drawBtn.addEventListener('click', performDraw);
 
 // D35: the hand is Draw's one static, legal drop target (D36's whole
 // point - it never needs computing). `preventDefault` is unconditional
@@ -1031,8 +1020,8 @@ handAreaEl.addEventListener('drop', (e) => {
 
 // --- Hand sort (US-23, D14): local-only, never broadcast. Writes into
 // the same handOrderIds that manual drag-reorder writes into, so the two
-// never fight (Smith Gate 1). Named functions so both the hidden legacy
-// buttons and the pile anchor (Sprint 12, T53.2) call one implementation. ---
+// never fight (Smith Gate 1). Named so the pile anchor (Sprint 12,
+// T53.2) has one implementation to call. ---
 function sortHandByRank() {
   const view = currentView();
   if (!view) return;
@@ -1045,8 +1034,6 @@ function sortHandBySuit() {
   handOrderIds = sortBySuit(view.myHand);
   renderGameFromView(view);
 }
-sortRankBtn.addEventListener('click', sortHandByRank);
-sortSuitBtn.addEventListener('click', sortHandBySuit);
 
 // --- Deal More (US-24): host-only, adds to existing hands without a
 // reset. Deliberately a different label/section/style than "Deal &
@@ -1103,7 +1090,6 @@ function togglePass() {
   if (role === 'host') dispatch({ type: 'TOGGLE_PASS', playerId: myId });
   else session.send({ type: 'action', action: { type: 'TOGGLE_PASS' } });
 }
-passToggleBtn.addEventListener('click', togglePass);
 
 // --- Motion (US-11): best-effort, cosmetic only. See protocol.js/ARCHITECTURE.md D4. ---
 function markMoving(playerId, active) {

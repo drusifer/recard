@@ -1067,20 +1067,6 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   .seat-zone .card-row { flex-wrap: wrap; overflow: visible; }
 }
 
-/* US-34: deck-acting controls sit with the deck visual they act on.
-   Kept compact and left-aligned under the deck stack rather than
-   stretched across the surface - they're occasional setup actions, not
-   the per-turn path (which is why `Draw` deliberately stays by the
-   hand instead). */
-.deck-controls {
-  margin: 0.4rem 0 0;
-  gap: 0.4rem;
-  align-items: center;
-}
-
-.deck-controls button { font-size: 0.85rem; padding: 0.45rem 0.7rem; }
-.deck-controls input { width: 3.6rem; font-size: 0.85rem; padding: 0.4rem 0.5rem; }
-
 /* US-36 follow-through: with several zones (a Split makes N piles at
    once) stacking them vertically buried everything past the first one
    behind the pot's own scroll - you could create four piles and see one.
@@ -1333,25 +1319,14 @@ body.targeting .middle-card-actions { display: none !important; }
   white-space: nowrap;
 }
 
-.deck-controls-strip {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  margin-top: 0.5rem;
-}
-
-.deck-controls-strip .deal-count {
+/* Phase 56 (T56.1): carried over from the legacy `.deck-controls-strip`
+   .deal-count's own sizing - a count input sits in the same popover as
+   44px action buttons, so it gets the same floor. */
+.pile-anchor-count {
   width: 3.25rem;
   min-height: 44px;
   text-align: center;
-}
-
-.deck-controls-strip button {
-  min-height: 44px;
-  font-size: 0.8rem;
-  padding: 0.35rem 0.6rem;
+  font-size: 0.85rem;
 }
 
 /* An empty deck still occupies its slot, so the controls beside it don't

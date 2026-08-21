@@ -170,8 +170,8 @@ try {
     { timeout: 10000 },
   );
 
-  // Sprint 12 (T54.1/T54.2): Draw moved onto the deck's own pile anchor
-  // - the legacy `#draw-btn` is `hidden` now. Two ways in, both tested:
+  // Sprint 12 (T54.1/T54.2): Draw lives on the deck's own pile anchor -
+  // the legacy `#draw-btn` is deleted now (Phase 58). Two ways in, both tested:
   // drag onto the hand (D35's action-token protocol) first, since that's
   // the one path this sprint added; then the tap shortcut (D36) below,
   // via the hover-then-click path a mouse user actually takes.
@@ -511,9 +511,9 @@ try {
   // --- Pass marker (US-25, D16): self-toggle only, visible to everyone.
   // Sprint 12 (T53.2): now reached through the hand's own pile anchor
   // (#hand-pile-anchor), not a permanently-visible button - the old
-  // #pass-toggle-btn is `hidden` now, so this exercises the hover-then-
-  // click path a real mouse user takes, same pattern the existing
-  // `cardAction` helper above already uses for D25's per-card row. ---
+  // #pass-toggle-btn is deleted now (Phase 58), so this exercises the
+  // hover-then-click path a real mouse user takes, same pattern the
+  // existing `cardAction` helper above already uses for D25's row. ---
   const handAnchorToggle = join.locator('#hand-pile-anchor .pile-anchor-toggle');
   await handAnchorToggle.hover();
   await join.click('#hand-pile-anchor [data-pile-action="pass"]');
@@ -1178,8 +1178,20 @@ try {
   console.log('US-44: and stops with a clear message once the retry budget is spent');
 
   // Smith Gate-close finding #1: once the session is over, nothing on
-  // screen should still act live.
-  assert(await join.locator('#draw-btn').isDisabled(), 'draw button should be disabled after session ends');
+  // screen should still act live. Phase 58: `#draw-btn` is deleted now
+  // (was `hidden`), so this checks the real, functional guarantee
+  // instead of a DOM property - `performDraw`'s own `sessionEnded`
+  // check (main.js) is what actually protects this, same as every
+  // other action in the app; a click on the anchor's Draw must be a
+  // behavioral no-op.
+  const joinHandBeforeEndedDraw = await join.evaluate(() => document.querySelectorAll('#hand-area .card').length);
+  await join.hover('#game-deck-area .pile-anchor-toggle');
+  await join.click('#game-deck-area [data-pile-action="draw"]');
+  await join.waitForTimeout(300);
+  assert(
+    (await join.evaluate(() => document.querySelectorAll('#hand-area .card').length)) === joinHandBeforeEndedDraw,
+    'drawing must be a no-op after the session has ended',
+  );
   const anyHandCardEnabled = await join.evaluate(() =>
     [...document.querySelectorAll('#hand-area .card')].some((el) => !el.disabled),
   );
@@ -1262,7 +1274,7 @@ try {
   // deal controls with it exactly when a host most needs them.
   await autoHost.evaluate(async () => {
     while (document.querySelector('#game-deck-area .deck-count-badge')) {
-      document.getElementById('draw-btn').click();
+      document.querySelector('#game-deck-area [data-pile-action="draw"]').click();
       await new Promise((r) => setTimeout(r, 40));
     }
   });
