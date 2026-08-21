@@ -788,34 +788,42 @@ export function renderDeck(container, count, opts = {}) {
   container.appendChild(stack);
 
   const actions = pileLevelActions('deck', { isHost: opts.isHost === true });
-  if (!actions.length) return;
+  if (!actions.length || !opts.onPileAction) return;
 
-  // Sprint 12 (T54.1): draggable/tap-shortcut actions (`target` set -
-  // today, only `draw`) move onto the deck's own pile anchor; the rest
-  // (deal/reshuffleDeal) stay on the legacy strip until Phase 56
-  // migrates them too. Two containers, not one re-styled - `deckControls`
-  // still owns the deal-count input those two need and `draw` doesn't.
-  //
-  // `onDraw` is deliberately its OWN callback, not routed through
-  // `opts.onPileAction` (which the strip's deal/reshuffleDeal use): that
-  // callback is `dealFromDeck` in main.js, and `dealFromDeck('draw', …)`
-  // would silently fall into its DEAL_MORE branch instead of drawing -
-  // a real bug, caught live (join's hand count stayed put after a
-  // direct in-page click, no error thrown) before it shipped.
-  const anchorActions = actions.filter((id) => PILE_ACTIONS[id].target);
-  const stripActions = actions.filter((id) => !PILE_ACTIONS[id].target);
-
-  if (anchorActions.length && opts.onDraw) {
-    const anchorSlot = document.createElement('div');
-    renderPileAnchor(anchorSlot, anchorActions, {
-      pileLabel: 'Deck',
-      onPileAction: (id) => { if (id === 'draw') opts.onDraw(); },
-    });
-    container.appendChild(anchorSlot);
-  }
-  if (stripActions.length && opts.onPileAction) {
-    container.appendChild(deckControls(stripActions, count, opts));
-  }
+  // Phase 56 (T56.1): every deck action - draw, deal, reshuffleDeal,
+  // shuffle, split - now lives on ONE pile anchor (Phase 54 gave it
+  // only `draw`; the legacy strip carried the rest until this phase).
+  // `counts` covers the two action groups that need a number: Deal and
+  // Reshuffle & deal share one "cards per player" input (exactly as the
+  // legacy strip's single `countInput` did); Split gets its own "how
+  // many piles" input, previously a bare `<input>` in an unrelated row.
+  const anchorSlot = document.createElement('div');
+  renderPileAnchor(anchorSlot, actions, {
+    pileLabel: 'Deck',
+    onPileAction: opts.onPileAction,
+    disabled: count <= 0 ? ['deal'] : [], // nothing left to deal from
+    counts: [
+      {
+        actions: ['deal', 'reshuffleDeal'],
+        value: opts.dealCount ?? 1,
+        onChange: opts.onDealCountChange,
+        min: 1,
+        max: 20,
+        ariaLabel: 'Cards to deal each player',
+        inputId: 'deck-deal-count',
+      },
+      {
+        actions: ['split'],
+        value: opts.splitCount ?? 2,
+        onChange: opts.onSplitCountChange,
+        min: 2,
+        max: 20,
+        ariaLabel: 'Number of piles',
+        inputId: 'deck-split-count',
+      },
+    ],
+  });
+  container.appendChild(anchorSlot);
 }
 
 /**
@@ -835,11 +843,18 @@ export function renderDeck(container, count, opts = {}) {
  * the plain click handler every action gets - Smith Gate 1 #4 ruled the
  * project's highest-frequency action out from being drag-only.
  *
+ * A destructive action (`reshuffleDeal`) gets a confirm before it fires,
+ * no matter where in the popover it's reached from (Smith Gate 2 #1) -
+ * carried over unchanged from the legacy deck strip this generalizes.
+ *
  * @param {HTMLElement} container rebuilt wholesale each call, like every
  *   other render* function here.
  * @param {string[]} actions ids from `pileLevelActions()`.
- * @param {{onPileAction: (id: string) => void, pileLabel?: string,
- *   labels?: Record<string,string>}} opts
+ * @param {{onPileAction: (id: string, count?: number) => void,
+ *   pileLabel?: string, labels?: Record<string,string>,
+ *   disabled?: string[],
+ *   counts?: {actions: string[], value: number, onChange?: (n: number) => void,
+ *     min?: number, max?: number, ariaLabel?: string, inputId?: string}[]}} opts
  */
 export function renderPileAnchor(container, actions, opts = {}) {
   container.innerHTML = '';
@@ -858,6 +873,30 @@ export function renderPileAnchor(container, actions, opts = {}) {
   const popover = document.createElement('div');
   popover.className = 'pile-anchor-popover';
 
+  // Count inputs some actions need (Deal/Reshuffle & deal share one;
+  // Split has its own) - one input per GROUP, rendered ahead of the
+  // actions and looked up by action id below.
+  const countInputs = {};
+  for (const group of opts.counts ?? []) {
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = String(group.min ?? 1);
+    input.max = String(group.max ?? 20);
+    input.value = String(group.value ?? group.min ?? 1);
+    input.className = 'pile-anchor-count';
+    if (group.inputId) input.id = group.inputId;
+    input.setAttribute('aria-label', group.ariaLabel ?? 'Count');
+    // Rebuilt wholesale on every state broadcast (like every render*
+    // function here), so a number the host has typed but not yet used
+    // would otherwise be destroyed by any unrelated broadcast - someone
+    // else drawing a card resets what you were about to deal. Reporting
+    // each keystroke lets the caller hold the value across re-renders
+    // (the legacy strip's own `countInput` comment, carried over).
+    input.addEventListener('input', () => group.onChange?.(Number(input.value)));
+    popover.appendChild(input);
+    for (const id of group.actions) countInputs[id] = input;
+  }
+
   for (const id of actions) {
     const spec = PILE_ACTIONS[id];
     const btn = document.createElement('button');
@@ -866,7 +905,13 @@ export function renderPileAnchor(container, actions, opts = {}) {
     btn.textContent = opts.labels?.[id] ?? spec.label;
     btn.title = spec.hint;
     if (spec.destructive) btn.classList.add('btn-danger');
-    btn.addEventListener('click', () => opts.onPileAction?.(id));
+    if (opts.disabled?.includes(id)) btn.disabled = true;
+    btn.addEventListener('click', () => {
+      if (spec.destructive && !window.confirm(
+        `${spec.hint}\n\nEvery player's current hand will be cleared. Continue?`)) return;
+      const n = countInputs[id] ? Number(countInputs[id].value) : undefined;
+      opts.onPileAction?.(id, n);
+    });
     if (spec.target) {
       btn.draggable = true;
       btn.addEventListener('dragstart', (e) => {
@@ -961,56 +1006,6 @@ function attachPileActionTouchDrag(sourceEl, actionId, onDrop) {
   sourceEl.addEventListener('touchmove', (e) => {
     if (state?.phase === 'dragging') e.preventDefault();
   }, { passive: false });
-}
-
-/**
- * The persistent pile-level control strip (D29) - not the D25 hover row.
- * These act on the deck, not on a card, so they are always visible rather
- * than revealed by pointing at something.
- */
-function deckControls(actions, count, opts) {
-  const strip = document.createElement('div');
-  strip.className = 'deck-controls-strip';
-
-  const countInput = document.createElement('input');
-  countInput.type = 'number';
-  countInput.min = '1';
-  countInput.max = '20';
-  countInput.value = String(opts.dealCount ?? 1);
-  countInput.className = 'deal-count';
-  countInput.id = 'deck-deal-count';
-  countInput.setAttribute('aria-label', 'Cards to deal each player');
-  // `renderDeck` rebuilds this strip wholesale on EVERY state broadcast,
-  // so a number the host has typed but not yet used is destroyed by any
-  // unrelated action from any player - someone else drawing a card resets
-  // what you were about to deal. Reporting each keystroke lets the caller
-  // hold the value across re-renders. This is a race the host cannot see,
-  // which is why it needs closing rather than documenting.
-  countInput.addEventListener('input', () => opts.onDealCountChange?.(Number(countInput.value)));
-  strip.appendChild(countInput);
-
-  for (const id of actions) {
-    const spec = PILE_ACTIONS[id];
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.dataset.pileAction = id;
-    btn.textContent = spec.label;
-    btn.title = spec.hint;
-    // Smith Gate 2 #1: this sprint deliberately moves dealing under the
-    // cursor of a host who came to deal one more card, so the click that
-    // wipes every hand now lands somewhere people actually look. New
-    // discoverability, new risk - hence the danger styling AND a confirm.
-    if (spec.destructive) btn.classList.add('btn-danger');
-    if (id === 'deal' && count <= 0) btn.disabled = true; // nothing left to deal from
-    btn.addEventListener('click', () => {
-      const n = Number(countInput.value);
-      if (spec.destructive && !window.confirm(
-        `${spec.hint}\n\nEvery player's current hand will be cleared. Continue?`)) return;
-      opts.onPileAction(id, n);
-    });
-    strip.appendChild(btn);
-  }
-  return strip;
 }
 
 /**

@@ -181,6 +181,12 @@ export const PILE_ACTIONS = {
   sortRank: { label: 'Sort by rank', destructive: false, hint: 'Sort your hand by rank.' },
   sortSuit: { label: 'Sort by suit', destructive: false, hint: 'Sort your hand by suit.' },
   pass: { label: 'Pass', destructive: false, hint: 'Toggle your own passed marker.' },
+  // Phase 56 (Sprint 12, T56.1): shuffle/split move onto the deck's own
+  // pile anchor alongside deal/reshuffleDeal/draw, joining a table they
+  // were never part of before (US-35/36 shipped as a standalone button
+  // row, not through `pileLevelActions` at all).
+  shuffle: { label: 'Shuffle', destructive: false, hint: 'Shuffle the deck stock in place.' },
+  split: { label: 'Split into piles', destructive: false, hint: 'Split the deck into face-down draw piles.' },
 };
 
 /**
@@ -195,10 +201,11 @@ export const PILE_ACTIONS = {
  */
 export function pileLevelActions(kind, { isHost, isOwner } = {}) {
   if (kind === 'deck') {
-    // Draw is open to everyone; deal/reshuffle-deal stay host-only,
-    // exactly as they already were (D29) - this generalization widens
-    // WHERE dealing lives, not WHO may do it.
-    return isHost ? ['draw', 'deal', 'reshuffleDeal'] : ['draw'];
+    // Draw is open to everyone; every other deck action stays host-only,
+    // exactly as deal/reshuffleDeal already were (D29) and shuffle/split
+    // already were as a standalone button row (US-35/36) - Phase 56
+    // moves WHERE they live, not WHO may use them.
+    return isHost ? ['draw', 'deal', 'reshuffleDeal', 'shuffle', 'split'] : ['draw'];
   }
   if (kind === 'hand') {
     // Matches actionsForCard's existing rule: a hand only offers

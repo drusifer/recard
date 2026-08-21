@@ -461,28 +461,31 @@ try {
 
   // --- Deal (US-24/US-41, D15/D29): host-only, adds to existing hands
   // without discarding them - the actual point of the "MORE" in the old
-  // name. Now driven from the deck's own control strip, not a button in
-  // an unrelated row: the whole point of US-41 is that this is reachable
-  // from where the cards are. ---
-  const dealStrip = host.locator('#game-deck-area .deck-controls-strip');
-  assert(await dealStrip.count() === 1, 'the host must get pile-level controls on the deck (US-41/D29)');
-  // Sprint 12, Phase 54 (D35): Draw moved OFF the strip onto the deck's
-  // own pile anchor - open to everyone (D34), unlike deal/reshuffleDeal,
-  // which stay host-only and stay on the strip until Phase 56. So a
-  // guest now gets the anchor (with Draw) but NOT the strip at all -
-  // the strip has nothing left to offer them.
+  // name. Driven from the deck's own pile anchor, not a button in an
+  // unrelated row: the whole point of US-41 is that this is reachable
+  // from where the cards are. Phase 56 (T56.1): the legacy
+  // `.deck-controls-strip` is gone entirely now - every deck action,
+  // deal included, lives on the ONE anchor `renderDeck` builds. ---
+  const hostDeckAnchor = host.locator('#game-deck-area .pile-anchor');
+  assert(await hostDeckAnchor.count() === 1, 'the host must get the deck pile anchor (US-41/D29)');
+  assert(await join.locator('#game-deck-area .deck-controls-strip').count() === 0,
+    'the legacy deck strip is gone (Phase 56) - every deck action now lives on the anchor');
+  // D34: Draw is open to everyone, unlike deal/reshuffleDeal/shuffle/
+  // split, which stay host-only - so a guest gets the anchor too, just
+  // with fewer actions in it.
   const guestDeckAnchor = join.locator('#game-deck-area .pile-anchor');
   assert(await guestDeckAnchor.count() === 1,
     'Draw is open to everyone (D34) - a guest must still see the deck pile anchor');
   assert(await guestDeckAnchor.locator('[data-pile-action="draw"]').count() === 1,
     'the guest deck anchor must offer Draw');
-  assert(await join.locator('#game-deck-area .deck-controls-strip').count() === 0,
-    'dealing stays host-only - a guest must not get the deal strip at all now Draw has moved off it');
+  assert(await guestDeckAnchor.locator('[data-pile-action="deal"]').count() === 0,
+    'dealing stays host-only - a guest must not get the Deal button');
   const hostHandIdsBeforeDealMore = await host.evaluate(() =>
     [...document.querySelectorAll('#hand-area .card')].map((c) => c.dataset.cardId),
   );
+  await host.hover('#game-deck-area .pile-anchor-toggle');
   await host.fill('#deck-deal-count', '2');
-  await dealStrip.locator('button[data-pile-action="deal"]').click();
+  await host.click('#game-deck-area [data-pile-action="deal"]');
   await host.waitForFunction(
     (before) => document.querySelectorAll('#hand-area .card').length === before + 2,
     hostHandIdsBeforeDealMore.length,
@@ -678,6 +681,7 @@ try {
   // native HTML5 DnD doesn't fire from synthetic input headless), so this
   // exercises the actual drop-region geometry against actually-rendered
   // card rects, not a stubbed hit test.
+  await host.hover('#game-deck-area .pile-anchor-toggle');
   await host.fill('#deck-deal-count', '3');
   await host.locator('#game-deck-area button[data-pile-action="deal"]').click();
   await host.waitForFunction(() => document.querySelectorAll('#hand-area .card').length >= 3, undefined, { timeout: 10000 });
@@ -873,16 +877,19 @@ try {
     'a touch reorder must not duplicate or lose a card');
   console.log('US-40/US-23: dragging a card with a finger reorders the hand, through the same performHandReorder the mouse uses');
 
-  // --- Deck operations (US-35/36, D22) ---
+  // --- Deck operations (US-35/36, D22). Phase 56 (T56.1): shuffle/split
+  // moved off their own standalone row onto the deck's pile anchor. ---
   await host.setViewportSize({ width: 1280, height: 900 });
-  assert(await host.locator('#deck-controls').isVisible(), 'the host sees deck controls');
-  assert(!(await join.locator('#deck-controls').isVisible()),
+  assert(await host.locator('#game-deck-area [data-pile-action="shuffle"]').count() === 1,
+    'the host sees Shuffle on the deck anchor');
+  assert(await join.locator('#game-deck-area [data-pile-action="shuffle"]').count() === 0,
     'deck operations are host-only, like Deal/Reset - a guest must not see them');
 
   const deckCountOn = (page) => page.evaluate(() =>
     Number(document.querySelector('.deck-count-badge')?.textContent ?? -1));
   const beforeShuffle = await deckCountOn(host);
-  await host.click('#shuffle-btn');
+  await host.hover('#game-deck-area .pile-anchor-toggle');
+  await host.click('#game-deck-area [data-pile-action="shuffle"]');
   await host.waitForTimeout(300);
   assert((await deckCountOn(host)) === beforeShuffle,
     'Shuffle reorders only - the remaining card count must not change');
@@ -934,8 +941,9 @@ try {
   await host.setViewportSize({ width: 1280, height: 900 });
 
   const zonesBeforeSplit = await join.locator('#table-area .zone').count();
-  await host.fill('#split-count', '3');
-  await host.click('#split-btn');
+  await host.hover('#game-deck-area .pile-anchor-toggle');
+  await host.fill('#deck-split-count', '3');
+  await host.click('#game-deck-area [data-pile-action="split"]');
   await join.waitForFunction(
     (n) => document.querySelectorAll('#table-area .zone').length === n + 3,
     zonesBeforeSplit,
@@ -1227,6 +1235,7 @@ try {
   // US-41: Reshuffle & deal is the "re-deal" that had no single control.
   let confirmMessage = null;
   autoHost.once('dialog', (d) => { confirmMessage = d.message(); d.accept(); });
+  await autoHost.hover('#game-deck-area .pile-anchor-toggle');
   await autoHost.fill('#deck-deal-count', '6');
   await autoHost.locator('#game-deck-area button[data-pile-action="reshuffleDeal"]').click();
   await autoHost.waitForFunction(() => document.querySelectorAll('#hand-area .card').length === 6, undefined, { timeout: 15000 });
@@ -1258,7 +1267,7 @@ try {
     }
   });
   await autoHost.waitForSelector('#game-deck-area .deck-empty', { timeout: 20000 });
-  assert(await autoHost.locator('#game-deck-area .deck-controls-strip').count() === 1,
+  assert(await autoHost.locator('#game-deck-area .pile-anchor').count() === 1,
     'an empty deck must KEEP its controls - hiding them is the dead-end this story exists to fix');
   assert(await autoHost.locator('#game-deck-area button[data-pile-action="deal"]').isDisabled(),
     'Deal has nothing to deal from on an empty deck, so it must be disabled rather than throwing');

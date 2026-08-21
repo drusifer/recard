@@ -45,7 +45,6 @@ const gameRosterEl = document.getElementById('game-roster');
 const drawBtn = document.getElementById('draw-btn');
 const resetBtn = document.getElementById('reset-btn');
 const resetScoresBtn = document.getElementById('reset-scores-btn');
-const deckControlsEl = document.getElementById('deck-controls');
 const splitCountEl = document.getElementById('split-count');
 const passToggleBtn = document.getElementById('pass-toggle-btn');
 const playAsEl = document.getElementById('play-as');
@@ -873,9 +872,10 @@ function renderRosterOnly() {
   renderDeck(document.getElementById('game-deck-area'), view.deckCount, {
     isHost: role === 'host',
     dealCount: lastDealCount,
+    splitCount: lastSplitCount,
     onDealCountChange: (n) => { lastDealCount = n; },
+    onSplitCountChange: (n) => { lastSplitCount = n; },
     onPileAction: (action, count) => dealFromDeck(action, count),
-    onDraw: performDraw,
   });
   passToggleBtn.textContent = view.passed?.[myId] ? 'Unpass' : 'Pass';
   // Sprint 12 (D34/D37, T53.2): the hand's own pile anchor replaces the
@@ -925,8 +925,9 @@ function renderGameFromView(view) {
   renderSeatZones(document.getElementById('seat-zones'), personalZones, view.zones, seatedOrder(view.players, myId), zoneOpts);
   resetBtn.hidden = role !== 'host';
   resetScoresBtn.hidden = role !== 'host';
-  // US-35/36: deck operations are host-only, same as Deal/Deal More/Reset.
-  deckControlsEl.hidden = role !== 'host';
+  // Sprint 12 (T56.1): shuffle/split moved onto the deck's own pile
+  // anchor - this legacy row stays permanently hidden (not deleted)
+  // per the same pattern as Phase 53/54/55's own migrated controls.
   renderRosterOnly();
 }
 
@@ -986,14 +987,14 @@ document.getElementById('create-zone-btn').addEventListener('click', () => {
   nameInput.value = '';
 });
 
-document.getElementById('shuffle-btn').addEventListener('click', () => {
+// Sprint 12 (T56.1): named so the deck's pile anchor calls the same
+// implementation the legacy shuffle/split buttons did.
+function performShuffle() {
   if (sessionEnded) return;
   dispatch({ type: 'SHUFFLE_DECK' });
-});
-
-document.getElementById('split-btn').addEventListener('click', () => {
+}
+function performSplit(pileCount) {
   if (sessionEnded) return;
-  const pileCount = Number(splitCountEl.value);
   try {
     dispatch({ type: 'SPLIT_DECK', pileCount });
   } catch (err) {
@@ -1001,7 +1002,9 @@ document.getElementById('split-btn').addEventListener('click', () => {
     // place the action was taken - not a silent no-op.
     window.alert(err.message);
   }
-});
+}
+document.getElementById('shuffle-btn').addEventListener('click', performShuffle);
+document.getElementById('split-btn').addEventListener('click', () => performSplit(Number(splitCountEl.value)));
 
 // Sprint 12 (D34/D35/D36, T54.1): named so the deck's pile anchor - both
 // its click/tap shortcut and its drag-onto-hand drop - calls the same
@@ -1048,25 +1051,32 @@ sortSuitBtn.addEventListener('click', sortHandBySuit);
 // --- Deal More (US-24): host-only, adds to existing hands without a
 // reset. Deliberately a different label/section/style than "Deal &
 // Start" so a mid-game host can't mis-tap into a reset (Smith Gate 1). ---
-/** Remembers the host's last deal count so a re-render doesn't reset the
- *  input they just typed into - `renderDeck` rebuilds the strip wholesale
- *  on every state broadcast. */
+/** Remembers the host's last deal/split counts so a re-render doesn't
+ *  reset an input the host already typed into - `renderDeck` rebuilds
+ *  the pile anchor wholesale on every state broadcast. */
 let lastDealCount = 1;
+let lastSplitCount = 2;
 
 /**
- * US-41/D29: both deck actions, over the reducer cases that already
- * exist. "Reshuffle & deal" is RESET then DEAL - two existing dispatches
- * rather than a third code path that could drift from either.
+ * US-41/D29, Phase 56 (T56.1): every deck pile-level action - the deck's
+ * pile anchor is the ONE thing that calls this now, having absorbed
+ * both the legacy strip's deal/reshuffleDeal and the legacy shuffle/
+ * split row. "Reshuffle & deal" is RESET then DEAL - two existing
+ * dispatches rather than a third code path that could drift from
+ * either.
  */
-function dealFromDeck(action, cardsPerPlayer) {
+function dealFromDeck(action, count) {
   if (sessionEnded) return;
-  lastDealCount = cardsPerPlayer;
+  if (action === 'draw') return performDraw();
+  if (action === 'shuffle') return performShuffle();
+  if (action === 'split') { lastSplitCount = count; return performSplit(count); }
+  lastDealCount = count;
   try {
     if (action === 'reshuffleDeal') {
       dispatch({ type: 'RESET' });
-      dispatch({ type: 'DEAL', cardsPerPlayer });
+      dispatch({ type: 'DEAL', cardsPerPlayer: count });
     } else {
-      dispatch({ type: 'DEAL_MORE', cardsPerPlayer });
+      dispatch({ type: 'DEAL_MORE', cardsPerPlayer: count });
     }
   } catch (err) {
     // US-41 AC: "fail the way it already does - a clear message, no

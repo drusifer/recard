@@ -113,3 +113,36 @@ test('D34: draw is no longer offered as a per-card action from the deck (moved t
   // a behaviour change anything currently depends on.
   assert.deepEqual(actionsForPileKind('deck'), []);
 });
+
+// --- Phase 56 (Sprint 12, T56.1): shuffle/split join the deck's
+// pile-level table, moving off their standalone button row. ---------
+
+test('Phase 56: the deck offers shuffle/split to the host, alongside deal/reshuffleDeal/draw', () => {
+  const actions = pileLevelActions('deck', { isHost: true });
+  for (const id of ['draw', 'deal', 'reshuffleDeal', 'shuffle', 'split']) {
+    assert.ok(actions.includes(id), `expected "${id}" in ${JSON.stringify(actions)}`);
+  }
+});
+
+test('Phase 56: shuffle/split stay host-only, exactly like deal/reshuffleDeal', () => {
+  const actions = pileLevelActions('deck', { isHost: false });
+  assert.deepEqual(actions, ['draw']);
+  assert.ok(!actions.includes('shuffle') && !actions.includes('split'));
+});
+
+test('Phase 56: shuffle and split are declared with a label and hint, and neither is destructive', () => {
+  for (const id of ['shuffle', 'split']) {
+    const spec = PILE_ACTIONS[id];
+    assert.ok(spec, `${id} must be declared`);
+    assert.ok(spec.label?.length > 0, `${id} needs a label`);
+    assert.ok(spec.hint?.length > 0, `${id} needs a hint`);
+    assert.equal(spec.destructive, false, `${id} must not be destructive - unlike reshuffleDeal, it never clears a hand`);
+  }
+});
+
+test('Phase 56: shuffle/split are never draggable - they act on the deck itself, in place', () => {
+  for (const id of ['shuffle', 'split']) {
+    assert.equal(PILE_ACTIONS[id].target, undefined);
+    assert.equal(PILE_ACTIONS[id].singleTarget, undefined);
+  }
+});

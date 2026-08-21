@@ -487,18 +487,24 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   z-index: 7;
 }
 
-/* Sprint 12: the deck's pile-level controls (.deck-controls-strip, D29)
-   are PERSISTENT, not hover-revealed - unlike a card's popup, they must
-   stay clickable unconditionally. Same trapped-stacking-context cause as
-   above (`#table-center`'s transform vs. `#seat-zones`'s sibling z-index:
-   1), same `:has()` fix - but always-on rather than conditional, since
-   there's no hover moment to key off. Confirmed live at the 2-player
-   seat geometry (`seatPosition`'s already-documented pot/seat overlap
-   above): a personal zone's empty `.card-row` was silently swallowing
-   clicks meant for the Deal button underneath it - not a hover
-   collision, a permanent one, because the strip is always there. */
-#table-center:has(.deck-controls-strip) {
-  z-index: 2;
+/* Sprint 12: the deck's pile anchor (originally `.deck-controls-strip`,
+   D29; the anchor absorbed it - Phase 53/56) is PERSISTENT, not hover-
+   revealed - unlike a card's popup, its toggle AND its open popover
+   must stay clickable unconditionally. Same trapped-stacking-context
+   cause as above (`#table-center`'s transform vs. `#seat-zones`'s AND
+   `#game-roster`'s sibling z-indexes), same `:has()` fix - but always-
+   on rather than conditional, since there's no hover moment to key off.
+   Confirmed live, TWICE, at the 2-player seat geometry (`seatPosition`'s
+   already-documented pot/seat overlap above): first a personal zone's
+   empty `.card-row` (z-index:1) swallowed a click, then - after beating
+   that one - a roster seat `<li>` (z-index:2, `.roster li.seat`) did the
+   same thing at a DIFFERENT popover position. 3 clears both (not 2,
+   which only ties the seat and loses on DOM order - `#game-roster`
+   comes later in the markup). `.pile-anchor` generically (not deck-
+   specific): the hand's own anchor lives outside `#table-center`
+   entirely, so this only ever matches the deck's. */
+#table-center:has(.pile-anchor) {
+  z-index: 3;
 }
 
 /* Drag cursor affordance (US-28, Smith Sprint 4 close-out finding #1):
