@@ -1478,6 +1478,92 @@ that don't use orientation (Deck, Discard) simply never read or set it
 it's the shape, not the plan.
 
 
+## v3.1 Decisions (Sprint 13, US-47) — Pile becomes a real type, Tranche 1
+
+### D41. D39 is split into two tranches; only the read-side ships this sprint
+
+Sizing D39 for real implementation surfaced a genuine gap in the
+interface as originally specified: `canAccept`/`insert`/`canRemove`/
+`remove` only covers actions that move a card **between two piles**
+(`PLAY`, `MOVE_CARD`, `PICKUP`, `DRAW`, `DEAL`). `REVEAL` mutates a card
+**in place** (flips `faceUp`, no pile change). `SHUFFLE_DECK` reorders
+one pile's own cards. `SPLIT_DECK` *creates* new piles from one. `SORT`/
+`TOGGLE_PASS` reorder or flag-toggle one pile, touching no card
+identity at all. None of these fit a remove-from-A/insert-into-B shape.
+Forcing them into it now, inside `state.js` — the authoritative reducer
+every client replicates — would be exactly the "architecture-stage
+defect caught during implementation" pattern this project's retros keep
+naming (D21 params-vs-rule drift, D24's wrong premises). Better to name
+the gap now than discover it mid-refactor of replicated state.
+
+**Decision:** D39 ships in two tranches.
+
+- **Tranche 1 (this sprint):** the *read-side* — `visibility`,
+  `redact`, `dropRule`, and offered-actions (`cardActions`/
+  `pileActions`) become one real per-type module (`src/piles/`) instead
+  of parallel string-switches in `state.js`/`pileActions.js`. Zero
+  behavior change; the reducer's mutation bodies are untouched, just
+  reading their visibility/action tables from the new registry instead
+  of the old hardcoded ones — one source of truth, not two.
+- **Tranche 2 (future sprint, not scheduled):** the *write-side* —
+  resolve the in-place-action gap above (likely: `canAccept`/`insert`/
+  `canRemove`/`remove` for the four actions that genuinely move a card,
+  plus a separate `apply(pile, action)` capability for in-place/
+  pile-only mutations — a real design decision, not assumed here) and
+  only then dispatch the reducer's mutation bodies through it.
+
+**Consequences:** A new Pile type this sprint (hypothetically) could
+declare its visibility/redaction/drop behavior and what it offers, but
+the reducer would still need its own `case` to actually move cards in
+or out of it — Open/Closed isn't fully achieved until Tranche 2 lands.
+That's a real, disclosed limitation of shipping Tranche 1 alone, not
+hidden in a commit message (Smith Gate 1 condition on this story).
+
+### D42. Pile-type module contract (Tranche 1)
+
+```
+src/piles/pileTypes.js   — registry: PILE_TYPES = { deck, hand, zone }
+src/piles/deckPile.js
+src/piles/handPile.js
+src/piles/zonePile.js
+```
+
+Each module exports:
+- `visibility` — `'hidden' | 'in-hand' | 'mixed'` (unchanged strings
+  from today's `PILE_VISIBILITY`, so `state.js`'s `viewFor` dispatch is
+  a drop-in swap, not a rewrite).
+- `redactCard(card, viewerId)` — only load-bearing for `'mixed'`
+  (today's `redactMiddleCard`); `'hidden'`/`'in-hand'` piles redact at
+  the *pile* level (count-only / owner-only), not per-card, so their
+  `redactCard` is unused by `viewFor` but present for interface
+  uniformity.
+- `dropRule` — `'NONE'` (Deck, Hand — no halo geometry reachable today;
+  Hand's own reorder goes through `handOrder.js`, not
+  `dropTarget.js`) or `'FAN'` (Zone — today's only `resolveDropTarget`
+  caller). Structural readiness for a future `'STACK'`-only type
+  (Discard, D38) — not exercised this sprint, since nothing produces
+  one yet.
+- `cardActions(pile, card, viewerId)` — generalizes
+  `actionsForPileKind`/`actionsForCard`'s combined per-kind switch +
+  visibility/ownership filtering.
+- `pileActions(ctx)` — generalizes `pileLevelActions`'s per-kind
+  switch. Deliberately kept at `pileLevelActions`'s *existing* call
+  shape (`ctx: {isHost, isOwner}`), not `(pile, viewerId, ctx)` as
+  first drafted here — checked both real call sites
+  (`ui.js:790`/`main.js:876`) before writing the module and found
+  neither has a real `pile` object or `viewerId` in scope, only a
+  `kind` string and a precomputed boolean (`main.js`'s hand anchor is
+  always the *viewer's own* hand, so `isOwner` is hardcoded `true`
+  there, never derived from comparing ids). Recording the correction
+  here rather than silently diverging from what's written — the doc
+  should match the code, not the other way around.
+
+`state.js`, `pileActions.js` (renamed call sites, same exported names
+where external callers depend on them — `ui.js`/`main.js` should not
+need to change), and `dropTarget.js`'s caller in `ui.js` all read
+through `PILE_TYPES[pile.kind]` instead of their own tables.
+
+
 ## Module Layout
 ```
 index.html              entry page, host/join screens, game screen

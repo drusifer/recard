@@ -1663,6 +1663,57 @@ is exactly the pattern (architecture-stage defect caught late) this
 project's own retros have flagged repeatedly (D21 params-vs-rule drift,
 D24 premises). Sprint 12 closes first; this starts clean after.
 
+---
+
+## Sprint 13 ("Pile becomes a real type") — US-47
+
+### US-47: Pile kind becomes a real per-type module, not a string switch
+
+**As** the codebase (this is a pure refactor story — no player-facing
+change), **I want** `pile.kind` to dispatch to a real per-type module
+instead of being switched on as a string in `state.js`, `pileActions.js`
+`ui.js`, **so that** D39's Pile interface exists as real code before
+D38 (GameConfig/Zone catalog) or a fourth pile type (Discard/Run) is
+built on top of it — adding a new pile type should touch zero existing
+pile-type code, not another `case`.
+
+**AC:**
+- One module per existing pile type (Deck, Hand, Zone) declares, in one
+  place: its **visibility rule** (today's `PILE_VISIBILITY` table +
+  `pileVisibility()`), its **redaction** (today's `viewFor`'s
+  per-visibility branch + `redactMiddleCard`), its **drop rule**
+  (`NONE` for Deck/Hand — no halo geometry involved today — `FAN` for
+  Zone, so `dropTarget.js`'s halo/stack logic is reachable through a
+  declared property instead of an implicit "only zones call this"),
+  and its **offered actions** (today's `actionsForPileKind`/
+  `actionsForCard`/`pileLevelActions` per-kind branches).
+- `state.js`, `pileActions.js`, and `dropTarget.js`'s call sites read
+  from this one registry — no duplicate parallel table left behind.
+- **Zero user-visible behavior change.** Every existing unit test and
+  the full e2e suite pass unmodified (a test needing a *change*, not
+  just a pass, is a signal this refactor altered behavior — stop and
+  flag it, don't force the test to agree).
+- New unit tests cover the per-type modules directly (visibility,
+  redact, dropRule, offered-actions), the same way `seating.js`/
+  `handOrder.js`/`dropTarget.js` are tested in isolation from
+  rendering.
+
+**Explicitly out of scope (deferred, see Morpheus D41 below):**
+- The reducer's actual mutation bodies (`PLAY`/`PICKUP`/`MOVE_CARD`/
+  `DRAW`/`DEAL` in `state.js`) are **not** rewritten to dispatch through
+  `canAccept`/`insert`/`canRemove`/`remove` this sprint. Cypher's
+  read, confirmed by Morpheus: D39 as written doesn't actually cover
+  `REVEAL`/`SHUFFLE_DECK`/`SPLIT_DECK`/`TOGGLE_PASS`/sort — none of
+  these move a card between two piles, so they don't fit a
+  remove/insert shape at all. Forcing that dispatch into `state.js` —
+  the authoritative, replicated reducer every client runs — before
+  that gap is resolved is exactly the "architecture-stage defect
+  caught during implementation" pattern this project's retros keep
+  naming. Resolving it is real design work, not a mechanical follow-on
+  — see D41.
+- `GameConfig`/`Zone` typing, `DeckDefinition`, `Card.orientation`,
+  the builder screen (all D38/D40 — untouched, later sprints).
+
 
 ---
 

@@ -1,0 +1,105 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { PILE_TYPES } from '../src/piles/pileTypes.js';
+import * as deckPile from '../src/piles/deckPile.js';
+import * as handPile from '../src/piles/handPile.js';
+import * as zonePile from '../src/piles/zonePile.js';
+
+// D42 (Sprint 13, US-47): one module per pile TYPE instead of a `kind`
+// string switched on in state.js/pileActions.js. Phase 59 builds these
+// as pure, standalone modules and proves them equivalent to the
+// EXISTING (still-untouched) behavior before Phase 60 wires anything -
+// same "module first, verify, then wire" order D18/D14/D21 used.
+
+test('the registry exposes exactly the three existing pile kinds', () => {
+  assert.deepEqual(Object.keys(PILE_TYPES).sort(), ['deck', 'hand', 'zone']);
+  assert.equal(PILE_TYPES.deck, deckPile);
+  assert.equal(PILE_TYPES.hand, handPile);
+  assert.equal(PILE_TYPES.zone, zonePile);
+});
+
+test('visibility matches state.js\'s existing PILE_VISIBILITY table exactly', () => {
+  assert.equal(deckPile.visibility, 'hidden');
+  assert.equal(handPile.visibility, 'in-hand');
+  assert.equal(zonePile.visibility, 'mixed');
+});
+
+test('dropRule: NONE for deck/hand (no halo geometry reachable today), FAN for zone (the only resolveDropTarget caller)', () => {
+  assert.equal(deckPile.dropRule, 'NONE');
+  assert.equal(handPile.dropRule, 'NONE');
+  assert.equal(zonePile.dropRule, 'FAN');
+});
+
+// --- cardActions: characterized against pileActions.js's actionsForCard ---
+
+const deck = { id: 'deck', kind: 'deck', ownerId: null };
+const myHand = { id: 'hand:me', kind: 'hand', ownerId: 'me' };
+const theirHand = { id: 'hand:you', kind: 'hand', ownerId: 'you' };
+const table = { id: 'table', kind: 'zone', ownerId: null };
+
+test('deck cardActions: always empty (D34 moved draw off the per-card table)', () => {
+  assert.deepEqual(deckPile.cardActions(deck, { id: 'c' }, 'me'), []);
+});
+
+test('hand cardActions: play, owner only', () => {
+  assert.deepEqual(handPile.cardActions(myHand, { id: 'c' }, 'me'), ['play']);
+  assert.deepEqual(handPile.cardActions(theirHand, { id: 'c' }, 'me'), []);
+});
+
+test('zone cardActions: face-up card offers pickup/move, not reveal', () => {
+  assert.deepEqual(zonePile.cardActions(table, { faceUp: true, owner: null }, 'me'), ['pickup', 'move']);
+});
+
+test('zone cardActions: shared face-down card - anyone may reveal or move, nobody may pick up', () => {
+  assert.deepEqual(zonePile.cardActions(table, { faceDown: true, owner: null }, 'me'), ['reveal', 'move']);
+});
+
+test('zone cardActions: a non-owner gets nothing on someone else\'s still-hidden private card', () => {
+  assert.deepEqual(
+    zonePile.cardActions(table, { faceDown: true, owner: 'you' }, 'me'),
+    [],
+    'not reveal, not move - a real privacy boundary, not an oversight',
+  );
+});
+
+test('zone cardActions: the owner of a still-hidden private card can reveal or move their own', () => {
+  assert.deepEqual(zonePile.cardActions(table, { faceDown: true, owner: 'me' }, 'me'), ['reveal', 'move']);
+});
+
+// --- redactCard: characterized against state.js's redactMiddleCard ---
+
+test('zone redactCard: a face-up card passes through unchanged', () => {
+  const card = { id: 'c1', rank: '5', suit: 'clubs', owner: null, faceUp: true };
+  assert.deepEqual(zonePile.redactCard(card, 'anyone'), card);
+});
+
+test('zone redactCard: a face-down card the viewer doesn\'t own loses rank/suit', () => {
+  const card = { id: 'c1', rank: '5', suit: 'clubs', owner: null, faceUp: false };
+  assert.deepEqual(zonePile.redactCard(card, 'anyone'), { id: 'c1', owner: null, faceDown: true });
+});
+
+test('zone redactCard: the owner of a still-hidden private card sees it in full', () => {
+  const card = { id: 'c1', rank: '5', suit: 'clubs', owner: 'me', faceUp: false };
+  assert.deepEqual(zonePile.redactCard(card, 'me'), card);
+});
+
+test('zone redactCard: layout survives redaction (D21 - arrangement leaks nothing about identity)', () => {
+  const card = { id: 'c1', rank: '5', suit: 'clubs', owner: null, faceUp: false, layout: 'stack' };
+  assert.deepEqual(zonePile.redactCard(card, 'anyone'), { id: 'c1', owner: null, faceDown: true, layout: 'stack' });
+});
+
+// --- pileActions: characterized against pileActions.js's pileLevelActions ---
+
+test('deck pileActions: draw open to everyone, deal/reshuffleDeal/shuffle/split host-only', () => {
+  assert.deepEqual(deckPile.pileActions({ isHost: true }), ['draw', 'deal', 'reshuffleDeal', 'shuffle', 'split']);
+  assert.deepEqual(deckPile.pileActions({ isHost: false }), ['draw']);
+});
+
+test('hand pileActions: sort/pass, owner only', () => {
+  assert.deepEqual(handPile.pileActions({ isOwner: true }), ['sortRank', 'sortSuit', 'pass']);
+  assert.deepEqual(handPile.pileActions({ isOwner: false }), []);
+});
+
+test('zone pileActions: none today - no pile-level action has ever targeted a shared zone', () => {
+  assert.deepEqual(zonePile.pileActions({}), []);
+});
