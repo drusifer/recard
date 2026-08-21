@@ -426,6 +426,13 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   /* Fan pivot (US-30): rotates from the bottom, like cards actually held
      in a hand, not around the wrapper's own center. */
   transform-origin: bottom center;
+  /* D51 follow-up: the fan spread (per-card rotate/translateY, set as
+     the `--raise-base` custom property in ui.js's `renderHand`) applies
+     through this plain class rule rather than an inline `transform`, so
+     the shared `.pile-hover-host:hover` rule (also class-based) can
+     compose its own raise on top instead of losing to an inline style
+     regardless of specificity - same pattern `.seat-zone` uses. */
+  transform: var(--raise-base, none);
 }
 
 /* Headroom for the fan's rotation/arc (US-30) so rotated card corners
@@ -1114,7 +1121,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
      not a CSS tuning problem - the actual fix is shrinking that
      footprint (fewer permanently-reserved per-card controls), which is
      the pile-actions redesign already flagged as separate, larger work. */
-  .table-surface { --table-min-h: 36rem; } /* D51: bigger cards need more ring clearance again */
+  .table-surface { --table-min-h: max(36rem, calc(100vh - 14.5rem)); } /* D51: bigger cards need more ring clearance; also grow with a tall window, not just cap at a fixed rem (direct user request) */
   /* Centred *in the surface* rather than left in normal flow. The pot
      had been flowing just under the deck area near the top, while
      personal zones ring the surface's true centre
@@ -1153,7 +1160,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 
 @media (min-width: 1440px) {
-  .table-surface { --table-min-h: 36rem; } /* D51: bigger cards need more ring clearance again */
+  .table-surface { --table-min-h: max(36rem, calc(100vh - 14.5rem)); } /* D51: bigger cards need more ring clearance; also grow with a tall window, not just cap at a fixed rem (direct user request) */
   #table-center { max-width: calc(100vw - 12rem); }
   #table-area { max-width: calc(100vw - 28rem); }
   .seat-zone { min-width: 16rem; max-width: 30rem; }
@@ -1237,7 +1244,16 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 
 .middle-card:hover .middle-card-actions,
-.middle-card:focus-within .middle-card-actions {
+.middle-card:focus-within .middle-card-actions,
+/* D51 follow-up: hand cards ("Play hidden") reuse `.middle-card-actions`
+   styling but aren't `.middle-card` - they're `.hand-card`, which
+   `renderActionRow` marks `.pile-hover-host` like every other actionable
+   pile/card. Extending the reveal selector here (rather than switching
+   the hand-card row to `.pile-anchor-popover`'s styling) keeps a card's
+   action row looking like a card's action row regardless of which list
+   it's rendered in. */
+.pile-hover-host:hover .middle-card-actions,
+.pile-hover-host:focus-within .middle-card-actions {
   display: flex;
 }
 

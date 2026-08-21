@@ -921,7 +921,15 @@ function renderGameFromView(view) {
   const nameById = new Map(view.players.map((p) => [p.id, p.id === myId ? 'You' : p.name]));
 
   renderHand(handAreaEl, orderedHand(view.myHand), {
-    onPlay: (card) => playCard(card.id, selectedVisibility()),
+    // D51 follow-up (direct user request): Play and Play Hidden are two
+    // separate actions now, not one gesture plus a separately-armed
+    // "Play as" dropdown. Tap is always public - the fast default,
+    // matching Draw's own precedent (D36). Play Hidden is the card's
+    // own hover-row action; which hidden mode it uses is still chosen
+    // by `selectedVisibility()`, which now only offers the two hidden
+    // modes (index.html's `#play-as`, relabeled "Hide as").
+    onPlay: (card) => playCard(card.id, 'public'),
+    onPlayHidden: (card) => playCard(card.id, selectedVisibility()),
     onHandMotion: (active) => motionThrottler.schedule('hand', { active }),
     onReorder: (newOrderIds) => {
       handOrderIds = newOrderIds;
@@ -1013,7 +1021,11 @@ function dropCardOnZone(cardId, targetZoneId, placement = {}) {
   const view = currentView();
   if (!view) return;
   if (view.myHand.some((c) => c.id === cardId)) {
-    playCard(cardId, selectedVisibility(), targetZoneId, placement);
+    // D51 follow-up: this now actually matches the comment above it -
+    // drag always plays public, same as a plain tap. "Play hidden" is
+    // its own explicit action (the hand card's hover row), never
+    // reachable by dragging.
+    playCard(cardId, 'public', targetZoneId, placement);
   } else {
     moveCard(cardId, targetZoneId, placement);
   }

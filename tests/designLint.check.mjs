@@ -123,7 +123,20 @@ try {
       // when its width dips slightly under 44px on the smallest tested
       // viewport - a different shape of affordance, not an undersized
       // button.
-      buttons: [...document.querySelectorAll('button:not([hidden]):not(.card)')]
+      // D51 finding: `.action-btn` (a card's hover-revealed action row -
+      // Turn over/Pick up/Move/Rotate/Play hidden) was ALWAYS exempt from
+      // the 44px floor by design (style.css's own comment: "a HOVER-
+      // revealed secondary path with an always-available alternative...
+      // not the primary touch target the 44px floor exists to protect"),
+      // but this checker never actually verified that exemption - it
+      // never hovers anything, so `.action-btn` was always `display:none`
+      // (0x0, filtered out below) at measurement time. Only surfaced now
+      // because a viewport RESIZE mid-check leaves Playwright's virtual
+      // mouse at its last (pre-resize) position, which can land on a
+      // reflowed element and genuinely trigger `:hover` by accident -
+      // exposing a real, pre-existing gap in this exemption, not a new
+      // regression to fix in the app.
+      buttons: [...document.querySelectorAll('button:not([hidden]):not(.card):not(.action-btn)')]
         .filter((b) => {
           const r = b.getBoundingClientRect();
           return r.width > 0 && r.height > 0; // skip genuinely hidden/collapsed ones

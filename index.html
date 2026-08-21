@@ -152,9 +152,14 @@
                  anchor toggle is gone - hovering the hand zone itself
                  (like hovering a card) reveals them; see
                  `renderPileAnchor`'s `hostEl` param. -->
-            <label class="play-as-label" for="play-as">Play as
+            <!-- D51 follow-up (direct user request): "public" is no
+                 longer an option here - Play and Play Hidden are two
+                 separate actions now (a plain tap/drag is always public;
+                 Play Hidden lives on the card's own hover row), so this
+                 selector only ever needs to say WHICH hidden mode Play
+                 Hidden uses. -->
+            <label class="play-as-label" for="play-as">Hide as
               <select id="play-as">
-                <option value="public">face-up</option>
                 <option value="shared-facedown">face-down (hidden from all)</option>
                 <option value="private-facedown">face-down (only you)</option>
               </select>

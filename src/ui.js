@@ -288,7 +288,7 @@ function performHandReorder(container, draggedId, beforeEl, onReorder) {
  * buttons write to (D14) - sorting and dragging share one source of
  * truth instead of fighting each other (Smith Gate 1).
  */
-export function renderHand(container, cards, { onPlay, onHandMotion, onReorder, onCardDrag, onDropCard, zones } = {}) {
+export function renderHand(container, cards, { onPlay, onPlayHidden, onHandMotion, onReorder, onCardDrag, onDropCard, zones } = {}) {
   container.innerHTML = '';
   cards.forEach((card, i) => {
     const wrapper = document.createElement('div');
@@ -300,7 +300,18 @@ export function renderHand(container, cards, { onPlay, onHandMotion, onReorder, 
     // tappable no matter how many are in hand.
     const center = (cards.length - 1) / 2;
     const offset = i - center;
-    wrapper.style.transform = `rotate(${offset * 4}deg) translateY(${Math.abs(offset) * 0.35}rem)`;
+    // D51 follow-up: the fan-spread transform is set via the
+    // `--raise-base` CUSTOM PROPERTY only, never the `transform`
+    // property directly - style.css's `.hand-card { transform:
+    // var(--raise-base, none); }` applies it as a plain class rule,
+    // which the shared `.pile-hover-host:hover` rule (also a class
+    // rule) can then outrank on hover. An inline `transform` would have
+    // always won regardless of specificity, silently making the new
+    // "Play hidden" hover row's raise effect never apply here - the
+    // exact `.seat-zone` conflict already fixed once this same pass,
+    // now avoided here by never using inline `transform` in the first
+    // place rather than composing inside it.
+    wrapper.style.setProperty('--raise-base', `rotate(${offset * 4}deg) translateY(${Math.abs(offset) * 0.35}rem)`);
     wrapper.draggable = true;
     wrapper.addEventListener('dragstart', (e) => {
       e.dataTransfer.setData('text/plain', card.id);
@@ -332,6 +343,19 @@ export function renderHand(container, cards, { onPlay, onHandMotion, onReorder, 
     attachTouchDrag(wrapper, card, { onDropCard, onReorder, onCardDrag, onHandMotion });
 
     wrapper.appendChild(cardEl(card, { onClick: onPlay }));
+
+    // D51 follow-up: "Play hidden" is the deliberate, secondary action -
+    // reached by hovering the card (same mechanism every other
+    // actionable pile/card uses now), never a tap/drag shortcut, so it
+    // can't be triggered by accident the way the fast default (plain
+    // tap/drag = public play, D36-style) can be.
+    if (onPlayHidden) {
+      renderActionRow(wrapper, ['playHidden'], {
+        rowClass: 'middle-card-actions',
+        buttonClass: 'action-btn',
+        onAction: () => onPlayHidden(card),
+      });
+    }
 
     container.appendChild(wrapper);
   });

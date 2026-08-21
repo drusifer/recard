@@ -50,7 +50,17 @@ export const ACTION_SPECS = {
   // Card-level: act on the card under the cursor, offered in its hover
   // row. `target: null` means it happens in place, with no destination
   // to pick.
+  // D51 follow-up (direct user request): "play" and "play hidden" are
+  // two distinct actions now, not one gesture plus a separately-armed
+  // "Play as" dropdown. `play` is unconditionally public - the fast,
+  // default gesture (tap or drag), matching Draw's own "highest-
+  // frequency action gets a shortcut" precedent (D36). `playHidden`
+  // is the deliberate, secondary case, reached via the card's hover
+  // row - which visibility it actually plays as (shared vs. private
+  // face-down) is chosen by the remaining "Hide as" selector, which
+  // now only offers the two hidden modes (main.js).
   play: { label: 'Play', target: 'zone', from: 'hand' },
+  playHidden: { label: 'Play hidden', target: 'zone', from: 'hand' },
   pickup: { label: 'Pick up', target: 'hand', from: 'zone' },
   move: { label: 'Move', target: 'zone', from: 'zone' },
   reveal: { label: 'Turn over', target: null, from: 'zone' },
