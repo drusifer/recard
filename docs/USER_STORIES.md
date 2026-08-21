@@ -1645,10 +1645,8 @@ collection onto one `piles` array) and this very sprint's D29/D34-D36
   existing Add Zone control (any table-side pile type is creatable),
   but that's still a global always-on capability, not yet gated per
   `GameConfig` — `GameConfig` itself doesn't exist yet.
-- `DeckDefinition` as its own concept (deck type incl. pinochle, N
-  decks, joker count) — generalizes `deck.js` past its current single
-  hardcoded 52+joker shape. Explicitly NOT the same axis as Pile type
-  (D38's rejected alternative).
+- ~~`DeckDefinition` as its own concept (deck type incl. pinochle)~~ —
+  **SHIPPED**, Sprint 17 (D47, US-51).
 - ~~New Pile types beyond Deck/Hand/zone-as-catch-all: Discard
   (stack, drop-only)~~ — **SHIPPED**, Sprint 15 (D45, US-49). Run/Set
   (fan, aligned sequence) remains open — US-32/33 already sketch this
@@ -1828,8 +1826,7 @@ independently re-verified. Mutation-verified: forcing the gate to
 never fire fails exactly the test written for it.
 
 **Still open:**
-- `DeckDefinition` (D38) — deck type/pinochle/N decks as its own
-  concept, not started.
+- ~~`DeckDefinition` (D38)~~ — **SHIPPED**, Sprint 17 (D47, US-51).
 - `Card.orientation` (D40) — replicated portrait/landscape state, not
   started.
 - Proactively hiding Add Zone when disallowed (see Rejected, above) —
@@ -1837,6 +1834,37 @@ never fire fails exactly the test written for it.
 - A config-driven preset schema tying `GameConfig`/`DeckDefinition`
   into `presets.js`, and the builder screen — both still later,
   separate stories per the original framework sidebar.
+
+## Sprint 17 ("DeckDefinition — a real second deck type") — US-51
+
+### US-51: A host can start a pinochle table, not just standard 52-card games
+
+**As** a host, **I want** to pick a deck type when creating a table,
+**so that** games that don't use a standard 52-card deck (pinochle
+first) are actually playable, not just theoretically supported.
+
+**AC:**
+- A "Deck type" selector on host setup: Standard (52) / Pinochle (48).
+  Defaults to Standard, matching every prior sprint's behavior.
+- Pinochle deals a real 48-card deck: two copies each of 9/10/J/Q/K/A
+  per suit, no 2-8, no jokers - not a placeholder/stub type.
+- Deck type is proven a genuinely separate axis from Pile type (D38's
+  rejected-alternative claim) by existing as its own registry
+  (`src/decks/*.js`), the same shape as `PILE_TYPES` (D42).
+
+**Sprint 17 status — SHIPPED (2026-08-21).** Full design in
+`docs/ARCHITECTURE.md` D47. 252/252 unit (6 new) + full e2e green,
+independently re-verified. Zero behavior change for the default
+`'standard'` type.
+
+**Still open:**
+- `Card.orientation` (D40) — replicated portrait/landscape state, not
+  started.
+- Proactively hiding Add Zone when disallowed (D46's own disclosed gap)
+  — unchanged by this sprint.
+- A config-driven preset schema tying `GameConfig`/`DeckDefinition`
+  into `presets.js` (e.g. a "Pinochle" quick-start preset), and the
+  builder screen — both still later, separate stories.
 
 
 ---

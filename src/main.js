@@ -534,6 +534,7 @@ document.getElementById('create-table').addEventListener('click', async () => {
   myName = document.getElementById('host-name').value.trim() || 'Host';
   expectedPlayers = Number(document.getElementById('host-expected-players').value) || 0;
   const deckConfig = {
+    type: document.getElementById('host-deck-type').value,
     numDecks: Number(document.getElementById('host-num-decks').value),
     jokers: Number(document.getElementById('host-jokers').value),
   };

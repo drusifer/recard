@@ -1301,6 +1301,27 @@ try {
   console.log('GameConfig.allowsPlayerZones (D46): a game can disallow player-added zones, with a real error message, not an uncaught throw');
   await noZonesHost.close();
 
+  // --- DeckDefinition (D47): a real second deck type, host-reachable. --
+  const pinochleHost = await (await browser.newContext()).newPage();
+  await pinochleHost.goto(BASE);
+  await pinochleHost.click('#show-host');
+  await pinochleHost.fill('#host-name', 'Fay');
+  await pinochleHost.selectOption('#host-deck-type', 'pinochle');
+  await pinochleHost.click('#create-table');
+  await pinochleHost.waitForSelector('#host-share:not([hidden])', { timeout: 20000 });
+  const pinochleDeckCount = await pinochleHost.evaluate(() =>
+    Number(document.querySelector('.deck-count-badge')?.textContent ?? -1));
+  assert(pinochleDeckCount === 48, `a pinochle table must start with 48 cards, got ${pinochleDeckCount}`);
+  await pinochleHost.fill('#cards-per-player', '12');
+  await pinochleHost.click('#deal-btn');
+  await pinochleHost.waitForFunction(
+    () => document.querySelectorAll('#hand-area .card').length === 12,
+    undefined,
+    { timeout: 15000 },
+  );
+  console.log('DeckDefinition (D47): a pinochle table deals from a real 48-card deck, reachable from host setup');
+  await pinochleHost.close();
+
   // --- Auto-start at the expected player count (US-42, D30) ----------
   // A FRESH pair, deliberately after the main table is torn down: a third
   // live player would permanently reshape the seat ring that the D24/US-31

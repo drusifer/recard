@@ -1,23 +1,24 @@
-export const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-export const SUITS = ['clubs', 'diamonds', 'hearts', 'spades'];
+import { DECK_TYPES } from './decks/deckTypes.js';
+
+// Re-exported for backward compatibility - `standardDeck.js` (D47) is
+// now the source of truth for these, `deck.js` just forwards them so no
+// existing caller (or test) needed to change import paths.
+export { RANKS, SUITS } from './decks/standardDeck.js';
 
 /**
- * @param {{numDecks?: number, jokers?: number}} [options]
+ * `type` (D47/D38's `DeckDefinition`) dispatches to `DECK_TYPES`
+ * (`src/decks/*.js`) instead of this function knowing how to build
+ * every deck type itself - the same registry-dispatch shape as
+ * `PILE_TYPES` (D42) and `ACTIONS` (D44). Defaults to `'standard'`,
+ * matching every prior sprint's behavior exactly (no caller has ever
+ * passed a `type` before this field existed).
+ * @param {{type?: string, numDecks?: number, jokers?: number}} [options]
  * @returns {{id: string, rank: string, suit: string|null}[]}
  */
-export function buildDeck({ numDecks = 1, jokers = 0 } = {}) {
-  const deck = [];
-  for (let d = 0; d < numDecks; d++) {
-    for (const suit of SUITS) {
-      for (const rank of RANKS) {
-        deck.push({ id: `${rank}-${suit}-${d}`, rank, suit });
-      }
-    }
-    for (let j = 0; j < jokers; j++) {
-      deck.push({ id: `JOKER-${j}-${d}`, rank: 'JOKER', suit: null });
-    }
-  }
-  return deck;
+export function buildDeck({ type = 'standard', numDecks = 1, jokers = 0 } = {}) {
+  const deckType = DECK_TYPES[type];
+  if (!deckType) throw new Error(`Unknown deck type: "${type}"`);
+  return deckType.build({ numDecks, jokers });
 }
 
 /**

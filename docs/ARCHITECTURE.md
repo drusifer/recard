@@ -1913,6 +1913,44 @@ creation, attempts Add Zone, gets a real visible error naming why, and
 confirms nothing was created. Mutation-verified: forcing the gate to
 never fire fails exactly the test written for it.
 
+### D47. `DeckDefinition` exists: deck TYPE as its own registry, proven with a real second type (pinochle)
+
+D38 explicitly rejected folding deck type into Pile type ("a pinochle
+Deck and a standard Deck are the same pile type - stack, draw-top -
+with a different DeckDefinition"). This ships that axis for real,
+using the exact registry-dispatch shape already proven twice
+(`PILE_TYPES`/D42, `ACTIONS`/D44): `src/decks/{standardDeck,
+pinochleDeck}.js` each export `build({numDecks, jokers})`;
+`src/decks/deckTypes.js` registers them; `deck.js`'s `buildDeck` becomes
+a 3-line dispatcher (`DECK_TYPES[type].build(...)`), throwing on an
+unknown type rather than building nothing/wrong silently.
+
+**Pinochle, not a placeholder second type:** a real 48-card single
+deck (two copies each of 9/10/J/Q/K/A per suit, no 2-8, no jokers).
+`numDecks` combines whole pinochle decks (2 → 96), the same meaning
+`standardDeck` already gives the parameter - not a second convention to
+learn. `jokers` is accepted (same call shape, so the registry can call
+either type uniformly) but silently unused - pinochle has no joker in
+its own rules, and a caller passing the shared default (0) shouldn't
+need to know that.
+
+`RANKS`/`SUITS` move to `standardDeck.js` and are re-exported from
+`deck.js` unchanged - every existing import path still works, no
+caller needed to change.
+
+A host-facing "Deck type" selector (Standard/Pinochle) sits beside the
+existing Decks/Jokers fields - `DeckDefinition` is reachable today, not
+just structurally proven, matching D46's same choice for
+`allowsPlayerZones`.
+
+**Consequences:** 252/252 unit (246 carried + 6 new: registry shape,
+type-dispatch default/unknown-type-throws, pinochle composition/
+numDecks/jokers-ignored) + full e2e green, including a new end-to-end
+block: create a pinochle table, confirm the deck badge reads 48, deal
+12 cards, confirm they land. Zero behavior change for the (still
+default) `'standard'` type - proven by the full existing suite passing
+unmodified.
+
 
 ## Module Layout
 ```

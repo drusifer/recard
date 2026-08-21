@@ -39,6 +39,16 @@
         </select>
       </label>
       <p id="host-preset-preview" class="deck-config" hidden></p>
+      <!-- D47: DeckDefinition's first host-facing field. Jokers stays
+           visible regardless of type - pinochle's own build() silently
+           ignores it rather than this control needing to know which
+           types care about jokers and which don't. -->
+      <label>Deck type
+        <select id="host-deck-type">
+          <option value="standard">Standard (52 cards)</option>
+          <option value="pinochle">Pinochle (48 cards)</option>
+        </select>
+      </label>
       <label>Decks <select id="host-num-decks"><option value="1">1</option><option value="2">2</option></select></label>
       <label>Jokers <select id="host-jokers"><option value="0">0</option><option value="2">2</option><option value="4">4</option></select></label>
       <!-- D46: GameConfig's first real field. Checked (allowed) by
