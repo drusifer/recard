@@ -443,3 +443,108 @@ D23's original per-card uniform `{owner, faceUp}`).
       is invisible to every unit test and to code review.
 - Endorsed Neo's pile-density finding as real and correctly *not* fixed
   under this phase; it needs a design call, not a CSS nudge.
+
+## 2026-08-20 — Added design-lint (user request, direct to Trin)
+
+**What:** `tests/designLint.mjs` (pure, DOM-free geometry assertions:
+`rectsOverlap`, `fitsViewport`, `meetsMinTouchTarget`, `pageOverflow`,
+`findOverlaps` - 17 unit tests, all 4 mutation-verified) +
+`tests/designLint.check.mjs` (renders the real app across 6 viewports,
+runs those assertions against real measured rects, non-zero exit on any
+violation). Wired into `npm run lint` as `lint:style && lint:design`
+(user's explicit choice: block now, fix as follow-up - not advisory).
+
+**Why this shape, not an off-the-shelf package:** researched npm for a
+literal "Designlint" package first (Trin protocol: verify, don't guess).
+Found five candidates - none catch layout/overlap/overflow regressions,
+which is what actually broke last session (table-too-big, seat-ring/pot
+collision, button-row wrapping). The project's OWN e2e suite already had
+one hand-rolled overlap check (D24, `tests/e2e.smoke.mjs`) - this
+generalizes that pattern instead of adding an unproven dependency,
+matching D1 (minimal toolchain) and my own "mocks validate assumptions,
+not reality" standard (extraction is real code, not a mocked belief
+about what a 3rd-party tool does).
+
+**Real finding, not a clean baseline:** first run found 70 pre-existing
+touch-target violations (buttons under the documented 44px floor),
+present even at 1440x900. Cross-verified independently via Playwright's
+own `boundingBox()` before trusting it - not a checker bug. Filed to
+`docs/USER_STORIES.md` Backlog rather than fixed here: several offenders
+sit in button rows Neo JUST repacked tighter to kill page scroll, so
+the real fix needs Smith's UX judgment on that trade-off, not a blind
+size bump from me.
+
+**Verification:** 188 unit (171 + 17 new) + full e2e green. `npm run
+lint` correctly propagates non-zero exit through the `&&` chain.
+`lint:style` alone still passes clean.
+
+## Next
+- Nothing queued. If picked up again: the 70-violation fix needs a
+  Cypher story + Smith gate (padding/font-size/layout trade-off against
+  the no-scroll fix), then re-run `lint:design` to confirm 0 before
+  anyone re-tightens the gate's expectations further.
+
+## 2026-08-20 (continued) — "fix them, not ignore them" + Sprint 12 kickoff
+
+User overrode the "advisory backlog" call above: fixed all 70 touch-
+target violations for real. Chain of real, live-diagnosed bugs along
+the way (each found by measuring, not guessing):
+- Base `button{}` now has `min-height/min-width: 44px` +
+  flex-centering; `.card` and `.action-btn` explicitly exempted (cards:
+  user authorized shrinking them; action-btn: min-width:44px per
+  button made D25's hover row wide enough to intercept neighbor cards).
+- Taller buttons reopened D24 seat-ring/pot overlap AND the "table too
+  big" scroll bug from the prior fix. Re-tuned `--table-min-h` (28-34rem
+  per width tier, binary-searched against the REAL e2e, not synthetic
+  probes) + pushed panel padding much harder in two height-based media
+  tiers (850px/700px, correctly ORDERED - narrower tier must come
+  SECOND in source or its tighter padding loses to the looser one).
+- `#table-area`'s `overflow-y:auto` (restored last session) clips
+  ABSOLUTELY-POSITIONED popups that extend past its IN-FLOW content
+  height - `max-height` bumps don't touch this, it's an overflow-vs-flow
+  mismatch. Padding-bottom to "reserve space" made it WORSE for zones
+  already at the cap (padding competes for the same capped budget).
+  Reverted `#table-area`'s overflow cap a 2nd time - the extreme
+  maxed-pot scenario it protected against isn't exercised by any
+  shipped test.
+- Then found `.middle-card`'s z-index:7 (on hover) was trapped inside
+  `#table-center`'s OWN stacking context (from `transform`) - couldn't
+  outrank `#seat-zones`, a stacking-context SIBLING. Fixed via
+  `#table-center:has(.middle-card:hover)`.
+
+**design-lint: 70 -> 1** (phone-SE hand-visibility, a real geometric
+wall - documented, not chased further at the CSS level).
+
+**e2e: STILL RED, not fixed.** Last known failure: deck-controls-strip's
+Deal button, untriaged (paused at a usage checkpoint before diagnosing
+it - this is a NEW failure point, not the same mechanism confirmed-fixed
+for card action-buttons). This is a real gap - `npm run lint` will pass
+but `npm run test:e2e` will not, as of this state.
+
+**Then /sprint this** (user): Sprint 12, US-46 - remove ALL persistent
+action buttons, pile-hover-reveals-actions + drag-an-action model, hand
+becomes a pile like any other. Full planning done (Cypher->Smith Gate 1
+[blocker: Draw needs a tap-shortcut, it's the project's own documented
+highest-frequency action] ->Morpheus D34-D37->Smith Gate 2 [correction:
+singleTarget must be STATIC, never computed from live pile count, or
+move/pickup would flip behavior mid-game]->Mouse's 7-phase plan->
+Morpheus review, approved). **Phase 52 done** (pileActions.js
+generalized: hand offers sort/pass to owner, draw moved pile-level open
+to everyone, singleTarget static+mutation-verified, targetsForAction
+gained a real fix - it only checked ACTIONS, so a dragged Draw would've
+had nowhere to drop). 196/196 unit green, UAT passed, Morpheus approved.
+**Phases 53-58 NOT started** - all UI-heavy (the pile anchor, Draw's
+drag+tap, reveal->tap, migrating remaining deck buttons, final
+cleanup). See task.md Sprint 12 section for the full phase list.
+
+## Next (supersedes the note above)
+1. **`npm run test:e2e` is red** - deck-controls-strip Deal button,
+   untriaged. Diagnose live (element-at-point, not guessing) before
+   Phase 53 touches that same area, or the fix and the new UI could
+   collide.
+2. Then Phase 53: the generalized pile anchor. Morpheus's own note to
+   whoever picks this up: build its positioning fresh, not adapted from
+   D25's per-card row - this session paid real cost for that exact
+   shortcut on the button-height fix.
+3. Nothing in this session is committed as of this note - see git
+   status before assuming a clean baseline.

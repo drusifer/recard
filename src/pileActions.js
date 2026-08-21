@@ -23,7 +23,6 @@
  */
 export const ACTIONS = {
   play: { label: 'Play', target: 'zone', from: 'hand' },
-  draw: { label: 'Draw', target: 'hand', from: 'deck' },
   pickup: { label: 'Pick up', target: 'hand', from: 'zone' },
   move: { label: 'Move', target: 'zone', from: 'zone' },
   reveal: { label: 'Turn over', target: null, from: 'zone' },
@@ -37,7 +36,12 @@ export const ACTIONS = {
 export function actionsForPileKind(kind) {
   switch (kind) {
     case 'deck':
-      return ['draw'];
+      // D34: Draw moved to a PILE-level action (`PILE_ACTIONS.draw`) -
+      // confirmed dead here first (grepped ui.js/main.js: the deck has
+      // never rendered a per-card hover row, since it renders via the
+      // separate D29 `renderDeck` path), so this is a real architecture
+      // correction, not a behaviour change anything depends on today.
+      return [];
     case 'hand':
       return ['play'];
     case 'zone':
@@ -96,8 +100,15 @@ export function actionsForCard(pile, card, viewerId) {
  * @returns {string[]} pile ids
  */
 export function targetsForAction(action, piles, { viewerId, fromPileId } = {}) {
-  const spec = ACTIONS[action];
-  if (!spec || spec.target === null) return [];
+  // D34/D35: `draw` moved to PILE_ACTIONS, but drop-target highlighting
+  // for a dragged Draw needs the same lookup card-level actions already
+  // get - checking only ACTIONS would silently light up nothing for it.
+  // ACTIONS is checked first: no id currently exists in both tables, but
+  // if one ever did, a per-card action should win over a pile-level one
+  // sharing its name, since this function's other parameter shapes
+  // (fromPileId, move's self-exclusion) assume a card-level caller.
+  const spec = ACTIONS[action] ?? PILE_ACTIONS[action];
+  if (!spec || spec.target === null || spec.target === undefined) return [];
 
   return piles
     .filter((pile) => {
@@ -140,6 +151,36 @@ export const PILE_ACTIONS = {
     destructive: true,
     hint: 'Gather every card back, reshuffle, and deal a fresh hand to each player.',
   },
+  // D34/D35: Draw generalized from a per-card action (dead - see
+  // actionsForPileKind) to a pile-level one, matching how the user
+  // actually described it: hover the DECK, not a specific hidden card.
+  // `target`/`from` mirror ACTIONS' shape so `targetsForAction` can
+  // drive drop-target highlighting for a dragged Draw the same way it
+  // already does for a dragged card.
+  //
+  // `singleTarget: true` (D36, Smith Gate 2 #1) is a STATIC fact about
+  // this action's definition - the deck has exactly one legal
+  // destination (the viewer's own hand) by the rules of the game
+  // itself, never something computed from how many piles currently
+  // exist. This is what makes Draw safe to also offer as a plain tap
+  // shortcut (Smith Gate 1 #4: the project's own highest-frequency
+  // action must not become drag-only) without opening the door to
+  // `move`/`pickup` silently doing the same the moment a game happens
+  // to have few zones.
+  draw: {
+    label: 'Draw',
+    destructive: false,
+    hint: 'Draw the top card into your hand.',
+    target: 'hand',
+    from: 'deck',
+    singleTarget: true,
+  },
+  // Hand pile-level actions (D34). No `target`/`singleTarget` - these
+  // happen in place, so they are never draggable, matching how `reveal`
+  // (target: null) already works in the card-level table.
+  sortRank: { label: 'Sort by rank', destructive: false, hint: 'Sort your hand by rank.' },
+  sortSuit: { label: 'Sort by suit', destructive: false, hint: 'Sort your hand by suit.' },
+  pass: { label: 'Pass', destructive: false, hint: 'Toggle your own passed marker.' },
 };
 
 /**
@@ -152,7 +193,19 @@ export const PILE_ACTIONS = {
  * @param {{isHost: boolean}} ctx
  * @returns {string[]} action ids
  */
-export function pileLevelActions(kind, { isHost } = {}) {
-  if (kind !== 'deck' || !isHost) return [];
-  return ['deal', 'reshuffleDeal'];
+export function pileLevelActions(kind, { isHost, isOwner } = {}) {
+  if (kind === 'deck') {
+    // Draw is open to everyone; deal/reshuffle-deal stay host-only,
+    // exactly as they already were (D29) - this generalization widens
+    // WHERE dealing lives, not WHO may do it.
+    return isHost ? ['draw', 'deal', 'reshuffleDeal'] : ['draw'];
+  }
+  if (kind === 'hand') {
+    // Matches actionsForCard's existing rule: a hand only offers
+    // anything to its own owner. Sorting or passing on someone else's
+    // behalf was never possible before this generalization and isn't
+    // now either.
+    return isOwner ? ['sortRank', 'sortSuit', 'pass'] : [];
+  }
+  return [];
 }

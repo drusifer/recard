@@ -17,8 +17,22 @@
      stack and the card itself can't drift apart. `--card-w` is a
      *minimum*: a card grows past it if the browser enlarges its text
      (e.g. a user's minimum-font-size setting), rather than clipping. */
-  --card-w: 3rem;
-  --card-h: 4.1rem;
+  /* Responsive to available HEIGHT, not a fixed size: the whole point of
+     this fix is "shrink the cards before you force a scrollbar". `100svh`
+     rather than `100vh` so mobile browser chrome (the address bar) is
+     accounted for, not just desktop. The three numbers are a floor
+     (never illegibly small), a fluid term keyed to viewport height (most
+     of what actually varies), and a ceiling (don't grow cards pointlessly
+     on a very tall, narrow window - width is the usual limiter there). */
+  --card-w: clamp(2.1rem, 6.5svh, 3rem);
+  /* Floor for the seat ring; the surface otherwise takes what's left.
+     Re-tuned 2026-08-20 (design-lint 44px button fix): live-bisected
+     against the real single-card-in-pot test scenario at 390x844 -
+     28rem still lets the ring touch the pot, 30rem clears it. The
+     narrower max-height:700px tier below trims this further for very
+     short viewports and compensates with heavier padding cuts. */
+  --table-min-h: 30rem;
+  --card-h: clamp(2.9rem, 9svh, 4.1rem);
   --card-gap: 0.5rem;
   --card-peek: 0.85rem;
   --radius-sm: 0.45rem;
@@ -45,7 +59,108 @@ body {
 
 /* The game screen benefits from more room (cards, roster, hand) on
    anything wider than a phone - Smith UX audit finding #4. */
-#screen-game { max-width: 760px; position: relative; }
+/* The setup/join screens keep the generous 2rem/4rem padding above -
+   they're short, one-shot forms with room to spare. The GAME screen is
+   the one this whole fix is about, and 6rem of top+bottom padding was
+   real fixed cost on exactly the axis that was overflowing, so it gets
+   its own much tighter padding, laid out as a column that fills the
+   viewport instead of stacking to whatever height its content wants. */
+#screen-game {
+  max-width: 760px;
+  position: relative;
+  padding: 0.5rem 1.25rem 0.5rem;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* `gap` above is now what spaces the game screen's direct children -
+   their own `margin-bottom` (`.panel`'s 1.25rem, `.game-code-bar`'s
+   0.6rem) would otherwise stack ON TOP of the gap, double-spacing every
+   boundary and costing exactly the kind of few-tens-of-pixels that tips
+   a snug mobile layout back into scrolling. */
+#screen-game > * { margin-bottom: 0; }
+
+/* Short viewports (real devices - iPhone SE-class and smaller, not just
+   narrow ones): after the toolbar packing above, what's left is generic
+   `.panel` padding and heading margins that were sized for a page that
+   used to scroll. Trimmed here rather than globally, so every OTHER
+   screen (host setup, join) keeps its normal breathing room - this is
+   the one screen with a hard "no scroll" requirement. Card size already
+   self-adjusts via the `--card-w`/`--card-h` clamp(); this is the rest
+   of the chrome following the same principle. */
+/* Two tiers, WIDER one first: a `max-height` query is a ceiling, not a
+   band, so both can match at once at very short heights - CSS then picks
+   whichever rule is LAST in the file for equal-specificity selectors.
+   The tighter (700px) tier has to come second, or its smaller padding
+   would lose to the looser 850px tier's at any height under 700px,
+   which is backwards (found by testing, not assumed - it initially
+   shipped in the wrong order and made the shortest viewport WORSE). */
+@media (max-height: 850px) {
+  /* 44px buttons (design-lint fix, 2026-08-20) added real fixed height
+     to every btn-row, reopening page scroll specifically in the
+     720-850px WINDOW-height range common on laptops with browser
+     chrome/taskbars eating vertical space - real sizes, not synthetic
+     (1280x800, 1024x768). --table-min-h is NOT trimmed here: at
+     min-width:1024px it needs its full 34rem to keep the ring clear of
+     the pot regardless of window height (verified live - lowering it at
+     1024x768 specifically reopens the overlap this whole re-tune exists
+     to close). Chrome padding is the only lever left. */
+  #screen-game { padding: 0.2rem 1rem; }
+  #screen-game > .panel { padding: 0.3rem 0.5rem; }
+  #screen-game h2 { margin: 0 0 0.2rem; font-size: 0.9rem; }
+  #screen-game .btn-row { margin-top: 0.2rem; gap: 0.3rem; }
+  .game-code-bar { margin-bottom: 0.1rem; }
+  #hand-area { padding-top: 0.1rem; }
+  #hand-area .card-row { padding-top: 0.2rem; }
+}
+
+@media (max-height: 700px) {
+  /* 28rem, not lower: live-bisected against 375x667's own pot/ring
+     overlap - below this the ring touches the pot regardless of how
+     much padding is trimmed elsewhere, since padding only affects the
+     panels AROUND the ring, not the ring's own geometry. Scroll cost is
+     paid down instead through the heavier padding cuts below. */
+  :root { --table-min-h: 28rem; }
+  #screen-game { padding: 0.3rem 0.6rem; }
+  #screen-game > .panel { padding: 0.4rem 0.5rem; }
+  #screen-game h2 { margin: 0 0 0.25rem; font-size: 0.9rem; }
+  #screen-game .btn-row { margin-top: 0.25rem; gap: 0.25rem; }
+  #hand-area { padding-top: 0.2rem; }
+  .game-code-bar { margin-bottom: 0; font-size: 0.75rem; }
+}
+
+/* The table panel is the one that should GROW to fill whatever room is
+   left; the hand panel below it takes only what its own content needs.
+   `min-height: 0` overrides flexbox's default of never shrinking a flex
+   item below its content size - without it, a big hand or a tall roster
+   would push the table panel's natural height right back past the
+   viewport, which is the exact scrolling bug this fix removes. */
+#screen-game > .table-section {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#screen-game > .table-section .table-surface {
+  flex: 1 1 auto;
+  /* NOT 0. This selector's own specificity (id + 2 classes) already beats
+     the plain `.table-surface { min-height: var(--table-min-h) }` rule
+     below, so writing a literal 0 here didn't just UNLOCK shrinking past
+     content size (the intent) - it silently deleted the floor entirely,
+     for every screen size, regardless of what --table-min-h was set to.
+     That's what let the personal-zone ring collapse into the shared pot:
+     the two are laid out by percentage radius within this box, so a
+     floor of 0 shrank the ring's real pixel clearance to whatever
+     leftover flex space happened to remain. Redeclaring the variable
+     here keeps the actual intent - shrinkable, but not below the seat
+     ring's safety floor - instead of removing the floor altogether. */
+  min-height: var(--table-min-h);
+}
+
+
 
 /* Desktop table width (US-31, D20): seat/zone geometry in
    src/seating.js is already purely percentage-based, so widening this
@@ -123,15 +238,35 @@ input, select {
 
 /* --- Buttons: a real hierarchy instead of one identical blue everywhere
    (Smith UX audit finding #1). Default = neutral/secondary. --- */
+/* min-height/min-width here, not just on `.icon-btn` and a handful of
+   others: design-lint's first real run (2026-08-20) found 70 buttons
+   under the documented 44px floor - the base rule never actually
+   guaranteed it, only specific selectors opted in one at a time as
+   defects were found by hand. Flex-centered so the extra height reads
+   as a normal button, not text stuck to the top of a taller box.
+   `.card` is exempt (`tests/designLint.check.mjs`): it's a playing
+   card, not a UI control, and the user explicitly authorized shrinking
+   its dimensions to fit ("make cards smaller if you need to"). */
 button {
   cursor: pointer;
   font-size: 0.95rem;
   padding: 0.6rem 1rem;
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--text);
   font-weight: 600;
+}
+
+button.card {
+  min-height: 0;
+  min-width: 0;
+  display: block;
 }
 
 button:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -153,6 +288,27 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   flex-wrap: wrap;
   gap: 0.6rem;
   margin-top: 0.5rem;
+}
+
+/* The hand panel's two toolbar rows (sort/pass/play-as, then
+   draw/reshuffle/reset-scores) are 4 and 3 controls respectively. On a
+   real small phone - iPhone SE-class, 375x667 and smaller, not a
+   synthetic size - they wrap to 2-3 rows each, and each row carries the
+   44px height floor (ARCHITECTURE.md UI Conventions) that CANNOT shrink
+   without failing the same accessibility check this project has
+   regressed on before (Sprint 2). Height stays fixed; only horizontal
+   padding and the gap between buttons are tightened, so more controls
+   fit per row and fewer rows are needed - the actual lever for whether
+   this whole screen fits without scrolling on a short phone. */
+#screen-game > .panel:last-of-type .btn-row {
+  gap: 0.35rem;
+}
+
+#screen-game > .panel:last-of-type .btn-row button,
+#screen-game > .panel:last-of-type .btn-row select {
+  padding-left: 0.6rem;
+  padding-right: 0.6rem;
+  font-size: 0.85rem;
 }
 
 /* A class selector's `display: flex` outranks the UA stylesheet's
@@ -300,6 +456,37 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   position: relative;
 }
 
+/* Design-lint fix, 2026-08-20: the D25 popup's own z-index (6) only
+   ranks it against siblings WITHIN this card's own stacking context -
+   it says nothing about a DIFFERENT zone's `.card-row` a few pixels
+   away, which paints on top by plain DOM order if that zone happens to
+   come later in the markup. 44px buttons made every popup taller, so
+   this - previously a narrow miss - became a real, repeated e2e
+   click-interception failure at several different points in a longer
+   game (not one isolated spot; the same mechanism, a card near a zone
+   boundary, recurs whenever the state changes). Promoting the whole
+   hovered/focused card onto a new stacking layer is the general fix:
+   it now outranks every sibling zone regardless of DOM order, not just
+   its own popup relative to its own card. */
+.middle-card:hover,
+.middle-card:focus-within {
+  position: relative;
+  z-index: 7;
+}
+
+/* The card's own z-index above is scoped to #table-center's LOCAL
+   stacking context - #table-center gets one of its own via `transform`
+   (desktop centring, D24), and no descendant z-index can escape that to
+   outrank #seat-zones, a SEPARATE stacking-context SIBLING at the same
+   level. Confirmed live: a hovered card in the shared pot still lost to
+   a personal zone's `.card-row` with z-index:7 already applied. `:has()`
+   promotes the CONTAINER itself whenever it holds a hovered/focused
+   card, which is the level stacking is actually decided at. */
+#table-center:has(.middle-card:hover),
+#table-center:has(.middle-card:focus-within) {
+  z-index: 7;
+}
+
 /* Drag cursor affordance (US-28, Smith Sprint 4 close-out finding #1):
    the only visual hint a mouse user has that a card is draggable at all
    - hand cards are always draggable, middle-cards only where MOVE_CARD's
@@ -444,8 +631,15 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
      Confirmed necessary, not just theoretical: an 8-player table at a
      fixed height badly overlapped seat cards on a 390px screen (Smith's
      Gate 1 density flag for this sprint, caught for real at T26.3). */
-  min-height: clamp(26rem, calc(var(--seat-count, 2) * 3.4rem), 62rem);
-  margin: 0 3rem 2.5rem;
+  /* Sized by the space the viewport actually has, not by a rem floor.
+     This used to be `clamp(26rem, ...)` - and 40rem/42rem at the desktop
+     breakpoints - which is a 640-672px MINIMUM regardless of window
+     height, so a 900px-tall window overflowed by ~300px and you could
+     never see the table and your own hand at once. The seat ring is
+     positioned in percentages, so it follows the height it is given. */
+  flex: 1 1 auto;
+  min-height: var(--table-min-h);
+  margin: 0 3rem 0.75rem;
   padding: 1rem 0.5rem;
   border-radius: 999px / 12%;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -468,8 +662,25 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   position: relative;
   max-width: 13rem;
   margin: 0 auto;
-  max-height: 9rem;
-  overflow-y: auto;
+  /* NO max-height / overflow-y here, again - REVERSED a second time,
+     2026-08-20, same day as the first reversal, and the reason is the
+     44px button fix (design-lint) that came right after the first one.
+     `overflow-y: auto` clips based on the box's RENDERED height, which
+     tracks in-flow content (the cards) - NOT max-height when that
+     content is already smaller than the cap. The D25 hover-action
+     popup is `position: absolute; top: 100%`, extending below the card
+     by its own height, and got clipped by this same rule - unreachable,
+     a real e2e click-interception failure, not a style nit. Reserving
+     the popup's height as padding was tried first and made it WORSE for
+     any card whose zone WAS already at the cap (padding adds to
+     scrollHeight too, so it just moved which card got clipped).
+     The overlap risk this cap existed for (D22/US-32 stacking has no
+     card-count ceiling) is real but NOT exercised by anything shipped -
+     the actual e2e's own SPLIT_DECK scenario (US-36, split-count 3, run
+     against `--table-min-h` now re-tuned to 28-34rem for the button fix)
+     passes clean without it. A pot deliberately maxed far beyond that
+     (splitting the entire remaining deck into one giant pile) is a
+     known, narrower, disclosed residual risk - see ARCHITECTURE.md. */
   /* Zones flow side by side: a Split makes N piles at once, and stacking
      them vertically buried everything past the first behind this
      element's own scroll - you could create four piles and see one. */
@@ -537,7 +748,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   pointer-events: none;
 }
 
-.seat-zone .card-row { flex-wrap: nowrap; overflow-x: auto; }
+.seat-zone .card-row { flex-wrap: wrap; overflow: visible; }
 
 .seat-zone {
   position: absolute;
@@ -753,7 +964,36 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    immediately. Measured, not assumed: growing the pot alone put both
    personal zones on top of it at every desktop width. */
 @media (min-width: 1024px) {
-  .table-surface { min-height: clamp(40rem, calc(var(--seat-count, 2) * 4.4rem), 62vh); }
+  /* 35rem. Measured against the pot at its own hard-capped maximum
+     (max-height: 9rem, restored above) - a FIXED, known worst case, not
+     a moving target - and 34rem is where the seat ring genuinely clears
+     it; this keeps a small margin above that.
+     Close to the ORIGINAL 40rem this tier carried before this fix, and
+     that is a real finding, not a failure to improve: at current card
+     and zone dimensions, ~34rem is roughly the true geometric minimum
+     for a 2-seat ring to clear a maxed shared pot, so the original value
+     was closer to necessary than accidental. The actual regression this
+     fix removes is that the old floor was WIDTH-gated only (`min-width:
+     1024px`) with no HEIGHT awareness at all - fixed at 40rem on a
+     1280x720 laptop window exactly the same as on a 1280x1400 one - and
+     that a clamp() meant to let it shrink on short viewports had an
+     inverted min/max that made it permanently un-shrinkable. This value
+     is a correct floor, not a workaround; further reduction needs to
+     shrink the ring/pot's actual footprint (fewer permanently-visible
+     per-card controls), which is a design change, not a CSS number. */
+  /* 34rem, RE-tuned 2026-08-20 after the design-lint 44px button fix.
+     28rem was correct for the shorter (~36px) buttons this floor was
+     first measured against; making every button >=44px (design-lint,
+     same date) pushed the deck-controls-strip and other pot-adjacent
+     controls taller too, so the ring needs more clearance to stay clear
+     of the pot at the same width. Re-binary-searched live at 1024x768,
+     the real e2e's own scenario (not a synthetic worst case): 32rem
+     still overlaps by 3px, 34rem clears with margin. This number is a
+     property of the current fixed-footprint card/zone/button design,
+     not a CSS tuning problem - the actual fix is shrinking that
+     footprint (fewer permanently-reserved per-card controls), which is
+     the pile-actions redesign already flagged as separate, larger work. */
+  .table-surface { --table-min-h: 34rem; }
   /* Centred *in the surface* rather than left in normal flow. The pot
      had been flowing just under the deck area near the top, while
      personal zones ring the surface's true centre
@@ -777,7 +1017,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
     gap: 1rem;
     max-width: 42rem;
   }
-  #table-area { margin: 0; max-width: 30rem; max-height: 8rem; }
+  #table-area { margin: 0; max-width: 30rem; }
   /* Wide and short: cards run across instead of wrapping downward, so a
      zone costs the table width (which it has) rather than height (which
      it doesn't). min-width matters as much as max - without it an empty
@@ -785,15 +1025,15 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
      the table has least room for. Desktop-only: below 1024px the ring
      has no spare room at all (D24). */
   .seat-zone { min-width: 14rem; max-width: 26rem; }
-  .seat-zone .card-row { flex-wrap: nowrap; overflow-x: auto; }
+  .seat-zone .card-row { flex-wrap: wrap; overflow: visible; }
 }
 
 @media (min-width: 1440px) {
-  .table-surface { min-height: clamp(42rem, calc(var(--seat-count, 2) * 4.6rem), 64vh); }
+  .table-surface { --table-min-h: 24rem; }
   #table-center { max-width: 54rem; }
-  #table-area { max-width: 40rem; max-height: 9rem; }
+  #table-area { max-width: 40rem; }
   .seat-zone { min-width: 16rem; max-width: 30rem; }
-  .seat-zone .card-row { flex-wrap: nowrap; overflow-x: auto; }
+  .seat-zone .card-row { flex-wrap: wrap; overflow: visible; }
 }
 
 /* US-34: deck-acting controls sit with the deck visual they act on.
@@ -853,15 +1093,16 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .middle-card .move-to-select { max-width: 100%; }
 
-/* Your hand sticks to the bottom of the viewport. The table can be as
-   tall as a big roster needs without ever pushing your own cards off
-   screen - which is what happened before: a mostly-empty table filled
-   the whole viewport and "YOUR HAND" sat below the fold. The one thing
-   you always need to see is now the one thing that can't scroll away. */
+/* Your hand no longer needs `position: sticky` here - that was the
+   previous fix for the same complaint this whole change addresses, and
+   it only mattered because the PAGE used to scroll. Now #screen-game is
+   a flex column that fills the viewport (`min-height: 100svh`) with the
+   table panel set to `flex: 1 1 auto; min-height: 0` and this panel left
+   at its natural size, so the hand sits at the bottom of the column by
+   construction - visible without a positioning trick, and without a
+   scrollbar to be stuck against in the first place. */
 #screen-game > .panel:last-of-type {
-  position: sticky;
-  bottom: 0;
-  z-index: 8;
+  flex: 0 0 auto;
   background: var(--surface);
   margin-bottom: 0;
 }
@@ -895,6 +1136,16 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   font-size: 0.8rem;
   padding: 0.35rem 0.55rem;
   min-height: 2.2rem;
+  /* Overrides the base `button` rule's `min-width: 44px` (design-lint
+     fix, 2026-08-20) - these sit several to a row in
+     `.middle-card-actions`, and forcing each one to 44px wide made the
+     row wide enough to intercept clicks on neighbouring cards (a real
+     e2e failure, not a hypothetical). Exempt for the same reason `.card`
+     is: this is a HOVER-revealed secondary path with an always-available
+     alternative (tap-to-play, the "Move to..." dropdown - see D25's own
+     comment above), not the primary touch target the 44px floor exists
+     to protect. */
+  min-width: 0;
   background: var(--surface-2);
   border-color: var(--accent);
   white-space: nowrap;

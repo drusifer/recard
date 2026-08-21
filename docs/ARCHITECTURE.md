@@ -1239,6 +1239,96 @@ same trigger, so the two paths cannot both fire.
    sees, including who else is still missing.
 
 
+## v2.0 Decisions (Sprint 12, US-46)
+
+### D34. Pile-level actions become one generalized table, revealed through a fixed anchor per pile — never card-relative
+
+Two categories already exist in `pileActions.js`, and the mistake this
+story exists to fix is that only one of them ever got a *pile-level*
+home:
+
+- **Card-target actions** (`play`, `move`, `pickup`, `reveal`) — a
+  specific card is the source. `play`/`move`/`pickup` already work by
+  *dragging the card itself* (US-28/40) — that mechanic is UNCHANGED
+  and stays exactly as it is. `reveal` has `target: null` (nothing to
+  drag to), so it becomes a **tap on the card**, joining tap-to-play in
+  the same low-friction vocabulary, rather than a hover button.
+- **Pile-level actions** (`draw`, `sort`, `pass`, `deal`,
+  `reshuffleDeal`, `shuffle`, `split`, `addZone`) — no single card is
+  the source; the *pile* is. `pileLevelActions()` (D29) already does
+  this for the deck alone. D34 generalizes it to every pile kind.
+
+**The anchor, not the card, is what's hovered/tapped.** Every pile gets
+one small, fixed-position affordance — reusing D29's own
+`deck-controls-strip` pattern, generalized — that reveals that pile's
+action popover on hover (mouse) or tap (touch, Smith Gate 1 #1: tapping
+a pile's own chrome has never meant anything until now, so it's
+collision-free with tap-to-play). This is the direct fix for the bug
+that started this sprint: D25's per-card row was positioned relative to
+*card content*, so it clipped and collided as card count changed. An
+anchor fixed to the pile's own box cannot do either.
+
+### D35. Dragging a pile-level action reuses D28's recognizer unchanged — it carries an action token instead of a card
+
+`touchDrag.js` already doesn't know or care what it's dragging; it
+emits `lift`/`move`/`drop`/`cancel` against timestamped samples. Today's
+only caller passes a card. A pile-action drag passes `{ pileId, action
+}` instead, and drop resolution reuses `targetsForAction` (already
+built for drop-target highlighting) to validate and dispatch. **No
+second gesture system** — this is the same reasoning D28 itself gave
+for reusing the D13 lift cue rather than inventing a rival vocabulary,
+applied one level up.
+
+### D36. An action with exactly one legal target gets a tap shortcut — structurally, not as a Draw special case
+
+Smith's Gate 1 blocker: Draw is the project's own documented
+highest-frequency action, and drag-only would regress every single turn
+of the game. The fix is general, not a `if (action === 'draw')`
+carve-out that will need rediscovering for the next single-target
+action: **whenever `targetsForAction(action, piles, ctx).length === 1`,
+tapping the revealed action dispatches directly against that one
+target, with no drag required.** Draw satisfies this by construction
+(the deck's only legal target is the viewer's own hand) — nothing
+Draw-specific is coded. `move`/`pickup` typically have more than one
+legal target (several zones) and correctly stay drag-first, tap-to-open
+the target picker as the existing fallback (Smith Gate 1 on US-28: drag
+is additive, never the only path).
+
+**Smith Gate 2 (2026-08-20) — approved, with 2 corrections.**
+
+1. **D36's "exactly one legal target" cannot be computed from live game
+   state.** `move`/`pickup` legitimately have exactly one target early
+   in a game - two zones total means moving out of one leaves exactly
+   one place to go. As written, D36 would make `move` a tap-shortcut in
+   that moment and silently flip to drag-first the instant a third zone
+   appears, mid-game, with no warning. The same action behaving two
+   different ways depending on a fact the player isn't tracking (how
+   many zones currently exist) is a worse defect than the one this
+   sprint is fixing. **The shortcut is a STATIC property of the action's
+   definition** (`draw`, `drawFaceDown` - always exactly one deck, always
+   exactly one destination, by the rules of the game itself) **never a
+   count computed from `targetsForAction` at drag time.** `move`/`pickup`
+   stay drag-first unconditionally, regardless of how many zones happen
+   to exist right now.
+2. **Reveal-by-tap is accepted, not waved through.** It removes the
+   hover-then-click friction reveal used to have, which sounds risky for
+   an irreversible, privacy-facing action - but the existing confirm
+   dialog for a *private* card's reveal (unchanged by this sprint) is
+   real protection against an accidental tap, and a *shared* face-down
+   card was never confirm-gated to begin with (anyone could already
+   reveal it in one click). Noting the reasoning rather than silently
+   approving: the safety net this relies on is the confirm dialog, not
+   anything in this redesign, so if that dialog is ever touched, this
+   AC needs re-checking.
+
+### D37. `design-lint` is a phase gate for this sprint, not a general CI afterthought
+
+Smith Gate 1 #5. Whatever renders a pile's action popover — on any
+pile, any viewport — runs `npm run lint:design` as its own UAT step,
+not deferred to sprint close. The sprint that removed 70 undersized
+buttons must not ship a new set of them under a different name.
+
+
 ## Module Layout
 ```
 index.html              entry page, host/join screens, game screen

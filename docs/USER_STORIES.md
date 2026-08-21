@@ -1421,6 +1421,179 @@ Fed by the sprint retro; ordered by Cypher, not yet scoped into stories.
 
 ---
 
+## v2.0 backlog: piles are the interaction, not just the data model (2026-08-20)
+
+Requested directly by the user, mid-session, while chasing a real
+consequence of the current design: fixing 70 touch-target violations
+(design-lint, 2026-08-20) made every persistent button 44px tall, which
+cascaded into a chain of real layout bugs across three separate CSS
+mechanisms (a stale height floor, an overflow rule clipping a hover
+popup, a z-index trapped in the wrong stacking context) — each fixed
+live, but confirming exactly what the user diagnosed: the permanently-
+visible button chrome is the actual problem, not any one CSS number.
+
+**Checked before writing this, not assumed:**
+- Hands are *already* `state.piles` entries (`kind: 'hand'`, D23) —
+  the data-layer unification the user is asking for is done. This
+  story is about the **interaction layer** only: `ui.js`'s rendering
+  and event wiring, not `state.js`.
+- `pileActions.js`'s `ACTIONS` table already models exactly the shape
+  the user described for Draw: `{ label: 'Draw', target: 'hand', from:
+  'deck' }` — an action already knows where its card comes from and
+  where it may go. Generalizing this table, not replacing it, is most
+  of the work.
+- `touchDrag.js` (D28) is already a DOM-free, input-agnostic
+  press-and-hold-then-drag recognizer, decoupled from *what* is being
+  dragged. It exists specifically so a second gesture wouldn't need
+  inventing later — this is that later.
+
+### US-46: Every pile-to-pile interaction works the same way
+**As** a player, **I want** to hover any pile — my hand included — to
+see what I can do with it, and drag an action to wherever it goes,
+**so that** I'm not hunting for a differently-shaped control (a button
+row, a hover-row-per-card, a deck strip) depending on which pile I'm
+touching.
+
+**AC:**
+- **No permanently-visible action buttons remain.** Sort, Pass, Draw,
+  Deal, Reshuffle & deal, Shuffle, Split, Reveal, Pick up, Move, Add
+  Zone — every one of these becomes a pile-hover action. The hand is a
+  pile like any other: hovering it reveals its actions (Sort by rank,
+  Sort by suit, Pass) exactly the way hovering the deck reveals Draw.
+- **Hovering a pile shows its available actions around/near the pile.**
+  What's offered depends on the pile's kind and the viewer's
+  relationship to it (owner vs. not) — generalizing `actionsForCard` +
+  `pileLevelActions`, not replacing their authorization logic.
+- **A grabbable action starts a drag on press-and-hold**, using the
+  existing D28 recognizer — not a second gesture system. Valid drop
+  targets light up while dragging, using the existing pile-target
+  highlight (D25) already built for this.
+- **Draw is the concrete worked example**: hover the deck, press-hold
+  "Draw", drag it, drop on your hand → a card is drawn. A separate
+  "Draw face-down" action is offered wherever the pile type supports
+  face-down cards, as its own drag-able action, not a modifier on Draw.
+- **Non-grabbable actions still work as a tap/click** — Reveal, Sort,
+  Pass, Shuffle, Reshuffle & deal don't have a meaningful "destination"
+  to drag to; hovering reveals them, clicking performs them in place.
+  Only actions with a real `target` (per `ACTIONS`) become draggable.
+- **Tap-to-play and existing low-friction paths are not removed** unless
+  this story's own hover+drag model strictly subsumes them — this
+  mirrors every prior Smith Gate 1 ruling on drag features in this
+  project (US-28, US-40): drag is additive until proven redundant, not
+  assumed redundant.
+- Mouse and touch both work through the same recognizer and the same
+  hover/reveal logic — no separate mobile-only or desktop-only path.
+
+**Explicitly out of scope for this story:**
+- Changing what any action *does* (the reducer, `state.js`) — this is
+  entirely a presentation-layer redesign.
+- The 3+ player 1024px seat-zone overlap (existing backlog item).
+- Multi-touch gestures.
+
+**Open questions for Smith (flagged, not assumed):**
+1. **Discoverability of a fully-hidden control set.** Every prior
+   button in this app was visible by default; this story hides all of
+   them behind hover, which has no direct touch equivalent (a finger
+   can't "hover"). What replaces hover-to-reveal on a touchscreen — tap
+   to reveal, then a second interaction to act? This is the single
+   biggest UX risk in the story and needs Smith's design, not an
+   assumption.
+2. **Where do actions render for a pile with many cards** (a maxed
+   deck, a big hand)? The existing D25 hover row is per-*card*; a
+   per-*pile* action set needs its own layout that doesn't reintroduce
+   the exact clipping/overlap bugs that motivated this story.
+3. **What happens on a failed/invalid drop** — a dragged action
+   released over nothing, or over a pile that can't legally receive it?
+   Needs an explicit "returns home" behavior, stated, not implied.
+
+**Smith Gate 1 amendments (2026-08-20):**
+
+**Answers to the three open questions:**
+1. **Tap the pile (not hover) reveals its actions on touch — a tap, not
+   a press-hold.** Tapping a pile's background/whitespace has never
+   meant anything until now, so it's free of collision with tap-to-play
+   (which targets a *card*, not the pile). A second tap elsewhere
+   dismisses it. This is the same shape D28 already uses (a touch
+   equivalent standing in for a mouse-only affordance), just tap
+   instead of press-hold, because REVEALING is the touch analog of
+   hover, not the analog of a mouse click.
+2. **Pile-level actions anchor to the pile's own fixed position, never
+   to individual card boxes.** This is exactly the mistake D25's
+   per-card hover row made, and exactly the mistake that produced this
+   whole story: a control positioned relative to card content moves and
+   clips as card count changes. A pile with 40 cards and a pile with 2
+   show their action menu in the same place.
+3. **A failed/invalid drop snaps back to origin, silently.** No error,
+   no state change — dropping nowhere useful is a cancel, not a
+   mistake to be corrected. Matches the existing US-32/33 "aiming at
+   nothing is open space" convention already in `dropTarget.js`.
+
+**One thing not asked, and the one that would have failed testing:**
+
+4. **BLOCKER — Draw cannot become drag-only.** This project already
+   has a Gate 1 ruling on exactly this action: Draw was deliberately
+   kept as its own one-tap button, separate from the deck's other
+   controls, specifically because it is *"the highest-frequency action
+   in the app."* Replacing a single tap with hover-reveal-then-
+   press-hold-then-drag is a real regression in the most common thing a
+   player does, every single turn, for the entire game. The story's own
+   AC #6 ("drag is additive... not assumed redundant") already commits
+   to not doing this — it just doesn't follow through on the one action
+   where it matters most.
+
+   **Required:** any action whose pile has exactly one sensible default
+   destination (Draw → my hand; there is no other legal target) gets a
+   plain tap-to-perform shortcut once the pile is revealed/hovered, in
+   addition to being draggable. Drag exists for the genuinely ambiguous
+   cases (Move, where the destination is a real choice among several
+   zones) — it must not become the *only* path for the unambiguous
+   ones.
+
+5. **The action set revealed by tapping a pile, on touch, must itself
+   respect the 44px floor** — the whole reason this sprint exists. A
+   redesign that removes 70 undersized buttons and replaces them with a
+   NEW set of undersized ones has fixed nothing. Wire `design-lint`
+   into this phase's own UAT, not just into general CI.
+
+**Gate 1: Approved with the above 5 amendments.** The direction is
+right and matches what the last several hours of fighting CSS numbers
+already proved: the fixed, always-visible chrome is the actual defect.
+Amendment 4 is the one condition on which my approval turns — ship this
+without a Draw shortcut and every single-player turn gets slower, which
+is the opposite of what a redesign motivated by "fix the UX" should do.
+
+
+---
+
+## Backlog: design-lint findings (2026-08-20)
+
+Filed by Trin, per the user's request to add a standing UX-regression
+lint (`npm run lint:design`, `tests/designLint.mjs`/`.check.mjs`). Its
+first run found real, pre-existing defects rather than confirming a
+clean baseline — recorded here rather than silently fixed, since fixing
+them is a real UX change with its own trade-off (below), not a
+mechanical lint-fix.
+
+1. **70 touch-target violations** across every checked viewport,
+   including 1440x900 desktop — most buttons never actually got the
+   `min-height: 44px` the base `button {}` rule implies but doesn't
+   enforce (only `.icon-btn` and a few others were given it explicitly).
+   Cross-verified against Playwright's own `boundingBox()`, not just the
+   new tool's own measurement.
+2. **The real fix is in tension with Sprint 9's own "no scroll" fix.**
+   Several of the worst offenders (`shuffle-btn`, `split-btn`,
+   `sort-rank-btn`, `draw-btn`, `reset-btn`) live in the exact button rows
+   that were just packed tighter to kill forced page scroll. Making them
+   ≥44px tall reopens some of that vertical cost — this needs Smith's
+   judgment on the trade-off (padding vs. font-size vs. layout), not a
+   blind size bump.
+3. **`npm run lint` is deliberately left failing**, at the user's
+   explicit choice, rather than shipped advisory-only — the count is
+   fixed at 70 as of 2026-08-20 and cannot silently grow while unfixed.
+
+
+---
+
 ## Deferred / Stretch
 - Scannable QR code image for joining (v1 ships join-code + Copy Link
   instead; descoped 2026-08-15, see CHAT.md Neo→Cypher).

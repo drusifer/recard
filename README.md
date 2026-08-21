@@ -41,7 +41,19 @@ one to host a table, one to join with the code/link the host shows.
 ```
 npm test            # unit tests (deck, state, protocol) - node:test, no framework
 npm run test:e2e     # real 2-browser Playwright smoke test over live PeerJS/WebRTC
+npm run lint         # stylelint + design-lint (below) - the merge gate
+npm run lint:style    # stylelint only, fast
+npm run lint:design   # design-lint only - renders the real app and checks
+                       # for forced page scroll, overlapping zones, and
+                       # touch targets under 44px, across 6 real viewports
 ```
+
+**`lint:design` currently fails** — it found 70 pre-existing touch-target
+violations (buttons under the documented 44px floor) on its first run,
+2026-08-20. That's real, known debt, not a bug in the checker (cross-
+verified against Playwright's own `boundingBox()`); see `docs/
+USER_STORIES.md` Backlog. Wired in as blocking rather than left silent so
+the count can't quietly grow while it's unfixed.
 
 `npm run test:e2e` needs a Chromium build Playwright can launch — either
 run `npx playwright install chromium` once, or have a system Chromium/

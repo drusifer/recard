@@ -734,3 +734,97 @@ Phases 48-51: Done. 171 unit + full e2e green, lint clean.
 Four bugs found by running it: a stalled retry loop (await with no
 timeout), an unregistered `host-lost` event, restore orphaning hands via
 a stale comment, and the manual Deal path seating unsettled peers.
+
+---
+
+## Sprint 12 ("piles are the interaction" — v2.0) — IN PROGRESS
+US-46, the user's own design, straight from the button-geometry chase
+in the design-lint fix. Architecture: D34-D37.
+
+**Scope note (Mouse):** Reset (whole-table) and Reset Scores
+(player-level) are NOT pile actions - neither has a single pile as its
+subject, so they're explicitly out of this redesign and stay as
+existing host-only controls. Add Zone is also excluded: it CREATES a
+pile, so there's nothing to hover yet: stays a small persistent control.
+
+### Phase 52 — generalize the pile-level action table (pure) ✅ DONE
+- [x] T52.1 `src/pileActions.js`: `pileLevelActions()` now covers hand
+      (sort-rank, sort-suit, pass, owner-only) and deck (draw, deal,
+      reshuffleDeal - draw open to everyone, dealing stays host-only).
+      `drawFaceDown` NOT implemented - flagged as a real scope conflict
+      (needs a `state.js` reducer change, which Cypher's story
+      explicitly excluded) rather than guessed at; needs its own
+      decision before Phase 54. STATIC `singleTarget: true` on `draw`
+      only (Smith Gate 2 #1), never computed from live pile counts.
+- [x] T52.2 Unit tests + mutation-verified (Neo AND independently by
+      Trin) that `move`/`pickup` never carry `singleTarget`. Also fixed
+      a real gap found along the way: `targetsForAction` only checked
+      `ACTIONS`, so a dragged Draw would have had no legal drop target
+      at all - now checks `PILE_ACTIONS` too. 196/196 unit green.
+
+### Phase 53 — the pile anchor (generalized, not deck-only)
+- [ ] T53.1 `src/ui.js`: generalize D29's `deck-controls-strip` pattern
+      into a pile-anchor usable by ANY pile kind - fixed to the pile's
+      own container, never card-relative (Smith Gate 1 #2, the exact
+      mistake this sprint exists to fix). Hover (mouse) / tap (touch,
+      Smith Gate 1 #1) reveals the popover.
+- [ ] T53.2 Wire the hand's anchor first (Sort rank/suit, Pass) -
+      removes 3 permanently-visible buttons. Old buttons stay hidden-
+      but-present until Phase 58's cleanup, so nothing breaks mid-sprint.
+- [ ] T53.3 `npm run lint:design` clean at every viewport (D37 gate) -
+      the anchor itself must clear 44px.
+
+### Phase 54 — Draw: the worked example (drag + static tap shortcut)
+- [ ] T54.1 Draw and Draw-face-down through the deck's pile anchor:
+      draggable via the action-token protocol (D35, reusing
+      `touchDrag.js` unchanged) AND a plain tap shortcut (D36, static
+      flag from Phase 52 - not computed).
+- [ ] T54.2 e2e: drag Draw onto the hand draws a card; tapping Draw
+      (revealed) also draws, with no drag.
+
+### Phase 55 — reveal becomes a tap on the card
+- [ ] T55.1 Remove D25's per-card hover button for `reveal`; wire a
+      direct tap on a revealable card, joining tap-to-play's existing
+      vocabulary. Private-card confirm dialog unchanged (Smith Gate 2 #2
+      - it's the actual safety net, not this AC).
+- [ ] T55.2 e2e: the existing confirm-cancel/confirm-accept reveal flow
+      still passes, now via tap instead of hover+button.
+
+### Phase 56 — remaining deck pile-level actions migrate to the anchor
+- [ ] T56.1 Shuffle, Split, Deal, Reshuffle & deal move from the
+      standalone `deck-controls-strip` onto the generalized pile anchor
+      from Phase 53 (host-only, unchanged authorization).
+
+### Phase 57 — move/pickup stay drag-first, unconditionally
+- [ ] T57.1 Confirm (don't reimplement) that `move`/`pickup` remain
+      drag-first regardless of live zone count (Smith Gate 2 #1) - a
+      regression test specifically for the 2-zone/early-game case that
+      motivated the correction.
+
+### Phase 58 — remove the old buttons, full regression
+- [ ] T58.1 Delete every button the pile-anchor system now replaces:
+      sort-rank-btn, sort-suit-btn, pass-toggle-btn, draw-btn,
+      deck-controls-strip's old buttons, the D25 reveal button.
+      `Reset`/`Reset Scores`/`Add Zone` stay (out of scope, see above).
+- [ ] T58.2 `npm run lint:design` + full `npm run test:e2e` green.
+      This is also where the design-lint task's OWN unresolved e2e
+      regression (deck-controls-strip Deal button, paused mid-fix) gets
+      re-verified - it may already be moot once Deal migrates here.
+
+### Sprint 12 status
+Phase 52: Done - 196/196 unit, UAT passed, Morpheus approved.
+Phases 53-58: not started (all UI-heavy: the pile anchor, Draw's
+drag+tap, reveal->tap, migrating remaining deck buttons, cleanup).
+
+**Blocking note for Phase 53**: `npm run test:e2e` is currently RED
+(unrelated to this sprint - a design-lint touch-target fix regression,
+last failing at the deck-controls-strip Deal button, untriaged).
+Diagnose that before Phase 53 touches the same area, or the fix and the
+new pile-anchor UI could collide. See `agents/trin.docs/state.md` for
+the full diagnostic trail.
+
+**Open decision needed before Phase 54**: `drawFaceDown` (US-46 AC) was
+NOT implemented in Phase 52 - it implies dealing a card from the deck
+face-down into a shared ZONE, which needs a `state.js` reducer change
+Cypher's story explicitly scoped out ("presentation-layer only"). Needs
+a real decision (widen scope, or drop the AC) before Phase 54.

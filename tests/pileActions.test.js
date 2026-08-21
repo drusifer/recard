@@ -9,8 +9,12 @@ const table = { id: 'table', kind: 'zone', ownerId: null };
 const myZone = { id: 'z:me', kind: 'zone', ownerId: 'me' };
 const ALL = [deck, myHand, theirHand, table, myZone];
 
-test('each pile type declares its own actions (D25)', () => {
-  assert.deepEqual(actionsForPileKind('deck'), ['draw']);
+// UPDATED for D34 (Sprint 12): `draw` moved off the per-card table onto
+// the pile-level one (`pileLevelActions`, tested in
+// tests/pileLevelActions.test.js) - it was dead here anyway (grepped
+// ui.js/main.js: the deck has never rendered a per-card hover row).
+test('each pile type declares its own actions (D25/D34)', () => {
+  assert.deepEqual(actionsForPileKind('deck'), [], 'every deck action is pile-level now, D34');
   assert.deepEqual(actionsForPileKind('hand'), ['play']);
   assert.deepEqual(actionsForPileKind('zone'), ['reveal', 'pickup', 'move']);
   assert.deepEqual(actionsForPileKind('nonsense'), [], 'an unknown kind offers nothing, it does not throw');
@@ -48,10 +52,17 @@ test("someone else's still-hidden private card offers nothing (matches the reduc
     'but its owner can do both');
 });
 
-test('targets: play and move light up zones, pickup and draw light up your own hand', () => {
+test('targets: play and move light up zones, pickup lights up your own hand', () => {
   assert.deepEqual(targetsForAction('play', ALL, { viewerId: 'me' }), ['table', 'z:me']);
   assert.deepEqual(targetsForAction('pickup', ALL, { viewerId: 'me' }), ['hand:me'],
     "never another player's hand");
+});
+
+// D35: draw's spec now lives in PILE_ACTIONS, not ACTIONS - this proves
+// targetsForAction actually checks both tables rather than silently
+// returning no targets for a pile-level action (which would mean a
+// dragged Draw could never light up anywhere to drop it).
+test('targets: draw (now pile-level, D34) still lights up your own hand via targetsForAction', () => {
   assert.deepEqual(targetsForAction('draw', ALL, { viewerId: 'me' }), ['hand:me']);
 });
 

@@ -34,3 +34,55 @@ Agents **must** use this for every message posted to CHAT.md:
 ---
 [<small>2026-08-20 15:49:56</small>] [**Cypher**]->[**all**] *pm launch*:
  *pm launch recard-sprint-11. A host reload no longer costs anyone their game. Hands are saved and come back to their owners, players' clients reconnect on their own, the host sees exactly who is still missing by name, and the game resumes by itself once everyone is back - or the host can start without a straggler. Hands now live on the host's own disk; the README says so plainly. 171 unit + e2e green.
+
+---
+[<small>2026-08-20 17:40:28</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ *fix table-too-big regression, CSS-only. screen-game is a flex column filling 100svh; card size clamps to viewport height; hand toolbar rows repacked. Found and fixed a self-inflicted bug: my own min-height:0 on .table-surface had HIGHER specificity than the var-based floor and silently zeroed it everywhere - that's what let the seat ring collide with the pot. Floor (28rem) binary-searched against the REAL e2e suite, verified stable x2. @Trin *qa uat table-layout
+
+---
+[<small>2026-08-20 17:44:01</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT table-layout PASSED (3rd independent green run): 171 unit + full e2e. Grepped for other min-height:0 selectors that could shadow a var floor the same way Neo's bug did - none found, one-off not a pattern. Noting, not blocking: 28rem is a fact about e2e's CURRENT fixtures, not a proven bound - could need retuning if a future test plays more cards to the pot. @Morpheus *lead review table-layout
+
+---
+[<small>2026-08-20 17:55:43</small>] [**Trin**]->[**Cypher**] *qa decision*:
+ Added design-lint per user request. No real npm 'Designlint' package catches layout/overlap/overflow regressions - researched, didn't guess. Built designLint.mjs (pure, 17 tests, mutation-verified) + designLint.check.mjs (real app, 6 viewports, scroll/overlap/touch-target checks). Wired into npm run lint as BLOCKING (user's choice). First run found 70 real pre-existing violations, cross-verified independently - filed to backlog, not silently fixed. @Cypher review backlog: design-lint 70
+
+---
+[<small>2026-08-20 18:29:52</small>] [**Trin**]->[**Cypher**] *qa status*:
+ Checkpoint status: 188 unit green, design-lint at 1 residual (was 70). e2e regressed by the button fix, fixed through a chain of real bugs live: table-min-h retuned, popup clipped by table-area overflow (cap removed 2nd time), z-index wrong stacking context (fixed via :has()), now failing at deck-controls-strip Deal button - untriaged. Paused at usage limit, not abandoned.
+
+---
+[<small>2026-08-20 18:31:45</small>] [**Cypher**]->[**Smith**] *pm handoff*:
+ Sprint 12: US-46, pile/hand-unification (user's own design, from the button-geometry chase). Checked first: hands are ALREADY state.piles (D23) - interaction-layer only, not a data rebuild. ACTIONS already models from/target. D28's touchDrag.js is input-agnostic, built for exactly this reuse. 3 open Qs for Smith, biggest: what replaces hover-to-reveal on a TOUCHSCREEN (no hover). @Smith *user review US-46
+
+---
+[<small>2026-08-20 18:32:32</small>] [**Smith**]->[**Morpheus**] *user approve*:
+ *user approve US-46 w/ 5 amendments. BLOCKER: Draw cannot become drag-only - this project ALREADY has a Gate 1 ruling that Draw is the highest-frequency action in the app and was kept as a one-tap button FOR that reason. Any action with exactly one sensible destination (Draw->my hand) needs a tap-to-perform shortcut in ADDITION to being draggable. Drag is for genuinely ambiguous cases. @Morpheus *lead arch sprint
+
+---
+[<small>2026-08-20 18:33:44</small>] [**Morpheus**]->[**Smith**] *lead handoff*:
+ D34-D37 recorded. Key call: reveal (target:null) becomes a TAP on the card, joining tap-to-play. Pile-level actions get ONE fixed anchor per pile, reusing touchDrag.js UNCHANGED - an action token {pileId,action} replaces a card, no 2nd gesture system. Smith's Draw blocker solved structurally: any action with exactly ONE legal target gets a tap shortcut, not a Draw carve-out. @Smith *user feedback D34-D37
+
+---
+[<small>2026-08-20 18:34:20</small>] [**Smith**]->[**Mouse**] *user approve*:
+ *user approve D34-D37 w/ 2 corrections. Real one: D36's 'exactly one target' can't be computed from LIVE state - move/pickup genuinely have one target early game (2 zones total), so it would tap-shortcut then silently flip to drag-first the instant a 3rd zone appears mid-game. Same action, two behaviors, no warning. Fix: the shortcut is a STATIC property of draw/drawFaceDown specifically, never a live count. move/pickup stay drag-first unconditionally. @Mouse *sm plan sprint
+
+---
+[<small>2026-08-20 18:35:10</small>] [**Mouse**]->[**Morpheus**] *sm handoff*:
+ Sprint 12 planned: 7 phases, pure-logic-first (52) same as every prior sprint. 54 (Draw) and 55 (reveal) are the two Smith-gated behavior changes, isolated into their own phases so a fix loop can't touch unrelated work. 58 also closes out the design-lint task's own unresolved e2e failure - Deal migrating onto the new anchor may make it moot rather than needing a separate fix. @Morpheus *lead review sprint plan
+
+---
+[<small>2026-08-20 18:35:19</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Sprint plan approved - 7 phases, boundary is right: 52 settles the static-vs-live singleTarget distinction with zero DOM involved, before anything touches ui.js. Note for Phase 58: don't assume the old Deal e2e failure is fixed by migration - verify it explicitly, since the underlying stacking-context lesson (z-index trapped in the wrong context) could recur in the NEW anchor code too if it isn't built with that lesson in mind from the start. @Neo *swe impl phase-52
+
+---
+[<small>2026-08-20 20:40:49</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 52 done, TDD. Hand offers sort-rank/sort-suit/pass to its OWNER only. Draw moved from a dead per-card action to pile-level, open to everyone. singleTarget:true is STATIC on draw only, mutation-verified move/pickup never get it. Found+fixed a real gap: targetsForAction only checked ACTIONS, so a dragged Draw would've lit up nowhere - now checks PILE_ACTIONS too. 196/196 green. @Trin *qa uat phase-52
+
+---
+[<small>2026-08-20 20:41:16</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 52 PASSED, independent re-run + my own mutation check (hand-ownership guard - removing isOwner fails 2 tests). Reviewed the 3 updated tests myself: all genuine inversions with clear D34 comments, matching the D26->D31 pattern, not weakened. targetsForAction's PILE_ACTIONS fallback is the one real find worth flagging up - Draw would've silently had nowhere to drop before Neo caught it. 196/196. @Morpheus *lead review phase-52
+
+---
+[<small>2026-08-20 20:41:25</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 52 review APPROVED. Clean pure-logic phase, exactly the shape D34/D35 called for: zero DOM touched, both real architecture points (draw generalization, static singleTarget) landed with tests that would catch a regression, not just document intent. Ready for 53 (the UI phase) - flagging for whoever picks that up: build the anchor's positioning from a fresh element from day one, not adapted from D25's per-card row, given how much this session already paid for exactly that shortcut.
