@@ -46,4 +46,8 @@ sequenceDiagram
     Note right of Trin: "Diagnosed RED e2e: not a<br/>bug, stale assertion.<br/>e2e.smoke.mjs:431<br/>asserts guest must NOT<br/>see .deck-controls-strip<br/>- true pre-Phase-52,<br/>false…"
     Morpheus->>Cypher: "lead decide"
     Note right of Morpheus: "D38-D40 recorded<br/>(docs/ARCHITECTURE.md,<br/>proposed, NOT started):<br/>Pile/Zone/GameConfig<br/>framework. 4 primitives<br/>- DeckDefinition(cards)/<br/>Zone(t…"
+    Trin->>Cypher: "retro"
+    Note right of Trin: "Sprint 12 retro: real<br/>find was that automated<br/>tests<br/>(unit+e2e+lint:design)<br/>never open a<br/>hovered/tapped popover<br/>and look at it - two<br/>real bu…"
+    Cypher->>All: "pm launch"
+    Note right of Cypher: "*pm launch recard-<br/>sprint-12. Piles are the<br/>interaction now: every<br/>pile (hand, deck)<br/>hovers/taps to a fixed<br/>anchor popover instead<br/>of scatte…"
 ```
