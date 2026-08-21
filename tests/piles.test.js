@@ -4,30 +4,43 @@ import { PILE_TYPES } from '../src/piles/pileTypes.js';
 import * as deckPile from '../src/piles/deckPile.js';
 import * as handPile from '../src/piles/handPile.js';
 import * as zonePile from '../src/piles/zonePile.js';
+import * as discardPile from '../src/piles/discardPile.js';
 
 // D42 (Sprint 13, US-47): one module per pile TYPE instead of a `kind`
 // string switched on in state.js/pileActions.js. Phase 59 builds these
 // as pure, standalone modules and proves them equivalent to the
 // EXISTING (still-untouched) behavior before Phase 60 wires anything -
 // same "module first, verify, then wire" order D18/D14/D21 used.
+// `discard` (D45, Sprint 15) is the first type added AFTER the registry
+// existed - proves Open/Closed for real, not just in the doc comment.
 
-test('the registry exposes exactly the three existing pile kinds', () => {
-  assert.deepEqual(Object.keys(PILE_TYPES).sort(), ['deck', 'hand', 'zone']);
+test('the registry exposes exactly the four existing pile kinds', () => {
+  assert.deepEqual(Object.keys(PILE_TYPES).sort(), ['deck', 'discard', 'hand', 'zone']);
   assert.equal(PILE_TYPES.deck, deckPile);
   assert.equal(PILE_TYPES.hand, handPile);
   assert.equal(PILE_TYPES.zone, zonePile);
+  assert.equal(PILE_TYPES.discard, discardPile);
 });
 
 test('visibility matches state.js\'s existing PILE_VISIBILITY table exactly', () => {
   assert.equal(deckPile.visibility, 'hidden');
   assert.equal(handPile.visibility, 'in-hand');
   assert.equal(zonePile.visibility, 'mixed');
+  assert.equal(discardPile.visibility, 'mixed');
 });
 
-test('dropRule: NONE for deck/hand (no halo geometry reachable today), FAN for zone (the only resolveDropTarget caller)', () => {
+test('dropRule: NONE for deck/hand (no halo geometry reachable today), FAN for zone, STACK for discard (D45)', () => {
   assert.equal(deckPile.dropRule, 'NONE');
   assert.equal(handPile.dropRule, 'NONE');
   assert.equal(zonePile.dropRule, 'FAN');
+  assert.equal(discardPile.dropRule, 'STACK');
+});
+
+test('tableSide (D45): zone and discard are PLAY/MOVE_CARD destinations, deck and hand are not', () => {
+  assert.equal(zonePile.tableSide, true);
+  assert.equal(discardPile.tableSide, true);
+  assert.equal(deckPile.tableSide, false);
+  assert.equal(handPile.tableSide, false);
 });
 
 // --- cardActions: characterized against pileActions.js's actionsForCard ---
@@ -168,4 +181,36 @@ test('deck removeCard/insertCard: pure', () => {
   assert.deepEqual(removed.cards.map((c) => c.id), ['b']);
   const inserted = deckPile.insertCard(removed, { id: 'c' });
   assert.deepEqual(inserted.cards.map((c) => c.id), ['c', 'b'], 'unexercised by any current action - DRAW only ever removes, never inserts, into a deck');
+});
+
+// --- Discard (D45, Sprint 15): "stack, drop-only" ---
+
+const discard = { id: 'discard', kind: 'discard', ownerId: null };
+
+test('discard cardActions: always empty - drop-only, nothing is ever offered on a discarded card', () => {
+  assert.deepEqual(discardPile.cardActions(discard, { id: 'c', faceUp: true }, 'me'), []);
+});
+
+test('discard pileActions: none today', () => {
+  assert.deepEqual(discardPile.pileActions({}), []);
+});
+
+test('discard canRemoveCard: always false, for every action, for every viewer - falls out of the empty cardActions, no new logic', () => {
+  const card = { id: 'c', faceUp: true, owner: null };
+  for (const action of ['pickup', 'move', 'reveal']) {
+    assert.equal(discardPile.canRemoveCard(discard, card, 'me', action), false, action);
+  }
+});
+
+test('discard insertCard: always lands on top (index 0), no placement/halo splicing like zone', () => {
+  const pile = { id: 'discard', kind: 'discard', cards: [{ id: 'a' }] };
+  const inserted = discardPile.insertCard(pile, { id: 'b' }, { targetCardId: 'a', side: 'before' });
+  assert.deepEqual(inserted.cards.map((c) => c.id), ['b', 'a'], 'placement is ignored entirely - STACK always wins');
+});
+
+test('discard redactCard: same per-card {owner, faceUp} rule as zone (D7) - a hidden discard is a real house rule', () => {
+  const hidden = { id: 'c1', rank: '5', suit: 'clubs', owner: null, faceUp: false };
+  assert.deepEqual(discardPile.redactCard(hidden, 'anyone'), { id: 'c1', owner: null, faceDown: true });
+  const visible = { id: 'c2', rank: '5', suit: 'clubs', owner: null, faceUp: true };
+  assert.deepEqual(discardPile.redactCard(visible, 'anyone'), visible);
 });

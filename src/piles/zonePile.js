@@ -14,6 +14,12 @@ export const visibility = 'mixed';
  * before/onto/after) is ever called for today. */
 export const dropRule = 'FAN';
 
+/** D45: a zone is a legal PLAY/MOVE_CARD destination - `state.js`'s
+ * `zonesOf` (despite its name, now "every table-side pile") derives
+ * this off the flag instead of a hardcoded `kind === 'zone'` string, so
+ * a second table-side type (`discardPile`, D45) is included for free. */
+export const tableSide = true;
+
 /**
  * D7: a viewer sees a card's identity if it's face-up, or they own it.
  * Otherwise they see only that it exists and (if applicable) whose it

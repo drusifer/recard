@@ -1726,6 +1726,69 @@ green, independently re-verified. `reduce()` itself shrinks from a
 readable without scanning past sibling `case` bodies.
 
 
+## v3.3 Decisions (Sprint 15+ — the remaining v3.0 epic: Discard pile,
+GameConfig, DeckDefinition, Card.orientation)
+
+### D45. `discard` is the first Pile type built AFTER the D42 interface existed - proves Open/Closed, and generalizes `state.js`'s zone-only assumptions off a `tableSide` flag
+
+D39/D42's whole argument was "a new Pile type costs one module and one
+registry entry, not a `case` in three files." Untested until a second
+type actually gets built - `discard` (D38's original wording: "stack,
+drop-only") is that proof.
+
+**Decision:**
+- `src/piles/discardPile.js`: `visibility: 'mixed'` (same per-card
+  `{owner, faceUp}` model as `zonePile` - a hidden discard is a real
+  house rule some games use), `dropRule: 'STACK'` (new - no before/
+  after halo, every drop lands on top unconditionally), `cardActions`
+  always `[]`. "Drop-only" needed **zero new logic**: `canRemoveCard =
+  cardActions(...).includes(action)` (the existing `zonePile`/
+  `handPile` pattern) is automatically always-false against an empty
+  `cardActions` - the interface already expressed this rule, it just
+  had never been exercised by a type that wanted it.
+- **New shared property: `tableSide` (boolean).** Sizing `discard` for
+  real implementation surfaced a genuine gap the same way D41 did for
+  D39: `state.js`'s `zonesOf()` (used by `findZoneAndCard`,
+  `RESET`'s structure-preservation, and PLAY/MOVE_CARD's destination-
+  exists checks) and `pileActions.js`'s `targetsForAction()` both had
+  `kind === 'zone'` hardcoded as "is this a card's legal table-side
+  home" - true when zone was the only such type, false the moment a
+  second one exists. Generalized to `PILE_TYPES[kind]?.tableSide`
+  (`zone`/`discard`: true; `deck`/`hand`: false) rather than adding a
+  second hardcoded string to check. `zonesOf()` keeps its name despite
+  the broader meaning - every real call site already reads "piles a
+  card can land on," not literally "kind is zone."
+- `CREATE_ZONE` gains an optional `kind` (defaults to `'zone'` - every
+  existing caller/test unaffected), validated against
+  `PILE_TYPES[kind]?.tableSide` rather than trusted - an unknown or
+  non-table-side kind (`'deck'`, `'hand'`) is rejected, not silently
+  creating a pile no reducer path could ever reach.
+- `viewFor`'s `zones` array entries gain a `kind` field - D42
+  deliberately left this out ("nothing needed it with only one
+  `'mixed'` type"); `discard` is the second, and `ui.js` needs it to
+  choose FAN vs. STACK drop behavior instead of assuming every zone
+  fans. A disclosed wire-format change, exactly the one D42 flagged as
+  Tranche 2 territory.
+
+**Rejected: giving `discardPile` its own `canAccept`-style insert
+gate.** Same reasoning as D43 - nothing has ever authorization-checked
+the insert side, and a discard pile accepting whatever's played/moved
+onto it (with the destination's OWN `insertCard` deciding placement,
+here always "on top") is exactly what "drop-only" means from the
+*receiving* end. The `canAccept` D39 originally floated stays unbuilt.
+
+**Consequences:** 238/238 unit tests (231 carried + 7 new: registry/
+visibility/dropRule/tableSide characterization, plus a full
+PLAY→discard→rejected-MOVE_CARD-and-PICKUP round trip through the real
+reducer, not just the module's own functions). Mutation-verified: an
+empty-`cardActions`-bypass mutation on `discardPile` fails 3 tests: a
+`tableSide: false` mutation on `zonePile` fails 50 - both genuinely
+load-bearing, not decorative. UI wiring (the `dropRule`/`kind` plumbing
+into `ui.js`'s drop handling, and a way to actually create a discard
+pile from the Add Zone control) is a separate phase within this same
+sprint - see below.
+
+
 ## Module Layout
 ```
 index.html              entry page, host/join screens, game screen

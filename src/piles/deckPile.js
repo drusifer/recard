@@ -16,6 +16,9 @@ export const visibility = 'hidden';
  * renders it, never `dropTarget.js`). */
 export const dropRule = 'NONE';
 
+/** The deck is never a PLAY/MOVE_CARD destination (D45). */
+export const tableSide = false;
+
 /** `viewFor` never calls this for a `hidden` pile - present for
  * interface uniformity with `zonePile.redactCard` only. */
 export function redactCard(card) {

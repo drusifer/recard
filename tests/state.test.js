@@ -252,6 +252,79 @@ test('CREATE_ZONE: adds a new empty zone by name, alongside the default', () => 
   assert.notEqual(zonesOf(state)[1].id, zonesOf(state)[0].id);
 });
 
+// --- D45 (Sprint 15): CREATE_ZONE's `kind` param, and a real Discard
+// pile exercised end-to-end through the reducer (not just its own
+// module's unit tests in tests/piles.test.js).
+
+test('CREATE_ZONE: kind defaults to "zone" - every pre-D45 caller (and every test above/below) is unaffected', () => {
+  const state = reduce(createInitialState({}, () => 0.5), { type: 'CREATE_ZONE', name: 'Table 2' });
+  assert.equal(state.piles.find((p) => p.name === 'Table 2').kind, 'zone');
+});
+
+test('CREATE_ZONE: kind: "discard" creates a real Discard pile, findable via zonesOf', () => {
+  const state = reduce(createInitialState({}, () => 0.5), { type: 'CREATE_ZONE', name: 'Discard', kind: 'discard' });
+  const pile = zonesOf(state).find((p) => p.name === 'Discard');
+  assert.equal(pile.kind, 'discard');
+  assert.deepEqual(pile.cards, []);
+});
+
+test('CREATE_ZONE: rejects a kind that is not table-side (deck/hand) rather than creating an unreachable pile', () => {
+  const state = createInitialState({}, () => 0.5);
+  assert.throws(() => reduce(state, { type: 'CREATE_ZONE', name: 'x', kind: 'deck' }));
+  assert.throws(() => reduce(state, { type: 'CREATE_ZONE', name: 'x', kind: 'hand' }));
+});
+
+test('CREATE_ZONE: rejects an unknown kind', () => {
+  const state = createInitialState({}, () => 0.5);
+  assert.throws(() => reduce(state, { type: 'CREATE_ZONE', name: 'x', kind: 'nonsense' }));
+});
+
+test('Discard pile end-to-end: PLAY into it, then MOVE_CARD out is rejected - drop-only, for real, through the whole reducer', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = withPlayers(state, ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Discard', kind: 'discard' });
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
+  const cardId = handOf(state, 'p1')[0].id;
+  const discardId = zonesOf(state).find((z) => z.name === 'Discard').id;
+
+  state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId, zoneId: discardId, visibility: 'public' });
+  const discardPile = zonesOf(state).find((z) => z.id === discardId);
+  assert.equal(discardPile.cards.length, 1);
+  assert.equal(discardPile.cards[0].id, cardId);
+
+  // Drop-only: nothing may move a card back out of a discard pile.
+  assert.throws(
+    () => reduce(state, { type: 'MOVE_CARD', playerId: 'p1', cardId, toZoneId: 'table' }),
+    /not authorized/,
+  );
+  assert.throws(
+    () => reduce(state, { type: 'PICKUP', playerId: 'p1', cardId }),
+    /not authorized/,
+  );
+});
+
+test('Discard pile: a SECOND card played onto it lands on TOP (index 0), matching a physical discard pile', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = withPlayers(state, ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Discard', kind: 'discard' });
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 2 });
+  const [firstCardId, secondCardId] = handOf(state, 'p1').map((c) => c.id);
+  const discardId = zonesOf(state).find((z) => z.name === 'Discard').id;
+
+  state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId: firstCardId, zoneId: discardId });
+  state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId: secondCardId, zoneId: discardId });
+
+  const cards = zonesOf(state).find((z) => z.id === discardId).cards;
+  assert.deepEqual(cards.map((c) => c.id), [secondCardId, firstCardId]);
+});
+
+test('viewFor: a "mixed"-visibility zone entry now carries its kind (D45), so ui.js can pick FAN vs. STACK drop behavior', () => {
+  const state = reduce(createInitialState({}, () => 0.5), { type: 'CREATE_ZONE', name: 'Discard', kind: 'discard' });
+  const view = viewFor(state, 'anyone');
+  assert.equal(view.zones.find((z) => z.name === 'Table').kind, 'zone');
+  assert.equal(view.zones.find((z) => z.name === 'Discard').kind, 'discard');
+});
+
 test('PLAY: with zoneId targets that zone instead of the default', () => {
   let state = createInitialState({}, () => 0.5);
   state = withPlayers(state, ['p1']);

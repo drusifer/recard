@@ -11,6 +11,11 @@ export const visibility = 'in-hand';
  * `dropTarget.js` - no halo geometry involved. */
 export const dropRule = 'NONE';
 
+/** A hand is reached by id (`hand:<playerId>`), never by the
+ * PLAY/MOVE_CARD "any table-side pile" existence check (D45) - it has
+ * its own dedicated lookup already. */
+export const tableSide = false;
+
 /** `viewFor` never calls this for an `in-hand` pile - present for
  * interface uniformity with `zonePile.redactCard` only. */
 export function redactCard(card) {

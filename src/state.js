@@ -43,17 +43,22 @@ function makePile(kind, { id, name, ownerId = null, cards = [] }) {
 }
 
 /**
- * D17 (generalized by D23): shared pile-construction for `CREATE_ZONE`,
- * `JOIN`'s auto-created personal zone, and `SPLIT_DECK`'s piles — a
- * personal zone is an ordinary zone pile, just with `ownerId` set (used
- * for UI seat placement only; every reducer treats it like any other).
+ * D17 (generalized by D23, D45): shared pile-construction for
+ * `CREATE_ZONE`, `JOIN`'s auto-created personal zone, and `SPLIT_DECK`'s
+ * piles — a personal zone is an ordinary zone pile, just with `ownerId`
+ * set (used for UI seat placement only; every reducer treats it like
+ * any other). `kind` defaults to `'zone'` for JOIN/SPLIT_DECK's own
+ * fixed calls; only `CREATE_ZONE` ever passes a different one.
  */
-function makeZonePile(name, ownerId = null) {
+function makeTableSidePile(kind, name, ownerId = null) {
   const id =
     typeof crypto !== 'undefined' && crypto.randomUUID
       ? crypto.randomUUID()
       : `zone-${Date.now()}-${Math.random()}`;
-  return makePile('zone', { id, name, ownerId });
+  return makePile(kind, { id, name, ownerId });
+}
+function makeZonePile(name, ownerId = null) {
+  return makeTableSidePile('zone', name, ownerId);
 }
 
 function makeDeckPile(deckConfig, rng) {
@@ -107,9 +112,12 @@ export function handsOf(state) {
   );
 }
 
-/** Every table/shared/personal pile, in creation order. */
+/** Every table-side pile (D45: zone AND discard, previously zone-only),
+ * in creation order. Name kept as-is despite the broader meaning - every
+ * call site (here and across `tests/`) already reads "the piles a card
+ * can be played/moved onto", not literally "kind === zone". */
 export function zonesOf(state) {
-  return state.piles.filter((p) => p.kind === 'zone');
+  return state.piles.filter((p) => PILE_TYPES[p.kind]?.tableSide);
 }
 
 // --- Internal pile helpers -------------------------------------------
@@ -326,8 +334,18 @@ const ACTIONS = {
     return { ...state, piles };
   },
 
+  // D45: `action.kind` lets a host create any table-side pile TYPE, not
+  // only a plain zone - defaults to 'zone' so every pre-D45 caller
+  // (and every existing test) is unaffected. Validated against the
+  // registry rather than trusted: a `kind` that doesn't exist, or
+  // exists but isn't `tableSide` (deck/hand), is rejected rather than
+  // silently creating a broken pile no reducer path can ever reach.
   CREATE_ZONE(state, action) {
-    return { ...state, piles: [...state.piles, makeZonePile(action.name)] };
+    const kind = action.kind ?? 'zone';
+    if (!PILE_TYPES[kind]?.tableSide) {
+      throw new Error(`Cannot create a zone of kind "${kind}"`);
+    }
+    return { ...state, piles: [...state.piles, makeTableSidePile(kind, action.name)] };
   },
 
   SHUFFLE_DECK(state, action) {
@@ -557,6 +575,12 @@ export function viewFor(state, playerId) {
           id: pile.id,
           name: pile.name,
           ownerId: pile.ownerId ?? null,
+          // D45: the view carries `kind` now - D42 deliberately left it
+          // out because nothing needed it with only one 'mixed' type in
+          // existence; `discardPile` (also 'mixed') is the second, and
+          // `ui.js` needs it to pick FAN vs. STACK drop behavior
+          // (dropRuleFor(kind)) instead of assuming every zone is a fan.
+          kind: pile.kind,
           // D42: `redactMiddleCard` moved to `PILE_TYPES.zone.redactCard`
           // - dispatched by `pile.kind` rather than hardcoded to zone,
           // so a future 'mixed'-visibility pile type redacts through
