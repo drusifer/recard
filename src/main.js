@@ -537,6 +537,8 @@ document.getElementById('create-table').addEventListener('click', async () => {
     numDecks: Number(document.getElementById('host-num-decks').value),
     jokers: Number(document.getElementById('host-jokers').value),
   };
+  // D46: GameConfig's first real field.
+  const gameConfig = { allowsPlayerZones: document.getElementById('host-allow-player-zones').checked };
 
   session = Session.host({ name: myName });
   const createErrorEl = document.getElementById('host-create-error');
@@ -550,7 +552,7 @@ document.getElementById('create-table').addEventListener('click', async () => {
   }
   createErrorEl.hidden = true;
 
-  gameState = reduce(createInitialState(deckConfig), { type: 'JOIN', playerId: myId, name: myName });
+  gameState = reduce(createInitialState(deckConfig, Math.random, gameConfig), { type: 'JOIN', playerId: myId, name: myName });
 
   // Table is created - the setup form no longer does anything, so stop
   // implying it's still live (Smith Gate-close finding #2).
@@ -970,6 +972,16 @@ function dropCardOnZone(cardId, targetZoneId, placement = {}) {
   }
 }
 
+/** Transient, beside the Add Zone row - same "where the click that caused
+ * it happened" pattern as `showDeckError` (US-41). */
+function showZoneError(message) {
+  const el = document.getElementById('zone-error');
+  el.textContent = message;
+  el.hidden = false;
+  clearTimeout(showZoneError.timer);
+  showZoneError.timer = setTimeout(() => { el.hidden = true; }, 4000);
+}
+
 document.getElementById('create-zone-btn').addEventListener('click', () => {
   if (sessionEnded) return;
   const nameInput = document.getElementById('new-zone-name');
@@ -979,8 +991,23 @@ document.getElementById('create-zone-btn').addEventListener('click', () => {
   // actual authority on which kinds are legal, this is just what's on
   // the wire.
   const kind = document.getElementById('new-zone-kind').value;
-  if (role === 'host') dispatch({ type: 'CREATE_ZONE', name, kind });
-  else session.send({ type: 'action', action: { type: 'CREATE_ZONE', name, kind } });
+  if (role === 'host') {
+    // D46: CREATE_ZONE can now be rejected (GameConfig.allowsPlayerZones
+    // false) - was an uncaught throw straight out of this handler before
+    // D46 gave it a real way to fail (same gap US-41 named for Deal
+    // before that story fixed it). A GUEST's rejected request has no
+    // local exception to catch at all (the host's `reduce` runs remotely
+    // and only `console.warn`s - the existing, established pattern for
+    // every other rejected guest action, e.g. an invalid MOVE_CARD today).
+    try {
+      dispatch({ type: 'CREATE_ZONE', name, kind });
+    } catch (err) {
+      showZoneError(err.message);
+      return;
+    }
+  } else {
+    session.send({ type: 'action', action: { type: 'CREATE_ZONE', name, kind } });
+  }
   nameInput.value = '';
 });
 

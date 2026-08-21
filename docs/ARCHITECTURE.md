@@ -1839,6 +1839,80 @@ observable behavior for `zone`/`hand`/`deck` (proven case-by-case
 before changing the code, then confirmed by the unmodified existing
 suite passing unchanged).
 
+### D46. `GameConfig` exists, with its first real field: `allowsPlayerZones`
+
+D38's original pitch named `GameConfig.allowsPlayerZones` as the
+mechanism that makes US-19 ("Add Zone") a per-game capability instead
+of an always-on global feature. Building the whole `GameConfig` object
+(player count, `DeckDefinition`, the Zone list, Zone→Pile bindings)
+just to reach this one field would be exactly the kind of premature,
+unearned scope this project's retros keep warning against - so this
+sprint ships `state.gameConfig` as a small, honestly-incomplete object
+(today: `{ allowsPlayerZones }`) that later sprints ADD fields to,
+never restructure.
+
+**Decision:**
+- `createInitialState(deckConfig, rng, gameConfig)` — a third,
+  separate param, not `deckConfig` nested inside a `gameConfig`
+  wrapper. Keeping `deckConfig` where it already is means every
+  existing call site (`main.js`, every test in the suite) stays valid
+  completely unchanged - a real, deliberate cost/benefit call, not an
+  oversight: nesting would have been the "more correct" long-term
+  shape, but at the price of a mechanical rename across the whole
+  codebase for a field this sprint doesn't even move.
+- `allowsPlayerZones` defaults `true` - matching every prior sprint's
+  behavior exactly, since Add Zone was unconditionally available
+  before this flag existed.
+- `CREATE_ZONE`'s reducer case is the ONLY thing gated. `JOIN`'s
+  personal zone and `SPLIT_DECK`'s piles both construct their piles
+  directly (`makeTableSidePile`/`makeZonePile`, never through the
+  `CREATE_ZONE` action) - a game that disallows player-added zones
+  still gets its default table, personal zones, and split piles
+  exactly as before. Gating anywhere upstream of the action itself
+  would have been gating things that were never in scope.
+- The check reads `state.gameConfig?.allowsPlayerZones === false`, not
+  `!state.gameConfig.allowsPlayerZones` - a **restored** game (a
+  snapshot saved before D46 existed) has no `gameConfig` field at all,
+  and must default to "allowed" (its own game's actual prior behavior),
+  not throw on a missing field or silently flip to disallowed.
+  `persistence.js`'s `snapshot()` now writes `gameConfig` too, as a
+  plain additive field - no `SNAPSHOT_VERSION` bump, unlike D31's
+  hands: an old blob's *absence* of this field isn't a semantic gap
+  that would misrepresent the restored game (contrast D31, where an
+  old blob really did need discarding rather than "restoring" with
+  silently empty hands).
+- A rejected `CREATE_ZONE` on the HOST's own click is caught and shown
+  as a transient error beside the Add Zone row (`#zone-error`, new),
+  the exact `showDeckError`/US-41 pattern: "fail the way it already
+  does" only works if something actually catches the throw, which
+  nothing did before this sprint gave `CREATE_ZONE` its first real way
+  to fail on the host's own request. A GUEST's rejected request gets
+  no local exception to catch at all - the host's `reduce` runs
+  remotely and only `console.warn`s, the same established, already-
+  shipped pattern every other rejected guest action already uses (an
+  invalid `MOVE_CARD` from a guest today behaves identically). Matching
+  it rather than inventing a new reject-message protocol for just this
+  one action.
+
+**Rejected: proactively hiding the Add Zone row when disallowed,**
+rather than only erroring on an attempt. Real UX polish, genuinely
+better than an error-after-the-fact - but it needs `viewFor` to expose
+`allowsPlayerZones` to guests too (today's view payload doesn't carry
+`gameConfig` at all), which is its own small, separate piece of wiring.
+Disclosed here as a known, deliberate gap rather than silently skipped
+- the same "structural readiness, not fully polished" shape D42's
+Tranche 1 shipped for `dropRule` before a second pile type existed to
+need it.
+
+**Consequences:** 246/246 unit (239 carried + 7 new: `gameConfig`
+defaults/override, `CREATE_ZONE` rejection, JOIN/SPLIT_DECK
+unaffected, missing-`gameConfig` backward compatibility, plus 2
+`persistence.js` round-trip tests) + full e2e green, including a new
+end-to-end block: a host unchecks "Players can add zones" at table
+creation, attempts Add Zone, gets a real visible error naming why, and
+confirms nothing was created. Mutation-verified: forcing the gate to
+never fire fails exactly the test written for it.
+
 
 ## Module Layout
 ```

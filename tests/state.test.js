@@ -17,6 +17,37 @@ test('createInitialState: empty roster, full shuffled deck, one empty default zo
   assert.deepEqual(zonesOf(state)[0].cards, []);
 });
 
+// --- D46: GameConfig's first real field ---
+
+test('createInitialState: gameConfig.allowsPlayerZones defaults true - matches every prior sprint\'s behavior exactly', () => {
+  const state = createInitialState({}, () => 0.5);
+  assert.deepEqual(state.gameConfig, { allowsPlayerZones: true });
+});
+
+test('createInitialState: allowsPlayerZones can be set false via the third param', () => {
+  const state = createInitialState({}, () => 0.5, { allowsPlayerZones: false });
+  assert.deepEqual(state.gameConfig, { allowsPlayerZones: false });
+});
+
+test('CREATE_ZONE: rejected when the game disallows player zones', () => {
+  const state = createInitialState({}, () => 0.5, { allowsPlayerZones: false });
+  assert.throws(() => reduce(state, { type: 'CREATE_ZONE', name: 'x' }), /does not allow/);
+});
+
+test('CREATE_ZONE: allowsPlayerZones does not affect JOIN\'s personal zone or SPLIT_DECK\'s piles - only this action is gated', () => {
+  let state = createInitialState({}, () => 0.5, { allowsPlayerZones: false });
+  state = reduce(state, { type: 'JOIN', playerId: 'p1', name: 'p1' });
+  assert.equal(zonesOf(state).length, 2, 'default table + p1\'s personal zone, neither went through CREATE_ZONE');
+  state = reduce(state, { type: 'SPLIT_DECK', pileCount: 2 });
+  assert.equal(zonesOf(state).length, 4, 'default + personal + 2 split piles - also unaffected');
+});
+
+test('CREATE_ZONE: a snapshot with no gameConfig at all (pre-D46) defaults to allowed, not a crash', () => {
+  const state = createInitialState({}, () => 0.5);
+  const { gameConfig, ...preD46State } = state;
+  assert.doesNotThrow(() => reduce(preD46State, { type: 'CREATE_ZONE', name: 'x' }));
+});
+
 test('JOIN: adds a player to the roster with connecting state', () => {
   const state = reduce(createInitialState({}, () => 0.5), {
     type: 'JOIN',

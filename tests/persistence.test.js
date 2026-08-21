@@ -86,6 +86,23 @@ test('load round-trips a saved game', () => {
   assert.ok(result.ageMs >= 0);
 });
 
+// --- D46: GameConfig round-trips ---
+
+test('D46: gameConfig round-trips through save/load', () => {
+  const state = createInitialState({}, () => 0.5, { allowsPlayerZones: false });
+  const storage = fakeStorage();
+  save(storage, state, 'ABC123');
+  assert.deepEqual(load(storage).state.gameConfig, { allowsPlayerZones: false });
+});
+
+test('D46: a snapshot from before this field existed restores fine, with no gameConfig at all - not a version bump, additive only', () => {
+  const preD46 = JSON.stringify({ version: SNAPSHOT_VERSION, piles: [], players: [] });
+  const storage = fakeStorage({ [STORAGE_KEY]: preD46 });
+  const result = load(storage);
+  assert.equal(result.ok, true, 'must NOT be refused the way a real version bump would refuse it');
+  assert.equal(result.state.gameConfig, undefined);
+});
+
 test('nothing saved yet is not an error, just nothing to offer', () => {
   const result = load(fakeStorage());
   assert.equal(result.ok, false);

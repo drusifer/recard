@@ -72,10 +72,17 @@ function makeDeckPile(deckConfig, rng) {
  * back.
  * @param {{numDecks?: number, jokers?: number}} deckConfig
  * @param {() => number} [rng]
+ * @param {{allowsPlayerZones?: boolean}} [gameConfig] D46: GameConfig's
+ *   first real field - a third, separate param rather than nesting
+ *   `deckConfig` inside it, so every existing call site (main.js, every
+ *   test) stays valid unchanged. `allowsPlayerZones` defaults `true`,
+ *   matching every prior sprint's behavior exactly (CREATE_ZONE was
+ *   always available before this gate existed).
  */
-export function createInitialState(deckConfig = {}, rng = Math.random) {
+export function createInitialState(deckConfig = {}, rng = Math.random, gameConfig = {}) {
   return {
     deckConfig,
+    gameConfig: { allowsPlayerZones: gameConfig.allowsPlayerZones ?? true },
     piles: [
       makeDeckPile(deckConfig, rng),
       makePile('zone', { id: DEFAULT_ZONE_ID, name: 'Table' }),
@@ -340,7 +347,23 @@ const ACTIONS = {
   // registry rather than trusted: a `kind` that doesn't exist, or
   // exists but isn't `tableSide` (deck/hand), is rejected rather than
   // silently creating a broken pile no reducer path can ever reach.
+  //
+  // D46: gated behind GameConfig.allowsPlayerZones - the ONLY place
+  // that flag matters, since JOIN's personal zone and SPLIT_DECK's
+  // piles both call `makeTableSidePile`/`makeZonePile` directly (never
+  // through this action), so a game that disallows player-added zones
+  // still gets its default table, personal zones, and split piles
+  // exactly as before.
   CREATE_ZONE(state, action) {
+    // `?.` + `=== false`, not `!state.gameConfig.allowsPlayerZones`: a
+    // snapshot saved before D46 existed (persistence.js) has no
+    // `gameConfig` field at all on restore, and must default to
+    // "allowed" (matching its own game's actual prior behavior)
+    // rather than throwing on a missing field or silently flipping to
+    // disallowed.
+    if (state.gameConfig?.allowsPlayerZones === false) {
+      throw new Error('This game does not allow players to add zones');
+    }
     const kind = action.kind ?? 'zone';
     if (!PILE_TYPES[kind]?.tableSide) {
       throw new Error(`Cannot create a zone of kind "${kind}"`);

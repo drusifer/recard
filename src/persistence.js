@@ -46,6 +46,12 @@ export function snapshot(state, code, hostName) {
     code: code ?? null,
     hostName: hostName ?? null,
     deckConfig: state.deckConfig,
+    // D46: optional, additive - an OLDER snapshot restored after this
+    // field existed simply won't have it, and `state.js`'s CREATE_ZONE
+    // guard already treats a missing `gameConfig` as "allowed" (its
+    // actual prior behavior), so no SNAPSHOT_VERSION bump is needed -
+    // unlike D31's hands, absence here isn't a semantic gap to disallow.
+    gameConfig: state.gameConfig,
     piles: state.piles,
     players: state.players,
     scores: state.scores,

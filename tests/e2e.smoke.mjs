@@ -1270,6 +1270,37 @@ try {
 
   await join.close();
 
+  // --- GameConfig.allowsPlayerZones (D46): a host can disallow player-
+  // added zones entirely; CREATE_ZONE is then rejected with a real
+  // error, not an uncaught throw straight out of the click handler
+  // (the exact gap US-41 named for Deal, before that story fixed it).
+  // Fresh context, deliberately after the main table tears down. ---
+  const noZonesHost = await (await browser.newContext()).newPage();
+  await noZonesHost.goto(BASE);
+  await noZonesHost.click('#show-host');
+  await noZonesHost.fill('#host-name', 'Eve');
+  await noZonesHost.uncheck('#host-allow-player-zones');
+  await noZonesHost.click('#create-table');
+  await noZonesHost.waitForSelector('#host-share:not([hidden])', { timeout: 20000 });
+  await noZonesHost.fill('#cards-per-player', '3');
+  await noZonesHost.click('#deal-btn');
+  await noZonesHost.waitForFunction(
+    () => !document.getElementById('screen-game').hidden,
+    undefined,
+    { timeout: 15000 },
+  );
+
+  const zonesBeforeAttempt = await noZonesHost.evaluate(() => document.querySelectorAll('#table-area .zone').length);
+  await noZonesHost.fill('#new-zone-name', 'Rejected');
+  await noZonesHost.click('#create-zone-btn');
+  await noZonesHost.waitForSelector('#zone-error:not([hidden])', { timeout: 5000 });
+  const zoneErrorText = (await noZonesHost.locator('#zone-error').textContent()).trim();
+  assert(/does not allow/.test(zoneErrorText), `the error must explain why, got ${JSON.stringify(zoneErrorText)}`);
+  const zonesAfterAttempt = await noZonesHost.evaluate(() => document.querySelectorAll('#table-area .zone').length);
+  assert(zonesAfterAttempt === zonesBeforeAttempt, 'a rejected CREATE_ZONE must not create anything');
+  console.log('GameConfig.allowsPlayerZones (D46): a game can disallow player-added zones, with a real error message, not an uncaught throw');
+  await noZonesHost.close();
+
   // --- Auto-start at the expected player count (US-42, D30) ----------
   // A FRESH pair, deliberately after the main table is torn down: a third
   // live player would permanently reshape the seat ring that the D24/US-31

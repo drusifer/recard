@@ -1791,9 +1791,52 @@ existed to expose them.
 **Still open:**
 - Run/Set (fan, aligned sequence) — the other D38 pile type candidate,
   not started.
-- `GameConfig`'s `allowsPlayerZones` capability gate — Add Zone (with
-  its new kind selector) is still a global always-on control, not
-  gated per game config (no `GameConfig` exists yet to gate it with).
+- ~~`GameConfig`'s `allowsPlayerZones` capability gate~~ — **SHIPPED**,
+  Sprint 16 (D46, US-50).
+
+## Sprint 16 ("GameConfig exists") — US-50
+
+### US-50: A host can disallow player-added zones for this game
+
+**As** a host, **I want** to turn off "players can add zones" when
+setting up a game whose table is meant to be fixed, **so that** the
+table stays exactly what the game defines, not whatever anyone adds
+mid-round.
+
+**AC:**
+- A checkbox on host setup ("Players can add zones"), checked by
+  default — matching every prior sprint's behavior exactly.
+- Unchecked: any `CREATE_ZONE` request (host or guest) is rejected.
+  The host sees a real, transient error naming why; a guest's rejected
+  request behaves like every other rejected guest action already does
+  in this app (silently, from their side — no new protocol invented).
+- The default table, every player's personal zone, and Split's piles
+  are unaffected either way — only the player-facing Add Zone control
+  is gated.
+- A restored (pre-D46) saved game defaults to "allowed", not a crash
+  or a silent flip to disallowed.
+
+**Sprint 16 status — SHIPPED (2026-08-21).** `state.gameConfig` exists
+as a small, honestly-incomplete object (`{allowsPlayerZones}` today —
+later sprints add fields, never restructure). Full design in
+`docs/ARCHITECTURE.md` D46, including the deliberate, disclosed choice
+NOT to proactively hide the Add Zone control (needs `viewFor` to expose
+`gameConfig` to guests too — its own small, separate piece of wiring,
+same "structural readiness, not fully polished" shape D42's Tranche 1
+used for `dropRule`). 246/246 unit (7 new) + full e2e green,
+independently re-verified. Mutation-verified: forcing the gate to
+never fire fails exactly the test written for it.
+
+**Still open:**
+- `DeckDefinition` (D38) — deck type/pinochle/N decks as its own
+  concept, not started.
+- `Card.orientation` (D40) — replicated portrait/landscape state, not
+  started.
+- Proactively hiding Add Zone when disallowed (see Rejected, above) —
+  needs `gameConfig` on the wire, not just in host state.
+- A config-driven preset schema tying `GameConfig`/`DeckDefinition`
+  into `presets.js`, and the builder screen — both still later,
+  separate stories per the original framework sidebar.
 
 
 ---

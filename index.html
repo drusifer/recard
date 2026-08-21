@@ -41,6 +41,10 @@
       <p id="host-preset-preview" class="deck-config" hidden></p>
       <label>Decks <select id="host-num-decks"><option value="1">1</option><option value="2">2</option></select></label>
       <label>Jokers <select id="host-jokers"><option value="0">0</option><option value="2">2</option><option value="4">4</option></select></label>
+      <!-- D46: GameConfig's first real field. Checked (allowed) by
+           default, matching every prior sprint's behavior exactly - Add
+           Zone was always available before this control existed. -->
+      <label><input id="host-allow-player-zones" type="checkbox" checked /> Players can add zones</label>
       <!-- US-42: OPTIONAL. Empty means no auto-start, i.e. exactly the
            behaviour before this existed (Smith Gate 1 answer 3). It is a
            start TRIGGER, not a capacity limit - a 5th player may still
@@ -134,6 +138,10 @@
              other than what a host looking to deal would search for.
              Dealing is now an action on the deck itself (D29). -->
       </div>
+      <!-- D46: CREATE_ZONE can now be rejected (GameConfig.allowsPlayerZones
+           false) - transient, beside the control that caused it, same
+           pattern as #deck-error (US-41). -->
+      <p id="zone-error" class="error-text" hidden></p>
     </section>
     <section class="panel">
       <h2>Your hand</h2>
