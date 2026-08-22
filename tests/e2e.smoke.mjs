@@ -43,17 +43,26 @@ function assert(condition, message) {
   if (!condition) throw new Error(`ASSERTION FAILED: ${message}`);
 }
 
-// D25: a card's actions are revealed on hover, and an action needing a
-// destination then highlights the piles that accept it. These mirror
-// what a real user does: hover the card, click the action, click a
-// lit-up pile.
-const actionBtn = (page, cardId, action) =>
-  page.locator(`.middle-card[data-card-id="${cardId}"] .action-btn[data-action="${action}"]`);
+// D25/D52: a card's (or pile's) actions are revealed on hover as a
+// pointer-centered radial menu, and an action needing a destination
+// then highlights the piles that accept it. These mirror what a real
+// user does: hover the actor, click the action, click a lit-up pile.
+// The menu is a single `document.body`-appended instance (not a
+// descendant of whatever was hovered - see D52/ARCHITECTURE.md), so
+// `.radial-menu-btn[data-action]` is never scoped to a card/pile - only
+// one menu is ever open at a time, whichever host was last hovered.
+const radialBtn = (page, action) => page.locator(`.radial-menu-btn[data-action="${action}"]`);
 
 async function cardAction(page, cardId, action) {
   const card = page.locator(`.middle-card[data-card-id="${cardId}"]`).first();
   await card.hover();
-  await actionBtn(page, cardId, action).first().click();
+  await radialBtn(page, action).first().click();
+}
+
+/** Hovers `hostSelector` (opens its radial menu) and clicks the named action. */
+async function pileAction(page, hostSelector, action) {
+  await page.hover(hostSelector);
+  await radialBtn(page, action).first().click();
 }
 
 // Phase 55 (T55.1): reveal moved off the hover row onto a direct tap on
@@ -176,8 +185,9 @@ try {
   // the one path this sprint added; then the tap shortcut (D36) below,
   // via the hover-then-click path a mouse user actually takes.
   const joinHandBeforeDrag = await join.evaluate(() => document.querySelectorAll('#hand-area .card').length);
+  await join.hover('#game-deck-area'); // opens the radial menu the button below queries
   await join.evaluate(() => {
-    const btn = document.querySelector('#game-deck-area [data-pile-action="draw"]');
+    const btn = document.querySelector('.radial-menu-btn[data-action="draw"]');
     const hand = document.getElementById('hand-area');
     const dt = new DataTransfer();
     dt.setData('text/plain', 'pile-action:draw');
@@ -193,7 +203,7 @@ try {
   console.log('US-46/D35: dragging Draw onto the hand draws a card, through the action-token protocol');
 
   await join.hover('#game-deck-area');
-  await join.click('#game-deck-area [data-pile-action="draw"]');
+  await join.click('.radial-menu-btn[data-action="draw"]');
   await host.waitForFunction(
     () => [...document.querySelectorAll('#game-roster li')].some((li) => li.textContent.includes('7 cards')),
     undefined,
@@ -203,12 +213,19 @@ try {
 
   // --- Middle-zone visibility (US-12/13/14, D7/D8) ---
 
-  // Host plays a card shared-face-down: hidden from both, "Turn over" for anyone.
-  // Face-down play is armed once in the hand toolbar now, rather than
-  // via a pair of icon buttons under every card (US-34 follow-up).
+  // Host plays a card shared-face-down. D51 follow-up (direct user
+  // request): Play and Play Hidden are two separate gestures now, not
+  // one tap plus a separately-armed dropdown - a plain click is ALWAYS
+  // public (`main.js`'s `onPlay`), so playing hidden means hovering the
+  // card (opens its radial menu, `playHidden` is its one action) and
+  // clicking that, with `#play-as` ("Hide as") choosing WHICH hidden
+  // mode it uses.
   await host.selectOption('#play-as', 'shared-facedown');
-  await host.locator('#hand-area .card').first().click();
-  await host.selectOption('#play-as', 'public');
+  await host.locator('#hand-area .hand-card').first().hover();
+  await host.locator('.radial-menu-btn[data-action="playHidden"]').click();
+  // No `#play-as` reset needed: it no longer has a 'public' option at
+  // all (D51 - a plain click is unconditionally public now), it only
+  // ever chooses WHICH hidden mode "Play hidden" uses.
   await join.waitForFunction(
     () => document.querySelectorAll('#table-area .card-back.revealable').length === 1,
     undefined,
@@ -222,7 +239,7 @@ try {
     document.querySelector('#table-area .card-back.revealable').dataset.cardId);
   await tapReveal(join, sharedFdId);
   await host.waitForFunction(
-    () => document.querySelectorAll('#table-area .action-btn[data-action="pickup"]').length === 2,
+    () => document.querySelectorAll('#table-area .middle-card .card:not(.card-back)').length === 2,
     undefined,
     { timeout: 10000 },
   );
@@ -232,8 +249,8 @@ try {
   // (confirm-gated), join sees an anonymous card-back with an owner tag.
   host.once('dialog', (d) => d.dismiss()); // first reveal attempt: cancel, must stay hidden
   await host.selectOption('#play-as', 'private-facedown');
-  await host.locator('#hand-area .card').first().click();
-  await host.selectOption('#play-as', 'public');
+  await host.locator('#hand-area .hand-card').first().hover();
+  await host.locator('.radial-menu-btn[data-action="playHidden"]').click();
   await host.waitForFunction(
     () => [...document.querySelectorAll('#table-area .owner-tag')].some((el) => el.textContent.includes('hidden from others')),
     undefined,
@@ -262,7 +279,7 @@ try {
   host.once('dialog', (d) => d.accept()); // second attempt: accept, must reveal
   await tapReveal(host, privateId);
   await join.waitForFunction(
-    () => document.querySelectorAll('#table-area .action-btn[data-action="pickup"]').length === 3,
+    () => document.querySelectorAll('#table-area .middle-card .card:not(.card-back)').length === 3,
     undefined,
     { timeout: 10000 },
   );
@@ -271,7 +288,7 @@ try {
   // Join picks up a face-up middle card into their own hand.
   const joinHandSizeBefore = await join.locator('#hand-area .card').count();
   const pickupId = await join.evaluate(() =>
-    document.querySelector('#table-area .action-btn[data-action="pickup"]').closest('.middle-card').dataset.cardId);
+    document.querySelector('#table-area .middle-card .card:not(.card-back)').closest('.middle-card').dataset.cardId);
   await cardAction(join, pickupId, 'pickup');
   assert((await litTargets(join)) === 1, 'Pick up must light up exactly one destination: your own hand');
   await join.locator('#hand-zone').click();
@@ -314,7 +331,7 @@ try {
   // D25: Move now lights up every zone that can receive the card, and
   // the destination is chosen by clicking one of them.
   const moveId = await host.evaluate(() =>
-    document.querySelector('#table-area .action-btn[data-action="move"]').closest('.middle-card').dataset.cardId);
+    document.querySelector('#table-area .middle-card .card:not(.card-back)').closest('.middle-card').dataset.cardId);
   const sourceZoneId = await host.evaluate((id) =>
     document.querySelector(`.middle-card[data-card-id="${id}"]`).closest('.zone').dataset.zoneId, moveId);
   await cardAction(host, moveId, 'move');
@@ -432,9 +449,9 @@ try {
   // without starving the hand-cursor-affordance check right after it.
   const handSizeBeforeTopUp = await host.evaluate(() => document.querySelectorAll('#hand-area .card').length);
   await host.hover('#game-deck-area');
-  await host.click('#game-deck-area [data-pile-action="draw"]');
+  await host.click('.radial-menu-btn[data-action="draw"]');
   await host.hover('#game-deck-area');
-  await host.click('#game-deck-area [data-pile-action="draw"]');
+  await host.click('.radial-menu-btn[data-action="draw"]');
   await host.waitForFunction(
     (before) => document.querySelectorAll('#hand-area .card').length === before + 2,
     handSizeBeforeTopUp,
@@ -571,16 +588,16 @@ try {
   assert(await join.locator('#game-deck-area.pile-hover-host').count() === 1,
     'Draw is open to everyone (D34) - a guest must still see the deck pile-hover host');
   await join.hover('#game-deck-area');
-  assert(await join.locator('#game-deck-area [data-pile-action="draw"]').count() === 1,
+  assert(await join.locator('.radial-menu-btn[data-action="draw"]').count() === 1,
     'the guest deck hover row must offer Draw');
-  assert(await join.locator('#game-deck-area [data-pile-action="deal"]').count() === 0,
+  assert(await join.locator('.radial-menu-btn[data-action="deal"]').count() === 0,
     'dealing stays host-only - a guest must not get the Deal button');
   const hostHandIdsBeforeDealMore = await host.evaluate(() =>
     [...document.querySelectorAll('#hand-area .card')].map((c) => c.dataset.cardId),
   );
   await host.hover('#game-deck-area');
   await host.fill('#deck-deal-count', '2');
-  await host.click('#game-deck-area [data-pile-action="deal"]');
+  await host.click('.radial-menu-btn[data-action="deal"]');
   await host.waitForFunction(
     (before) => document.querySelectorAll('#hand-area .card').length === before + 2,
     hostHandIdsBeforeDealMore.length,
@@ -611,7 +628,7 @@ try {
   // mouse user takes, same pattern the existing `cardAction` helper
   // above already uses for D25's row. ---
   await join.hover('#hand-zone-name');
-  await join.click('#hand-zone [data-pile-action="pass"]');
+  await join.click('.radial-menu-btn[data-action="pass"]');
   await host.waitForFunction(
     () => [...document.querySelectorAll('#game-roster li')].some((li) => li.textContent.includes('Bob') && li.textContent.includes('Passed')),
     undefined,
@@ -619,7 +636,7 @@ try {
   );
   console.log('TOGGLE_PASS: pass marker propagated to the other client');
   await join.hover('#hand-zone-name');
-  await join.click('#hand-zone [data-pile-action="pass"]');
+  await join.click('.radial-menu-btn[data-action="pass"]');
   await host.waitForFunction(
     () => ![...document.querySelectorAll('#game-roster li')].some((li) => li.textContent.includes('Bob') && li.textContent.includes('Passed')),
     undefined,
@@ -662,10 +679,10 @@ try {
   // must survive the NEXT state broadcast instead of being silently wiped
   // like the old drag-reorder-only behavior was. ---
   await join.hover('#hand-zone-name');
-  await join.click('#hand-zone [data-pile-action="sortRank"]');
+  await join.click('.radial-menu-btn[data-action="sortRank"]');
   const joinSortedIds = await join.evaluate(() => [...document.querySelectorAll('#hand-area .card')].map((c) => c.dataset.cardId));
   await join.hover('#game-deck-area');
-  await join.click('#game-deck-area [data-pile-action="draw"]'); // triggers a fresh state broadcast
+  await join.click('.radial-menu-btn[data-action="draw"]'); // triggers a fresh state broadcast
   await join.waitForFunction(
     (before) => document.querySelectorAll('#hand-area .card').length === before + 1,
     joinSortedIds.length,
@@ -778,7 +795,7 @@ try {
   // card rects, not a stubbed hit test.
   await host.hover('#game-deck-area');
   await host.fill('#deck-deal-count', '3');
-  await host.locator('#game-deck-area button[data-pile-action="deal"]').click();
+  await host.locator('.radial-menu-btn[data-action="deal"]').click();
   await host.waitForFunction(() => document.querySelectorAll('#hand-area .card').length >= 3, undefined, { timeout: 10000 });
   for (let i = 0; i < 3; i++) {
     await host.locator('#hand-area .card').first().click();
@@ -907,6 +924,20 @@ try {
     'a swipe must leave the hand exactly as it was');
   console.log('US-40: a swipe over a card scrolls - no ghost, no reorder, and no late lift from a stale hold timer');
 
+  // The swipe just above genuinely scrolls `#hand-area` (`overflow-x:
+  // auto`, US-30's fan-overflows-sideways design) - real touch momentum/
+  // inertia in headless Chromium keeps drifting that scroll position for
+  // a while afterward, no fixed wait reliably outlasts it (confirmed
+  // live: `elementFromPoint` at a freshly-measured card's own rect still
+  // missed the card, because the rect itself was already stale by the
+  // time it was read - measuring harder doesn't fix a target that keeps
+  // moving). Resetting the scroll deterministically, rather than waiting
+  // for inertia to settle on its own, is what actually converges: the
+  // exact scroll offset doesn't matter to the drag test that follows,
+  // only that it's stable and known.
+  await join.evaluate(() => { document.getElementById('hand-area').scrollLeft = 0; });
+  await join.waitForTimeout(200);
+
   // 2. Hold, then drag onto a zone: the card plays, and the host sees it.
   //    Same `performZoneDrop` the mouse path uses - that is the point.
   // D51: the hand now repositions itself (`positionHandZone`) on every
@@ -914,7 +945,7 @@ try {
   // a real behavior change worth a settle wait here so the coordinates
   // measured below match where the card is BY THE TIME the touch event
   // actually dispatches, not a stale position from mid-reflow.
-  await join.waitForTimeout(200);
+  await join.waitForTimeout(500);
   const touchCardId = await join.locator('#hand-area .card').first().getAttribute('data-card-id');
   const [cx, cy] = await centreOf(join.locator(`#hand-area [data-card-id="${touchCardId}"]`));
   const [zx, zy] = await centreOf(join.locator('#table-area .zone').first());
@@ -981,16 +1012,18 @@ try {
   // --- Deck operations (US-35/36, D22). Phase 56 (T56.1): shuffle/split
   // moved off their own standalone row onto the deck's pile anchor. ---
   await host.setViewportSize({ width: 1280, height: 900 });
-  assert(await host.locator('#game-deck-area [data-pile-action="shuffle"]').count() === 1,
+  await host.hover('#game-deck-area');
+  assert(await host.locator('.radial-menu-btn[data-action="shuffle"]').count() === 1,
     'the host sees Shuffle on the deck anchor');
-  assert(await join.locator('#game-deck-area [data-pile-action="shuffle"]').count() === 0,
+  await join.hover('#game-deck-area');
+  assert(await join.locator('.radial-menu-btn[data-action="shuffle"]').count() === 0,
     'deck operations are host-only, like Deal/Reset - a guest must not see them');
 
   const deckCountOn = (page) => page.evaluate(() =>
     Number(document.querySelector('.deck-count-badge')?.textContent ?? -1));
   const beforeShuffle = await deckCountOn(host);
   await host.hover('#game-deck-area');
-  await host.click('#game-deck-area [data-pile-action="shuffle"]');
+  await host.click('.radial-menu-btn[data-action="shuffle"]');
   await host.waitForTimeout(300);
   assert((await deckCountOn(host)) === beforeShuffle,
     'Shuffle reorders only - the remaining card count must not change');
@@ -1044,7 +1077,7 @@ try {
   const zonesBeforeSplit = await join.locator('#table-area .zone').count();
   await host.hover('#game-deck-area');
   await host.fill('#deck-split-count', '3');
-  await host.click('#game-deck-area [data-pile-action="split"]');
+  await host.click('.radial-menu-btn[data-action="split"]');
   await join.waitForFunction(
     (n) => document.querySelectorAll('#table-area .zone').length === n + 3,
     zonesBeforeSplit,
@@ -1118,15 +1151,35 @@ try {
   // (non-0/180-degree angles). Pre-existing geometry, not a D20 defect,
   // and not in this story's scope - not asserted here for that reason.
 
+  // D51 follow-up (direct user request, "the table should genuinely
+  // fill the window"): the two FIXED desktop caps D20 originally shipped
+  // (1240px/1600px) are gone - `#screen-game`'s max-width is now fluid,
+  // `calc(100vw - 3rem)` at >=1024px and `calc(100vw - 4rem)` at
+  // >=1440px (style.css), matching the user's own complaint that a fixed
+  // cap "left visible unused window on anything bigger than a laptop."
+  // The margin is intentionally SMALLER below 1440px (3rem) than at/
+  // above it (4rem) - crossing that boundary is a real, small step DOWN
+  // in width at the same viewport width class, not a monotonic-only
+  // growth curve; asserted below within slack for scrollbar-width
+  // rounding, not an exact pixel match.
   const w1023 = await screenGameWidth(1023);
   assert(w1023 <= 760, `below the 1024px breakpoint, #screen-game must stay at the 760px cap, got ${w1023}px`);
   const w1024 = await screenGameWidth(1024);
-  assert(w1024 > 760 && w1024 <= 1240, `at 1024px, #screen-game must grow to the 1240px desktop cap, got ${w1024}px`);
+  const expected1024 = 1024 - 48; // calc(100vw - 3rem), 3rem = 48px
+  assert(w1024 > 760 && Math.abs(w1024 - expected1024) <= 2,
+    `at 1024px, #screen-game must fill the window minus a 3rem margin (~${expected1024}px), got ${w1024}px`);
   const w1439 = await screenGameWidth(1439);
-  assert(w1439 <= 1240, `just below 1440px, #screen-game must still be at the 1240px cap, got ${w1439}px`);
+  const expected1439 = 1439 - 48;
+  assert(Math.abs(w1439 - expected1439) <= 2,
+    `just below 1440px, #screen-game must still use the 3rem margin (~${expected1439}px), got ${w1439}px`);
   const w1440 = await screenGameWidth(1440);
-  assert(w1440 > 1240 && w1440 <= 1600, `at 1440px, #screen-game must grow to the 1600px wide-desktop cap, got ${w1440}px`);
-  console.log('US-31/D20: #screen-game widens at both the 1024px and 1440px breakpoints, bounded correctly at each tier');
+  // max(100vw-4rem, 1440px-3rem) - the floor is what keeps this tier
+  // from ever being narrower than the 3rem tier was a moment before
+  // (see style.css's own comment on this rule).
+  const expected1440 = Math.max(1440 - 64, 1440 - 48);
+  assert(Math.abs(w1440 - expected1440) <= 2,
+    `at 1440px, #screen-game must not shrink versus the 3rem tier (~${expected1440}px), got ${w1440}px`);
+  console.log('US-31/D51: #screen-game fills the window (fluid margin, not a fixed cap) at both the 1024px and 1440px breakpoints');
 
   assert(!(await hasHorizontalScroll(320)), 'no horizontal scroll/overflow at a 320px phone width');
   assert(!(await hasHorizontalScroll(1920)), 'no horizontal scroll/overflow at a 1920px wide-desktop width');
@@ -1287,7 +1340,7 @@ try {
   // behavioral no-op.
   const joinHandBeforeEndedDraw = await join.evaluate(() => document.querySelectorAll('#hand-area .card').length);
   await join.hover('#game-deck-area');
-  await join.click('#game-deck-area [data-pile-action="draw"]');
+  await join.click('.radial-menu-btn[data-action="draw"]');
   await join.waitForTimeout(300);
   assert(
     (await join.evaluate(() => document.querySelectorAll('#hand-area .card').length)) === joinHandBeforeEndedDraw,
@@ -1418,7 +1471,7 @@ try {
   autoHost.once('dialog', (d) => { confirmMessage = d.message(); d.accept(); });
   await autoHost.hover('#game-deck-area');
   await autoHost.fill('#deck-deal-count', '6');
-  await autoHost.locator('#game-deck-area button[data-pile-action="reshuffleDeal"]').click();
+  await autoHost.locator('.radial-menu-btn[data-action="reshuffleDeal"]').click();
   await autoHost.waitForFunction(() => document.querySelectorAll('#hand-area .card').length === 6, undefined, { timeout: 15000 });
   // Smith Gate 2 #1: it wipes every hand, so it must confirm first.
   assert(confirmMessage !== null && /cleared/i.test(confirmMessage),
@@ -1441,19 +1494,31 @@ try {
   // Smith Gate 1 BLOCKER: an empty deck must keep its controls. renderDeck
   // used to hide the whole container at zero, which would have taken the
   // deal controls with it exactly when a host most needs them.
-  await autoHost.evaluate(async () => {
-    while (document.querySelector('#game-deck-area .deck-count-badge')) {
-      document.querySelector('#game-deck-area [data-pile-action="draw"]').click();
-      await new Promise((r) => setTimeout(r, 40));
-    }
-  });
+  // D52: the old version drove this loop entirely inside `page.evaluate`
+  // (a persistent button could just be `.click()`-ed repeatedly). The
+  // radial menu only exists after a REAL pointer hover opens it, so this
+  // has to be a real Node-side loop - hover, click, repeat - not a
+  // synthetic in-page one.
+  while (await autoHost.evaluate(() => document.querySelector('#game-deck-area .deck-count-badge') !== null)) {
+    await autoHost.hover('#game-deck-area');
+    await autoHost.click('.radial-menu-btn[data-action="draw"]');
+    await autoHost.waitForTimeout(40);
+  }
   await autoHost.waitForSelector('#game-deck-area .deck-empty', { timeout: 20000 });
   assert(await autoHost.locator('#game-deck-area.pile-hover-host').count() === 1,
     'an empty deck must KEEP its controls - hiding them is the dead-end this story exists to fix');
+  // D52: `openRadialMenu` filters `opts.disabled` OUT of the menu
+  // entirely (`ids = actionIds.filter(id => !disabled.includes(id))`)
+  // rather than rendering a disabled-but-visible button the way the
+  // pre-D52 linear row did - Deal is OMITTED on an empty deck, not
+  // shown greyed-out. Still satisfies the underlying safety requirement
+  // ("must not throw when clicked") at least as well - there's nothing
+  // to click at all - so this is a real, disclosed behavior change,
+  // asserted here rather than left for the next person to rediscover.
   await autoHost.hover('#game-deck-area');
-  assert(await autoHost.locator('#game-deck-area button[data-pile-action="deal"]').isDisabled(),
-    'Deal has nothing to deal from on an empty deck, so it must be disabled rather than throwing');
-  assert(await autoHost.locator('#game-deck-area button[data-pile-action="reshuffleDeal"]').isEnabled(),
+  assert(await autoHost.locator('.radial-menu-btn[data-action="deal"]').count() === 0,
+    'Deal has nothing to deal from on an empty deck, so it must not be offered at all');
+  assert(await autoHost.locator('.radial-menu-btn[data-action="reshuffleDeal"]').isEnabled(),
     'Reshuffle & deal must stay reachable on an empty deck - that is exactly when it is needed');
   console.log('US-41 (Smith Gate 1 blocker): an empty deck keeps its controls - Deal disabled, Reshuffle & deal still reachable');
 

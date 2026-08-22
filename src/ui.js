@@ -469,14 +469,27 @@ function beginTargeting(action, targetIds, onChoose) {
 
   for (const el of els) {
     el.classList.add('pile-target');
-    el.addEventListener('click', onPick);
+    // CAPTURE phase, not bubble: a pile-target element (`#hand-zone`, a
+    // zone) can contain its own genuinely-clickable content - a hand
+    // card's `onClick` (Play), a revealable middle-card's `onClick`
+    // (tap-to-reveal). Choosing that PILE as a target by clicking its
+    // body, at whatever point the pointer happens to land, must not
+    // ALSO fire whatever's underneath - found live (D52 follow-up): a
+    // Pick-up-into-hand click that happened to land on a hand card
+    // silently played that card too, netting the hand size unchanged
+    // and reading as "pickup does nothing". Capturing here means this
+    // listener runs BEFORE the click ever reaches that descendant, and
+    // its own `stopPropagation()` (still called, same as before) then
+    // stops it from proceeding to the target at all - not a bubble-
+    // order race, doesn't depend on which registered first.
+    el.addEventListener('click', onPick, { capture: true });
   }
   document.addEventListener('keydown', onEscape);
   // Deferred so the click that opened targeting doesn't immediately close it.
   setTimeout(() => document.addEventListener('click', onElsewhere, { once: true }), 0);
 
   cancelTargeting = () => {
-    for (const el of els) el.removeEventListener('click', onPick);
+    for (const el of els) el.removeEventListener('click', onPick, { capture: true });
     document.removeEventListener('keydown', onEscape);
     document.removeEventListener('click', onElsewhere);
   };

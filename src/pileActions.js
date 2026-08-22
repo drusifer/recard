@@ -53,13 +53,22 @@ export const ACTION_SPECS = {
   // two distinct actions now, not one gesture plus a separately-armed
   // "Play as" dropdown. `play` is unconditionally public - the fast,
   // default gesture (tap or drag), matching Draw's own "highest-
-  // frequency action gets a shortcut" precedent (D36). `playHidden`
-  // is the deliberate, secondary case, reached via the card's hover
-  // row - which visibility it actually plays as (shared vs. private
-  // face-down) is chosen by the remaining "Hide as" selector, which
-  // now only offers the two hidden modes (main.js).
+  // frequency action gets a shortcut" precedent (D36); it keeps
+  // `target: 'zone'` because a native drag of the card itself DOES let
+  // the drop location choose a destination zone (`highlightDragTargets`
+  // in ui.js reads this). `playHidden` is the deliberate, secondary
+  // case, reached ONLY via the card's radial menu, never draggable
+  // itself (no `draggable: true` passed to its `attachRadialMenu` call)
+  // - `target: null`, same as `reveal`/`rotate`, so a click dispatches
+  // it directly instead of opening the "choose a destination" targeting
+  // mode `openRadialMenu` would otherwise (wrongly) enter for a
+  // `target`-bearing action with no `targetsFor` wired for it - always
+  // plays to the same default zone `onPlay` does, no picker. Which
+  // visibility it actually plays as (shared vs. private face-down) is
+  // chosen by the remaining "Hide as" selector, which now only offers
+  // the two hidden modes (main.js).
   play: { label: 'Play', target: 'zone', from: 'hand' },
-  playHidden: { label: 'Play hidden', target: 'zone', from: 'hand' },
+  playHidden: { label: 'Play hidden', target: null, from: 'hand' },
   pickup: { label: 'Pick up', target: 'hand', from: 'zone' },
   move: { label: 'Move', target: 'zone', from: 'zone' },
   reveal: { label: 'Turn over', target: null, from: 'zone' },

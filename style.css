@@ -175,8 +175,18 @@ body {
   #screen-game { max-width: calc(100vw - 3rem); }
 }
 
+/* Found live (D52 follow-up): a bigger 4rem margin here, on its own,
+   made the window narrower right at 1440px than it was a moment before
+   at 1439px under the 3rem tier (100vw-4rem < 100vw-3rem at the same
+   viewport width, by construction) - a real, small step BACKWARD while
+   continuously resizing through the breakpoint, exactly the class of
+   bug this project's own Gate-2 continuous-resize sweep exists to
+   catch (D20). `max()` against what the 3rem tier would already give
+   at this exact viewport keeps the wider margin's intent (more
+   breathing room on very wide screens, once the window is wide enough
+   to afford it) without ever shrinking on the way in. */
 @media (min-width: 1440px) {
-  #screen-game { max-width: calc(100vw - 4rem); }
+  #screen-game { max-width: max(calc(100vw - 4rem), calc(1440px - 3rem)); }
 }
 
 h1 {
@@ -519,21 +529,15 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   z-index: 7;
 }
 
-.pile-hover-host {
-  position: relative;
-}
-
-.pile-hover-host:hover,
-.pile-hover-host:focus-within {
-  z-index: 8;
-}
-
 /* Discoverability (user's own finding): a hoverable pile needs a visual
    cue that it's a thing you can act on, not just empty table space -
    without this, "hover the deck to see Draw" is invisible until you
    stumble onto it. A subtle border, not a button-like fill: piles are
-   the surface, not controls sitting on it. */
+   the surface, not controls sitting on it. (Consolidated from two
+   `no-duplicate-selectors`-violating blocks - `lint:style`, found while
+   fixing e2e for D52 - same selectors, no behavior change.) */
 .pile-hover-host {
+  position: relative;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 0.3rem;
@@ -542,6 +546,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .pile-hover-host:hover,
 .pile-hover-host:focus-within {
+  z-index: 8;
   border-color: var(--accent);
 }
 
@@ -884,6 +889,37 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .hand-zone {
   max-width: min(92vw, 44rem);
   width: max-content;
+  /* D52 follow-up, found live: a big hand (44rem wide) genuinely
+     overlaps `#table-center`'s own content once enough zones/cards
+     exist there - `.seat-zone`'s baseline `z-index: 1` isn't enough to
+     win that fight once `#table-center` is itself escalated (up to 8,
+     `.pile-hover-host:hover`'s own rule above) by whatever's hovered
+     inside it. A hand card underneath then silently ate the hover/click
+     meant for `#hand-zone-name`, the same trapped-stacking-context
+     class of bug as every other `#table-center:has(...)` escalation in
+     this file - fixed the same way, one level higher than the highest
+     existing escalation (8) so the hand zone always wins regardless of
+     what else is hovered. */
+  z-index: 9;
+}
+
+/* D52 follow-up, found live: `#hand-zone-name` is a thin one-line text
+   heading, and the shared `.pile-hover-host:hover` raise (`translateY(
+   -0.35rem) scale(1.02)`) shifts a box that short by enough of its own
+   height that the pointer (still at its ORIGINAL position) ends up
+   outside the now-moved box - which un-hovers it, which un-raises it,
+   which puts it back under the pointer, which re-hovers it. A genuine
+   self-triggering oscillation, not a test-timing flake: confirmed live
+   by watching its own `getBoundingClientRect()` change on every single
+   hover attempt, and the radial menu it opens repeatedly detaching and
+   reattaching as the hover flips. "Raise it off the table" reads fine
+   for a card or a whole pile's body; it never needed to apply to a bare
+   text label in the first place - cancelled here rather than only
+   worked around at the call site, since a real mouse user hitting this
+   would see the same jitter. */
+#hand-zone-name.pile-hover-host:hover,
+#hand-zone-name.pile-hover-host:focus-within {
+  transform: none;
 }
 
 .hand-zone-controls { margin-top: 0.4rem; }
