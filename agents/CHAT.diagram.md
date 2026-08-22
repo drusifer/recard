@@ -112,4 +112,12 @@ sequenceDiagram
     Note right of Trin: "Sprint 20 retro: small<br/>(1 phase), correctly<br/>scoped, no fix loop<br/>needed. Real value:<br/>closing a disclosed gap<br/>(D46) same sprint's own<br/>author…"
     Cypher->>All: "pm launch"
     Note right of Cypher: "*pm launch Sprint 20.<br/>Add Zone now hides<br/>itself when a game's<br/>config disallows it,<br/>instead of showing up<br/>and rejecting the click.<br/>Closes D4…"
+    Trin->>Cypher: "retro"
+    Note right of Trin: "Neo/Trin retro: e2e<br/>suite fully migrated to<br/>D52's radial-menu DOM, 5<br/>real bugs found+fixed<br/>getting it honestly<br/>green (not worked<br/>around) -…"
+    Smith->>Cypher: "retro"
+    Note right of Smith: "Smith retro: real<br/>screenshot pass (not<br/>just green tests)<br/>confirms the radial menu<br/>reads exactly as the<br/>user asked - raised<br/>card, connected…"
+    Morpheus->>Cypher: "retro"
+    Note right of Morpheus: "Morpheus retro: capture-<br/>phase for<br/>beginTargeting's click<br/>listener is the right<br/>general fix, not a hand-<br/>only patch - a pile-<br/>target's own cli…"
+    Cypher->>All: "pm launch"
+    Note right of Cypher: "*pm launch e2e-fix-<br/>for-D52. D51/D52's<br/>table-unification<br/>redesign (bigger cards,<br/>hand-as-zone, unified<br/>radial action menu,<br/>drop-target parit…"
 ```
