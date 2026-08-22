@@ -2189,6 +2189,85 @@ through hand drag-reorder/sort-persistence/card-drag-broadcast/US-32/33
 stacking before the disclosed touch-coordinate issue above - not a
 fully clean run, reported honestly rather than claimed clean.
 
+### D52. The linear action popover is replaced by a pointer-centered radial menu, with click-to-follow targeting
+
+Direct, explicit user request, after seeing D51 shipped: "on Actionable
+hover, draw a radial menu of actions around my pointer... when I click
+that action the card follows my mouse and displays what drop targets
+are valid... click to confirm."
+
+**Shape:** `ui.js`'s `openRadialMenu`/`attachRadialMenu` replace
+`renderActionRow` (deleted) as what both a card's and a pile's hover
+now open - one small ring of buttons, `position: fixed` at the
+pointer's own screen coordinates (`e.clientX/clientY` from
+`pointerenter`), not the host element's box. This is also why this
+sidesteps this project's whole history of trapped-stacking-context
+z-index bugs (D24/D51's `#table-center:has(...)` escalations) rather
+than needing one more: a menu that isn't nested inside any pile's own
+box can't lose a stacking fight to one.
+
+**Dispatch, unchanged in spirit from D51:** an in-place action (`target`
+null/undefined) or a STATIC `singleTarget` action (`draw` - D36's
+"don't make the highest-frequency action need an extra step" rule,
+preserved exactly) fires the moment it's clicked. Everything else opens
+`beginTargetingWithGhost` - reuses `beginTargeting`'s existing
+highlight-then-click machinery UNCHANGED for "which pile did they
+choose" (same `.pile-target` class, same Escape/click-elsewhere
+cancel), adding only the visual the user asked for: a small label that
+tracks the cursor via `mousemove` until a target is chosen or
+cancelled, cleaned up through the same `cancelTargeting` hook
+`clearPileTargets` already calls - one way out of targeting mode, not
+two.
+
+**Two real bugs found live while building this, both fixed before
+shipping:**
+1. The menu is a child of `document.body` (needed for `position:
+   fixed` to escape stacking contexts at all), NOT a descendant of the
+   hovered host - so `pointerleave` on the host fired the instant the
+   mouse moved toward a menu button, closing the menu out from under
+   the click. Fixed by giving the menu its own `pointerenter`/
+   `pointerleave` that cancels/reschedules the same deferred close -
+   "hovering the host OR the menu" keeps it open, checked one tick
+   later so a leave-then-enter pair between two disjoint elements
+   doesn't close in between.
+2. A single-action menu (e.g. a hand card's "Play hidden") was placed
+   at radius 0 - directly ON the pointer, which is also where the card
+   itself sits. That silently ate the plain tap-to-play gesture: the
+   menu button, freshly opened by the same hover that precedes a tap,
+   sat on top of the card and intercepted the click. Every menu now
+   gets a real ring, even a one-button one, offset above the pointer -
+   a single action can no longer cover the thing you hovered to reach
+   it.
+
+**Consequences:**
+- Deal/Reshuffle & deal's "cards per player" and Split's "how many
+  piles" count inputs moved OUT of the menu and onto the deck itself,
+  persistent/always-visible (`ui.js`'s `pileCountInput`) rather than
+  nested inside a transient ring of buttons - there's no natural way to
+  embed a text field in a radial layout, and these are settings set
+  ahead of the action, not part of the action's own identity.
+- `draw`'s action-token drag protocol (D35) is preserved ALONGSIDE the
+  new click-to-follow gesture on the radial button itself, not replaced
+  by it - dragging Draw onto the hand still works exactly as before.
+- **Not done in this pass, disclosed rather than silently left broken:**
+  `tests/e2e.smoke.mjs` was not updated to match - `.action-btn`,
+  `.middle-card-actions`, `.pile-anchor-popover`, and the hover-then-
+  click sequences built around them are all gone from the real DOM now
+  (replaced by `.radial-menu`/`.radial-menu-btn`, opened via
+  `pointerenter` with real screen coordinates, not a CSS-only hover a
+  synthetic event can fake as easily). The feature itself was verified
+  working end-to-end via direct, ad hoc Playwright scripts during
+  development (deck menu open/Draw dispatch, card menu open/Move
+  follow-mode/target confirm, hand card Play/Play-hidden split) - real
+  evidence it works, just not captured as durable, checked-in e2e
+  coverage. Updating the suite for the new DOM shape is real,
+  nontrivial follow-up work, not a quick pass.
+
+260/260 unit tests green (no unit test covers this - it's DOM/pointer
+interaction, matching this project's own established unit-vs-e2e
+split). `lint:design`: same 3 pre-existing/disclosed violations, no new
+ones.
+
 
 ## Module Layout
 ```

@@ -1227,56 +1227,6 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 /* Deck + its controls as one column in the centred cluster. */
 .deck-column { display: flex; flex-direction: column; align-items: flex-start; gap: 0.3rem; }
 
-/* D25: a card's actions appear on hover/focus rather than always taking
-   up room under every card. Keeping them out of flow means a zone is a
-   row of cards, not a row of button stacks - which is what let zones
-   become wide-and-short. */
-.middle-card-actions {
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  display: none;
-  gap: 0.25rem;
-  padding-top: 0.2rem;
-  z-index: 6;
-  white-space: nowrap;
-}
-
-.middle-card:hover .middle-card-actions,
-.middle-card:focus-within .middle-card-actions,
-/* D51 follow-up: hand cards ("Play hidden") reuse `.middle-card-actions`
-   styling but aren't `.middle-card` - they're `.hand-card`, which
-   `renderActionRow` marks `.pile-hover-host` like every other actionable
-   pile/card. Extending the reveal selector here (rather than switching
-   the hand-card row to `.pile-anchor-popover`'s styling) keeps a card's
-   action row looking like a card's action row regardless of which list
-   it's rendered in. */
-.pile-hover-host:hover .middle-card-actions,
-.pile-hover-host:focus-within .middle-card-actions {
-  display: flex;
-}
-
-
-.action-btn {
-  font-size: 0.8rem;
-  padding: 0.35rem 0.55rem;
-  min-height: 2.2rem;
-  /* Overrides the base `button` rule's `min-width: 44px` (design-lint
-     fix, 2026-08-20) - these sit several to a row in
-     `.middle-card-actions`, and forcing each one to 44px wide made the
-     row wide enough to intercept clicks on neighbouring cards (a real
-     e2e failure, not a hypothetical). Exempt for the same reason `.card`
-     is: this is a HOVER-revealed secondary path with an always-available
-     alternative (tap-to-play, the "Move to..." dropdown - see D25's own
-     comment above), not the primary touch target the 44px floor exists
-     to protect. */
-  min-width: 0;
-  background: var(--surface-2);
-  border-color: var(--accent);
-  white-space: nowrap;
-}
-
 /* Every pile that can receive the chosen action lights up, so the valid
    destinations are visible rather than guessed (Nielsen #1/#6). */
 /* D51 finding: a click-to-choose target (`beginTargeting`) needs to be
@@ -1303,8 +1253,6 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 #table-center:has(.pile-target) {
   z-index: 4;
 }
-
-body.targeting .middle-card-actions { display: none !important; }
 
 /* The table code stays visible for the whole game - late arrivals and
    rejoins always need it, and it used to live only on a screen you had
@@ -1403,56 +1351,71 @@ body.targeting .middle-card-actions { display: none !important; }
   .touch-hint { display: block; }
 }
 
-/* --- Pile-level controls (US-41, D29; generalized D34/D37; unified D51)
-   D51 (table-unification pass, explicit user direction): the deck's
-   action row is no longer a persistent strip nor a small "..." anchor
-   toggle - it's revealed by hovering/focusing the PILE ITSELF
-   (`.pile-hover-host`, `ui.js`'s `renderActionRow`), the exact same
-   mechanism a card's `.middle-card-actions` row already used, so
-   pile-level and card-level actions finally read as one system instead
-   of two. `.pile-anchor`/`.pile-anchor-toggle` are gone; see D51's own
-   ARCHITECTURE.md entry for why this pass is DESKTOP-ONLY (no touch-
-   parity chase for the lost `:focus-within`-via-tap trigger). */
-.pile-anchor-popover {
+/* --- Pile-level and card-level actions (US-41, D29; generalized D34/D37;
+   unified D51; radial D52) ------------------------------------------
+   D52 (direct user request): actions no longer appear in an edge-
+   anchored popover at all - hovering an actionable card or pile opens
+   a small ring of buttons CENTERED ON THE POINTER (`ui.js`'s
+   `openRadialMenu`), not on the actor's own box. This is also why the
+   z-index fights this project fought all through D24/D51
+   (`#table-center:has(...)` escalations, `.pile-target`'s own z-index)
+   mostly stop mattering here: `position: fixed` at the pointer's own
+   screen coordinates isn't nested inside anyone's stacking context to
+   lose a fight in. */
+.radial-menu {
+  position: fixed;
+  z-index: 20;
+  /* The menu's own (0,0) IS the pointer position `ui.js` passed in -
+     each button is placed by its own `transform: translate(...)`
+     (trig, computed in JS), not by flow layout. */
+  width: 0;
+  height: 0;
+}
+
+.radial-menu-btn {
   position: absolute;
-  top: 100%;
-  left: 0;
-  margin-top: 0.3rem;
-  display: none;
-  /* Smith close-out finding: a deck with every action (2 count inputs
-     + 5 buttons) is 7 items - a single column ran far enough down to
-     overlap the roster seat card below it, illegibly (measured live,
-     not assumed from the item count). Column-wrap caps how far down
-     it can reach; a genuinely tall popover grows sideways instead. */
-  flex-flow: column wrap;
-  max-height: 10.5rem;
-  gap: 0.3rem;
-  padding: 0.4rem;
-  z-index: 6;
-  white-space: nowrap;
-  /* Same close-out finding, the other half: nothing behind an OPEN
-     popover has any business showing through it - confirmed live,
-     hand cards and a roster row were both illegible bleeding through
-     a background-less popover. */
-  background: var(--surface);
-  border: 1px solid var(--border);
+  /* Centers each button ON its computed point rather than at its
+     top-left corner - without this every button's ring radius would be
+     off by half a button, worse for the ones further from (0,0) where
+     it's least visually forgiving. */
+  translate: -50% -50%;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  padding: 0.3rem;
+  line-height: 1.15;
+  text-align: center;
+  white-space: normal;
+  background: var(--surface-2);
+  border-color: var(--accent);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 45%);
+}
+
+/* The follow-mode label (`beginTargetingWithGhost`) - "the card follows
+   my mouse" (user's own wording). Text-only, not a full card clone: the
+   ghost only needs to say WHICH action is armed, not re-render the
+   card's face - `dropTarget.js`'s "picked-up" cue is the pile lighting
+   up `.pile-target`, not this label. */
+.radial-follow-ghost {
+  position: fixed;
+  translate: -50% -140%;
+  z-index: 21;
+  pointer-events: none;
+  background: var(--accent);
+  color: var(--accent-text);
+  padding: 0.3rem 0.6rem;
   border-radius: var(--radius-md);
-  box-shadow: 0 8px 20px rgb(0 0 0 / 45%);
-}
-
-.pile-hover-host:hover > .pile-anchor-popover,
-.pile-hover-host:focus-within > .pile-anchor-popover {
-  display: flex;
-}
-
-.pile-anchor-popover button {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 600;
   white-space: nowrap;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 45%);
 }
 
-/* Phase 56 (T56.1): carried over from the legacy `.deck-controls-strip`
-   .deal-count's own sizing - a count input sits in the same popover as
-   44px action buttons, so it gets the same floor. */
+/* Phase 56 (T56.1)/D52: the count inputs (Deal's cards-per-player,
+   Split's pile count) are persistent now, next to the deck itself, not
+   nested in a menu - see `ui.js`'s `pileCountInput`. Sizing carried over
+   from the legacy popover-era input unchanged. */
 .pile-anchor-count {
   width: 3.25rem;
   min-height: 44px;

@@ -893,7 +893,14 @@ function renderRosterOnly() {
     splitCount: lastSplitCount,
     onDealCountChange: (n) => { lastDealCount = n; },
     onSplitCountChange: (n) => { lastSplitCount = n; },
-    onPileAction: (action, count) => dealFromDeck(action, count),
+    // D52: the radial menu no longer threads a count through the click
+    // itself (there's no natural place for a number field in a ring of
+    // buttons) - `lastDealCount`/`lastSplitCount` are already the live
+    // source of truth for the persistent count inputs `renderDeck` now
+    // renders beside the deck, so reading them directly here is not a
+    // new source of truth, just no longer relaying an already-current
+    // value back to itself.
+    onPileAction: (action) => dealFromDeck(action, action === 'split' ? lastSplitCount : lastDealCount),
   });
   // Sprint 12 (D34/D37, T53.2/T58.1): the hand's own pile anchor - Sort
   // by rank/suit and Pass, one control instead of three. D51: hosted on

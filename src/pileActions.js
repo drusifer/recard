@@ -39,12 +39,11 @@ import { PILE_TYPES } from './piles/pileTypes.js';
  * separate, correctly so - this does NOT try to unify it - is
  * *offering* (`actionsForCard` vs. `pileLevelActions`: a card's
  * authorization and a pile's are real, different computations, not the
- * same rule wearing two names) and *rendering* (`ui.js`'s card hover-row
- * can open a "choose a destination" mode for a clicked `target`-bearing
- * action; `renderActionRow`, the shared piece both now go through,
- * handles the drag/tap-shortcut/label/hint/danger-styling identically
- * either way - see its own doc comment). One spec, two offer-rules, one
- * renderer.
+ * same rule wearing two names) and *rendering* (`ui.js`'s
+ * `attachRadialMenu`/`openRadialMenu` (D52) is the shared piece both a
+ * card's radial menu and a pile's go through - a `target`-bearing
+ * action opens the card-follows-cursor targeting mode; see its own doc
+ * comment). One spec, two offer-rules, one renderer.
  */
 export const ACTION_SPECS = {
   // Card-level: act on the card under the cursor, offered in its hover

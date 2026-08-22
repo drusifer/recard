@@ -350,11 +350,7 @@ export function renderHand(container, cards, { onPlay, onPlayHidden, onHandMotio
     // can't be triggered by accident the way the fast default (plain
     // tap/drag = public play, D36-style) can be.
     if (onPlayHidden) {
-      renderActionRow(wrapper, ['playHidden'], {
-        rowClass: 'middle-card-actions',
-        buttonClass: 'action-btn',
-        onAction: () => onPlayHidden(card),
-      });
+      attachRadialMenu(wrapper, () => ['playHidden'], { onAction: () => onPlayHidden(card) });
     }
 
     container.appendChild(wrapper);
@@ -487,6 +483,191 @@ function beginTargeting(action, targetIds, onChoose) {
 }
 
 /**
+ * D52 (direct user request): "on hover, draw a radial menu of actions
+ * around my pointer... click an action, the card follows my mouse and
+ * displays what drop targets are valid... click to confirm." Reuses
+ * `beginTargeting`'s highlight-then-click machinery unchanged for the
+ * "which pile did they choose" half (same `.pile-target` class, same
+ * Escape/click-elsewhere cancel) - this only ADDS the visual: a small
+ * label that tracks the cursor for as long as targeting stays open,
+ * cleaned up through the same `cancelTargeting` hook `clearPileTargets`
+ * already calls, so there is exactly one way out of either mode, not two.
+ */
+function beginTargetingWithGhost(action, targetIds, label, onChoose) {
+  beginTargeting(action, targetIds, onChoose);
+  if (!cancelTargeting) return; // beginTargeting found no legal targets - nothing to track
+
+  const ghost = document.createElement('div');
+  ghost.className = 'radial-follow-ghost';
+  ghost.textContent = label;
+  document.body.appendChild(ghost);
+  const onMove = (e) => {
+    ghost.style.left = `${e.clientX}px`;
+    ghost.style.top = `${e.clientY}px`;
+  };
+  document.addEventListener('mousemove', onMove);
+
+  const cleanup = cancelTargeting;
+  cancelTargeting = () => {
+    cleanup();
+    document.removeEventListener('mousemove', onMove);
+    ghost.remove();
+  };
+}
+
+/**
+ * D52: a pointer-centered radial menu of `actionIds`, replacing the
+ * D34-era edge-anchored popover. `position: fixed` at the pointer's OWN
+ * screen coordinates (never the host element's box) sidesteps this
+ * project's whole history of trapped-stacking-context bugs (D24/D51's
+ * `#table-center:has(...)` escalations) at the source, rather than
+ * fixing them one more time for a new host shape - a menu that isn't
+ * inside any pile's own box can't lose a z-index fight to one.
+ *
+ * Dispatch mirrors D51's existing split: an in-place
+ * action (`target` null/undefined) or a STATIC `singleTarget` action
+ * (D36 - Draw's own "don't make the highest-frequency action need an
+ * extra step" rule, preserved exactly here too) dispatches the moment
+ * it's clicked. Anything else opens `beginTargetingWithGhost` - the
+ * card-follows-cursor-until-you-confirm behavior.
+ *
+ * @param {string[]} actionIds
+ * @param {number} cx @param {number} cy pointer screen coordinates
+ * @param {{labels?: Record<string,string>, disabled?: string[],
+ *   targetsFor: (actionId: string) => string[],
+ *   onAction: (actionId: string, targetPileId?: string) => void}} opts
+ */
+function openRadialMenu(actionIds, cx, cy, opts) {
+  closeRadialMenu();
+  const ids = actionIds.filter((id) => !opts.disabled?.includes(id));
+  if (!ids.length) return;
+
+  const menu = document.createElement('div');
+  menu.className = 'radial-menu';
+  menu.style.left = `${cx}px`;
+  menu.style.top = `${cy}px`;
+
+  const n = ids.length;
+  // D52 real bug, found live: a SINGLE action at radius 0 sits exactly
+  // AT the pointer - the same point the user just hovered to reach it,
+  // which for a card is usually the card itself. That silently ate the
+  // plain tap-to-play gesture (the menu button was on top, intercepting
+  // the click meant for the card underneath). Every menu gets a real
+  // ring, even a one-button one - offset above the pointer, matching
+  // the follow-ghost's own upward offset, so a single action never
+  // covers the thing you hovered to open it.
+  const radius = 4.6 * 16; // px
+  ids.forEach((id, i) => {
+    const spec = ACTION_SPECS[id];
+    const angle = (2 * Math.PI * i) / n - Math.PI / 2; // first item points up
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'radial-menu-btn' + (spec.destructive ? ' btn-danger' : '');
+    btn.style.transform = `translate(${Math.round(Math.cos(angle) * radius)}px, ${Math.round(Math.sin(angle) * radius)}px)`;
+    btn.dataset.action = id;
+    btn.textContent = opts.labels?.[id] ?? spec.label;
+    if (spec.hint) btn.title = spec.hint;
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (spec.destructive && !window.confirm(
+        `${spec.hint}\n\nEvery player's current hand will be cleared. Continue?`)) return;
+      closeRadialMenu();
+      if (spec.target == null || spec.singleTarget) {
+        opts.onAction(id);
+      } else {
+        beginTargetingWithGhost(id, opts.targetsFor(id), spec.label, (targetId) => opts.onAction(id, targetId));
+      }
+    });
+    // D35/D51/D52: a `target`-bearing pile action (today, only `draw`)
+    // keeps its own action-token drag protocol ALONGSIDE the new
+    // click-to-follow gesture above - not a replacement. Cards never
+    // need this (a card's own element is what gets dragged for
+    // move/pickup/play), only pile-level actions.
+    if (opts.draggable && spec.target) {
+      btn.draggable = true;
+      btn.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', pileActionToken(id));
+        closeRadialMenu();
+      });
+      attachPileActionTouchDrag(btn, id, () => opts.onAction(id));
+    }
+    menu.appendChild(btn);
+  });
+  // D52 real bug, found live: the menu is a child of `document.body`,
+  // positioned by `position: fixed` at the pointer's coordinates - NOT
+  // a descendant of `hostEl`. Moving the mouse from the host onto a
+  // button fires `pointerleave` on the host with nothing to catch it,
+  // closing the menu out from under the click before it lands. Giving
+  // the menu its OWN enter/leave that cancels/reschedules the same
+  // close (deferred one tick, so a leave-then-immediately-enter pair
+  // between two disjoint elements doesn't close in between) is the fix
+  // - "hovering the host OR the menu" is what should keep it open, not
+  // just the host alone.
+  menu.addEventListener('pointerenter', cancelRadialClose);
+  menu.addEventListener('pointerleave', scheduleRadialClose);
+  document.body.appendChild(menu);
+  radialMenuEl = menu;
+}
+
+let radialMenuEl = null;
+let radialCloseTimer = null;
+
+function cancelRadialClose() {
+  clearTimeout(radialCloseTimer);
+  radialCloseTimer = null;
+}
+
+function scheduleRadialClose() {
+  cancelRadialClose();
+  radialCloseTimer = setTimeout(closeRadialMenu, 0);
+}
+
+function closeRadialMenu() {
+  cancelRadialClose();
+  radialMenuEl?.remove();
+  radialMenuEl = null;
+}
+
+/**
+ * Wires `hostEl` to open a radial menu of `getActionIds()` on mouse
+ * hover, centered on the pointer. Desktop/mouse-only, matching D51's
+ * own explicit scope for this whole redesign pass (`e.pointerType`
+ * gates it, same as `attachTouchDrag`'s own mouse-vs-touch split) - no
+ * touch equivalent was built or attempted.
+ *
+ * @param {HTMLElement} hostEl
+ * @param {() => string[]} getActionIds computed fresh on every hover,
+ *   not cached, since what a card offers can change between renders.
+ * @param {object} opts see `openRadialMenu`'s own `opts`.
+ */
+function attachRadialMenu(hostEl, getActionIds, opts) {
+  // `.pile-hover-host` still drives a plain CSS `:hover` raise (a small
+  // lift + shadow on the actor itself, style.css) as the "this is
+  // actionable" cue - independent of the radial menu's own open/closed
+  // state, which is JS-driven (needs real pointer coordinates, which
+  // `:hover` alone can't give). `tabIndex` is the same low-cost,
+  // unverified touch nicety D51 already noted - not a real touch
+  // equivalent, no effort spent confirming it.
+  hostEl.classList.add('pile-hover-host');
+  if (hostEl.tabIndex < 0 || hostEl.tabIndex == null) hostEl.tabIndex = 0;
+  hostEl.addEventListener('pointerenter', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    cancelRadialClose();
+    openRadialMenu(getActionIds(), e.clientX, e.clientY, { targetsFor: () => [], ...opts });
+  });
+  hostEl.addEventListener('pointerleave', () => {
+    // A menu still open (nothing clicked yet) closes when the pointer
+    // leaves both the host AND the menu itself (`scheduleRadialClose`
+    // is cancelable - see the menu's own pointerenter in
+    // `openRadialMenu`); targeting already in progress (a target-
+    // bearing action was clicked) stays open regardless of where the
+    // pointer wanders - that's the whole point of "the card follows
+    // the mouse".
+    if (!cancelTargeting) scheduleRadialClose();
+  });
+}
+
+/**
  * Reveal a still-hidden card (Sprint 12, Phase 55, T55.1): a direct tap
  * on the card itself, joining tap-to-play's existing vocabulary, rather
  * than a separate hover-revealed button. The confirm gate is unchanged
@@ -503,16 +684,17 @@ function performReveal(card, viewerId, onReveal) {
 }
 
 /**
- * The hover-revealed action row for one card in a zone - `renderActionRow`
- * (D51) wired for the card case: a `target`-bearing action opens a
- * "choose a destination" mode (`beginTargeting`) since a card may have
- * several legal destinations (`move` among zones); an in-place action
- * (`target: null` - today just `rotate`) dispatches directly. `reveal`
- * is deliberately excluded (Phase 55 moved it to a direct tap on the
- * card - see `performReveal` and its call site in `renderZoneCards`).
+ * The radial action menu for one card in a zone (D52) - `attachRadialMenu`
+ * wired for the card case: a `target`-bearing action opens the card-
+ * follows-cursor targeting mode since a card may have several legal
+ * destinations (`move` among zones); an in-place action (`target: null`
+ * - today just `rotate`) dispatches directly. `reveal` is deliberately
+ * excluded (Phase 55 moved it to a direct tap on the card - see
+ * `performReveal` and its call site in `renderZoneCards`).
  *
  * @param {HTMLElement} wrapper the card's own `.middle-card` element -
- *   the host `renderActionRow` raises on hover and appends the row to.
+ *   `attachRadialMenu` opens the menu on hovering it, centered on the
+ *   pointer.
  */
 function actionMenuEl(wrapper, zone, card, allZones, opts) {
   const { viewerId, onPickup, onMoveCard, onRotate } = opts;
@@ -527,23 +709,16 @@ function actionMenuEl(wrapper, zone, card, allZones, opts) {
     { id: HAND_PILE_ID, kind: 'hand', ownerId: viewerId },
   ];
 
-  renderActionRow(wrapper, available, {
-    rowClass: 'middle-card-actions',
-    buttonClass: 'action-btn',
-    onAction: (action, spec) => {
-      // D48: an in-place action has no destination to pick, so it
-      // dispatches directly rather than going through
-      // `targetsForAction`/`beginTargeting` - those return `[]` for a
-      // null-target action, which is a no-op click, not a bug in either.
-      if (spec.target === null) {
-        if (action === 'rotate') onRotate?.(card.id);
-        return;
-      }
-      const targets = targetsForAction(action, piles, { viewerId, fromPileId: zone.id });
-      beginTargeting(action, targets, (targetId) => {
-        if (action === 'pickup') onPickup?.(card.id);
-        else if (action === 'move') onMoveCard?.(card.id, targetId);
-      });
+  attachRadialMenu(wrapper, () => available, {
+    targetsFor: (action) => targetsForAction(action, piles, { viewerId, fromPileId: zone.id }),
+    onAction: (action, targetId) => {
+      // D48: an in-place action has no destination to pick - `openRadialMenu`
+      // dispatches it directly (no `targetId` argument) rather than going
+      // through targeting, since `targetsForAction` would return `[]` for
+      // a null-target action anyway (a no-op click, not a bug in either).
+      if (action === 'rotate') onRotate?.(card.id);
+      else if (action === 'pickup') onPickup?.(card.id);
+      else if (action === 'move') onMoveCard?.(card.id, targetId);
     },
   });
 }
@@ -917,179 +1092,78 @@ export function renderDeck(container, count, opts = {}) {
   const actions = pileLevelActions('deck', { isHost: opts.isHost === true });
   if (!actions.length || !opts.onPileAction) return;
 
+  // D52: count inputs (how many cards to Deal, how many piles to Split
+  // into) moved OUT of the action menu and onto the deck itself,
+  // persistent/always-visible rather than nested inside a transient
+  // radial menu - there's no natural way to embed a text field in a
+  // ring of buttons, and these are settings you set ahead of clicking
+  // the action, not part of the action's own identity.
+  if (actions.includes('deal') || actions.includes('reshuffleDeal')) {
+    container.appendChild(pileCountInput({
+      value: opts.dealCount ?? 1, onChange: opts.onDealCountChange,
+      min: 1, max: 20, ariaLabel: 'Cards to deal each player', inputId: 'deck-deal-count',
+    }));
+  }
+  if (actions.includes('split')) {
+    container.appendChild(pileCountInput({
+      value: opts.splitCount ?? 2, onChange: opts.onSplitCountChange,
+      min: 2, max: 20, ariaLabel: 'Number of piles', inputId: 'deck-split-count',
+    }));
+  }
+
   // Phase 56 (T56.1): every deck action - draw, deal, reshuffleDeal,
-  // shuffle, split - now lives on ONE pile anchor (Phase 54 gave it
-  // only `draw`; the legacy strip carried the rest until this phase).
-  // `counts` covers the two action groups that need a number: Deal and
-  // Reshuffle & deal share one "cards per player" input (exactly as the
-  // legacy strip's single `countInput` did); Split gets its own "how
-  // many piles" input, previously a bare `<input>` in an unrelated row.
-  // D51: hosted on `container` (`#game-deck-area`) itself, not a
-  // separate empty anchor slot - hovering the deck's own stack/empty
-  // state reveals its actions, the same mechanism a card's hover row
-  // already used, instead of a small invisible target beside it.
-  renderPileAnchor(container, actions, {
-    onPileAction: opts.onPileAction,
+  // shuffle, split - lives on one menu (Phase 54 gave it only `draw`;
+  // the legacy strip carried the rest until this phase). D52: that menu
+  // is now the pointer-centered radial menu, hosted on `container`
+  // (`#game-deck-area`) itself, not a separate anchor slot - hovering
+  // the deck's own stack/empty state opens it, the same mechanism a
+  // card's hover menu already used.
+  attachRadialMenu(container, () => actions, {
+    onAction: (id) => opts.onPileAction(id),
     disabled: count <= 0 ? ['deal'] : [], // nothing left to deal from
-    counts: [
-      {
-        actions: ['deal', 'reshuffleDeal'],
-        value: opts.dealCount ?? 1,
-        onChange: opts.onDealCountChange,
-        min: 1,
-        max: 20,
-        ariaLabel: 'Cards to deal each player',
-        inputId: 'deck-deal-count',
-      },
-      {
-        actions: ['split'],
-        value: opts.splitCount ?? 2,
-        onChange: opts.onSplitCountChange,
-        min: 2,
-        max: 20,
-        ariaLabel: 'Number of piles',
-        inputId: 'deck-split-count',
-      },
-    ],
+    draggable: true,
   });
 }
 
-/**
- * D51 (Actionable interface, table-unification pass): the ONE row-of-
- * action-buttons builder both a card's hover row (`actionMenuEl`) and a
- * pile's hover row (`renderPileAnchor` below) go through - same spec
- * source (`ACTION_SPECS`), same label/hint/danger-confirm/disabled
- * handling, same reveal mechanism (`hostEl` gets `.pile-hover-host`,
- * whose `:hover`/`:focus-within` raises it and shows this row - see
- * style.css). What's genuinely still different per caller is captured
- * in `opts`, not hardcoded here:
- * - `opts.onAction(id, spec)` - what a click actually DOES. A card's
- *   `target`-bearing action opens a "choose a destination" mode
- *   (`beginTargeting`); a pile action always dispatches directly
- *   (D36: even `draw`, the one `singleTarget` case, never needs
- *   `beginTargeting` - there's only ever one legal destination).
- *   Two real behaviors, expressed by the caller, not by this function
- *   guessing which actor it's building a row for.
- * - `opts.draggable` (pile-only) - wires the action-token drag protocol
- *   (D35) on top of the click handler. Cards never need this: a card's
- *   OWN element is what gets dragged for `move`/`pickup`/`play`
- *   (`renderZoneCards`'s existing dragstart), not a button in its
- *   action row - there is no "drag the reveal button" gesture to build.
- * - `opts.counts` (pile-only) - Deal/Reshuffle & deal/Split's count
- *   inputs.
- *
- * A destructive action (`reshuffleDeal`) gets a confirm before it fires,
- * from either caller, since the check lives here once (Smith Gate 2 #1).
- *
- * DESKTOP-ONLY by explicit user direction (this pass): unlike D34/D37's
- * `.pile-anchor-toggle`, there's no separate always-focusable tap target
- * for touch to reveal a PILE's row through `:focus-within` any more -
- * hovering the pile's own container is the only trigger now, matching
- * how a card has always worked. `hostEl.tabIndex = 0` is set below as a
- * low-cost, unverified nicety (some mobile browsers focus a tabbable
- * element on tap, which would incidentally restore rough touch access),
- * not a real touch equivalent - no touch-specific effort was spent
- * confirming or fixing it. See `docs/ARCHITECTURE.md` D51.
- *
- * @param {HTMLElement} hostEl the actor's own visual container - gets
- *   `.pile-hover-host` and the row appended as its child, rebuilt
- *   wholesale each call like every other render* function here.
- * @param {string[]} actionIds ids from `ACTION_SPECS`.
- * @param {{onAction: (id: string, spec: object) => void,
- *   rowClass?: string, draggable?: boolean, labels?: Record<string,string>,
- *   disabled?: string[],
- *   counts?: {actions: string[], value: number, onChange?: (n: number) => void,
- *     min?: number, max?: number, ariaLabel?: string, inputId?: string}[]}} opts
- * @returns {HTMLElement|null} the row element, or null if `actionIds` is empty.
- */
-function renderActionRow(hostEl, actionIds, opts = {}) {
-  // `hostEl` isn't always rebuilt from scratch each call the way a
-  // `render*` function's own container usually is (`renderDeck`'s
-  // `#game-deck-area` is; `main.js`'s persistent `#hand-zone` is NOT -
-  // it keeps its heading/`#hand-area`/play-as selector across renders).
-  // `[data-action-row]` marks whichever row THIS function last appended
-  // to `hostEl`, so it's the only thing removed - never a sibling that
-  // belongs to the caller.
-  hostEl.querySelector(':scope > [data-action-row]')?.remove();
-  if (!actionIds.length) return null;
-  hostEl.classList.add('pile-hover-host');
-  if (hostEl.tabIndex < 0 || hostEl.tabIndex == null) hostEl.tabIndex = 0;
-
-  const row = document.createElement('div');
-  row.dataset.actionRow = 'true';
-  row.className = opts.rowClass ?? 'pile-anchor-popover';
-
-  const countInputs = {};
-  for (const group of opts.counts ?? []) {
-    const input = document.createElement('input');
-    input.type = 'number';
-    input.min = String(group.min ?? 1);
-    input.max = String(group.max ?? 20);
-    input.value = String(group.value ?? group.min ?? 1);
-    input.className = 'pile-anchor-count';
-    if (group.inputId) input.id = group.inputId;
-    input.setAttribute('aria-label', group.ariaLabel ?? 'Count');
-    // Rebuilt wholesale on every state broadcast (like every render*
-    // function here), so a number typed but not yet used would
-    // otherwise be destroyed by any unrelated broadcast - someone else
-    // drawing a card resets what you were about to deal. Reporting each
-    // keystroke lets the caller hold the value across re-renders.
-    input.addEventListener('input', (e) => { e.stopPropagation(); group.onChange?.(Number(input.value)); });
-    row.appendChild(input);
-    for (const id of group.actions) countInputs[id] = input;
-  }
-
-  for (const id of actionIds) {
-    const spec = ACTION_SPECS[id];
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = opts.buttonClass ?? '';
-    btn.dataset.action = id;
-    btn.dataset.pileAction = id; // kept alongside dataset.action: existing e2e coverage queries this attribute
-    btn.textContent = opts.labels?.[id] ?? spec.label;
-    if (spec.hint) btn.title = spec.hint;
-    if (spec.destructive) btn.classList.add('btn-danger');
-    if (opts.disabled?.includes(id)) btn.disabled = true;
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (spec.destructive && !window.confirm(
-        `${spec.hint}\n\nEvery player's current hand will be cleared. Continue?`)) return;
-      const n = countInputs[id] ? Number(countInputs[id].value) : undefined;
-      opts.onAction(id, spec, n);
-    });
-    if (opts.draggable && spec.target) {
-      btn.draggable = true;
-      btn.addEventListener('dragstart', (e) => {
-        e.dataTransfer.setData('text/plain', pileActionToken(id));
-      });
-      attachPileActionTouchDrag(btn, id, () => opts.onAction(id, spec));
-    }
-    row.appendChild(btn);
-  }
-  hostEl.appendChild(row);
-  return row;
+/** D52: a small, always-visible number input for a pile-level action's
+ * count setting (Deal's cards-per-player, Split's pile count) - see
+ * `renderDeck`'s own comment for why this lives outside the radial
+ * menu now. */
+function pileCountInput({ value, onChange, min, max, ariaLabel, inputId }) {
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.min = String(min ?? 1);
+  input.max = String(max ?? 20);
+  input.value = String(value ?? min ?? 1);
+  input.className = 'pile-anchor-count';
+  if (inputId) input.id = inputId;
+  input.setAttribute('aria-label', ariaLabel ?? 'Count');
+  input.addEventListener('input', () => onChange?.(Number(input.value)));
+  return input;
 }
 
 /**
- * A pile's own hover-revealed action row (Draw, Deal, Sort, Pass, ...) -
- * `renderActionRow` above wired for the pile case: dispatch is always
- * direct (no "choose a destination" mode, ever - even `draw`'s
+ * D52: a pile's own radial action menu (Draw, Deal, Sort, Pass, ...) -
+ * `attachRadialMenu` wired for the pile case: dispatch is always direct
+ * (no "choose a destination"/follow mode, ever - even `draw`'s
  * `singleTarget` case just means there's only one legal destination,
- * D36), and `target`-bearing actions (today, only `draw`) get the
- * action-token drag protocol on top of the click handler (D35).
+ * D36), and `target`-bearing actions (today, only `draw`) also keep
+ * their own action-token drag protocol (D35) alongside the new click.
  *
  * @param {HTMLElement} hostEl the pile's own visual container (e.g.
- *   `#game-deck-area`, `.hand-zone`) - see `renderActionRow`'s doc.
+ *   `#game-deck-area`, `#hand-zone`) - `attachRadialMenu` opens the menu
+ *   on hovering this element, centered on the pointer, not the element's
+ *   own box.
  * @param {string[]} actions ids from `pileLevelActions()`.
- * @param {{onPileAction: (id: string, count?: number) => void,
- *   labels?: Record<string,string>, disabled?: string[],
- *   counts?: object[]}} opts
+ * @param {{onPileAction: (id: string) => void,
+ *   labels?: Record<string,string>, disabled?: string[]}} opts
  */
 export function renderPileAnchor(hostEl, actions, opts = {}) {
-  renderActionRow(hostEl, actions, {
-    ...opts,
+  attachRadialMenu(hostEl, () => actions, {
+    labels: opts.labels,
+    disabled: opts.disabled,
     draggable: true,
-    onAction: (id, spec, n) => opts.onPileAction?.(id, n),
+    onAction: (id) => opts.onPileAction?.(id),
   });
 }
 
