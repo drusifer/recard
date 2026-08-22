@@ -1426,6 +1426,20 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   background: var(--surface-2);
   border-color: var(--accent);
   box-shadow: 0 4px 14px rgb(0 0 0 / 45%);
+  /* D52 ("maybe animate the radial menu for some flare", user request):
+     each button pops out from the pointer to its own ring position.
+     `--radial-delay` (set per-button in `ui.js`) staggers them into a
+     small fan-out instead of every button popping at once. Only plays
+     once, on creation - the menu is a brand-new element each time it
+     opens (`openRadialMenu` always builds fresh), never reused, so
+     there's no need to reset/replay it manually. */
+  animation: radial-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  animation-delay: var(--radial-delay, 0s);
+}
+
+@keyframes radial-pop {
+  from { opacity: 0; scale: 0.4; }
+  to { opacity: 1; scale: 1; }
 }
 
 /* The follow-mode label (`beginTargetingWithGhost`) - "the card follows

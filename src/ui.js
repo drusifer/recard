@@ -350,7 +350,7 @@ export function renderHand(container, cards, { onPlay, onPlayHidden, onHandMotio
     // can't be triggered by accident the way the fast default (plain
     // tap/drag = public play, D36-style) can be.
     if (onPlayHidden) {
-      attachRadialMenu(wrapper, () => ['playHidden'], { onAction: () => onPlayHidden(card) });
+      attachRadialMenu(wrapper, card.id, () => ['playHidden'], { onAction: () => onPlayHidden(card) });
     }
 
     container.appendChild(wrapper);
@@ -529,6 +529,27 @@ function beginTargetingWithGhost(action, targetIds, label, onChoose) {
 }
 
 /**
+ * D52 (real bug fix, direct user report): the menu used to reopen
+ * itself at the CURRENT pointer position on every `pointerenter` -
+ * including a `pointerenter` fired by a brand-new DOM node this app's
+ * own wholesale re-renders (`renderZoneCards`/`renderGameFromView` etc.,
+ * on every state/motion broadcast) insert right under a mouse that
+ * hasn't actually moved anywhere. Each re-render's fresh node re-fired
+ * the "just started hovering" event, silently teleporting the menu to
+ * wherever the mouse happened to be at that instant - "a race to click
+ * it" in the user's own words, because it could relocate mid-click.
+ *
+ * The fix is identity, not timing: track WHAT the open menu belongs to
+ * by a caller-supplied stable `key` (a card id, or a fixed string like
+ * `'deck'`) rather than by DOM node reference, which re-renders don't
+ * preserve. A `pointerenter` for the SAME key is a re-render artifact,
+ * not a new hover - it's ignored outright, so the menu stays exactly
+ * where it opened until one of the three things the user asked for
+ * actually happens.
+ */
+let radialMenuKey = null;
+
+/**
  * D52: a pointer-centered radial menu of `actionIds`, replacing the
  * D34-era edge-anchored popover. `position: fixed` at the pointer's OWN
  * screen coordinates (never the host element's box) sidesteps this
@@ -544,13 +565,33 @@ function beginTargetingWithGhost(action, targetIds, label, onChoose) {
  * it's clicked. Anything else opens `beginTargetingWithGhost` - the
  * card-follows-cursor-until-you-confirm behavior.
  *
+ * Persists once open (direct user request) until: an action is
+ * clicked, a click lands anywhere else (the deferred document
+ * listener below), or the pointer genuinely moves to a DIFFERENT
+ * actionable thing (a new `key` arrives via `attachRadialMenu`).
+ *
+ * @param {string} key stable identity of what's opening this menu (a
+ *   card id, or a fixed string per pile) - see the doc comment above.
  * @param {string[]} actionIds
  * @param {number} cx @param {number} cy pointer screen coordinates
  * @param {{labels?: Record<string,string>, disabled?: string[],
  *   targetsFor: (actionId: string) => string[],
  *   onAction: (actionId: string, targetPileId?: string) => void}} opts
  */
-function openRadialMenu(actionIds, cx, cy, opts) {
+function openRadialMenu(key, actionIds, cx, cy, opts) {
+  // D52 real bug (found live, right after the "don't reposition" fix
+  // above): a re-render's `pointerenter` for the SAME key must keep the
+  // menu's POSITION, but still needs to rebuild its CONTENT - the
+  // re-render might be exactly what changed which actions are legal
+  // (drawing the last card disables Deal, mid-hover). Reusing the
+  // existing menu's own coordinates instead of the new event's is what
+  // "same key, don't move" actually means; skipping the rebuild
+  // entirely would have left a stale, wrong action list on screen.
+  const reopeningSameKey = radialMenuEl && radialMenuKey === key;
+  if (reopeningSameKey) {
+    cx = parseFloat(radialMenuEl.style.left);
+    cy = parseFloat(radialMenuEl.style.top);
+  }
   closeRadialMenu();
   const ids = actionIds.filter((id) => !opts.disabled?.includes(id));
   if (!ids.length) return;
@@ -561,15 +602,12 @@ function openRadialMenu(actionIds, cx, cy, opts) {
   menu.style.top = `${cy}px`;
 
   const n = ids.length;
-  // D52 real bug, found live: a SINGLE action at radius 0 sits exactly
-  // AT the pointer - the same point the user just hovered to reach it,
-  // which for a card is usually the card itself. That silently ate the
-  // plain tap-to-play gesture (the menu button was on top, intercepting
-  // the click meant for the card underneath). Every menu gets a real
-  // ring, even a one-button one - offset above the pointer, matching
-  // the follow-ghost's own upward offset, so a single action never
-  // covers the thing you hovered to open it.
-  const radius = 4.6 * 16; // px
+  // D52: brought closer in (user request #1: "bring the radial menu
+  // into the card interface, overlap or just get closer") - also
+  // shortens how far the mouse has to travel to reach a button, which
+  // matters more now that the menu is stable (not fighting to relocate
+  // out from under a moving cursor) but still worth minimizing travel.
+  const radius = 3 * 16; // px
   ids.forEach((id, i) => {
     const spec = ACTION_SPECS[id];
     const angle = (2 * Math.PI * i) / n - Math.PI / 2; // first item points up
@@ -577,6 +615,10 @@ function openRadialMenu(actionIds, cx, cy, opts) {
     btn.type = 'button';
     btn.className = 'radial-menu-btn' + (spec.destructive ? ' btn-danger' : '');
     btn.style.transform = `translate(${Math.round(Math.cos(angle) * radius)}px, ${Math.round(Math.sin(angle) * radius)}px)`;
+    // D52 flare: a small stagger so the ring fans out rather than
+    // popping in as one flat block - style.css's `radial-pop` keyframe
+    // reads this per-button delay.
+    btn.style.setProperty('--radial-delay', `${i * 0.025}s`);
     btn.dataset.action = id;
     btn.textContent = opts.labels?.[id] ?? spec.label;
     if (spec.hint) btn.title = spec.hint;
@@ -620,6 +662,17 @@ function openRadialMenu(actionIds, cx, cy, opts) {
   menu.addEventListener('pointerleave', scheduleRadialClose);
   document.body.appendChild(menu);
   radialMenuEl = menu;
+  radialMenuKey = key;
+
+  // D52 user request #2b: "a click anywhere besides the action buttons"
+  // closes it - mirrors `beginTargeting`'s own `onElsewhere` (deferred
+  // so the SAME click that opened the menu, via a card's own click-to-
+  // reveal path elsewhere in this app, doesn't immediately close it).
+  setTimeout(() => document.addEventListener('click', onRadialElsewhere, { once: true }), 0);
+}
+
+function onRadialElsewhere(e) {
+  if (!e.target.closest('.radial-menu')) closeRadialMenu();
 }
 
 let radialMenuEl = null;
@@ -637,8 +690,10 @@ function scheduleRadialClose() {
 
 function closeRadialMenu() {
   cancelRadialClose();
+  document.removeEventListener('click', onRadialElsewhere);
   radialMenuEl?.remove();
   radialMenuEl = null;
+  radialMenuKey = null;
 }
 
 /**
@@ -649,11 +704,14 @@ function closeRadialMenu() {
  * touch equivalent was built or attempted.
  *
  * @param {HTMLElement} hostEl
+ * @param {string} key stable identity for this host - see
+ *   `openRadialMenu`'s own doc comment for why this exists (re-render
+ *   churn, not DOM reference, is what "still the same card" means here).
  * @param {() => string[]} getActionIds computed fresh on every hover,
  *   not cached, since what a card offers can change between renders.
  * @param {object} opts see `openRadialMenu`'s own `opts`.
  */
-function attachRadialMenu(hostEl, getActionIds, opts) {
+function attachRadialMenu(hostEl, key, getActionIds, opts) {
   // `.pile-hover-host` still drives a plain CSS `:hover` raise (a small
   // lift + shadow on the actor itself, style.css) as the "this is
   // actionable" cue - independent of the radial menu's own open/closed
@@ -666,7 +724,7 @@ function attachRadialMenu(hostEl, getActionIds, opts) {
   hostEl.addEventListener('pointerenter', (e) => {
     if (e.pointerType !== 'mouse') return;
     cancelRadialClose();
-    openRadialMenu(getActionIds(), e.clientX, e.clientY, { targetsFor: () => [], ...opts });
+    openRadialMenu(key, getActionIds(), e.clientX, e.clientY, { targetsFor: () => [], ...opts });
   });
   hostEl.addEventListener('pointerleave', () => {
     // A menu still open (nothing clicked yet) closes when the pointer
@@ -722,7 +780,7 @@ function actionMenuEl(wrapper, zone, card, allZones, opts) {
     { id: HAND_PILE_ID, kind: 'hand', ownerId: viewerId },
   ];
 
-  attachRadialMenu(wrapper, () => available, {
+  attachRadialMenu(wrapper, card.id, () => available, {
     targetsFor: (action) => targetsForAction(action, piles, { viewerId, fromPileId: zone.id }),
     onAction: (action, targetId) => {
       // D48: an in-place action has no destination to pick - `openRadialMenu`
@@ -1131,7 +1189,7 @@ export function renderDeck(container, count, opts = {}) {
   // (`#game-deck-area`) itself, not a separate anchor slot - hovering
   // the deck's own stack/empty state opens it, the same mechanism a
   // card's hover menu already used.
-  attachRadialMenu(container, () => actions, {
+  attachRadialMenu(container, 'deck', () => actions, {
     onAction: (id) => opts.onPileAction(id),
     disabled: count <= 0 ? ['deal'] : [], // nothing left to deal from
     draggable: true,
@@ -1172,7 +1230,11 @@ function pileCountInput({ value, onChange, min, max, ariaLabel, inputId }) {
  *   labels?: Record<string,string>, disabled?: string[]}} opts
  */
 export function renderPileAnchor(hostEl, actions, opts = {}) {
-  attachRadialMenu(hostEl, () => actions, {
+  // 'hand-pile' is a fixed key, not per-instance: today's only caller
+  // (main.js) always uses this for the SAME logical pile (the viewer's
+  // own hand) - see `openRadialMenu`'s doc comment for why a stable key
+  // (not the DOM node) is what "still the same thing" means here.
+  attachRadialMenu(hostEl, 'hand-pile', () => actions, {
     labels: opts.labels,
     disabled: opts.disabled,
     draggable: true,

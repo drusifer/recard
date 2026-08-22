@@ -2303,6 +2303,37 @@ ones.
 >    zone heading's text behind it ("Table (1)") when the card sits near
 >    the zone's own label. Not a functional blocker (the menu paints on
 >    top, still clickable) but a readability rough edge.
+>
+> **Follow-up fix (2026-08-21), direct user report: "the menu is
+> following the mouse after it comes up so it's a race to click it."**
+> Root cause: the menu reopened itself at the CURRENT pointer position
+> on every `pointerenter` - including one fired by a brand-new DOM node
+> this app's own wholesale re-renders (`renderZoneCards`/
+> `renderGameFromView`, on every state broadcast) insert right under a
+> mouse that hasn't moved. Each re-render's fresh node silently
+> teleported the menu to wherever the cursor happened to be, so it could
+> relocate mid-click. Fixed with identity, not timing: `openRadialMenu`
+> now tracks what the open menu belongs to by a caller-supplied stable
+> `key` (a card id, or a fixed string per pile) rather than DOM
+> reference, which re-renders don't preserve - a `pointerenter` for the
+> SAME key keeps the menu's position, but still rebuilds its button
+> list (a second real bug, found immediately after the first fix: the
+> position-lock can't also freeze the CONTENT, or a deck emptying
+> mid-hover would leave a stale "Deal" button on screen - the existing
+> e2e assertion for that exact case caught it). Also landed the user's
+> other two asks: the menu now persists until an action is chosen, a
+> click lands anywhere else (a new deferred document listener,
+> mirroring `beginTargeting`'s own `onElsewhere`), or a genuinely
+> different key is hovered; the ring radius is smaller (closer to the
+> card, per "bring the radial menu into the card interface"); and each
+> button gets a small staggered pop-in animation (`--radial-delay`,
+> CSS `scale`/`opacity` keyframe - composed via the standalone `scale`
+> property, not `transform`, so it doesn't collide with the ring
+> position math already using `transform: translate(...)`). 260/260
+> unit + full e2e green (independently re-run after both fixes),
+> `lint:design` unchanged.
+
+## Module Layout
 ```
 index.html              entry page, host/join screens, game screen
 style.css                styling
