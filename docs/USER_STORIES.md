@@ -1981,18 +1981,35 @@ necessary rather than at every phase).
 - In-app text chat or reactions.
 - Custom card backs/themes.
 - Reconnect-to-session after refresh/drop.
-- **Radial action menu, pointer-centered** (user proposal, post-D51):
-  on hovering an actionable card/pile, show its actions as a radial
-  menu around the pointer instead of the current edge-anchored row;
-  clicking an action makes the card follow the mouse with valid drop
-  targets highlighted, click to confirm. Real merit (distance-based,
-  pointer-centered avoids the exact hover-blocks-interaction bug D51
-  just fixed) but needs real scoping before building: (1) this app has
-  no icon language today - every action is a text button, and radial
-  layouts don't hold long text labels well, so an icon set is likely a
-  prerequisite, not a follow-on; (2) pointer-centered means edge-of-
-  screen clamping math, a class of bug this project has paid for
-  repeatedly this session; (3) touches the same machinery
-  (`touchDrag.js`, `beginTargeting`, `dropTarget.js`) D51 just
-  stabilized. Needs a real Cypher story + Smith gate (icons vs. text,
-  touch equivalent) before implementation, not a rushed bolt-on.
+- ~~**Radial action menu, pointer-centered**~~ - **SHIPPED (D52,
+  2026-08-21)**: hovering an actionable card/pile now shows its actions
+  as a radial ring around the pointer; a `target`-bearing action makes
+  the card follow the mouse with valid drop targets highlighted, click
+  to confirm. Built without the icon-language prerequisite this entry
+  originally flagged (text labels, not icons - reads fine in practice
+  at this button count) and without new edge-clamping math (a fixed
+  small radius, not distance/screen-bounds-aware). `tests/e2e.smoke.mjs`
+  coverage for it landed in a follow-up close-out pass; see D52's own
+  groom note in `docs/ARCHITECTURE.md` for the five real bugs that
+  surfaced getting the suite honestly green.
+
+## Backlog: two Smith close-out findings from the radial menu (2026-08-21)
+
+From a real screenshot pass (not just green tests) after D52's e2e fix
+closed out. Both disclosed rather than fixed here - see
+`docs/ARCHITECTURE.md`'s D52 close-out groom note for the full context.
+
+1. **Personal-zone label overlaps the hand's own card row at 1440x900
+   with a moderately full hand** ("Alice (0)" visually collided with
+   the Hand zone's cards in the screenshot). `lint:design`'s current
+   viewport matrix samples phone widths and one short-desktop tier, not
+   this one, so it shipped undetected. Possibly the same root cause as
+   the already-disclosed `lint:design` phone-width zone-overlap
+   findings, possibly a distinct desktop-width instance - not
+   diagnosed. Needs a real measurement pass before a fix, matching this
+   project's own "measure, don't guess" standard.
+2. **A card's radial menu button can render on top of a zone heading's
+   text** when the card sits close to the zone's own label (seen: "Pick
+   up" over "Table (1)"). Not a functional blocker - the menu paints on
+   top and stays clickable - but a real readability rough edge, not
+   just a cosmetic nit worth ignoring.

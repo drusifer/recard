@@ -2268,8 +2268,41 @@ interaction, matching this project's own established unit-vs-e2e
 split). `lint:design`: same 3 pre-existing/disclosed violations, no new
 ones.
 
-
-## Module Layout
+> **Close-out groom (2026-08-21): the disclosed `tests/e2e.smoke.mjs`
+> gap above is now closed.** Full suite migrated to the D52 DOM and
+> independently re-verified green twice. Getting it honestly green (not
+> just passing) surfaced and fixed five real bugs, each at the source:
+> `playHidden`'s spec carried a stray `target: 'zone'` that silently
+> no-opped it; `beginTargeting`'s click listener used the bubble phase,
+> so completing a Pick-up onto the hand could also fire a hand card's
+> own Play handler underneath it, netting no visible change; `.hand-zone`
+> needed a higher static z-index to reliably beat `#table-center`'s own
+> escalation; `#hand-zone-name`'s hover-raise transform was shifting it
+> out from under a stationary pointer, a genuine self-oscillating hover
+> loop; and the 1440px width tier's larger margin made the page briefly
+> *narrower* than the 1439px tier a moment before, a real regression of
+> exactly the class Smith's Gate 2 continuous-resize check exists to
+> catch. Also consolidated two pre-existing `lint:style`
+> `no-duplicate-selectors` violations found while in the area (unrelated
+> to D52, not newly introduced). Full reasoning for each: commit
+> `65090e4`.
+>
+> **Smith close-out visual pass (real screenshots, not just green
+> tests):** the radial menu itself reads exactly as designed - a raised
+> card with actions arranged in a connected ring around it. Two real,
+> disclosed-not-fixed findings from that pass, routed to backlog rather
+> than expanding this fix's scope:
+> 1. At 1440x900 with a moderately full hand, the personal zone label
+>    ("Alice (0)") visually overlaps the Hand zone's own card row - a
+>    density collision `lint:design`'s current viewport matrix (phone
+>    and one short-desktop tier) doesn't sample, so it shipped
+>    undetected. Possibly the same root cause as the already-disclosed
+>    `lint:design` phone-width zone-overlap findings, possibly a new
+>    desktop-width instance - not diagnosed here.
+> 2. A card's radial menu can render a button ("Pick up") overlapping a
+>    zone heading's text behind it ("Table (1)") when the card sits near
+>    the zone's own label. Not a functional blocker (the menu paints on
+>    top, still clickable) but a readability rough edge.
 ```
 index.html              entry page, host/join screens, game screen
 style.css                styling
