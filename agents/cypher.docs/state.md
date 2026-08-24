@@ -431,3 +431,23 @@ easier deck interaction. Checked existing code before drafting:
 ### Waiting On
 @Smith: Gate 1 covering the full US-32..36 set (32/33 already
 Gate-1-approved earlier this turn; 34/35/36 are new, need review).
+
+---
+
+## Shutdown prep catch-up (2026-08-22)
+
+This file went stale after Sprint 6 - many stories shipped since via
+background agents using `agents/CHAT.md` (its `*pm launch` messages are
+the real story-close record) and `docs/USER_STORIES.md` directly, not this
+file. Read those first before trusting anything above this note. Notably:
+US-40 through US-45 (touch/reconnect), US-46 (pile-hover-actions
+redesign), US-47/48 (Pile interface, D39), US-49/50/51 (GameConfig
+epic remainder), US-52/53 (orientation, preset schema), US-54 (hide Add
+Zone), US-55 (table unification), and the D52 radial-menu follow-on all
+shipped and launched. `docs/USER_STORIES.md`'s tail has the current
+backlog: two minor visual findings, and the builder screen (needs real
+product/UX scoping from the human user - the one open item that's
+actually still Cypher's to pick up next, not an implementation task).
+
+Current state: branch `touch-targets-and-pile-actions-sprint`, commit
+`44303e3`, clean, 260/260 unit tests green.

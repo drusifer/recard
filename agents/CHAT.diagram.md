@@ -14,7 +14,8 @@ sequenceDiagram
     participant Smith
     participant Mouse
     participant Oracle
-    Note over Cypher,Oracle: 📅 2026-08-20
+    participant User
+    Note over Cypher,User: 📅 2026-08-20
     Cypher->>All: "pm launch"
     Note right of Cypher: "*pm launch recard-<br/>sprint-11. A host reload<br/>no longer costs anyone<br/>their game. Hands are<br/>saved and come back to<br/>their owners, players'<br/>clien…"
     Neo->>Trin: "swe handoff"
@@ -69,7 +70,7 @@ sequenceDiagram
     Note right of Trin: "UAT phase 59 PASSED,<br/>independently re-run<br/>(218/218) + mutation<br/>check: stripped<br/>handPile's isOwner<br/>guard, exactly 1 test<br/>failed on purpose (…"
     Morpheus->>Neo: "lead handoff"
     Note right of Morpheus: "Phase 59 review<br/>APPROVED. Clean, exactly<br/>the shape D42 called for<br/>- pure modules, zero<br/>DOM, characterization-<br/>tested against the<br/>still-live…"
-    Note over Cypher,Oracle: 📅 2026-08-21
+    Note over Cypher,User: 📅 2026-08-21
     Neo->>Trin: "swe handoff"
     Note right of Neo: "Phase 60 done.<br/>state.js/pileActions.js<br/>read PILE_TYPES now, old<br/>parallel tables deleted <br/>(PILE_VISIBILITY/redactM<br/>iddleCard/actionsForPile<br/>Kin…"
     Trin->>Morpheus: "qa handoff"
@@ -120,4 +121,12 @@ sequenceDiagram
     Note right of Morpheus: "Morpheus retro: capture-<br/>phase for<br/>beginTargeting's click<br/>listener is the right<br/>general fix, not a hand-<br/>only patch - a pile-<br/>target's own cli…"
     Cypher->>All: "pm launch"
     Note right of Cypher: "*pm launch e2e-fix-<br/>for-D52. D51/D52's<br/>table-unification<br/>redesign (bigger cards,<br/>hand-as-zone, unified<br/>radial action menu,<br/>drop-target parit…"
+    Note over Cypher,User: 📅 2026-08-22
+    Morpheus->>All: "state save"
+    Note right of Morpheus: "State saved across all<br/>persona files before<br/>session shutdown<br/>(2026-08-22): stale<br/>Sprint 5/6-era files (mo<br/>use/cypher/oracle/neo/tr<br/>in/smith/m…"
+    Note over Cypher,User: 📅 2026-08-24
+    User->>All: "init"
+    Note right of User: "Bob Protocol initialized<br/>(cold start). Last<br/>session ended clean:<br/>Sprint e2e-fix-for-D52<br/>launched, branch touch-<br/>targets-and-pile-<br/>actions-spr…"
+    Morpheus->>All: "resume"
+    Note right of Morpheus: "Morpheus resumed (cold<br/>start), recapping<br/>Pile/Zone/GameConfig<br/>arch (D38-D52) for user<br/>- no new decision,<br/>informational only."
 ```

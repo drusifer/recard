@@ -953,3 +953,26 @@ stack/overlap drag, Shuffle/Split), stylelint clean.
 
 ---
 *Last updated: 2026-08-20 (shutdown prep)*
+
+## Shutdown prep catch-up (2026-08-22)
+
+Substantial implementation work landed since the note above, via
+background agents: the design-lint/touch-target fix, Sprint 12's pile-
+hover-actions redesign (US-46, D34-D37), the full Pile/Zone/GameConfig
+framework epic (D38-D49 - Pile as a real polymorphic interface,
+GameConfig, DeckDefinition/pinochle, a Discard pile type, Card.orientation,
+preset schema), hiding Add Zone when disallowed (D50), and the table-
+unification + radial-menu redesign (D51/D52 - bigger cards, Hand folded
+into the table as a real Zone, one unified `ACTION_SPECS` interface for
+card and pile actions with NO backward-compat aliases kept, a pointer-
+centered radial action menu replacing every other action-display
+mechanism). `docs/ARCHITECTURE.md`'s D-entries are the real implementation
+record now, not this file's older notes.
+
+Two items from "Next / open" above are now resolved: hands ARE persisted
+(D31, Sprint 11) and drag/hover DO have touch equivalents (D28 touch drag,
+Sprint 12's tap-to-reveal) - though the D51/D52 redesign itself was built
+desktop-only by explicit user direction, not re-extended to touch.
+
+Current state: branch `touch-targets-and-pile-actions-sprint`, commit
+`44303e3`, clean, 260/260 unit tests green, e2e green as of last close.

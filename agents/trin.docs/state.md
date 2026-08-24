@@ -548,3 +548,29 @@ cleanup). See task.md Sprint 12 section for the full phase list.
    shortcut on the button-height fix.
 3. Nothing in this session is committed as of this note - see git
    status before assuming a clean baseline.
+
+---
+
+## Shutdown prep catch-up (2026-08-22)
+
+This note is from mid-Sprint-12 planning, before Phase 53 even started -
+badly stale now. What actually happened: the `test:e2e` RED blocker got
+diagnosed and fixed for real (not a stale-assertion issue for the Deal
+button specifically, but a genuine z-index stacking-context trap, plus a
+card-stack/halo test that needed reordering, plus a D24 seat-ring/pot
+clearance retune) before Phase 53 landed. Sprint 12 shipped and closed.
+Sprints 13-21+ followed: the full Pile/Zone/GameConfig framework (D38-D49,
+verified with exhaustive characterization + mutation testing on the
+authoritative replicated reducer at every phase), then the table-
+unification + radial-menu redesign (D51/D52), then a full e2e-suite
+migration to the new radial-menu DOM (5 real bugs found fixing it
+honestly rather than routing around it) and a proper formal close.
+
+Standing verification guidance changed mid-session, by explicit user
+request: don't run the full `npm run test:e2e` suite for routine
+verification (it's slow) - reserve it for genuine gates. `npm test` (fast
+unit suite) is the default for routine checks now.
+
+Current state: branch `touch-targets-and-pile-actions-sprint`, commit
+`44303e3`, clean, 260/260 unit tests green, e2e green as of last close.
+Two minor visual findings backlogged in `docs/USER_STORIES.md`, not fixed.

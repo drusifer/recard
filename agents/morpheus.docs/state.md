@@ -575,3 +575,54 @@ alongside the rest of the v2.0 sprint's decisions during groom (note:
 sprints only got recorded in `ARCHITECTURE.md`'s per-sprint sections;
 worth flagging to Oracle as a real gap, not assuming it's already
 synced).
+
+---
+*Last updated: 2026-08-20 (D38-D40 sidebar, mid-Sprint-12)*
+
+## Shutdown prep catch-up (2026-08-22)
+
+Everything sequenced above happened, and then a lot more. Full arc since
+the note above: Sprint 12 (v2.0, US-46 pile-hover-actions, D34-D37) shipped
+and closed, including a real pre-Phase-53 diagnosis of a RED e2e suite (a
+z-index stacking-context trap, a card-stack/halo test ordering issue, a
+D24 seat-ring/pot retune - none of them the stale-assertion issue
+originally assumed). Then the D38-D40 epic ran to completion across
+Sprints 13-20 (D41-D50): Pile as a real polymorphic interface, split into
+two tranches (D41) when the original single-tranche design turned out not
+to cover in-place actions; GameConfig, DeckDefinition (pinochle), a real
+Discard pile type proving Open/Closed, Card.orientation, a preset schema,
+and hiding Add Zone when disallowed. The `docs/DECISIONS.md` D20-ceiling
+gap flagged in this file's own note above got resolved during Sprint 14 -
+the file now states it's superseded by ARCHITECTURE.md's per-sprint
+sections, not left stale.
+
+Then a second design pass, driven directly by user feedback rather than a
+Cypher-scoped story: bigger cards (root-caused a `min-width:0` specificity
+bug, not just a number bump), Hand folded into the table as a real Zone
+(reusing the Pile framework the D38-D49 epic had just built - exactly the
+kind of cheap extension that epic was for), one shared `ACTION_SPECS`
+interface replacing `ACTIONS`/`PILE_ACTIONS` with NO compatibility
+aliases (explicit user correction - see [[feedback-no-backcompat-shims]]
+in project memory), and finally a pointer-centered radial action menu
+(D52) replacing every prior action-display mechanism entirely. A full e2e
+suite migration + proper formal close followed, catching 5 more real bugs
+along the way (see CHAT.md's retro messages around commit `65090e4` for
+the list).
+
+**Architecture is current through D52** in `docs/ARCHITECTURE.md`. Two
+architectural judgment calls worth remembering if resuming cold:
+- The D51/D52 redesign was explicitly scoped **desktop-only** by direct
+  user instruction, overriding this persona's usual touch-parity
+  instinct - not an oversight, don't re-raise it as a gap next time this
+  area is touched unless asked to extend it to touch.
+- "When unifying two interfaces, fully prune the old ones" is now a
+  standing user preference (saved to project memory), not a one-off for
+  `ACTION_SPECS` - apply it by default on future consolidations here.
+
+**Still open:** the builder screen (needs real user product/UX scoping,
+not an architecture call) is the only piece of the original D38 epic
+never started. Two minor visual overlaps are backlogged, not blockers.
+
+Current state: branch `touch-targets-and-pile-actions-sprint`, commit
+`44303e3`, working tree clean, 260/260 unit tests green, e2e green as of
+last close. Nothing pushed to remote.

@@ -140,3 +140,26 @@ Handed to Morpheus for `*lead review sprint plan`.
 
 ---
 *Last updated: 2026-08-16 (Sprint 6 planning)*
+
+## Shutdown prep catch-up (2026-08-22)
+
+This file went stale after Sprint 6 - Sprints 9 through 21+ (touch parity,
+deck-side dealing, restart/reconnect, the design-lint/touch-target fix, the
+full Pile/Zone/GameConfig framework epic D38-D49, the table-unification
+redesign D51, and the D52 radial action menu) all shipped via background
+agents that used `agents/CHAT.md` and `docs/ARCHITECTURE.md`/
+`docs/USER_STORIES.md` for phase/sprint continuity instead of this file.
+Those are the authoritative sources for anyone resuming cold - read
+CHAT.md's tail first, then the latest D-numbered entries in
+ARCHITECTURE.md, before trusting anything above this note.
+
+**Current state:** branch `touch-targets-and-pile-actions-sprint`, latest
+commit `44303e3`, working tree clean, 260/260 unit tests green, e2e green
+as of the last full sprint close. Sprint numbering is up to ~21 in
+practice (see CHAT.md's `*pm launch` messages for the exact list).
+
+**Open, not urgent:** two disclosed minor visual overlaps backlogged in
+`docs/USER_STORIES.md` (personal-zone-label/hand-row at 1440x900, radial-
+menu-button/zone-heading text collision). The builder screen (the one
+piece of the framework epic never started) is waiting on real user
+product/UX input, not phase planning.

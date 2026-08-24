@@ -155,3 +155,23 @@ Nothing — groom is done, handing off now.
 
 ---
 *Last updated: 2026-08-16 (Sprint 5 groom)*
+
+## Shutdown prep catch-up (2026-08-22)
+
+This file went stale after Sprint 5 - many groom passes happened since
+(Sprints 6, 9-21+) directly in `docs/ARCHITECTURE.md`/`docs/USER_STORIES.md`/
+`docs/DECISIONS.md` rather than being logged here. Two real, previously-
+flagged gaps worth knowing about: (1) `docs/DECISIONS.md`'s narrative log
+used to stop at D20 while ARCHITECTURE.md ran to D42+ - this was flagged
+twice with no action, then actually resolved during Sprint 14's groom:
+DECISIONS.md's header now marks it superseded by ARCHITECTURE.md's
+per-sprint sections, so that gap is closed, not still open. (2) The D51
+table-unification redesign got superseded by D52's radial menu less than
+a day after shipping, before a formal groom ever ran on D51 alone - the
+e2e-fix-and-close sprint (commit `d007cf2`) groomed both together so the
+docs read as current truth, not a stale intermediate state.
+
+Current state: branch `touch-targets-and-pile-actions-sprint`, commit
+`44303e3`, clean, 260/260 unit tests green, e2e green as of last close.
+`docs/ARCHITECTURE.md` is current through D52. Nothing needs grooming
+right now.

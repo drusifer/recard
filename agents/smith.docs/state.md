@@ -366,3 +366,23 @@ Nothing.
 
 ---
 *Last updated: 2026-08-16 (Sprint 6 Gate 2, incl. D23)*
+
+## Shutdown prep catch-up (2026-08-22)
+
+Many gates ran since - notably Sprint 12's US-46 Gate 1 (the blocker that
+kept Draw tap-shortcut-able, not drag-only - highest-frequency action in
+the app) and Gate 2 (the STATIC-not-live `singleTarget` correction, D36).
+Real UAT/user-testing passes (with actual screenshots, not just green
+tests) caught genuine bugs at several sprint closes - a phone-tap-
+interception bug and a missing popup backdrop at Sprint 12 close, and two
+minor visual overlaps at the D52 (radial menu) close, still backlogged.
+
+**One standing instruction worth knowing for future gates:** the D51/D52
+table-unification + radial-menu redesign was built desktop-only by
+explicit user direction ("DESKTOP ONLY FOR THIS - DONT TRY TO MAKE IT FIT
+ON MOBILE") - a deliberate, stated override of this persona's usual touch-
+parity concern, not an oversight to re-raise next time this area is
+touched. Don't assume it generalizes to future work without checking.
+
+Current state: branch `touch-targets-and-pile-actions-sprint`, commit
+`44303e3`, clean, 260/260 unit tests green.

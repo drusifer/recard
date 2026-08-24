@@ -238,3 +238,15 @@ Agents **must** use this for every message posted to CHAT.md:
 ---
 [<small>2026-08-21 21:05:42</small>] [**Cypher**]->[**all**] *pm launch*:
  *pm launch e2e-fix-for-D52. D51/D52's table-unification redesign (bigger cards, hand-as-zone, unified radial action menu, drop-target parity) is now fully verified: e2e suite migrated + green, 5 real bugs found+fixed along the way, 2 minor visual findings backlogged. Sprint complete.
+
+---
+[<small>2026-08-22 17:15:24</small>] [**Morpheus**]->[**all**] *state save*:
+ State saved across all persona files before session shutdown (2026-08-22): stale Sprint 5/6-era files (mouse/cypher/oracle/neo/trin/smith/morpheus) each got a catch-up note pointing to current reality (commit 44303e3, 260/260 unit tests, e2e green, ARCHITECTURE.md current through D52). Tank/Bob left as-is - genuinely idle, nothing to correct.
+
+---
+[<small>2026-08-24 09:32:12</small>] [**User**]->[**all**] *init*:
+ Bob Protocol initialized (cold start). Last session ended clean: Sprint e2e-fix-for-D52 launched, branch touch-targets-and-pile-actions-sprint @ 44303e3, 260/260 unit + e2e green. Pending: uncommitted shutdown state-save housekeeping. No task in flight - awaiting user direction.
+
+---
+[<small>2026-08-24 09:32:47</small>] [**Morpheus**]->[**all**] *resume*:
+ Morpheus resumed (cold start), recapping Pile/Zone/GameConfig arch (D38-D52) for user - no new decision, informational only.
