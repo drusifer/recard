@@ -10,8 +10,17 @@ test('every preset has a config the host UI can use directly', () => {
     assert.ok(preset.name, 'preset needs a name');
     assert.ok(preset.numDecks >= 1);
     assert.ok(preset.jokers >= 0);
-    assert.ok(preset.cardsPerPlayer >= 1);
-    assert.equal(typeof preset.usesMiddle, 'boolean');
+    // D53: was `>= 1` until Solitaire/Spit - both deal the whole deck
+    // into declared `zones` (tableau/stock/center piles), not into a
+    // traditional per-player hand, so `0` is a real, honest value here,
+    // not a placeholder standing in for "no preset needs this yet".
+    assert.ok(preset.cardsPerPlayer >= 0);
+  }
+});
+
+test('usesMiddle is retired - no preset carries it any more', () => {
+  for (const preset of PRESETS) {
+    assert.equal(preset.usesMiddle, undefined, `${preset.name} should not have usesMiddle`);
   }
 });
 
@@ -51,4 +60,40 @@ test('every rules-reference entry has the same consistent shape', () => {
     assert.equal(typeof entry.turns, 'string', `${name}.turns`);
     assert.ok(entry.goal.length > 0 && entry.setup.length > 0 && entry.turns.length > 0);
   }
+});
+
+// --- D53 (Sprint 22): Solitaire/Spit are the first presets that
+// declare a starting `zones` layout.
+
+test('Solitaire preset: 4 foundations + 7 cascades, shared (not per-player)', () => {
+  const preset = PRESETS.find((p) => p.name === 'Solitaire');
+  assert.ok(preset);
+  assert.deepEqual(preset.zones, [
+    { kind: 'foundation', ownerId: null, count: 4 },
+    { kind: 'cascade', ownerId: null, count: 7 },
+  ]);
+  assert.equal(preset.cardsPerPlayer, 0, 'no traditional hand - the table IS the deal');
+});
+
+test('Spit preset: 2 shared rank-adjacent piles + a cascade per player', () => {
+  const preset = PRESETS.find((p) => p.name === 'Spit');
+  assert.ok(preset);
+  assert.deepEqual(preset.zones, [
+    { kind: 'rankAdjacent', ownerId: null, count: 2 },
+    { kind: 'cascade', ownerId: 'perPlayer', count: 1 },
+  ]);
+});
+
+test('every preset without a declared zones field is unaffected (undefined, not [])', () => {
+  const declaresZones = ['Solitaire', 'Spit', 'Gin Rummy'];
+  for (const preset of PRESETS) {
+    if (declaresZones.includes(preset.name)) continue;
+    assert.equal(preset.zones, undefined, `${preset.name} should not declare zones`);
+  }
+});
+
+test('Gin Rummy preset: a real discard pile, declared - not the generic shared Table zone standing in for one', () => {
+  const preset = PRESETS.find((p) => p.name === 'Gin Rummy');
+  assert.ok(preset);
+  assert.deepEqual(preset.zones, [{ kind: 'discard', ownerId: null, count: 1 }]);
 });

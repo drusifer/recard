@@ -8,8 +8,17 @@
 export const visibility = 'in-hand';
 
 /** A hand's own reorder goes through `handOrder.js` (D14), not
- * `dropTarget.js` - no halo geometry involved. */
-export const dropRule = 'NONE';
+ * `dropTarget.js` - no halo geometry involved. D53: real method, not a
+ * `dropRule` string. */
+export function resolveDropTarget() {
+  return {};
+}
+
+/** D53: PLAY has never gated by card content - unconditional accept
+ * keeps this a zero-behavior-change refactor. */
+export function canAccept() {
+  return true;
+}
 
 /** A hand is reached by id (`hand:<playerId>`), never by the
  * PLAY/MOVE_CARD "any table-side pile" existence check (D45) - it has

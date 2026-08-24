@@ -92,7 +92,7 @@ test('D46: gameConfig round-trips through save/load', () => {
   const state = createInitialState({}, () => 0.5, { allowsPlayerZones: false });
   const storage = fakeStorage();
   save(storage, state, 'ABC123');
-  assert.deepEqual(load(storage).state.gameConfig, { allowsPlayerZones: false });
+  assert.deepEqual(load(storage).state.gameConfig, { allowsPlayerZones: false, zones: [] });
 });
 
 test('D46: a snapshot from before this field existed restores fine, with no gameConfig at all - not a version bump, additive only', () => {

@@ -412,3 +412,37 @@ This file contains critical lessons and rules derived from past errors, technica
   hundreds of milliseconds network flakiness would suggest. It stays
   finite because a host who *declines* gets a new code, and clients would
   otherwise hammer a dead one.
+
+## Sprint 22 (2026-08-24): Zone/Pile polymorphism, proven by Solitaire + Spit
+
+- **Check for a concrete driver before a speculative refactor, even
+  when directly asked for one.** The user asked to "complete the
+  refactor to Zone/Pile APIs" - grepping first found no current caller
+  needing D38's original separate Zone-type catalog; `ownerId`+
+  `tableSide`+`kind` already covered every zone behavior in use, with
+  zero config surface. Flagging that (rather than building the catalog
+  speculatively) surfaced the REAL ask underneath the request: elevate
+  `dropRule`'s hardcoded enum to real polymorphism, proven against two
+  actual games (Solitaire, Spit), not the originally-pitched shape.
+  The user's own follow-up name for this: "elevate coded behavior to
+  the class."
+- **"Top of the pile" is not one fixed convention across kinds.**
+  `zonePile`/`cascadePile` append (last element = top); `deckPile`/
+  `discardPile`/`rankAdjacentPile` prepend (first element = top, the
+  STACK shape). A new pile type's `canAccept` must read whichever index
+  its own `insertCard` treats as top - copying another type's index
+  convention without checking is a real, easy-to-ship bug (caught in
+  review before merge this sprint, not after).
+- **Adding a field to a persisted config object breaks exact-shape
+  assertions on purpose, not by accident.** `GameConfig.zones` (D53)
+  made 3 existing `assert.deepEqual(state.gameConfig, {...})` tests fail
+  - the fix was updating those 3 assertions to include the new field,
+  not treating the failure as a regression to work around. When adding
+  an additive field to `gameConfig`/`deckConfig`/any object multiple
+  tests pin exactly, grep for those pins before writing the new field,
+  not after the red run surprises you.
+- **A relaxed invariant needs its reason written into the test itself,
+  not just the commit.** `cardsPerPlayer >= 1` became `>= 0` because
+  Solitaire/Spit genuinely deal to declared zones, not a hand - the test
+  now says so inline, so a future reader sees WHY 0 is valid rather than
+  wondering if the floor was carelessly dropped.

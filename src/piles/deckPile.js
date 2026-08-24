@@ -13,8 +13,19 @@
 export const visibility = 'hidden';
 
 /** No halo geometry is reachable for the deck today (D29's own strip
- * renders it, never `dropTarget.js`). */
-export const dropRule = 'NONE';
+ * renders it, never `dropTarget.js`). D53: this is now a real method,
+ * not a `dropRule` string `ui.js` branches on. */
+export function resolveDropTarget() {
+  return {};
+}
+
+/** D53: nothing has ever gated a DRAW/insert into the deck by card
+ * content - unconditional accept keeps this a zero-behavior-change
+ * refactor. Present so `transferCard` (state.js) has one uniform call
+ * site across every pile kind. */
+export function canAccept() {
+  return true;
+}
 
 /** The deck is never a PLAY/MOVE_CARD destination (D45). */
 export const tableSide = false;

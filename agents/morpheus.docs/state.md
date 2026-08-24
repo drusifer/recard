@@ -626,3 +626,33 @@ never started. Two minor visual overlaps are backlogged, not blockers.
 Current state: branch `touch-targets-and-pile-actions-sprint`, commit
 `44303e3`, working tree clean, 260/260 unit tests green, e2e green as of
 last close. Nothing pushed to remote.
+
+---
+## Sprint 22 ("Zone/Pile polymorphism, proven by Solitaire + Spit") — 2026-08-24
+
+### Context
+User asked to "complete the refactor to Zone/Pile APIs." Checked the
+premise first (no current caller needs D38's original separate Zone-
+type catalog) and flagged it rather than building speculatively; user's
+follow-up sharpened the real ask into D53 (docs/ARCHITECTURE.md):
+retire `dropRule` enum for real per-pile-type `canAccept`/
+`resolveDropTarget` polymorphism, proven against Solitaire (`foundation`,
+`cascade` kinds) and Spit (`rankAdjacent` kind), plus one additive
+`GameConfig.zones` field so a preset can auto-build its table.
+Full *plan sprint chain run: Cypher (US-56..59) → Smith Gate 1 (approved,
+1 note on foundation's silent-lock UX) → Morpheus D53 → Smith Gate 2
+(approved, 1 ask: preset-select should prefill the table visibly) → Mouse
+6-phase plan (task.md Phases 62-67) → Morpheus review: APPROVED.
+
+### Current Task
+**Status:** Planning complete, handed to Neo for Phase 62.
+Sequencing is load-bearing: Phase 62 (dropRule→polymorphism on the 4
+EXISTING kinds, zero behavior change) must land + pass full regression
+before Phase 63 (foundation/cascade) starts — same discipline as D23/
+Phase 29.
+
+### Next Steps
+Resume with `*swe impl phase 62` (Neo), then `*qa uat phase 62` (Trin),
+then back here for code review, before Phase 63 begins. Context was
+getting large this turn — recommend `/clear` before starting Phase 62's
+actual implementation if not already done.

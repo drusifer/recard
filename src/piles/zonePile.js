@@ -4,15 +4,30 @@
  * `{owner, faceUp}` (D7). Sprint 14/Tranche 2 (D43) adds the write
  * side: `canRemoveCard`/`removeCard`/`insertCard`, the shape
  * `state.js`'s PICKUP/MOVE_CARD/PLAY-into-a-zone dispatch through.
+ * D53 (Sprint 22): owns `resolveDropTarget` outright (delegating to
+ * `dropTarget.js`'s pure halo geometry) instead of declaring a
+ * `dropRule: 'FAN'` string for `ui.js` to branch on.
  */
+import { resolveDropTarget as resolveHaloTarget } from '../dropTarget.js';
 
 /** Per-card `{owner, faceUp}` visibility, not a pile-level rule -
  * "Open" when every card is face-up, "Mixed" when they differ. */
 export const visibility = 'mixed';
 
-/** The only pile kind `dropTarget.js`'s `resolveDropTarget` (halo
- * before/onto/after) is ever called for today. */
-export const dropRule = 'FAN';
+/** The only pile kind with real before/onto/after halo geometry today -
+ * `dropTarget.js`'s pure math, owned here rather than switched on
+ * centrally by a `dropRule` string. */
+export function resolveDropTarget(cardBoxes, point) {
+  return resolveHaloTarget(cardBoxes, point);
+}
+
+/** D53: nothing has ever gated a zone insert by card content -
+ * unconditional accept keeps this a zero-behavior-change refactor.
+ * The first real (content-based) `canAccept` is Sprint 22's `foundation`/
+ * `cascade`/`rankAdjacent` kinds. */
+export function canAccept() {
+  return true;
+}
 
 /** D45: a zone is a legal PLAY/MOVE_CARD destination - `state.js`'s
  * `zonesOf` (despite its name, now "every table-side pile") derives

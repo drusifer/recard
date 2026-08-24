@@ -5,6 +5,9 @@ import * as deckPile from '../src/piles/deckPile.js';
 import * as handPile from '../src/piles/handPile.js';
 import * as zonePile from '../src/piles/zonePile.js';
 import * as discardPile from '../src/piles/discardPile.js';
+import * as foundationPile from '../src/piles/foundationPile.js';
+import * as cascadePile from '../src/piles/cascadePile.js';
+import * as rankAdjacentPile from '../src/piles/rankAdjacentPile.js';
 
 // D42 (Sprint 13, US-47): one module per pile TYPE instead of a `kind`
 // string switched on in state.js/pileActions.js. Phase 59 builds these
@@ -14,8 +17,9 @@ import * as discardPile from '../src/piles/discardPile.js';
 // `discard` (D45, Sprint 15) is the first type added AFTER the registry
 // existed - proves Open/Closed for real, not just in the doc comment.
 
-test('the registry exposes exactly the four existing pile kinds', () => {
-  assert.deepEqual(Object.keys(PILE_TYPES).sort(), ['deck', 'discard', 'hand', 'zone']);
+test('the registry exposes exactly the seven pile kinds (D53/Sprint 22: +foundation, +cascade, +rankAdjacent)', () => {
+  assert.deepEqual(Object.keys(PILE_TYPES).sort(),
+    ['cascade', 'deck', 'discard', 'foundation', 'hand', 'rankAdjacent', 'zone']);
   assert.equal(PILE_TYPES.deck, deckPile);
   assert.equal(PILE_TYPES.hand, handPile);
   assert.equal(PILE_TYPES.zone, zonePile);
@@ -29,11 +33,23 @@ test('visibility matches state.js\'s existing PILE_VISIBILITY table exactly', ()
   assert.equal(discardPile.visibility, 'mixed');
 });
 
-test('dropRule: NONE for deck/hand (no halo geometry reachable today), FAN for zone, STACK for discard (D45)', () => {
-  assert.equal(deckPile.dropRule, 'NONE');
-  assert.equal(handPile.dropRule, 'NONE');
-  assert.equal(zonePile.dropRule, 'FAN');
-  assert.equal(discardPile.dropRule, 'STACK');
+test('canAccept (D53): every existing kind accepts unconditionally - zero behavior change, only Sprint 22\'s new kinds add real rules', () => {
+  const card = { id: 'c' };
+  assert.equal(deckPile.canAccept({ cards: [] }, card), true);
+  assert.equal(handPile.canAccept({ cards: [] }, card), true);
+  assert.equal(zonePile.canAccept({ cards: [] }, card), true);
+  assert.equal(discardPile.canAccept({ cards: [] }, card), true);
+});
+
+test('resolveDropTarget (D53, replaces the dropRule enum): deck/hand/discard have no geometry to offer, zone delegates to dropTarget.js\'s halo geometry', () => {
+  const point = { x: 5, y: 5 };
+  const boxes = [{ cardId: 'a', left: 0, right: 10, top: 0, bottom: 10, width: 10 }];
+  assert.deepEqual(deckPile.resolveDropTarget([], point), {});
+  assert.deepEqual(handPile.resolveDropTarget([], point), {});
+  assert.deepEqual(discardPile.resolveDropTarget(boxes, point), {},
+    'STACK behavior: every drop lands on top, no positional geometry computed');
+  assert.deepEqual(zonePile.resolveDropTarget(boxes, point),
+    { targetCardId: 'a', side: 'after', layout: 'stack' });
 });
 
 test('tableSide (D45): zone and discard are PLAY/MOVE_CARD destinations, deck and hand are not', () => {
@@ -213,4 +229,100 @@ test('discard redactCard: same per-card {owner, faceUp} rule as zone (D7) - a hi
   assert.deepEqual(discardPile.redactCard(hidden, 'anyone'), { id: 'c1', owner: null, faceDown: true });
   const visible = { id: 'c2', rank: '5', suit: 'clubs', owner: null, faceUp: true };
   assert.deepEqual(discardPile.redactCard(visible, 'anyone'), visible);
+});
+
+// D53 (Sprint 22, US-56): foundation - same-suit, strictly ascending,
+// append-only. First real (content-based) canAccept caller.
+
+test('foundation canAccept: empty accepts only an Ace, rejects any other rank', () => {
+  const empty = { cards: [] };
+  assert.equal(foundationPile.canAccept(empty, { rank: 'A', suit: 'hearts' }), true);
+  assert.equal(foundationPile.canAccept(empty, { rank: '2', suit: 'hearts' }), false);
+  assert.equal(foundationPile.canAccept(empty, { rank: 'K', suit: 'hearts' }), false);
+});
+
+test('foundation canAccept: same suit, exactly rank+1 - rejects a different suit or a skipped rank', () => {
+  const pile = { cards: [{ rank: '5', suit: 'clubs' }] };
+  assert.equal(foundationPile.canAccept(pile, { rank: '6', suit: 'clubs' }), true, 'same suit, next rank');
+  assert.equal(foundationPile.canAccept(pile, { rank: '6', suit: 'hearts' }), false, 'wrong suit');
+  assert.equal(foundationPile.canAccept(pile, { rank: '7', suit: 'clubs' }), false, 'skipped a rank');
+  assert.equal(foundationPile.canAccept(pile, { rank: '5', suit: 'clubs' }), false, 'same rank, not ascending');
+});
+
+test('foundation: append-only, never removable, offers no actions (silent-lock UX per Smith Gate 2)', () => {
+  assert.equal(foundationPile.canRemoveCard(), false);
+  assert.deepEqual(foundationPile.cardActions(), []);
+  const pile = { cards: [{ id: 'a' }] };
+  const inserted = foundationPile.insertCard(pile, { id: 'b' });
+  assert.deepEqual(inserted.cards.map((c) => c.id), ['a', 'b']);
+});
+
+test('foundation: tableSide true, resolveDropTarget always empty (no halo geometry)', () => {
+  assert.equal(foundationPile.tableSide, true);
+  assert.deepEqual(foundationPile.resolveDropTarget([{ cardId: 'a' }], { x: 0, y: 0 }), {});
+});
+
+// D53 (Sprint 22, US-57): cascade - alternating color, strictly
+// descending, reuses D21's overlap rendering.
+
+test('cascade canAccept: empty accepts anything (deal-time fill)', () => {
+  assert.equal(cascadePile.canAccept({ cards: [] }, { rank: '7', suit: 'clubs' }), true);
+});
+
+test('cascade canAccept: opposite color, exactly rank-1 - rejects same color or a skipped/ascending rank', () => {
+  const pile = { cards: [{ rank: '8', suit: 'clubs' }] }; // black 8
+  assert.equal(cascadePile.canAccept(pile, { rank: '7', suit: 'hearts' }), true, 'red 7 on black 8');
+  assert.equal(cascadePile.canAccept(pile, { rank: '7', suit: 'spades' }), false, 'same color (black)');
+  assert.equal(cascadePile.canAccept(pile, { rank: '6', suit: 'hearts' }), false, 'skipped a rank');
+  assert.equal(cascadePile.canAccept(pile, { rank: '9', suit: 'hearts' }), false, 'ascending, not descending');
+});
+
+test('cascade insertCard: first card renders flat, every card after carries layout: overlap (D21 reuse)', () => {
+  const empty = { cards: [] };
+  const first = cascadePile.insertCard(empty, { id: 'a' });
+  assert.equal(first.cards[0].layout, undefined);
+  const second = cascadePile.insertCard(first, { id: 'b' });
+  assert.equal(second.cards[1].layout, 'overlap');
+});
+
+test('cascade: tableSide true, resolveDropTarget always empty (accept/reject only, no positional choice)', () => {
+  assert.equal(cascadePile.tableSide, true);
+  assert.deepEqual(cascadePile.resolveDropTarget([{ cardId: 'a' }], { x: 0, y: 0 }), {});
+});
+
+// D53 (Sprint 22, US-58): rankAdjacent - Spit's shared center pile,
+// either direction, any suit, wraps King<->Ace.
+
+test('rankAdjacent canAccept: empty accepts anything', () => {
+  assert.equal(rankAdjacentPile.canAccept({ cards: [] }, { rank: '7', suit: 'clubs' }), true);
+});
+
+test('rankAdjacent canAccept: either direction, any suit - rejects a 2-rank gap', () => {
+  const pile = { cards: [{ rank: '7', suit: 'clubs' }] };
+  assert.equal(rankAdjacentPile.canAccept(pile, { rank: '8', suit: 'hearts' }), true, 'one rank up, any suit');
+  assert.equal(rankAdjacentPile.canAccept(pile, { rank: '6', suit: 'spades' }), true, 'one rank down, any suit');
+  assert.equal(rankAdjacentPile.canAccept(pile, { rank: '9', suit: 'hearts' }), false, 'two ranks up');
+  assert.equal(rankAdjacentPile.canAccept(pile, { rank: '7', suit: 'hearts' }), false, 'same rank');
+});
+
+test('rankAdjacent canAccept: wraps King<->Ace in both directions', () => {
+  const onKing = { cards: [{ rank: 'K', suit: 'clubs' }] };
+  assert.equal(rankAdjacentPile.canAccept(onKing, { rank: 'A', suit: 'hearts' }), true);
+  const onAce = { cards: [{ rank: 'A', suit: 'clubs' }] };
+  assert.equal(rankAdjacentPile.canAccept(onAce, { rank: 'K', suit: 'hearts' }), true);
+});
+
+test('rankAdjacent: tableSide true, always shared (no ownerId concept enforced by the module itself - CREATE_ZONE never sets one)', () => {
+  assert.equal(rankAdjacentPile.tableSide, true);
+});
+
+test('rankAdjacent insertCard: STACK - lands on top (index 0), same convention as discard', () => {
+  const pile = { cards: [{ id: 'a' }] };
+  const inserted = rankAdjacentPile.insertCard(pile, { id: 'b' });
+  assert.deepEqual(inserted.cards.map((c) => c.id), ['b', 'a']);
+});
+
+test('rankAdjacent: no turn-order/ownership restriction on move - matches Spit\'s simultaneous-play rule', () => {
+  const faceUp = { id: 'c', faceUp: true, owner: null };
+  assert.deepEqual(rankAdjacentPile.cardActions({}, faceUp, 'anyone'), ['pickup', 'move', 'rotate']);
 });

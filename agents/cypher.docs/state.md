@@ -451,3 +451,14 @@ actually still Cypher's to pick up next, not an implementation task).
 
 Current state: branch `touch-targets-and-pile-actions-sprint`, commit
 `44303e3`, clean, 260/260 unit tests green.
+
+---
+## Sprint 22 ("Zone/Pile polymorphism") — 2026-08-24
+
+Drafted US-56..59 in USER_STORIES.md per direct user request, but only
+after Morpheus checked whether D38's original Zone-catalog pitch had a
+real driver (it didn't) - user's follow-up reframed the ask around
+Solitaire+Spit as concrete proof games. Gate 1 approved with 1 UX note
+(foundation lock affordance). Handed through Morpheus/Mouse; sprint now
+in implementation (task.md Phases 62-67). Nothing further for Cypher
+until close-out.

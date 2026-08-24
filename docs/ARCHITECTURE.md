@@ -118,9 +118,11 @@ US-15 (presets) and US-18 (rules reference) need **no `state.js` or
 protocol changes** — they're both pure lookup tables consumed entirely
 client-side before/alongside existing actions:
 - `src/presets.js`: exports a list of `{ name, numDecks, jokers,
-  cardsPerPlayer, usesMiddle }`. The host-setup UI reads from this list
-  to prefill the existing US-3/US-4 form fields; "Custom" is just "don't
-  apply a preset." `usesMiddle` gates presets that depend on D7/D8 landing.
+  cardsPerPlayer }`. The host-setup UI reads from this list to prefill
+  the existing US-3/US-4 form fields; "Custom" is just "don't apply a
+  preset." (`usesMiddle` originally gated presets on D7/D8 landing;
+  retired in the D53 audit follow-up once D7/D8 had been shipped for
+  20+ sprints with nothing ever reading the flag.)
 - `src/rulesReference.js`: exports `{ [gameName]: { goal, setup, turns }
   }` (or similar consistent shape — Smith's Gate 1 AC requires uniform
   format across entries). Rendered by `ui.js` in an overlay that does
@@ -2332,6 +2334,109 @@ ones.
 > position math already using `transform: translate(...)`). 260/260
 > unit + full e2e green (independently re-run after both fixes),
 > `lint:design` unchanged.
+
+### D53. `dropRule` retired in favor of real polymorphism; three new Pile behaviors, proven against Solitaire and Spit specifically
+
+Direct user request to "complete the refactor to Zone/Pile APIs."
+**Checked the premise before designing anything**: grepped for any
+current caller that needs D38's original pitch — a `Zone` type
+decoupled from `Pile` via its own catalog/registry — and found none.
+`ownerId` + `tableSide` + `pile.kind` already produce every zone
+behavior the app uses, with zero config surface; only the (deliberately
+parked) builder screen would ever consume a real Zone catalog. Flagged
+this to the user rather than building it speculatively — matches this
+project's own retro lessons about writing structure ahead of a
+concrete caller (D21 params-vs-rule, D24 premises).
+
+The user's response reframed the real ask, and it's sharper than the
+original pitch: **`ui.js`'s `dropRule` enum (`'NONE'`/`'FAN'`/
+`'STACK'`) is a conditional that should be a polymorphic method.**
+Concretely:
+
+- `PILE_TYPES[kind].dropRule` (a string, switched on by
+  `showZoneDragOver`/`performZoneDrop` in `ui.js`) is replaced by
+  `PILE_TYPES[kind].resolveDropTarget(pile, cardBoxesInRow, point)` — a
+  function each pile module owns outright. `deck`/`hand` return "no
+  geometry" (today's `NONE`); `zone`/`discard` return exactly today's
+  FAN/STACK placement (moved into the module, not rewritten); new
+  modules return their own real geometry. `ui.js` makes ONE polymorphic
+  call, no kind-branching left anywhere in it. Zero behavior change for
+  existing kinds — same discipline and same verification bar as D42/
+  US-47 (every existing unit + e2e test passes unmodified; a test
+  needing a *change* is a stop-and-flag signal, not a green light).
+- The Pile interface gains a real `canAccept(pile, card)` predicate.
+  This existed only as a stub concept in D39's original 5-method pitch
+  and collapsed to "always true if tableSide" in every pile type built
+  so far (D42/D43/D45) because none of them needed content-based
+  rules. That was correct sequencing, not a shortcut — Solitaire/Spit
+  are the first real callers.
+
+**Three new pile kinds, each validated against one concrete game rule,
+not a speculative superset (US-56/57/58):**
+1. **`foundation`** (Solitaire) — same-suit, strictly ascending,
+   append-only. `canRemoveCard` is always `false`; per Smith's Gate 2
+   note, an unremovable pile offers zero actions (`cardActions` returns
+   `[]`), which — per the existing D45 pattern (empty `cardActions` ⇒
+   no hover row renders at all) — gives the "this is locked" affordance
+   for free, no new UI concept needed.
+2. **`cascade`** (Solitaire) — alternating-color, strictly descending.
+   Reuses D21's existing `layout: 'overlap'` rendering verbatim; only
+   `canAccept` is new. Multi-card sequence drag (moving a bound run as
+   one unit) is explicitly deferred — real feature, doesn't fit D43's
+   single-card transfer shape, and Klondike remains playable card-by-
+   card without it.
+3. **`rankAdjacent`** (Spit) — either direction, any suit, wraps K↔A,
+   always shared (`ownerId: null`). No new authorization logic: Spit is
+   simultaneous/real-time by rule, and the existing `MOVE_CARD` auth
+   (any player may move a card they can reach) already matches that
+   exactly.
+
+**GameConfig gains one additive field**: `zones:
+[{kind, ownerId: 'perPlayer'|null, count}]`, defaulting to `[]` (today's
+exact behavior — only the auto-created personal/table/deck/hand zones).
+A preset MAY declare a starting layout (Solitaire: 4 `foundation` + 7
+`cascade`; Spit: 2 `rankAdjacent` + a `stock`/mini-`cascade` per
+player) so selecting it builds the real table instead of requiring 11
+manual Add Zone clicks. This is the one piece of the original D38
+"GameConfig enumerates zones" pitch that turned out to have a real,
+current driver — scoped to exactly what these two presets need, not
+the full builder-screen schema.
+
+**Rejected:** building `Zone` as a separate typed entity/catalog
+(D38's original shape) decoupled from `Pile`. Every new requirement
+this sprint actually needed was a Pile *behavior* question (what can
+land here, how does it render) — nothing needed a zone to know its own
+"type" independent of the pile bound to it. Revisit only if the builder
+screen (still parked on user product/UX input) turns out to need slot
+identity independent of pile behavior; no evidence of that yet.
+
+**Sequencing:** the `dropRule` → polymorphism swap for the four
+*existing* kinds must land and pass full regression FIRST, isolated
+from the three new kinds — same "foundation phase before feature
+phases" discipline as D23/Phase 29 in Sprint 6. Adding a new kind on
+top of a still-conditional `ui.js` would re-introduce exactly the
+branching this refactor exists to remove.
+
+### D53 follow-up. Gin Rummy's preset switched to a real declared `discard` zone, not the generic Table zone
+
+Direct user follow-up, same session as D53: the Gin Rummy preset's
+setup (a shared "Table" zone doubling as its discard pile) predates
+`GameConfig.zones` existing at all - now that a declared pile is one
+line, that stand-in is worse than the real thing, and the user asked
+for "the new system" only, not both side by side. `presets.js`'s Gin
+Rummy entry gains `zones: [{kind: 'discard', ownerId: null, count: 1}]`;
+`rulesReference.js`'s setup text dropped the now-inaccurate "turn the
+top card face-up to start the discard pile" instruction (the pile
+exists empty from table creation, not manually initiated).
+
+**Naming fix that fell out of building this**: `buildConfiguredZones`
+(state.js) named every declared zone `"<kind> <N>"` unconditionally
+(Solitaire's "foundation 1".."foundation 4" reads fine at N≥2, but Gin
+Rummy's single pile came out "discard 1" - awkward for a count of one).
+Fixed once, for every kind: capitalized, and only numbered when
+`count > 1` (`Discard`, not `Discard 1`; `Cascade 1`/`Cascade 2`/...
+when there's more than one). Applies retroactively to Solitaire/Spit's
+zone names too - no separate naming rule per preset.
 
 ## Module Layout
 ```

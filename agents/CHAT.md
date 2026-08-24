@@ -250,3 +250,135 @@ Agents **must** use this for every message posted to CHAT.md:
 ---
 [<small>2026-08-24 09:32:47</small>] [**Morpheus**]->[**all**] *resume*:
  Morpheus resumed (cold start), recapping Pile/Zone/GameConfig arch (D38-D52) for user - no new decision, informational only.
+
+---
+[<small>2026-08-24 10:17:12</small>] [**Cypher**]->[**Morpheus**] *pm plan*:
+ *pm plan: scoping 'complete Zone/Pile refactor' epic per user request. Before drafting phases, routing to Morpheus for a real feasibility read - is there a concrete driver for a Zone-type catalog, or does today's ownerId+kind already satisfy D38's Zone/Pile decoupling? @Morpheus *lead guide
+
+---
+[<small>2026-08-24 10:50:16</small>] [**Cypher**]->[**Smith**] *pm plan*:
+ *pm plan confirmed w/ user: real driver is Solitaire+Spit, not speculation. 3 new Pile behaviors needed (Foundation: same-suit ascending; Cascade: alt-color descending, reuses D21 overlap render; RankAdjacent: +/-1 either dir, shared, Spit's center). dropRule enum retired - each pile owns canAccept+resolveDropTarget (poly, not switch). GameConfig gains declared starting-zone layout so presets auto-build the table. @Smith *user review
+
+---
+[<small>2026-08-24 10:50:59</small>] [**Smith**]->[**Morpheus**] *user approve*:
+ *user review US-56..59: APPROVED with 1 note. Foundation's 'never removable' (US-56) needs a visible affordance it's locked - no tooltip precedent in this app (matches Add Zone's hide-not-disable convention), so a locked foundation should just render with no hover-action row at all, same silence pattern as US-54. No other UX concerns - rejected drops already have return-to-origin feedback from existing MOVE_CARD rejection. @Morpheus *lead arch
+
+---
+[<small>2026-08-24 10:51:43</small>] [**Morpheus**]->[**Smith**] *lead decision*:
+ D53 recorded: dropRule enum retired, replaced by polymorphic canAccept/resolveDropTarget per pile module. 3 new kinds (foundation/cascade/rankAdjacent) validated against Solitaire+Spit specifically, not speculative. GameConfig.zones (additive) lets presets auto-build a table. Rejected: separate Zone-type catalog (D38 original) - no current caller needs slot-identity independent of pile behavior. Full text ARCHITECTURE.md D53. @Smith *user feedback
+
+---
+[<small>2026-08-24 10:51:49</small>] [**Smith**]->[**Morpheus**] *user approve*:
+ *user feedback D53: APPROVED. Foundation's silent-lock (no hover row) matches D45/US-54 convention exactly. Reused D21 overlap render for cascade means zero new visual language to learn for that pile. One ask: Solitaire/Spit preset selection should visibly populate the table immediately on select (like existing presets already prefill deck/deal fields) so a host sees what they're getting before starting. @Morpheus *lead handoff
+
+---
+[<small>2026-08-24 10:52:33</small>] [**Mouse**]->[**Morpheus**] *sm plan*:
+ *sm plan sprint 22: 6 phases (62-67, task.md). 62=dropRule->polymorphism refactor on existing 4 kinds, MUST land+regress clean first. 63=foundation+cascade (Solitaire). 64=rankAdjacent (Spit). 65=GameConfig.zones+2 new presets, incl. Smith's prefill-on-select ask. 66=e2e. 67=reserved bug-fix. @Morpheus *lead review sprint plan
+
+---
+[<small>2026-08-24 10:52:39</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ *lead review sprint plan: APPROVED, no changes. Sequencing matches D53 exactly - Phase 62 isolates the zero-behavior-change refactor before any new pile kind touches the polymorphic call site, same discipline as D23/Phase 29. Each of 63/64 traces to exactly one D53 pile kind, 65 closes the loop with the one GameConfig field that has a real driver. @Neo *swe impl phase 62
+
+---
+[<small>2026-08-24 11:08:03</small>] [**Neo**]->[**all**] *swe impl*:
+ Resolved: next phase = Phase 62 (task.md Sprint 22). *swe impl phase 62 starting - dropRule->polymorphism refactor, zero behavior change.
+
+---
+[<small>2026-08-24 11:11:16</small>] [**Trin**]->[**Morpheus**] *qa uat*:
+ *qa uat phase 62 PASSED. 261/261 unit (net +1, dropRule tests replaced with canAccept+resolveDropTarget coverage), independently re-run. Confirmed zero-behavior-change claim: only src/piles/*.js, pileActions.js, state.js, ui.js touched, no CSS/DOM structure change - e2e not re-run per user's standing 'frugal e2e' preference, deferred to Phase 66's dedicated e2e pass. @Morpheus *lead review phase 62
+
+---
+[<small>2026-08-24 11:11:35</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ *lead review phase 62: APPROVED. Diff scoped exactly to the refactor (7 files, no stray changes), canAccept wiring into transferCard is real infrastructure not just a stub. Phase 62 DONE. @Neo *swe impl phase 63 (foundation+cascade piles)
+
+---
+[<small>2026-08-24 11:12:20</small>] [**Neo**]->[**all**] *swe impl*:
+ *swe impl phase 63 starting - foundation+cascade pile kinds (Solitaire).
+
+---
+[<small>2026-08-24 11:15:14</small>] [**Trin**]->[**Morpheus**] *qa uat*:
+ *qa uat phase 63 PASSED. 273/273 unit (+12: module accept/reject, targetsForAction generalization, 3 full-reducer end-to-end tests proving Phase 62's canAccept wiring rejects for real, not just returns true). Real finding: CREATE_ZONE{kind:'foundation'|'cascade'} worked with ZERO state.js changes - D45's tableSide gate already generalizes. @Morpheus *lead review phase 63
+
+---
+[<small>2026-08-24 11:15:14</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ *lead review phase 63: APPROVED. foundationPile/cascadePile stay self-contained (redactCard/cardActions duplicated per module convention, not imported) - consistent with discardPile's precedent. canAccept logic is genuinely minimal (rank/suit comparison only), no scope creep toward full solitaire rule-checking. @Neo *swe impl phase 64 (rankAdjacent pile, Spit)
+
+---
+[<small>2026-08-24 11:16:33</small>] [**Trin**]->[**Morpheus**] *qa uat*:
+ *qa uat phase 64 PASSED. 280/280 unit (+8: wrap-around accept/reject, STACK insertion order, 1 full-reducer end-to-end). @Morpheus *lead review phase 64
+
+---
+[<small>2026-08-24 11:16:33</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ *lead review phase 64: APPROVED. Caught+fixed my own draft's index bug before it shipped (canAccept was reading cards[length-1] against a STACK pile whose top is cards[0]) - worth noting for the retro: 'top of the pile' isn't a fixed convention across kinds (zone/cascade append=last-is-top, deck/discard/rankAdjacent prepend=first-is-top), each canAccept must match its own insertCard. @Neo *swe impl phase 65 (GameConfig.zones + presets)
+
+---
+[<small>2026-08-24 11:21:49</small>] [**Trin**]->[**Morpheus**] *qa uat*:
+ *qa uat phase 65 PASSED. 288/288 unit (+15). lint:design: same 3 pre-existing violations as unmodified baseline (git stash comparison) - zero regression. Real finding: cardsPerPlayer>=1 invariant relaxed to >=0 for real reason (Solitaire/Spit deal to zones not hands), disclosed in the test itself, not silently loosened. @Morpheus *lead review phase 65
+
+---
+[<small>2026-08-24 11:21:57</small>] [**Morpheus**]->[**Trin**] *lead review*:
+ *lead review phase 65: APPROVED. Diff exactly matches scope - zones wiring in state.js, 2 presets + rules-reference entries, preview text, one honest test-invariant relaxation with its reason written in. GameConfig.zones stays additive throughout, matches D53 exactly. All 4 implementation phases (62-65) now done. @Trin *qa e2e phase 66
+
+---
+[<small>2026-08-24 11:38:15</small>] [**Trin**]->[**Morpheus**] *qa e2e*:
+ *qa e2e phase 66 PASSED (2 full runs green). 2 new scenarios: Solitaire/Spit build their real declared tables through the host-setup form. Found+disclosed a pre-existing e2e flake (identity-reconnect race, confirmed pre-existing via git stash on baseline), logged to USER_STORIES.md backlog, not fixed. Full detail: task.md Phase 66. @Morpheus *lead review phase 66
+
+---
+[<small>2026-08-24 11:38:20</small>] [**Morpheus**]->[**Trin**] *lead review*:
+ *lead review phase 66: APPROVED. Scoping the drag-simulation out of e2e (relying on state.test.js's reduce()-level proof instead) is the right call - real coverage without seeded-deck flakiness risk. Flake disclosure with a git-stash baseline comparison is exactly the right evidence bar before calling something pre-existing. All 5 impl phases (62-66) done. @Trin *qa uat phase 67 (reserved bug-fix)
+
+---
+[<small>2026-08-24 11:38:39</small>] [**Trin**]->[**Oracle**] *qa uat*:
+ *qa uat phase 67 (reserved bug-fix): nothing found. Final regression: 288/288 unit, 2 full e2e runs green, lint:design unchanged. @Oracle *ora groom sprint 22
+
+---
+[<small>2026-08-24 11:39:34</small>] [**Oracle**]->[**Smith**] *ora groom*:
+ *ora groom sprint 22 complete. ARCHITECTURE.md D53, USER_STORIES.md US-56..59+flake backlog, task.md 62-67, 4 new lessons, 1 memory.md milestone row (+ explicit gap-marker for the untracked D21-D52 span, not silently glossed). DECISIONS.md untouched - already marked superseded since Sprint 14. @Smith *user test sprint 22
+
+---
+[<small>2026-08-24 11:40:50</small>] [**Smith**]->[**Cypher**] *user test*:
+ *user test sprint 22: real screenshot pass (Solitaire preset, 1440x900) confirms the Pile/Zone API works exactly as designed - all 11 declared zones render with correct labels/kinds. 1 real finding, backlogged not fixed: at 11 zones the flat zone-list layout overflows and the roster card overlaps Cascade 4/5 - a layout/density problem, explicitly out of D53's API scope. @Cypher *pm launch sprint 22
+
+---
+[<small>2026-08-24 11:41:01</small>] [**Trin**]->[**Cypher**] *retro*:
+ Trin retro: real end-to-end proof this sprint, not just module units - 3 dedicated reducer-level tests (foundation/cascade/rankAdjacent) proved canAccept's Phase 62 wiring rejects for real through the actual PLAY dispatch, not just returns true everywhere. Also: caught + disclosed a pre-existing e2e flake via git-stash baseline comparison rather than assuming it was ours - worth doing by default whenever a failure looks unrelated to the diff.
+
+---
+[<small>2026-08-24 11:41:01</small>] [**Morpheus**]->[**Cypher**] *retro*:
+ Morpheus retro: the premise-check before this sprint's refactor (grep for a real caller of D38's Zone catalog before building it) is the single most reusable move here - the user's own follow-up sharpened scope to something better than the original ask, not just a smaller version of it. Also: 'top of the pile' index-convention bug (cards[0] vs cards[length-1]) caught in review, not after - worth a standing review question for any new STACK-vs-append pile type.
+
+---
+[<small>2026-08-24 11:41:10</small>] [**Smith**]->[**Cypher**] *retro*:
+ Smith retro: real screenshot pass (not just green tests) caught a genuine density problem 288/288 unit + 2 clean e2e runs couldn't - 11 zones is past what the flat zone-list layout was ever designed for. Good instance of 'measure the actual rendered thing' paying off even on a sprint that was explicitly framed as API work, not UI work.
+
+---
+[<small>2026-08-24 11:41:15</small>] [**Cypher**]->[**all**] *pm launch*:
+ *pm launch Sprint 22 (Zone/Pile polymorphism, proven by Solitaire+Spit). dropRule retired for real per-pile canAccept/resolveDropTarget. 3 new pile kinds validated against 2 real games. GameConfig.zones lets presets auto-build tables. 288/288 unit + 2 clean e2e, zero regressions. 2 findings disclosed not fixed (pre-existing flake, many-zone layout). Sprint complete.
+
+---
+[<small>2026-08-24 15:47:44</small>] [**Neo**]->[**all**] *swe impl*:
+ *swe impl: user request - Gin Rummy preset gets a declared discard-kind zone via GameConfig.zones (D53's pattern), replacing the old manual 'turn the top card to start the discard pile' instruction with the auto-built pile. No back-compat - one system only, per user's standing no-shims preference.
+
+---
+[<small>2026-08-24 15:52:08</small>] [**Morpheus**]->[**Trin**] *lead decision*:
+ D53 follow-up recorded: Gin Rummy preset now declares a real discard zone (GameConfig.zones) instead of the generic shared Table zone standing in for one - user's direct ask, one system only, no dual path. Also fixed configured-zone naming project-wide: capitalized, numbered only when count>1 (was 'discard 1' even at count 1). rulesReference.js setup text updated to match. Full text: ARCHITECTURE.md D53 follow-up. 291/291 unit + e2e green.
+
+---
+[<small>2026-08-24 15:52:17</small>] [**Trin**]->[**Cypher**] *qa uat*:
+ *qa uat: Gin Rummy discard-zone change verified - 291/291 unit, real screenshot pass confirms 'Discard (0)' renders cleanly (not 'discard 1'), full e2e re-run green. @Cypher *pm launch
+
+---
+[<small>2026-08-24 15:52:17</small>] [**Cypher**]->[**all**] *pm launch*:
+ *pm launch: Gin Rummy preset now declares a real discard pile (D53 follow-up), replacing the old generic-Table-zone stand-in - one system, per direct user request. Configured-zone naming also fixed project-wide (no more 'Discard 1' for a single pile). 291/291 unit + e2e green.
+
+---
+[<small>2026-08-24 16:21:07</small>] [**Neo**]->[**all**] *swe impl*:
+ *swe impl: retiring dead usesMiddle field from presets.js (no reader anywhere since D7/D8 landed 20+ sprints ago) per user's direct confirmation.
+
+---
+[<small>2026-08-24 16:21:49</small>] [**Trin**]->[**Cypher**] *qa uat*:
+ *qa uat: usesMiddle retired from presets.js (dead since Sprint 2, D7/D8 shipped, nothing ever read it - confirmed by grep before deleting). Every preset entry + the test + ARCHITECTURE.md D10 reference updated. 292/292 unit green. @Cypher *pm launch
+
+---
+[<small>2026-08-24 16:21:50</small>] [**Cypher**]->[**all**] *pm launch*:
+ *pm launch: usesMiddle field retired from presets.js - dead weight since Sprint 2, no reader anywhere. Real cleanup, not a behavior change. 292/292 unit green.

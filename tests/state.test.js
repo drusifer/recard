@@ -21,12 +21,12 @@ test('createInitialState: empty roster, full shuffled deck, one empty default zo
 
 test('createInitialState: gameConfig.allowsPlayerZones defaults true - matches every prior sprint\'s behavior exactly', () => {
   const state = createInitialState({}, () => 0.5);
-  assert.deepEqual(state.gameConfig, { allowsPlayerZones: true });
+  assert.deepEqual(state.gameConfig, { allowsPlayerZones: true, zones: [] });
 });
 
 test('createInitialState: allowsPlayerZones can be set false via the third param', () => {
   const state = createInitialState({}, () => 0.5, { allowsPlayerZones: false });
-  assert.deepEqual(state.gameConfig, { allowsPlayerZones: false });
+  assert.deepEqual(state.gameConfig, { allowsPlayerZones: false, zones: [] });
 });
 
 test('CREATE_ZONE: rejected when the game disallows player zones', () => {
@@ -560,6 +560,72 @@ test('JOIN: re-joining with the same playerId does not create a second personal 
   assert.equal(zonesOf(state).filter((z) => z.ownerId === 'p1').length, 1);
 });
 
+// --- D53 (Sprint 22): GameConfig.zones - a declared starting table
+// layout (Solitaire's 4 foundations + 7 cascades, Spit's 2 shared
+// rank-adjacent piles + a per-player stock).
+
+test('createInitialState: gameConfig.zones defaults to [] - zero behavior change for every preset before Solitaire/Spit', () => {
+  const state = createInitialState({}, () => 0.5);
+  assert.deepEqual(state.gameConfig.zones, []);
+  assert.equal(zonesOf(state).length, 1, 'just the default table, nothing extra built');
+});
+
+test('createInitialState: shared (ownerId: null) configured zones build immediately, before any player joins', () => {
+  const state = createInitialState({}, () => 0.5, {
+    zones: [{ kind: 'foundation', ownerId: null, count: 4 }, { kind: 'cascade', ownerId: null, count: 7 }],
+  });
+  assert.equal(zonesOf(state).filter((z) => z.kind === 'foundation').length, 4);
+  assert.equal(zonesOf(state).filter((z) => z.kind === 'cascade').length, 7);
+  assert.equal(zonesOf(state).length, 1 + 4 + 7, 'default table + 4 foundations + 7 cascades');
+});
+
+test('createInitialState: a configured zone is capitalized and only numbered when there is more than one', () => {
+  const single = createInitialState({}, () => 0.5, { zones: [{ kind: 'discard', ownerId: null, count: 1 }] });
+  assert.equal(zonesOf(single).find((z) => z.kind === 'discard').name, 'Discard', 'not "Discard 1"');
+
+  const many = createInitialState({}, () => 0.5, { zones: [{ kind: 'cascade', ownerId: null, count: 3 }] });
+  assert.deepEqual(
+    zonesOf(many).filter((z) => z.kind === 'cascade').map((z) => z.name),
+    ['Cascade 1', 'Cascade 2', 'Cascade 3'],
+  );
+});
+
+test('createInitialState: a \'perPlayer\' configured zone builds NO piles yet - count isn\'t knowable before a player exists', () => {
+  const state = createInitialState({}, () => 0.5, {
+    zones: [{ kind: 'cascade', ownerId: 'perPlayer', count: 1 }],
+  });
+  assert.equal(zonesOf(state).filter((z) => z.kind === 'cascade').length, 0);
+});
+
+test('JOIN: a \'perPlayer\' configured zone builds one pile per player, alongside their personal zone', () => {
+  let state = createInitialState({}, () => 0.5, {
+    zones: [{ kind: 'rankAdjacent', ownerId: null, count: 2 }, { kind: 'cascade', ownerId: 'perPlayer', count: 1 }],
+  });
+  state = withPlayers(state, ['p1', 'p2']);
+
+  for (const id of ['p1', 'p2']) {
+    const ownPile = zonesOf(state).find((z) => z.kind === 'cascade' && z.ownerId === id);
+    assert.ok(ownPile, `${id} has their own configured cascade pile`);
+  }
+  assert.equal(zonesOf(state).filter((z) => z.kind === 'rankAdjacent').length, 2, 'shared piles are not duplicated per player');
+});
+
+test('JOIN: a per-player configured zone name reads "<player>\'s <Kind>", singular, no index for count 1', () => {
+  let state = createInitialState({}, () => 0.5, { zones: [{ kind: 'cascade', ownerId: 'perPlayer', count: 1 }] });
+  state = reduce(state, { type: 'JOIN', playerId: 'p1', name: 'Alice' });
+  const ownPile = zonesOf(state).find((z) => z.kind === 'cascade' && z.ownerId === 'p1');
+  assert.equal(ownPile.name, "Alice's Cascade");
+});
+
+test('JOIN: re-joining does not duplicate a \'perPlayer\' configured zone either', () => {
+  let state = createInitialState({}, () => 0.5, { zones: [{ kind: 'cascade', ownerId: 'perPlayer', count: 1 }] });
+  state = reduce(state, { type: 'JOIN', playerId: 'p1', name: 'Alice' });
+  state = reduce(state, { type: 'SET_CONNECTION', playerId: 'p1', connection: 'connecting' });
+  state = reduce(state, { type: 'JOIN', playerId: 'p1', name: 'Alice' });
+
+  assert.equal(zonesOf(state).filter((z) => z.kind === 'cascade' && z.ownerId === 'p1').length, 1);
+});
+
 test('personal zones behave exactly like any other zone for PLAY/MOVE_CARD/REVEAL/PICKUP', () => {
   let state = createInitialState({}, () => 0.5);
   state = withPlayers(state, ['p1', 'p2']);
@@ -866,6 +932,100 @@ test('DEAL after DEAL re-deals from scratch; DEAL_MORE appends (D23 shared-case 
   state = reduce(state, { type: 'DEAL', cardsPerPlayer: 2 });
   assert.equal(handOf(state, 'p1').length, 2, 'a second DEAL clears hands first, it does not append');
   assert.equal(handOf(state, 'p2').length, 2);
+});
+
+// --- D53 (Sprint 22, US-56/57): foundation/cascade exercised end-to-end
+// through the whole reducer, not just their own modules' unit tests
+// (tests/piles.test.js) - proves canAccept's transferCard wiring (D53)
+// against real content-based rejection, the first since Phase 62 made
+// it real infrastructure.
+
+function withCardInHand(state, playerId, card) {
+  return {
+    ...state,
+    piles: state.piles.map((p) => (p.id === `hand:${playerId}` ? { ...p, cards: [...p.cards, card] } : p)),
+  };
+}
+
+test('Foundation end-to-end: a non-Ace is rejected on an empty foundation, an Ace is accepted', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = withPlayers(state, ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Hearts', kind: 'foundation' });
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 0 });
+  const foundationId = zonesOf(state).find((z) => z.name === 'Hearts').id;
+
+  state = withCardInHand(state, 'p1', { id: 'six-hearts', rank: '6', suit: 'hearts' });
+  assert.throws(
+    () => reduce(state, { type: 'PLAY', playerId: 'p1', cardId: 'six-hearts', zoneId: foundationId, visibility: 'public' }),
+    /cannot accept/,
+  );
+
+  state = withCardInHand(state, 'p1', { id: 'ace-hearts', rank: 'A', suit: 'hearts' });
+  state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId: 'ace-hearts', zoneId: foundationId, visibility: 'public' });
+  const foundation = zonesOf(state).find((z) => z.id === foundationId);
+  assert.deepEqual(foundation.cards.map((c) => c.id), ['ace-hearts']);
+});
+
+test('Foundation end-to-end: once placed, a card can never move back out', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = withPlayers(state, ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Hearts', kind: 'foundation' });
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 0 });
+  const foundationId = zonesOf(state).find((z) => z.name === 'Hearts').id;
+  state = withCardInHand(state, 'p1', { id: 'ace-hearts', rank: 'A', suit: 'hearts' });
+  state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId: 'ace-hearts', zoneId: foundationId, visibility: 'public' });
+
+  assert.throws(
+    () => reduce(state, { type: 'MOVE_CARD', playerId: 'p1', cardId: 'ace-hearts', toZoneId: 'table' }),
+    /not authorized/,
+  );
+});
+
+test('Cascade end-to-end: same-color/skipped-rank is rejected, opposite-color rank-1 is accepted and carries layout: overlap', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = withPlayers(state, ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Tableau 1', kind: 'cascade' });
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 0 });
+  const cascadeId = zonesOf(state).find((z) => z.name === 'Tableau 1').id;
+
+  state = withCardInHand(state, 'p1', { id: 'eight-clubs', rank: '8', suit: 'clubs' });
+  state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId: 'eight-clubs', zoneId: cascadeId, visibility: 'public' });
+
+  state = withCardInHand(state, 'p1', { id: 'seven-spades', rank: '7', suit: 'spades' });
+  assert.throws(
+    () => reduce(state, { type: 'PLAY', playerId: 'p1', cardId: 'seven-spades', zoneId: cascadeId, visibility: 'public' }),
+    /cannot accept/,
+    'same color (both black) - rejected',
+  );
+
+  state = withCardInHand(state, 'p1', { id: 'seven-hearts', rank: '7', suit: 'hearts' });
+  state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId: 'seven-hearts', zoneId: cascadeId, visibility: 'public' });
+  const cascade = zonesOf(state).find((z) => z.id === cascadeId);
+  assert.deepEqual(cascade.cards.map((c) => c.id), ['eight-clubs', 'seven-hearts']);
+  assert.equal(cascade.cards[1].layout, 'overlap');
+});
+
+test('RankAdjacent end-to-end: accepts +/-1 either direction and the King<->Ace wrap, rejects a 2-rank gap', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = withPlayers(state, ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Center', kind: 'rankAdjacent' });
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 0 });
+  const centerId = zonesOf(state).find((z) => z.name === 'Center').id;
+
+  state = withCardInHand(state, 'p1', { id: 'seven-clubs', rank: '7', suit: 'clubs' });
+  state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId: 'seven-clubs', zoneId: centerId, visibility: 'public' });
+
+  state = withCardInHand(state, 'p1', { id: 'nine-hearts', rank: '9', suit: 'hearts' });
+  assert.throws(
+    () => reduce(state, { type: 'PLAY', playerId: 'p1', cardId: 'nine-hearts', zoneId: centerId, visibility: 'public' }),
+    /cannot accept/,
+    'two ranks away - rejected',
+  );
+
+  state = withCardInHand(state, 'p1', { id: 'eight-spades', rank: '8', suit: 'spades' });
+  state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId: 'eight-spades', zoneId: centerId, visibility: 'public' });
+  assert.deepEqual(zonesOf(state).find((z) => z.id === centerId).cards.map((c) => c.id),
+    ['eight-spades', 'seven-clubs'], 'STACK: lands on top');
 });
 
 // --- Card stack/overlap layout (D21, US-32/US-33) ---

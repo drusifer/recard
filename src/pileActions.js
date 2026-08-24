@@ -200,16 +200,18 @@ export function pileLevelActions(kind, ctx = {}) {
 }
 
 /**
- * D45: which drop geometry `ui.js` should use for a pile of this kind -
- * `'FAN'` (before/onto/after halo, `dropTarget.js`) or `'STACK'` (every
- * drop lands on top, no geometry to compute at all). Kept as its own
- * accessor rather than having `ui.js` import `PILE_TYPES` directly, the
- * same reasoning as `pileLevelActions` above: callers go through this
- * module's narrow surface, not the registry's internals.
+ * D53 (Sprint 22, replaces D45's `dropRuleFor`/`dropRule` enum): the
+ * drop-target geometry for a pile of this kind, computed by the pile
+ * TYPE's own `resolveDropTarget` (`src/piles/*.js`) rather than a
+ * central `ui.js` branch on a `'NONE'|'FAN'|'STACK'` string. Kept as
+ * its own accessor rather than having `ui.js` import `PILE_TYPES`
+ * directly, same reasoning as `pileLevelActions` above.
  *
  * @param {string} kind
- * @returns {'NONE'|'FAN'|'STACK'|undefined}
+ * @param {object[]} cardBoxes
+ * @param {{x: number, y: number}} point
+ * @returns {{targetCardId?: string, side?: 'before'|'after', layout?: string}}
  */
-export function dropRuleFor(kind) {
-  return PILE_TYPES[kind]?.dropRule;
+export function resolveDropTargetFor(kind, cardBoxes, point) {
+  return PILE_TYPES[kind]?.resolveDropTarget(cardBoxes, point) ?? {};
 }

@@ -9,5 +9,8 @@ import * as deck from './deckPile.js';
 import * as hand from './handPile.js';
 import * as zone from './zonePile.js';
 import * as discard from './discardPile.js';
+import * as foundation from './foundationPile.js';
+import * as cascade from './cascadePile.js';
+import * as rankAdjacent from './rankAdjacentPile.js';
 
-export const PILE_TYPES = { deck, hand, zone, discard };
+export const PILE_TYPES = { deck, hand, zone, discard, foundation, cascade, rankAdjacent };

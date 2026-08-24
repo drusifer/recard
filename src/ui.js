@@ -1,6 +1,5 @@
-import { resolveDropTarget } from './dropTarget.js';
 import { step as touchDragStep, HOLD_MS } from './touchDrag.js';
-import { ACTION_SPECS, actionsForCard, pileLevelActions, targetsForAction, dropRuleFor } from './pileActions.js';
+import { ACTION_SPECS, actionsForCard, pileLevelActions, targetsForAction, resolveDropTargetFor } from './pileActions.js';
 import { seatPosition } from './seating.js';
 
 const SUIT_SYMBOL = { clubs: '♣', diamonds: '♦', hearts: '♥', spades: '♠' };
@@ -175,7 +174,7 @@ function attachTouchDrag(sourceEl, card, ctx) {
       const target = touchTargetAt(ev.x, ev.y);
       if (hinted && (target?.kind !== 'zone' || target.el !== hinted.el)) clearHint();
       if (target?.kind === 'zone') {
-        showZoneDragOver(target.el, target.row, { x: ev.x, y: ev.y }, dropRuleFor(target.el.dataset.kind));
+        showZoneDragOver(target.el, target.row, { x: ev.x, y: ev.y }, target.el.dataset.kind);
         hinted = target;
       }
     },
@@ -193,7 +192,7 @@ function attachTouchDrag(sourceEl, card, ctx) {
         performHandReorder(target.el.parentElement, card.id, target.el, ctx.onReorder);
       } else if (ctx.onDropCard) {
         performZoneDrop(target.el, target.row, target.el.dataset.zoneId, card.id,
-          { x: ev.x, y: ev.y }, ctx.onDropCard, dropRuleFor(target.el.dataset.kind));
+          { x: ev.x, y: ev.y }, ctx.onDropCard, target.el.dataset.kind);
       }
     },
     cancel: () => {
@@ -976,16 +975,18 @@ function showDropHint(rowEl, placement) {
  * looks: if touch computed placement separately it would drift from
  * mouse, and only mouse is covered by the e2e suite.
  *
- * D45: `dropRule` gates whether `dropTarget.js`'s halo geometry runs at
- * all. `'FAN'` (zone) keeps the existing before/onto/after behavior;
- * anything else (`'STACK'`, discard - or the `undefined` an unrecognized
- * kind would produce) skips it entirely and always resolves to a plain
- * append, matching "every drop lands on top, no positional choice" with
- * no geometry computed for a pile that has none to offer.
+ * D53 (Sprint 22, replaces D45's `dropRule` string): the pile TYPE's
+ * own `resolveDropTarget` (`resolveDropTargetFor`, `pileActions.js`)
+ * decides the geometry - `ui.js` makes one polymorphic call, no
+ * kind-branching left here at all. `zone` still resolves real
+ * before/onto/after halo geometry (delegated to `dropTarget.js`
+ * internally by `zonePile.js`); `deck`/`hand`/`discard` still resolve
+ * to `{}` (plain append, no positional choice) - same outcomes as
+ * before, just owned by each module instead of switched on centrally.
  */
-function showZoneDragOver(zoneEl, row, point, dropRule) {
+function showZoneDragOver(zoneEl, row, point, kind) {
   zoneEl.classList.add('zone-drag-over');
-  showDropHint(row, dropRule === 'FAN' ? resolveDropTarget(cardBoxesIn(row), point) : {});
+  showDropHint(row, resolveDropTargetFor(kind, cardBoxesIn(row), point));
 }
 
 function clearZoneDragOver(zoneEl, row) {
@@ -993,16 +994,14 @@ function clearZoneDragOver(zoneEl, row) {
   clearDropHints(row);
 }
 
-function performZoneDrop(zoneEl, row, zoneId, cardId, point, onDropCard, dropRule) {
+function performZoneDrop(zoneEl, row, zoneId, cardId, point, onDropCard, kind) {
   clearZoneDragOver(zoneEl, row);
   if (!cardId) return;
   // US-32/33: the drop point decides stack vs. overlap vs. plain
   // append. Aiming at the card being dragged itself is meaningless
   // (it's about to leave that position), so it's treated as open
   // space rather than a self-referential placement.
-  const placement = dropRule === 'FAN'
-    ? resolveDropTarget(cardBoxesIn(row).filter((b) => b.cardId !== cardId), point)
-    : {};
+  const placement = resolveDropTargetFor(kind, cardBoxesIn(row).filter((b) => b.cardId !== cardId), point);
   onDropCard(cardId, zoneId, placement);
 }
 
@@ -1027,11 +1026,11 @@ function renderZonePanel(zone, allZones, opts) {
   const zoneEl = document.createElement('div');
   zoneEl.className = 'zone';
   zoneEl.dataset.zoneId = zone.id; // D25: addressable as a drop target
-  // D45: the kind travels with the element so the touch-drag path
+  // D45/D53: the kind travels with the element so the touch-drag path
   // (which only has the DOM node, not the view object, at drop time)
-  // can look up its dropRule too - see touchTargetAt/attachTouchDrag.
+  // can resolve its own drop-target geometry too - see
+  // touchTargetAt/attachTouchDrag.
   zoneEl.dataset.kind = zone.kind;
-  const dropRule = dropRuleFor(zone.kind);
 
   const heading = document.createElement('div');
   heading.className = 'zone-name';
@@ -1046,13 +1045,13 @@ function renderZonePanel(zone, allZones, opts) {
   if (opts.onDropCard) {
     zoneEl.addEventListener('dragover', (e) => {
       e.preventDefault();
-      showZoneDragOver(zoneEl, row, { x: e.clientX, y: e.clientY }, dropRule);
+      showZoneDragOver(zoneEl, row, { x: e.clientX, y: e.clientY }, zone.kind);
     });
     zoneEl.addEventListener('dragleave', () => clearZoneDragOver(zoneEl, row));
     zoneEl.addEventListener('drop', (e) => {
       e.preventDefault();
       performZoneDrop(zoneEl, row, zone.id, e.dataTransfer.getData('text/plain'),
-        { x: e.clientX, y: e.clientY }, opts.onDropCard, dropRule);
+        { x: e.clientX, y: e.clientY }, opts.onDropCard, zone.kind);
     });
   }
 

@@ -1425,6 +1425,74 @@ try {
   console.log('Preset schema (D49): the Pinochle quick-start preset reaches DeckDefinition end to end, not just deal count');
   await presetHost.close();
 
+  // --- D53 (Sprint 22): Solitaire/Spit presets build a real declared
+  // table (GameConfig.zones), reachable end-to-end through the actual
+  // host setup form - not just proven at the reducer level
+  // (tests/state.test.js already proves canAccept accept/reject through
+  // the whole `reduce()` dispatch, the exact function the host runs; this
+  // covers the DOM/UI wiring those unit tests can't see: the preset
+  // selector, the preview text, and the zones actually landing on the
+  // rendered table). ---
+  const solitaireHost = await (await browser.newContext()).newPage();
+  await solitaireHost.goto(BASE);
+  await solitaireHost.click('#show-host');
+  await solitaireHost.fill('#host-name', 'Sol');
+  await solitaireHost.selectOption('#host-preset', 'Solitaire');
+  const solitairePreview = (await solitaireHost.locator('#host-preset-preview').textContent()).trim();
+  assert(/4 foundations \+ 7 cascades/.test(solitairePreview),
+    `the preview must name the declared table layout before Create Table, got ${JSON.stringify(solitairePreview)}`);
+  await solitaireHost.click('#create-table');
+  await solitaireHost.waitForSelector('#host-share:not([hidden])', { timeout: 20000 });
+  await solitaireHost.click('#deal-btn'); // enters the game screen where zones actually render (cardsPerPlayer is 0, preset-prefilled)
+  await solitaireHost.waitForSelector('#screen-game:not([hidden])', { timeout: 15000 });
+  const solitaireZoneKinds = await solitaireHost.evaluate(() =>
+    [...document.querySelectorAll('.zone')].map((z) => z.dataset.kind).sort());
+  const foundationCount = solitaireZoneKinds.filter((k) => k === 'foundation').length;
+  const cascadeCount = solitaireZoneKinds.filter((k) => k === 'cascade').length;
+  assert(foundationCount === 4, `Solitaire must build 4 foundation zones, got ${foundationCount}`);
+  assert(cascadeCount === 7, `Solitaire must build 7 cascade zones, got ${cascadeCount}`);
+  console.log('D53: the Solitaire preset builds its declared table (4 foundations + 7 cascades) automatically, reachable from host setup');
+  await solitaireHost.close();
+
+  const spitHost = await (await browser.newContext()).newPage();
+  const spitGuest = await (await browser.newContext()).newPage();
+  await spitHost.goto(BASE);
+  await spitHost.click('#show-host');
+  await spitHost.fill('#host-name', 'Spike');
+  await spitHost.selectOption('#host-preset', 'Spit');
+  await spitHost.click('#create-table');
+  await spitHost.waitForSelector('#host-share:not([hidden])', { timeout: 20000 });
+  const spitCode = (await spitHost.locator('.share-code').textContent()).trim();
+  await spitGuest.goto(`${BASE}/?join=${encodeURIComponent(spitCode)}`);
+  await spitGuest.fill('#join-name', 'Robin');
+  await spitGuest.click('#join-btn');
+  await spitGuest.waitForFunction(
+    () => document.getElementById('join-status').textContent.includes('Connected'),
+    undefined,
+    { timeout: 15000 },
+  );
+  await spitHost.waitForFunction(
+    () => document.querySelectorAll('#host-roster li.roster-player').length === 2,
+    undefined,
+    { timeout: 15000 },
+  );
+  await spitHost.click('#deal-btn'); // enters the game screen (cardsPerPlayer is 0, preset-prefilled)
+  await spitHost.waitForSelector('#screen-game:not([hidden])', { timeout: 15000 });
+  await spitHost.waitForFunction(
+    () => document.querySelectorAll('.zone[data-kind="cascade"]').length === 2, // host's own + guest's, both joined before deal
+    undefined,
+    { timeout: 10000 },
+  );
+  const spitZoneKinds = await spitHost.evaluate(() =>
+    [...document.querySelectorAll('.zone')].map((z) => z.dataset.kind));
+  const centerCount = spitZoneKinds.filter((k) => k === 'rankAdjacent').length;
+  const perPlayerCascadeCount = spitZoneKinds.filter((k) => k === 'cascade').length;
+  assert(centerCount === 2, `Spit must build 2 shared rankAdjacent piles, got ${centerCount}`);
+  assert(perPlayerCascadeCount === 2, `Spit must build one cascade per player (2 players joined), got ${perPlayerCascadeCount}`);
+  console.log('D53: the Spit preset builds 2 shared rank-adjacent piles plus one per-player pile as each player joins');
+  await spitHost.close();
+  await spitGuest.close();
+
   // --- Auto-start at the expected player count (US-42, D30) ----------
   // A FRESH pair, deliberately after the main table is torn down: a third
   // live player would permanently reshape the seat ring that the D24/US-31

@@ -66,26 +66,58 @@ function makeDeckPile(deckConfig, rng) {
 }
 
 /**
+ * D53 (Sprint 22): `GameConfig.zones` declares a starting table layout
+ * (e.g. Solitaire's 4 foundations + 7 cascades) so a preset can build it
+ * automatically instead of the host manually clicking Add Zone N times.
+ * Only the SHARED (`ownerId: null`) entries build here - a `'perPlayer'`
+ * entry's count isn't knowable until a player actually exists, so those
+ * build at JOIN instead (below), the same "personal zone created on
+ * first join" timing D17 already established.
+ */
+/** "discard", 1 -> "Discard"; "cascade", 3 of 7 -> "Cascade 3" - only
+ * numbered when there's more than one, so Gin Rummy's single discard
+ * pile doesn't read as "Discard 1". */
+function configuredZoneName(kind, index, count) {
+  const capitalized = kind.charAt(0).toUpperCase() + kind.slice(1);
+  return count > 1 ? `${capitalized} ${index + 1}` : capitalized;
+}
+
+function buildConfiguredZones(zones) {
+  const piles = [];
+  for (const { kind, ownerId, count = 1 } of zones) {
+    if (ownerId === 'perPlayer') continue;
+    for (let i = 0; i < count; i++) {
+      piles.push(makeTableSidePile(kind, configuredZoneName(kind, i, count)));
+    }
+  }
+  return piles;
+}
+
+/**
  * Host-authoritative game state. This is the single source of truth per
  * ARCHITECTURE.md D3 — only the host runs `reduce`; other clients send
  * action requests and render from the state/view messages the host sends
  * back.
  * @param {{numDecks?: number, jokers?: number}} deckConfig
  * @param {() => number} [rng]
- * @param {{allowsPlayerZones?: boolean}} [gameConfig] D46: GameConfig's
- *   first real field - a third, separate param rather than nesting
- *   `deckConfig` inside it, so every existing call site (main.js, every
- *   test) stays valid unchanged. `allowsPlayerZones` defaults `true`,
- *   matching every prior sprint's behavior exactly (CREATE_ZONE was
- *   always available before this gate existed).
+ * @param {{allowsPlayerZones?: boolean, zones?: object[]}} [gameConfig]
+ *   D46: GameConfig's first real field - a third, separate param rather
+ *   than nesting `deckConfig` inside it, so every existing call site
+ *   (main.js, every test) stays valid unchanged. `allowsPlayerZones`
+ *   defaults `true`, matching every prior sprint's behavior exactly
+ *   (CREATE_ZONE was always available before this gate existed). D53:
+ *   `zones` defaults `[]`, same "additive, zero behavior change until a
+ *   preset actually sets it" shape.
  */
 export function createInitialState(deckConfig = {}, rng = Math.random, gameConfig = {}) {
+  const zones = gameConfig.zones ?? [];
   return {
     deckConfig,
-    gameConfig: { allowsPlayerZones: gameConfig.allowsPlayerZones ?? true },
+    gameConfig: { allowsPlayerZones: gameConfig.allowsPlayerZones ?? true, zones },
     piles: [
       makeDeckPile(deckConfig, rng),
       makePile('zone', { id: DEFAULT_ZONE_ID, name: 'Table' }),
+      ...buildConfiguredZones(zones),
     ],
     players: [],
     scores: {},
@@ -255,6 +287,14 @@ function transferCard(state, { fromPileId, toPileId, cardId, viewerId, action, p
   const toType = PILE_TYPES[toPile.kind];
   const movedCard = transform ? transform(card) : card;
 
+  // D53: the destination pile gets a real say in whether it accepts the
+  // card, not just whether it exists. Every pre-Sprint-22 kind accepts
+  // unconditionally (zero behavior change) - `foundation`/`cascade`/
+  // `rankAdjacent` are the first real callers.
+  if (!toType.canAccept(toPile, movedCard)) {
+    throw new Error(`Pile ${toPileId} cannot accept card ${cardId}`);
+  }
+
   // Two passes, remove-then-insert, exactly like the pre-D43 PLAY/
   // MOVE_CARD code did: this is what makes fromPileId === toPileId (a
   // same-zone reorder) work correctly without a special case - the
@@ -269,7 +309,8 @@ function transferCard(state, { fromPileId, toPileId, cardId, viewerId, action, p
 // `reduce()` used to be one large `switch (action.type)`, exactly the
 // shape D42/D43 just replaced for `pile.kind` - so it gets the same
 // prescription. Unlike Pile types (a multi-method contract: visibility/
-// dropRule/cardActions/canRemoveCard/removeCard/insertCard), an action
+// resolveDropTarget/canAccept/cardActions/canRemoveCard/removeCard/
+// insertCard), an action
 // type shares only ONE thing across every kind - "take state + this
 // action, return new state" - so this is the plain Command pattern
 // (one `apply(state, action)` per entry), not a second `src/piles/`-
@@ -292,6 +333,17 @@ const ACTIONS = {
     // time this playerId is seen, same "preserved on re-join" spirit
     // as scores/passed below.
     const alreadyHasPersonalZone = zonesOf(state).some((z) => z.ownerId === action.playerId);
+    // D53: a GameConfig.zones entry with `ownerId: 'perPlayer'` (e.g.
+    // Spit's per-player stock) builds here, on first join, alongside the
+    // existing personal zone - its count isn't knowable any earlier
+    // than this, since it's created once per actual player.
+    const perPlayerPiles = alreadyHasPersonalZone
+      ? []
+      : (state.gameConfig?.zones ?? [])
+          .filter((z) => z.ownerId === 'perPlayer')
+          .flatMap(({ kind, count = 1 }) =>
+            Array.from({ length: count }, (_, i) =>
+              makeTableSidePile(kind, `${action.name}'s ${configuredZoneName(kind, i, count)}`, action.playerId)));
     return {
       ...state,
       players: [
@@ -300,7 +352,7 @@ const ACTIONS = {
       ],
       piles: alreadyHasPersonalZone
         ? state.piles
-        : [...state.piles, makeZonePile(action.name, action.playerId)],
+        : [...state.piles, makeZonePile(action.name, action.playerId), ...perPlayerPiles],
       scores: { [action.playerId]: 0, ...state.scores },
       passed: { [action.playerId]: false, ...state.passed },
     };

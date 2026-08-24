@@ -163,3 +163,12 @@ practice (see CHAT.md's `*pm launch` messages for the exact list).
 menu-button/zone-heading text collision). The builder screen (the one
 piece of the framework epic never started) is waiting on real user
 product/UX input, not phase planning.
+
+---
+## Sprint 22 phase plan — 2026-08-24
+
+6 phases (task.md 62-67): 62 dropRule->polymorphism refactor (foundation,
+must land clean first), 63 foundation+cascade piles (Solitaire), 64
+rankAdjacent pile (Spit), 65 GameConfig.zones+2 presets, 66 e2e, 67
+reserved bug-fix. Morpheus-approved, no changes requested. Handed to
+Neo for Phase 62. Track phase-by-phase status in task.md as usual.

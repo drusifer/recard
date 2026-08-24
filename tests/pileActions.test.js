@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ACTION_SPECS, actionsForCard, targetsForAction, dropRuleFor } from '../src/pileActions.js';
+import { ACTION_SPECS, actionsForCard, targetsForAction, resolveDropTargetFor } from '../src/pileActions.js';
 
 const deck = { id: 'deck', kind: 'deck', ownerId: null };
 const myHand = { id: 'hand:me', kind: 'hand', ownerId: 'me' };
@@ -9,6 +9,8 @@ const table = { id: 'table', kind: 'zone', ownerId: null };
 const myZone = { id: 'z:me', kind: 'zone', ownerId: 'me' };
 const discard = { id: 'discard', kind: 'discard', ownerId: null };
 const ALL = [deck, myHand, theirHand, table, myZone, discard];
+const foundation = { id: 'f:hearts', kind: 'foundation', ownerId: null };
+const cascade = { id: 'c:1', kind: 'cascade', ownerId: null };
 
 // UPDATED for D42 (Sprint 13): `actionsForPileKind` (a kind-only,
 // pre-ownership-filter list) is gone - each pile TYPE's `cardActions`
@@ -85,10 +87,19 @@ test('an in-place action has no targets to highlight', () => {
   assert.deepEqual(targetsForAction('not-an-action', ALL, { viewerId: 'me' }), []);
 });
 
-test('dropRuleFor (D45): FAN for zone, STACK for discard, NONE for deck/hand, undefined for an unknown kind', () => {
-  assert.equal(dropRuleFor('zone'), 'FAN');
-  assert.equal(dropRuleFor('discard'), 'STACK');
-  assert.equal(dropRuleFor('deck'), 'NONE');
-  assert.equal(dropRuleFor('hand'), 'NONE');
-  assert.equal(dropRuleFor('nonsense'), undefined);
+test('targets (D53): foundation and cascade generalize tableSide for free, same as discard did in D45', () => {
+  assert.deepEqual(
+    targetsForAction('move', [...ALL, foundation, cascade], { viewerId: 'me', fromPileId: 'table' }),
+    ['z:me', 'discard', 'f:hearts', 'c:1'],
+  );
+});
+
+test('resolveDropTargetFor (D53): delegates to the pile module\'s own resolveDropTarget; an unknown kind resolves to no geometry, not a throw', () => {
+  const point = { x: 5, y: 5 };
+  const boxes = [{ cardId: 'a', left: 0, right: 10, top: 0, bottom: 10, width: 10 }];
+  assert.deepEqual(resolveDropTargetFor('deck', boxes, point), {});
+  assert.deepEqual(resolveDropTargetFor('discard', boxes, point), {});
+  assert.deepEqual(resolveDropTargetFor('nonsense', boxes, point), {});
+  assert.deepEqual(resolveDropTargetFor('zone', boxes, point),
+    { targetCardId: 'a', side: 'after', layout: 'stack' });
 });

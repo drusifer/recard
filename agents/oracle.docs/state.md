@@ -175,3 +175,20 @@ Current state: branch `touch-targets-and-pile-actions-sprint`, commit
 `44303e3`, clean, 260/260 unit tests green, e2e green as of last close.
 `docs/ARCHITECTURE.md` is current through D52. Nothing needs grooming
 right now.
+
+---
+## Sprint 22 groom (2026-08-24)
+
+Groomed: `docs/ARCHITECTURE.md` D53, `docs/USER_STORIES.md` US-56..59
+(+ the pre-existing-flake backlog entry), `task.md` Phases 62-67,
+`agents/oracle.docs/lessons.md` (4 new lessons), `agents/oracle.docs/
+memory.md` (1 milestone row + an explicit gap-marker row for the
+untracked D21-D52 span, rather than silently leaving the table looking
+current through D20). `docs/DECISIONS.md` untouched - its own header
+already marks it superseded by ARCHITECTURE.md's per-sprint sections
+(resolved Sprint 14), so D53 doesn't need a mirrored entry there.
+
+Current state: branch `touch-targets-and-pile-actions-sprint`, working
+tree has Sprint 22's uncommitted diff (not yet committed - awaiting
+Smith close-out + user sign-off), 288/288 unit tests green, e2e green
+(2 clean runs). `docs/ARCHITECTURE.md` is current through D53.

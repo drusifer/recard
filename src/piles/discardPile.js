@@ -21,8 +21,17 @@ export const visibility = 'mixed';
 
 /** No before/after halo - a discard pile has exactly one landing spot
  * (on top), so `dropTarget.js`'s geometry is never consulted for this
- * type (D45 wires `ui.js` to skip it for any non-`'FAN'` dropRule). */
-export const dropRule = 'STACK';
+ * type. D53: real method (own module owns "no geometry"), not a
+ * `dropRule` string `ui.js` branches on. */
+export function resolveDropTarget() {
+  return {};
+}
+
+/** D53: drop-only, but content-unconditional - anything may land on
+ * top. Unconditional accept keeps this a zero-behavior-change refactor. */
+export function canAccept() {
+  return true;
+}
 
 /** A discard pile is a legal PLAY/MOVE_CARD destination, the same
  * "table surface" category `zonePile` is - `state.js`'s zone-only

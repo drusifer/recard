@@ -1993,6 +1993,149 @@ necessary rather than at every phase).
   groom note in `docs/ARCHITECTURE.md` for the five real bugs that
   surfaced getting the suite honestly green.
 
+## Sprint 22 ("Zone/Pile polymorphism, proven by Solitaire + Spit") — US-56..59
+
+Direct user request, grounded before drafting rather than taken at face
+value: user asked to "complete the refactor to Zone/Pile APIs." Morpheus
+checked the actual code first and found no concrete driver for D38's
+original "separate Zone-type catalog" pitch — `ownerId`+`tableSide`+
+`pile.kind` already produce every zone behavior in use today, with zero
+config surface. Flagged this to the user rather than building ahead of
+need. User's answer sharpened the real ask: **elevate today's hardcoded
+`dropRule` enum + `ui.js` FAN/STACK branch into real per-pile-type
+methods** (Replace Conditional with Polymorphism), proven against two
+concrete games — Solitaire and Spit — not a speculative superset.
+
+### US-56: Foundation pile — same-suit, strictly ascending, append-only
+
+**As** a Solitaire player, **I want** a pile that only accepts the next
+card in suit-ascending order (empty → Ace, then rank+1 same suit),
+**so that** the foundation piles are real enforced game state, not just
+a place cards can be dropped.
+
+**AC:**
+- New pile kind `foundation`. `canAccept(pile, card)`: pile empty → card
+  is an Ace; else card matches top card's suit and `rank === top.rank +
+  1`.
+- Rejected drop = card returns to its origin, same as any other
+  rejected `MOVE_CARD` today (no new rejection UX to invent).
+- No card is ever removable from a foundation pile once placed (matches
+  standard Klondike; `canRemoveCard` always `false`) — this is a stated
+  simplification, not a bug: real Klondike allows taking a card back off
+  a foundation, deferred as a later relaxation if ever requested.
+
+### US-57: Cascade pile — alternating color, strictly descending, overlap-reveal
+
+**As** a Solitaire player, **I want** a tableau pile that only accepts a
+card one rank below the current top card, in the opposite color, **so
+that** the tableau enforces the actual build rule instead of accepting
+anything.
+
+**AC:**
+- New pile kind `cascade`. `canAccept(pile, card)`: pile empty → any
+  card (deal-time fill); else card is one rank below top card AND
+  opposite color (♥/♦ vs ♣/♠).
+- Reuses D21's existing `layout: 'overlap'` rendering — no new visual
+  mechanic, just a new accept rule gating what can land there.
+- **Explicitly out of scope:** moving a bound sequence of cards together
+  (dragging a 3-card run as one unit). Single-card `MOVE_CARD` only this
+  sprint — multi-card sequence moves are a real, separate feature
+  (bulk transfer shape, doesn't fit D43's single-card dispatch) and
+  Klondike is still playable card-by-card without it, just slower.
+
+### US-58: Rank-adjacent pile — either direction, any suit, shared (Spit's center)
+
+**As** a Spit player, **I want** a shared center pile that accepts any
+card one rank above OR below the current top card (any suit, wrapping
+King→Ace), **so that** both players can race to play to it per Spit's
+actual rule.
+
+**AC:**
+- New pile kind `rankAdjacent`. `canAccept(pile, card)`: pile empty →
+  any card; else `abs(card.rank - top.rank) === 1` mod 13 (wraps K↔A).
+- `tableSide: true`, `ownerId: null` always — it's shared, never a
+  personal zone.
+- No turn-order enforcement — Spit is explicitly simultaneous/real-time;
+  the existing `MOVE_CARD` authorization (any player may move a card
+  they can see/reach) already matches this, no new auth logic needed.
+
+### US-59: `dropRule` retired; GameConfig declares a starting zone layout
+
+**As** the codebase, **I want** each pile type to own its own
+`canAccept`/`resolveDropTarget` methods instead of `ui.js` branching on
+a `dropRule` string, **so that** adding a new pile behavior (this
+sprint proves it 3x) never touches `ui.js`/`dropTarget.js` again — and
+**as** a host, **I want** a Solitaire/Spit preset to build its own
+table (4 foundations + 7 cascades, or 2 rank-adjacent + per-player
+stock) automatically, **so that** I don't manually Add Zone 11 times to
+start a game.
+
+**AC:**
+- `dropRule` (`'NONE'`/`'FAN'`/`'STACK'`) is removed from every pile
+  module. `ui.js`'s `showZoneDragOver`/`performZoneDrop` call
+  `PILE_TYPES[kind].resolveDropTarget(...)` directly — one polymorphic
+  call site, zero kind-branching left in `ui.js`.
+  `dropTarget.js`'s halo geometry becomes `zonePile`'s/`cascade`'s own
+  `resolveDropTarget` implementation (still a pure, unit-testable
+  function — just owned by the module, not shared centrally by name).
+- Every existing pile type's behavior is bit-for-bit unchanged (`deck`/
+  `hand` keep `resolveDropTarget` returning "no geometry", `zone`/
+  `discard` keep exactly today's FAN/STACK behavior) — this is a real
+  refactor with a zero-behavior-change constraint on existing kinds,
+  same discipline as D42/US-47.
+- `GameConfig.zones: [{kind, ownerId: 'perPlayer'|null, count}]`
+  (additive field, defaults to `[]` = today's exact behavior: only the
+  auto-created personal+table+deck+hand zones). A preset MAY set it;
+  none of today's presets are required to.
+- New "Solitaire" and "Spit" presets exercise the full path end-to-end:
+  selecting them creates the real starting table, not just deck/deal
+  config.
+- Smith Gate 2: selecting either preset visibly populates the table
+  immediately (same "prefill on select" pattern existing presets
+  already use for deck/deal fields), not only once the game starts.
+
+**Explicitly out of scope:** the builder screen (unchanged — still
+needs your product/UX scoping); multi-card sequence drag (US-57's own
+note); turn-order/win-condition logic for either game (this app referees
+nothing, per the PRD's own Vision — these two games only exist here to
+*validate the primitives*, not to be fully implemented rule-checkers
+beyond pile accept-rules).
+
+---
+
+## Backlog: intermittent e2e flake in the guest-identity-reconnect scenario (2026-08-24)
+
+Found running Sprint 22's Phase 66 e2e gate, confirmed pre-existing (not
+caused by this sprint - baseline also fails via `git stash` comparison,
+and the sprint's diff touches zero session/identity/roster code). The
+"guest reloads and keeps their hand" scenario
+(`tests/e2e.smoke.mjs`, assertion "the host must have issued the guest
+an identity to remember") failed 2 of 5 total runs. Looks like a timing
+race in the real WebRTC/PeerJS identity-announce path (`session.sendTo`
+in the `roster` handler, `src/main.js`), not a logic bug - re-running
+always passes. Not investigated further this sprint (out of scope);
+worth a dedicated look if it starts failing more often.
+
+---
+
+## Backlog: Smith close-out finding, Sprint 22 (2026-08-24) - many-zone layout
+
+Real screenshot pass (not just green tests) after Phase 66's e2e gate,
+at 1440x900: the Solitaire preset's 11 declared zones (4 foundations +
+7 cascades, plus the default Table zone) render through the same flat
+zone-list panel every other game uses. At this zone count the list
+grows taller than the viewport and the personal roster/score card
+("Sol - connected") visually overlaps Cascade 4/5's panels. Functionally
+fine (every zone exists, is addressable, scrolls into view) - this is a
+layout/density problem, not a Pile/Zone API defect, and explicitly out
+of D53's scope (that story was the API, not per-game table layout).
+Not fixed here - a real solution needs a dedicated many-zone layout
+(grid/grouping by kind, or a scrollable table region), which is real
+design work belonging to a future sprint if Solitaire/Spit get picked
+up as real playable games rather than API-proving presets.
+
+---
+
 ## Backlog: two Smith close-out findings from the radial menu (2026-08-21)
 
 From a real screenshot pass (not just green tests) after D52's e2e fix

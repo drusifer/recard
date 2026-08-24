@@ -914,3 +914,145 @@ mutation dispatch through canAccept/insert/canRemove/remove, plus the
 in-place-action gap D41 named: Reveal/Shuffle/Split/Pass don't fit that
 shape) is unscheduled - see the Sprint 13 backlog entry in
 `docs/USER_STORIES.md`.
+
+---
+
+## Sprint 22 ("Zone/Pile polymorphism, proven by Solitaire + Spit") — US-56..59, D53
+
+Phase numbering resumes at 62 - task.md went stale after Sprint 13
+(Phase 61); Sprints 14-21 tracked phase-by-phase progress in
+`agents/CHAT.md`/`docs/ARCHITECTURE.md` instead. Disclosed here rather
+than silently reusing numbers or renumbering history.
+
+### Phase 62 — Foundation: retire `dropRule`, wire `canAccept`+`resolveDropTarget` polymorphism (zero behavior change) ✅ DONE
+Covers: US-59 (partial — the refactor half only, no new pile kinds yet).
+- [x] Each existing pile module (`deck`/`hand`/`zone`/`discard`) grows
+      `resolveDropTarget(cardBoxesInRow, point)`, moved out of `ui.js`'s
+      `dropRule === 'FAN' ? ... : ...` branch. `zonePile.js` delegates to
+      `dropTarget.js`'s existing pure halo math; the other three return
+      `{}` (no geometry), matching their exact prior behavior.
+- [x] `canAccept(pile, card)` added to all four (unconditional `true`),
+      wired into `state.js`'s `transferCard` as a real gate — zero
+      behavior change today, real infrastructure for Phase 63/64.
+- [x] `dropRule` export deleted from all four modules; `dropRuleFor()`
+      replaced by `resolveDropTargetFor()` in `pileActions.js`; `ui.js`
+      makes one polymorphic call (`showZoneDragOver`/`performZoneDrop`
+      now take `kind`, not a pre-resolved `dropRule` string) — zero
+      kind-branching left in `ui.js`. Dead `resolveDropTarget` import
+      removed from `ui.js`.
+- [x] 261/261 unit tests green (net +1: `dropRule` tests replaced by
+      `canAccept`/`resolveDropTarget` coverage in `piles.test.js` and
+      `pileActions.test.js`). Trin UAT passed, Morpheus reviewed the
+      actual diff (7 files, scoped exactly to the refactor, no stray
+      changes). e2e deferred to Phase 66 per the user's standing
+      frugal-e2e preference.
+
+### Phase 63 — `foundation` + `cascade` pile kinds (Solitaire) ✅ DONE
+Covers: US-56, US-57.
+- [x] `src/piles/foundationPile.js`: `canAccept` (empty→Ace, else
+      same-suit rank+1), `canRemoveCard` always `false`, `cardActions`
+      always `[]` (silent-lock, per Smith's Gate 2 note - no new UI).
+- [x] `src/piles/cascadePile.js`: `canAccept` (empty→any, else opposite
+      color + rank-1), `insertCard` auto-applies D21's `layout:
+      'overlap'` to every card after the first.
+- [x] Registered both in `pileTypes.js` - 6 kinds total now.
+      `CREATE_ZONE{kind:'foundation'|'cascade'}` worked with ZERO
+      `state.js` changes (D45's `tableSide` gate already generalizes),
+      confirming D53's polymorphism claim again.
+- [x] 12 new tests: module-level accept/reject + insertCard/layout
+      (`piles.test.js`), `targetsForAction` tableSide generalization
+      (`pileActions.test.js`), and 3 full reducer end-to-end tests
+      (`state.test.js`) proving Phase 62's `canAccept` wiring rejects
+      for real (not just returns `true` everywhere) - a non-Ace on an
+      empty foundation and a same-color card on a cascade both throw
+      `/cannot accept/` through the actual `PLAY` dispatch.
+- [x] 273/273 unit green.
+
+### Phase 64 — `rankAdjacent` pile kind (Spit) ✅ DONE
+Covers: US-58.
+- [x] `src/piles/rankAdjacentPile.js`: `canAccept` (empty→any, else
+      `abs(rank diff) === 1` or the K↔A wrap), STACK `insertCard` (top
+      = index 0, matching `discardPile`'s convention — `canAccept`
+      reads `pile.cards[0]` accordingly, not the array's last element).
+      `ownerId: null` always holds by construction — `CREATE_ZONE`
+      never takes an `ownerId` param, no extra enforcement needed.
+      No new authorization — confirmed existing `MOVE_CARD` auth
+      already covers "any player, any reachable card."
+- [x] 8 new tests (module-level accept/reject + wrap + STACK order,
+      1 full-reducer end-to-end). 280/280 unit green.
+
+### Phase 65 — `GameConfig.zones` + Solitaire/Spit presets
+Covers: US-59 (remainder). ✅ DONE
+- [x] `GameConfig.zones: [{kind, ownerId, count}]`, additive, defaults
+      `[]` (verified: `createInitialState`/`persistence.js`/`JOIN`
+      round-trip tests all confirm zero behavior change for every
+      pre-Sprint-22 preset).
+- [x] Table-build logic: shared (`ownerId: null`) entries build in
+      `createInitialState` (game creation); `'perPlayer'` entries build
+      per player in `JOIN` (count isn't knowable any earlier). Both
+      idempotent on reconnect, matching D17's existing personal-zone
+      pattern exactly.
+- [x] Two new presets: "Solitaire" (4 `foundation` + 7 `cascade`,
+      `cardsPerPlayer: 0`), "Spit" (2 `rankAdjacent` + a per-player
+      `cascade`, `cardsPerPlayer: 0`) — plus matching `RULES_REFERENCE`
+      entries (Smith Gate 1's existing linkage requirement).
+- [x] Smith Gate 2: preset preview text now names the declared table
+      layout (`describeConfiguredZones`, main.js) alongside the
+      existing deck/deal prefill, visible the instant the host selects
+      the preset — before Create Table, not only after.
+- [x] Real finding, disclosed: `cardsPerPlayer >= 1` was an existing
+      test invariant: Solitaire/Spit legitimately need `0` (the whole
+      deck goes to declared zones, not a hand) — relaxed to `>= 0` with
+      the reason written into the test, not silently loosened.
+      `#cards-per-player`'s HTML `min` also updated 1→0 to match.
+- [x] 15 new tests across `state.test.js`/`presets.test.js`. 288/288
+      unit green. `lint:design`: same 3 pre-existing violations as the
+      unmodified baseline (confirmed via `git stash` comparison) — zero
+      regression, nothing this phase touched CSS/layout.
+
+### Phase 66 — e2e verification ✅ DONE
+- [x] Full `tests/e2e.smoke.mjs` run confirms Phase 62's refactor causes
+      zero regressions (every existing zone/discard drop assertion
+      passes unchanged).
+- [x] Two new scenarios added: Solitaire preset builds its real table
+      (4 foundation + 7 cascade zones, verified via `.zone[data-kind]`
+      in the live DOM) reachable from host setup; Spit preset builds 2
+      shared rankAdjacent piles + one cascade per player as each joins.
+      Both go through the real host-setup form (preset select → preview
+      text → Create Table → Deal), proving the DOM/UI wiring unit tests
+      can't reach.
+- [x] **Scope note, not silently dropped**: the accept/reject rule
+      itself (legal move succeeds, illegal one throws) is NOT
+      re-proven via simulated drag in this pass - `state.test.js`
+      already proves it through the exact `reduce()` dispatch the host
+      runs (3 dedicated end-to-end tests added in Phase 63/64), and a
+      real Playwright drag would need a seeded/known deck to land a
+      specific rank+suit, adding real flakiness risk for coverage this
+      project already has at the correct layer.
+- [x] Real, disclosed flake found while running this gate (unrelated to
+      Sprint 22): the guest-identity-reconnect scenario
+      ("the host must have issued the guest an identity to remember",
+      ~line 1217) failed intermittently (2 of 5 runs total, including
+      one on the unmodified baseline via `git stash`) - a timing race
+      in the real WebRTC/PeerJS identity-announce path, not caused by
+      this sprint's diff (zero session/identity/roster code touched).
+      Confirmed not new: baseline fails at the identical assertion too.
+      Logged to backlog below, not fixed here - out of this sprint's
+      scope and pre-existing.
+- [x] 2 full suite runs green after the new scenarios were added and
+      fixed (join-flow selectors, `deal-btn` needed to reach the game
+      screen before `.zone` elements render).
+
+### Phase 67 — reserved bug-fix ✅ DONE, nothing found
+- [x] Final regression pass: 288/288 unit green, 2 full e2e runs green,
+      `lint:design` unchanged (same 3 pre-existing violations as
+      baseline). No real findings to fix - same clean outcome as
+      Sprint 13's Phase 61.
+
+### Sprint 22 status — SHIPPED
+6 phases (62-67), zero user-visible regressions on any existing kind,
+3 new Pile kinds (foundation/cascade/rankAdjacent) proven against
+Solitaire and Spit specifically per the user's own direction, `dropRule`
+enum fully retired in favor of real polymorphism. One pre-existing e2e
+flake found and disclosed (not caused by this sprint, not fixed here -
+see USER_STORIES.md backlog).

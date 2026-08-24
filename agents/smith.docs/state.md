@@ -386,3 +386,22 @@ touched. Don't assume it generalizes to future work without checking.
 
 Current state: branch `touch-targets-and-pile-actions-sprint`, commit
 `44303e3`, clean, 260/260 unit tests green.
+
+---
+## Sprint 22 gates — 2026-08-24
+
+Gate 1 (US-56..59): approved, 1 note - foundation pile's permanent lock
+should render silent (no hover row), matching D45/US-54's established
+hide-not-disable convention. Gate 2 (D53): approved, 1 ask - Solitaire/
+Spit preset selection should visibly prefill the table on select, same
+pattern existing presets already use for deck/deal fields. Both notes
+folded into US-59's AC. Next engagement: Stage-3 close-out test once
+implementation phases (task.md 62-67) finish.
+
+---
+## Sprint 22 close-out (2026-08-24)
+
+Real screenshot pass (Solitaire preset, 1440x900): Pile/Zone API renders
+correctly (11 zones, correct labels/kinds). 1 real finding backlogged,
+not fixed - many-zone flat-list layout overflows/overlaps at 11 zones
+(USER_STORIES.md). Out of scope for D53 (API, not layout). Sprint closed.

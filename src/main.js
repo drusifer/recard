@@ -84,6 +84,19 @@ function describeDeckConfig({ type, numDecks, jokers }) {
   return `${numDecks} ${typePrefix}${deckWord}, ${jokers} ${jokerWord}`;
 }
 
+/** D53: a one-line summary of a preset's declared `zones` (Solitaire's
+ * 4 foundations + 7 cascades, Spit's 2 rank-adjacent piles + a stock
+ * per player), or `''` for every pre-Sprint-22 preset that has none. */
+function describeConfiguredZones(zones) {
+  if (!zones?.length) return '';
+  return zones
+    .map(({ kind, ownerId, count = 1 }) => {
+      const word = count === 1 ? kind : `${kind}s`;
+      return ownerId === 'perPlayer' ? `${count} ${word}/player` : `${count} ${word}`;
+    })
+    .join(' + ');
+}
+
 // --- Rules reference (US-18): a toggleable overlay, not a showScreen()
 // swap, so opening it never loses table state (Smith Gate 1 AC). ---
 renderRulesPanel(document.getElementById('rules-content'), RULES_REFERENCE);
@@ -119,7 +132,13 @@ presetSelect.addEventListener('change', () => {
   document.getElementById('host-num-decks').value = String(preset.numDecks);
   document.getElementById('host-jokers').value = String(preset.jokers);
   const cardsWord = preset.cardsPerPlayer === 1 ? 'card' : 'cards';
-  previewEl.textContent = `${describeDeckConfig(preset)}, ${preset.cardsPerPlayer} ${cardsWord}/player`;
+  // D53 (Smith Gate 2): a preset that declares a starting table layout
+  // says so in the preview too, same "prefill on select" spirit as the
+  // deck/deal fields above - the host sees what they're getting before
+  // clicking Create Table, not only after.
+  const zonesText = describeConfiguredZones(preset.zones);
+  previewEl.textContent = `${describeDeckConfig(preset)}, ${preset.cardsPerPlayer} ${cardsWord}/player`
+    + (zonesText ? ` — table: ${zonesText}` : '');
   previewEl.hidden = false;
 });
 
@@ -550,8 +569,13 @@ document.getElementById('create-table').addEventListener('click', async () => {
     numDecks: Number(document.getElementById('host-num-decks').value),
     jokers: Number(document.getElementById('host-jokers').value),
   };
-  // D46: GameConfig's first real field.
-  const gameConfig = { allowsPlayerZones: document.getElementById('host-allow-player-zones').checked };
+  // D46: GameConfig's first real field. D53: `zones` comes from the
+  // selected preset (if any) - no manual host UI for it this sprint,
+  // matching the AC ("a preset MAY declare a starting layout").
+  const gameConfig = {
+    allowsPlayerZones: document.getElementById('host-allow-player-zones').checked,
+    zones: selectedPreset?.zones ?? [],
+  };
 
   session = Session.host({ name: myName });
   const createErrorEl = document.getElementById('host-create-error');
