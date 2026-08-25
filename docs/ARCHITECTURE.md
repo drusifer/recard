@@ -2438,6 +2438,81 @@ Fixed once, for every kind: capitalized, and only numbered when
 when there's more than one). Applies retroactively to Solitaire/Spit's
 zone names too - no separate naming rule per preset.
 
+### D54. Zone and Pile split into real, separate Web Components; Deck becomes a genuine Pile
+
+Direct follow-up session, same branch as D53: `renderZonePanel` had
+been doing three jobs at once — drawing the box, wiring move/resize,
+AND rendering a pile's own cards — so "a zone" and "the one pile in
+it" were indistinguishable in code even though D53 had already made
+them distinct in the data model. The user drove this incrementally
+across several corrections (own-zone-content cleanup → native Web
+Components for special panels → "don't conflate Piles and Zones" →
+"Piles should move with their containing zone" → "I don't want nested
+zones, I just want all piles in a zone" → "a Deck is a specific kind
+of Pile, not a rename, a refactor"), landing on the split named in
+this heading's title.
+
+**End state:** `renderPileShell` (extracted from `renderPile`) is the
+one function every Pile-type component calls against itself — header,
+`Actionable` addressability, drop-target wiring, no box, no move/
+resize. `renderZonePanel` is purely the box: one title, `wirePanelLayout`
+called exactly once, holding N Pile components. `<zone-panel>` is the
+single generic element that builds every zone shape (the Table Zone
+group, each player's zone, every standalone shared zone) — no more
+per-shape components (`TableZone.js`/`PlayerZone.js`/`SeatZone.js`,
+all deleted). `<pile-panel>`, `<fan-pile>`, and `<deck-stack>` are
+three equally-thin, fully self-contained Pile components; `renderZones`
+picks between them off each pile type's own declared `rowShape`
+(`deckPile.js`/`handPile.js`), never a kind-check inside a shared
+renderer. A bare pile inside a group (`opts.bare`, D53-session-internal)
+still gets its own `<header-actions>` title bar — grouped-into-a-zone
+never means non-Actionable.
+
+**The Deck is a real Pile now, not a special case:** `viewFor` pushes
+it into `view.zones` (dual-routed, same pattern the hand pile already
+used before D-current), instead of only exposing it via `deckCount` —
+so it renders through the same generic pipeline and groups into the
+Table Zone alongside Table/Discard, same as any other pile. The old
+bespoke `<deck-zone>` property/event-driven element is deleted.
+
+**Also landed in the same session, all direct consequences of pulling
+this thread:** presets can seed a starting local panel layout
+(`applyPresetLayout`, `panelLayout.js`) — every preset now declares
+one (Gin Rummy gets the user's own captured blob verbatim; simple
+presets get a calibrated table-zone+score layout; Solitaire/Spit get
+programmatic grids). Opponent scores get their own `<score-zone>` each
+(parity had been lost when the player roster was retired earlier in
+the session — this restores it, keyed per-seat so each moves
+independently). The hand's fan curve switched from linear to quadratic
+droop, so it reads as a real arc instead of a triangular peak.
+
+**Two real pre-existing bugs found and fixed at the source while doing
+this, not worked around:** (1) the Table Zone's own `wirePanelLayout`
+id was `'table'` (the pile's own id) instead of `'table-zone'` — every
+preset's `table-zone` layout entry had been silently never applying,
+for as long as preset layouts existed. (2) player zones added
+`.seat-zone` *before* calling `.render()`, which wipes `className` —
+silently losing all positioning styling every render.
+
+**Rejected, same reasoning as D53:** keeping Zone and Pile
+distinguishable only by convention/naming rather than as genuinely
+separate component boundaries — the whole point of this session was
+that the prior "one renderer, kind-checked" shape kept re-blurring the
+line the data model (D53) had already drawn.
+
+**Verified:** 303 → 308 unit tests, all green, stylelint clean.
+`lint:design` tracked real, screenshot-confirmed improvement across the
+session (33 → 12 → 10 → 7 → 6 violations), landing back at exactly the
+pre-session 6-violation baseline. `tests/e2e.smoke.mjs` was NOT updated
+this session (flagged, not silently skipped) — it predates this work
+and is substantially out of date; a dedicated pass is still open.
+
+**Open, standing items carried forward:** per-seat anchor geometry for
+non-viewer seats (the "Table Zone overlaps Bob"-class findings), the
+`tests/e2e.smoke.mjs` update pass, and `handPile.redactCard` (hand
+cards currently leak to every viewer via `view.zones` — no privacy
+enforcement yet, the biggest real gap of the three).
+
 ## Module Layout
 ```
 index.html              entry page, host/join screens, game screen
@@ -2507,6 +2582,19 @@ cover (visual/UX judgment calls, not just functional correctness).
   per phase.
 
 ## Open Items Carried Forward (not blocking v1)
+- **`handPile.redactCard` — no privacy enforcement.** Hand cards leak to
+  every viewer via `view.zones` since the roster-retirement/D54 session
+  moved the hand into the generic zone pipeline. The single biggest
+  open gap as of D54 — flagged repeatedly through that session, not
+  fixed yet.
+- **Per-seat anchor geometry for non-viewer seats** — D54's Table Zone
+  growth (Deck joining it) produces real overlaps against seat/score
+  panels at several desktop widths; needs a per-seat anchor direction
+  based on ring position, not the one constant direction used today.
+- **`tests/e2e.smoke.mjs` is substantially out of date** relative to the
+  D53/D54 DOM (missing `#game-deck-area`, predates the Zone/Pile
+  component split) — deliberately deferred all of D54's session, needs
+  its own dedicated update pass.
 - **3+ players at ~1024px: a personal seat zone overlaps the shared pot.**
   Surfaced at Sprint 9 while adding touch coverage; D24's grown zone caps
   had only ever been measured against a two-player seat ring. Distinct

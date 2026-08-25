@@ -19,7 +19,7 @@ hole cards) · see other players actually dragging cards live, in real
 time · quick-start presets for common games · simple +/- score tracking ·
 an in-app rules reference · works solo for solitaire-type games too ·
 sort your hand by rank/suit or drag to reorder, both persist ·
-deal and re-deal straight from the deck itself · a self-toggle "Passed" marker · optionally start the game automatically once everyone you're expecting has joined.
+deal and re-deal straight from the deck itself · a self-toggle "Passed" marker · optionally start the game automatically once everyone you're expecting has joined · drag panels around the table and resize them to your own layout, remembered locally per browser · see every player's score, not just your own.
 
 See `docs/PRD.md` for the product vision and `docs/ARCHITECTURE.md` for
 the technical design.
@@ -48,12 +48,12 @@ npm run lint:design   # design-lint only - renders the real app and checks
                        # touch targets under 44px, across 6 real viewports
 ```
 
-**`lint:design` currently fails** — it found 70 pre-existing touch-target
-violations (buttons under the documented 44px floor) on its first run,
-2026-08-20. That's real, known debt, not a bug in the checker (cross-
-verified against Playwright's own `boundingBox()`); see `docs/
-USER_STORIES.md` Backlog. Wired in as blocking rather than left silent so
-the count can't quietly grow while it's unfixed.
+**`lint:design` currently reports 6 known violations** (down from 70 at
+its first run, 2026-08-20) — all phone-width (390/375px) zone-overlap
+cases, disclosed and tracked rather than silently accepted; see
+`docs/ARCHITECTURE.md` D54 and `docs/USER_STORIES.md` Backlog. Wired in
+as blocking rather than left silent so the count can't quietly grow
+while it's unfixed.
 
 `npm run test:e2e` needs a Chromium build Playwright can launch — either
 run `npx playwright install chromium` once, or have a system Chromium/
@@ -95,18 +95,26 @@ Chrome installed (the test falls back to `/usr/bin/chromium`,
 - **Multi-touch gestures (pinch, rotate) and long-press menus do
   nothing.** Touch support covers dragging cards; it isn't a full mobile
   gesture vocabulary.
+- **Hand cards are not actually private from other players yet.** Since
+  a player's seat became a real Pile in the shared zone pipeline,
+  `handPile.redactCard` was never implemented — hand contents currently
+  reach every viewer, not just their owner. The single biggest known
+  gap as of `docs/ARCHITECTURE.md` D54; not yet fixed.
+- **`tests/e2e.smoke.mjs` is out of date** relative to the current DOM
+  (Zone/Pile split into Web Components, D54) — a dedicated update pass
+  is still open.
 
 ## How it works, briefly
 
 - Host's browser is the hub (star topology) and holds the one true copy
   of the game state (deck, hands, table). Everyone else connects only to
   the host, never to each other.
-- A player's hand is only ever sent to that player's own connection —
-  never broadcast — so privacy holds at the data layer, not just the UI.
-  The same rule extends to the shared "middle": a face-down card's
-  rank/suit only ever reaches clients allowed to see it (nobody, for a
-  shared face-down card; just its owner, for a private one) — never sent
-  and hidden in the UI, actually never sent.
+- The shared "middle" enforces privacy at the data layer, not just the
+  UI: a face-down card's rank/suit only ever reaches clients allowed to
+  see it (nobody, for a shared face-down card; just its owner, for a
+  private one) — never sent and hidden in the UI, actually never sent.
+  **Hand privacy is currently a known gap** (see Known limitations
+  below) — this data-layer guarantee does not yet extend to hands.
 - Card movement (organizing your hand, or actually dragging a card on the
   table) shows up on other screens live, best-effort and throttled — a
   card you're not allowed to see stays an anonymous back the whole time
@@ -118,7 +126,7 @@ Full rationale: `docs/ARCHITECTURE.md`.
 
 - [`docs/PRD.md`](docs/PRD.md) — product vision, scope, feasibility flags
 - [`docs/USER_STORIES.md`](docs/USER_STORIES.md) — user stories + acceptance criteria
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — technical design (D1-D19), testing strategy
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — technical design (D1-D54), testing strategy
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) — decision log with context/consequences
 - [`task.md`](task.md) — sprint task board
 - `agents/` — Bob Protocol persona docs, state, and team chat log (`agents/CHAT.md`)

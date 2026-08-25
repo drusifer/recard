@@ -177,6 +177,47 @@ Current state: branch `touch-targets-and-pile-actions-sprint`, commit
 right now.
 
 ---
+## Post-Sprint-22 / D54 groom (2026-08-25)
+
+Groomed after the ad-hoc post-Sprint-22 session that split Zone and
+Pile into real Web Components (commit `ab75f0a`). Added:
+- `docs/ARCHITECTURE.md`: D54 entry (full narrative - the five-round
+  user-corrected design path, the Deck-becomes-a-Pile change, two
+  real pre-existing bugs found+fixed, verification numbers), plus
+  refreshed "Open Items Carried Forward" with the 3 current standing
+  gaps (handPile.redactCard privacy, per-seat anchor geometry,
+  e2e.smoke.mjs staleness) at the top, above the older still-open items.
+- `agents/oracle.docs/memory.md`: Major Decisions +1 row (D54),
+  Repository Structure section refreshed (chat_archive listing,
+  src/piles + src/components, current test count 308).
+- `agents/oracle.docs/lessons.md`: 3 new lessons - checker-selector rot
+  after a DOM rename (false-positive-clean, not just false-positive-red),
+  iterative user corrections as real design refinement not scope creep,
+  geometric proof over screenshot-read applied to a new claim shape
+  (fan curve).
+- `README.md`: fixed a real doc/code contradiction found while
+  grooming - "How it works" claimed hand privacy holds at the data
+  layer, which stopped being true when the hand became a real Pile in
+  the shared zone pipeline (handPile.redactCard was never implemented).
+  Corrected the claim, added the gap to Known Limitations explicitly
+  rather than leaving stale documentation standing. Also refreshed the
+  long-stale `lint:design` status line (70 -> 6 violations) and added 2
+  small user-visible feature bullets (panel drag/resize, opponent
+  scores) that had shipped with no README mention.
+- `agents/CHAT.md`: was at 138 messages (well over the 50-100
+  threshold), archived the top 103 (messages spanning Sprint 12 through
+  Sprint 22 + the full D54 ad-hoc session) to
+  `agents/chat_archive/CHAT_SPRINT_12_22.md`, regenerated
+  `CHAT.diagram.md` via `bobp chat-diagram`.
+
+`docs/DECISIONS.md` untouched - still correctly marked superseded by
+ARCHITECTURE.md's per-sprint sections (resolved Sprint 14).
+
+Current state: branch `touch-targets-and-pile-actions-sprint`, commit
+`ab75f0a` (pushed to main), working tree has this groom's docs-only
+diff uncommitted. `docs/ARCHITECTURE.md` is current through D54.
+
+---
 ## Sprint 22 groom (2026-08-24)
 
 Groomed: `docs/ARCHITECTURE.md` D53, `docs/USER_STORIES.md` US-56..59

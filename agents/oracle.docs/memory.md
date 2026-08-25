@@ -25,20 +25,28 @@ This file serves as a consolidated index of project-wide decisions, historical c
 | 2026-08-16 | v1.4: desktop table width - two `@media` tiers on `#screen-game` (1024px->1100px, 1440px->1300px) (D20) | User: "I need more room on desktop browsers"; `seating.js` geometry already percentage-based, so pure CSS was provably sufficient, verified before deciding | First Fast-Track (1-phase) sprint, zero JS/state/protocol change; Trin's UAT found a real AC-coverage gap in Neo's own tests and a real (non-blocking) 2-player vertical-seat-geometry limitation, see `docs/DECISIONS.md` |
 | 2026-08-24 | (table gap, D21-D52: Sprints 6-21 shipped via background agents, tracked in CHAT.md/ARCHITECTURE.md/USER_STORIES.md rather than backfilled here - see each persona's state.md "Shutdown prep catch-up" note) | | |
 | 2026-08-24 | Sprint 22: `dropRule` enum retired for real polymorphism (`canAccept`/`resolveDropTarget` owned per pile module); 3 new Pile kinds (`foundation`/`cascade`/`rankAdjacent`) proven against Solitaire + Spit specifically; `GameConfig.zones` lets a preset auto-build its table (D53) | User asked to "complete the refactor to Zone/Pile APIs" - checked for a concrete driver first (none existed for D38's original separate Zone-type catalog), user's follow-up reframed the real ask as polymorphism + two named games | 6-phase sprint (62-67), zero regressions on any existing kind, 288/288 unit + 2 clean e2e runs; one pre-existing e2e flake found+disclosed (not caused by this sprint), see `docs/USER_STORIES.md` backlog |
+| 2026-08-25 | Zone and Pile split into genuinely separate Web Components (`renderPileShell`/`renderZonePanel`); Deck becomes a real Pile routed through `view.zones` instead of a bespoke `<deck-zone>` (D54) | Prior renderer conflated box-drawing, move/resize wiring, and pile-card rendering in one function - user drove the split incrementally across several corrections until Zone/Pile were separate in code, matching what D53 had already made separate in data | 303->308 unit green, stylelint clean, `lint:design` tracked 33->12->10->7->6 (back to pre-session baseline); found+fixed 2 real pre-existing bugs (table-zone's own wirePanelLayout id, seat-zone className wipe); `tests/e2e.smoke.mjs` NOT updated (flagged, deferred), `handPile.redactCard` privacy gap still open, see `docs/ARCHITECTURE.md` D54 |
 
 ## Repository Structure Memory
 - `agents/`: Contains persona-specific documentation and state.
   `agents/chat_archive/`: archived CHAT.md snapshots by sprint moniker
-  (current: `CHAT_SPRINT_1_2.md`; Sprint 3 archived this groom too, see
-  below).
+  (current, newest last: `CHAT_SPRINT_1_2.md`, `CHAT_SPRINT_3_4.md`,
+  `CHAT_recard-sprint-9.md`, `CHAT_recard-sprint-10.md`,
+  `CHAT_recard-sprint-11.md`, `CHAT_SPRINT_12_22.md`).
 - `docs/`: Global documentation (PRD.md, ARCHITECTURE.md, DECISIONS.md, USER_STORIES.md).
-- `task.md`: Single source of truth for the current sprint (maintained by Mouse). Sprints 1-3 DONE; Sprint 4 implementation (Phases 21-26) DONE as of 2026-08-15, Stage 3 close-out in progress.
+- `task.md`: Sprint history log (maintained by Mouse), current through Sprint 22 (Phases 62-67).
 - `src/`: app source — deck.js, state.js (reducer + viewFor redaction),
   protocol.js (incl. v1.3's `cardDragPayload`, D19), session.js, ui.js,
   qrcode.js, presets.js, rulesReference.js, handOrder.js (v1.2, D14),
-  seating.js (v1.3, D18), main.js.
-- `tests/`: unit tests (`*.test.js`, run via `npm test`, 86 passing) +
-  `e2e.smoke.mjs` (`npm run test:e2e`, real 2-browser Playwright/WebRTC;
-  now also covers personal zones, drag-and-drop play/move, and live
-  card-drag broadcast privacy).
+  seating.js (v1.3, D18), panelLayout.js (local per-viewer panel
+  move/resize + preset layout seeding), touchDrag.js, pileActions.js,
+  main.js; `src/piles/{pileTypes,deckPile,handPile,zonePile,...}.js`
+  (D42/D53) - foundation/cascade/rankAdjacent added D53;
+  `src/components/` (D54) - `<zone-panel>`, `<pile-panel>`, `<fan-pile>`,
+  `<deck-stack>`, `<score-zone>`, `<header-actions>` as native Web
+  Components.
+- `tests/`: unit tests (`*.test.js`, run via `npm test`, 308 passing as
+  of D54) + `e2e.smoke.mjs` (`npm run test:e2e`, real 2-browser
+  Playwright/WebRTC) - **stale as of D54**, predates the Zone/Pile
+  component split, dedicated update pass still open.
 - `index.html`/`style.css`: the static site itself.

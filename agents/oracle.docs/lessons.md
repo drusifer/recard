@@ -446,3 +446,28 @@ This file contains critical lessons and rules derived from past errors, technica
   Solitaire/Spit genuinely deal to declared zones, not a hand - the test
   now says so inline, so a future reader sees WHY 0 is valid rather than
   wondering if the floor was carelessly dropped.
+- **A checker's own selectors can silently rot when the DOM they target
+  is renamed.** `designLint`'s overlap check kept reporting "clean"
+  after a Web-Component rename because it queried removed ids and found
+  zero zones to compare, not because the layout was actually fine. Any
+  DOM-id-renaming pass should re-verify the checker's OWN selectors
+  still match something real, not just trust a clean run - a
+  false-positive-clean state is worse than a known-red one because
+  nothing signals it needs attention. (D54 session, recurred twice.)
+- **Iterative user corrections toward a smaller, sharper shape are not
+  scope creep - each one is a real design correction worth taking at
+  face value.** D54's Zone/Pile split went through five rounds of "not
+  quite, actually X" before landing (own-zone cleanup -> Web Components
+  -> "don't conflate Piles/Zones" -> "no nested zones, just piles in a
+  zone" -> "Deck is a Pile, refactor don't rename"). Treating each
+  correction as reopening the design rather than a nit to bolt onto the
+  last cut is what got to the actually-right shape instead of a
+  compromise between five half-right ones.
+- **A geometric claim needs a geometric proof, not a screenshot read -
+  even for something as visual as a card fan's curve.** Two rounds of
+  "looks more triangular than curved" only resolved once Neo measured
+  real per-card edge deltas and showed they strictly decreased toward
+  center (the parabola signature) - the actual bug (linear droop, not
+  quadratic) wasn't visible from eyeballing alone. Same standing lesson
+  as the fan-clipping and density-measurement precedents, reapplied to
+  a new shape of claim.
