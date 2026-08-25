@@ -119,83 +119,16 @@
     <section class="panel panel-felt table-section">
       <h2 class="sr-only">Table</h2>
       <div id="table-surface" class="table-surface">
-        <!-- The draw stock sits in the middle of the table with the
-             shared piles, the way it would on a real one. `#table-area`
-             is re-rendered wholesale by renderZones, so the deck lives
-             beside it in a shared centred wrapper rather than inside. -->
-        <div id="table-center">
-          <div class="deck-column">
-            <div id="game-deck-area" class="deck-area"></div>
-            <!-- US-41: a failed deal reports beside the deck, where the
-                 click that caused it happened. Outside #game-deck-area
-                 because renderDeck rebuilds that wholesale. -->
-            <p id="deck-error" class="error-text" hidden></p>
-          </div>
-          <div id="table-area"></div>
-        </div>
-        <div id="seat-zones"></div>
-        <!-- D51 (table-unification pass): the hand is a Pile like any
-             other (`src/piles/handPile.js`, D39/D42) - it now RENDERS
-             like one too, as a zone on the table at the viewer's own
-             seat, instead of a separate "Your hand" section below it.
-             Sibling of #seat-zones rather than a child: renderSeatZones
-             wipes that container wholesale every render
-             (`container.innerHTML = ''`), which would destroy this
-             element if it lived inside. Positioned by JS
-             (`positionHandZone`, src/ui.js) using the same
-             `seatPosition()` geometry every other seat zone uses -
-             viewer is always seat index 0 (D18), i.e. the bottom of the
-             ring, matching "my hand is right in front of me." -->
-        <div id="hand-zone" class="zone seat-zone hand-zone">
-          <div class="zone-name" id="hand-zone-name">Hand</div>
-          <div id="hand-area" class="card-row"></div>
-          <div class="btn-row hand-zone-controls">
-            <!-- Sprint 12 (D34/D37): Sort by rank/suit and Pass live on
-                 the hand's own pile-hover actions now. D51: the "..."
-                 anchor toggle is gone - hovering the hand zone itself
-                 (like hovering a card) reveals them; see
-                 `renderPileAnchor`'s `hostEl` param. -->
-            <!-- D51 follow-up (direct user request): "public" is no
-                 longer an option here - Play and Play Hidden are two
-                 separate actions now (a plain tap/drag is always public;
-                 Play Hidden lives on the card's own hover row), so this
-                 selector only ever needs to say WHICH hidden mode Play
-                 Hidden uses. -->
-            <label class="play-as-label" for="play-as">Hide as
-              <select id="play-as">
-                <option value="shared-facedown">face-down (hidden from all)</option>
-                <option value="private-facedown">face-down (only you)</option>
-              </select>
-            </label>
-          </div>
-        </div>
-        <ul id="game-roster" class="roster"></ul>
-      </div>
-      <div class="btn-row" id="add-zone-row">
-        <input id="new-zone-name" type="text" placeholder="New zone name" maxlength="24" />
-        <!-- D45: kind defaults to a plain zone - CREATE_ZONE's own
-             validation is the source of truth for what's legal here,
-             this list is just its two current table-side options. -->
-        <select id="new-zone-kind" aria-label="New zone type">
-          <option value="zone">Zone</option>
-          <option value="discard">Discard pile</option>
-        </select>
-        <button id="create-zone-btn" type="button">Add Zone</button>
-        <!-- US-41: "Deal More (no reset)" and its orphaned number input
-             used to live here, in a row about zones, named for something
-             other than what a host looking to deal would search for.
-             Dealing is now an action on the deck itself (D29). -->
-      </div>
-      <!-- D46: CREATE_ZONE can now be rejected (GameConfig.allowsPlayerZones
-           false) - transient, beside the control that caused it, same
-           pattern as #deck-error (US-41). -->
-      <p id="zone-error" class="error-text" hidden></p>
-      <!-- D51: host-only table utilities, relocated out of the now-
-           removed "Your hand" section - unrelated to the hand, always
-           were table/game-level resets. -->
-      <div class="btn-row">
-        <button id="reset-btn" type="button" class="btn-danger" hidden>Reshuffle &amp; Reset</button>
-        <button id="reset-scores-btn" type="button" class="btn-danger" hidden>Reset Scores</button>
+        <!-- UX follow-up (direct user request): "just have table-surface
+             -> zone" - every pile/zone panel (shared, personal, AND the
+             deck) is a direct child of this one container now, no
+             `#table-center`/`#table-area`/`#seat-zones` split. Rebuilt
+             wholesale every render by `ui.js`'s `renderZones`/`main.js`. -->
+        <div id="zones"></div>
+        <!-- US-41: a failed deal reports beside the deck, where the
+             click that caused it happened. Outside `#zones` because that
+             container is rebuilt wholesale every render. -->
+        <p id="deck-error" class="error-text" hidden></p>
       </div>
     </section>
   </main>

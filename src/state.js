@@ -44,21 +44,16 @@ function makePile(kind, { id, name, ownerId = null, cards = [] }) {
 
 /**
  * D17 (generalized by D23, D45): shared pile-construction for
- * `CREATE_ZONE`, `JOIN`'s auto-created personal zone, and `SPLIT_DECK`'s
- * piles — a personal zone is an ordinary zone pile, just with `ownerId`
- * set (used for UI seat placement only; every reducer treats it like
- * any other). `kind` defaults to `'zone'` for JOIN/SPLIT_DECK's own
- * fixed calls; only `CREATE_ZONE` ever passes a different one.
+ * `CREATE_ZONE` and `JOIN`'s per-player configured zones (Spit's
+ * per-player stock, etc). `kind` defaults to `'zone'` for `CREATE_ZONE`'s
+ * own default; every other caller passes an explicit one.
  */
-function makeTableSidePile(kind, name, ownerId = null) {
-  const id =
-    typeof crypto !== 'undefined' && crypto.randomUUID
+function makeTableSidePile(kind, name, ownerId = null, id = null) {
+  const resolvedId = id ??
+    (typeof crypto !== 'undefined' && crypto.randomUUID
       ? crypto.randomUUID()
-      : `zone-${Date.now()}-${Math.random()}`;
-  return makePile(kind, { id, name, ownerId });
-}
-function makeZonePile(name, ownerId = null) {
-  return makeTableSidePile('zone', name, ownerId);
+      : `zone-${Date.now()}-${Math.random()}`);
+  return makePile(kind, { id: resolvedId, name, ownerId });
 }
 
 function makeDeckPile(deckConfig, rng) {
@@ -71,8 +66,7 @@ function makeDeckPile(deckConfig, rng) {
  * automatically instead of the host manually clicking Add Zone N times.
  * Only the SHARED (`ownerId: null`) entries build here - a `'perPlayer'`
  * entry's count isn't knowable until a player actually exists, so those
- * build at JOIN instead (below), the same "personal zone created on
- * first join" timing D17 already established.
+ * build at JOIN instead (below), on first join only.
  */
 /** "discard", 1 -> "Discard"; "cascade", 3 of 7 -> "Cascade 3" - only
  * numbered when there's more than one, so Gin Rummy's single discard
@@ -82,12 +76,30 @@ function configuredZoneName(kind, index, count) {
   return count > 1 ? `${capitalized} ${index + 1}` : capitalized;
 }
 
+/** UX follow-up (direct user request - *nit "adjust the presets for
+ * the new layout settings"): a configured (preset-declared) zone's id
+ * is deterministic now - `kind` alone when there's only one (mirrors
+ * `configuredZoneName`'s own un-numbered case), else `kind-N`, plus the
+ * owning player's id for a `perPlayer` zone (needed for uniqueness -
+ * every player gets their own pile of the same kind/index). Panel
+ * position/size is a local, per-browser preference now
+ * (`panelLayout.js`), keyed by pile id - `makeTableSidePile`'s own
+ * random `crypto.randomUUID()` meant a player's arranged Solitaire
+ * table (11 zones) reset to the default layout on every new game, even
+ * of the exact same preset. A plain CREATE_ZONE-added zone still gets a
+ * random id: it has no preset-declared "shape" to be stable ACROSS games
+ * in the first place. */
+function configuredZoneId(kind, index, count, ownerId = null) {
+  const base = count > 1 ? `${kind}-${index + 1}` : kind;
+  return ownerId ? `${base}-${ownerId}` : base;
+}
+
 function buildConfiguredZones(zones) {
   const piles = [];
   for (const { kind, ownerId, count = 1 } of zones) {
     if (ownerId === 'perPlayer') continue;
     for (let i = 0; i < count; i++) {
-      piles.push(makeTableSidePile(kind, configuredZoneName(kind, i, count)));
+      piles.push(makeTableSidePile(kind, configuredZoneName(kind, i, count), null, configuredZoneId(kind, i, count)));
     }
   }
   return piles;
@@ -130,9 +142,16 @@ export function createInitialState(deckConfig = {}, rng = Math.random, gameConfi
 // indexing `state.piles` by hand, so "which pile kind am I looking at"
 // is stated once here instead of re-derived at every call site.
 
-/** The draw stock's cards. */
+/** The draw stock's cards. UX follow-up: matched by `id`, not `kind`,
+ * now that a deck-kind pile is no longer necessarily THE deck - decks
+ * can be created/moved into zones like any other table-side pile
+ * (`deckPile.tableSide`), so more than one may exist. `DECK_PILE_ID` is
+ * still the one and only pile DRAW/DEAL/SHUFFLE_DECK/SPLIT_DECK act on
+ * - the D24 invariant ("exactly one deck pile always exists") now reads
+ * as "exactly one pile with this SPECIFIC id", not "exactly one pile of
+ * this kind". */
 export function deckOf(state) {
-  return state.piles.find((p) => p.kind === 'deck').cards;
+  return state.piles.find((p) => p.id === DECK_PILE_ID).cards;
 }
 
 /** One player's hand. Empty (not undefined) if they have no hand pile yet. */
@@ -328,31 +347,35 @@ function transferCard(state, { fromPileId, toPileId, cardId, viewerId, action, p
 // same as before this change).
 const ACTIONS = {
   JOIN(state, action) {
-    // D17: a returning player (SET_CONNECTION reconnect-of-same-id
-    // case) already has a personal zone - only create one the first
-    // time this playerId is seen, same "preserved on re-join" spirit
-    // as scores/passed below.
-    const alreadyHasPersonalZone = zonesOf(state).some((z) => z.ownerId === action.playerId);
+    // UX follow-up (direct user request): the D17 auto-created personal
+    // zone is retired - a player's seat is their hand pile now (D42's
+    // `handPile`, `tableSide: true` as of this same change), created
+    // lazily by `ensureHandPile` on first deal/draw/pickup, not eagerly
+    // here. "Has this player already joined before" (so a reconnect
+    // doesn't re-trigger one-time setup) is now asked directly of the
+    // roster instead of inferred from personal-zone existence.
+    const alreadyJoined = state.players.some((p) => p.id === action.playerId);
     // D53: a GameConfig.zones entry with `ownerId: 'perPlayer'` (e.g.
-    // Spit's per-player stock) builds here, on first join, alongside the
-    // existing personal zone - its count isn't knowable any earlier
-    // than this, since it's created once per actual player.
-    const perPlayerPiles = alreadyHasPersonalZone
+    // Spit's per-player stock) builds here, on first join - its count
+    // isn't knowable any earlier than this, since it's created once per
+    // actual player.
+    const perPlayerPiles = alreadyJoined
       ? []
       : (state.gameConfig?.zones ?? [])
           .filter((z) => z.ownerId === 'perPlayer')
           .flatMap(({ kind, count = 1 }) =>
             Array.from({ length: count }, (_, i) =>
-              makeTableSidePile(kind, `${action.name}'s ${configuredZoneName(kind, i, count)}`, action.playerId)));
+              makeTableSidePile(
+                kind, `${action.name}'s ${configuredZoneName(kind, i, count)}`, action.playerId,
+                configuredZoneId(kind, i, count, action.playerId),
+              )));
     return {
       ...state,
       players: [
         ...state.players.filter((p) => p.id !== action.playerId),
         { id: action.playerId, name: action.name, connection: 'connected' },
       ],
-      piles: alreadyHasPersonalZone
-        ? state.piles
-        : [...state.piles, makeZonePile(action.name, action.playerId), ...perPlayerPiles],
+      piles: alreadyJoined ? state.piles : [...state.piles, ...perPlayerPiles],
       scores: { [action.playerId]: 0, ...state.scores },
       passed: { [action.playerId]: false, ...state.passed },
     };
@@ -384,7 +407,8 @@ const ACTIONS = {
     let piles = state.piles;
     for (const player of players) piles = ensureHandPile(piles, player.id);
     piles = piles.map((p) => {
-      if (p.kind === 'deck') return withCards(p, remaining);
+      // UX follow-up: `id`, not `kind` - see `deckOf`'s own comment.
+      if (p.id === DECK_PILE_ID) return withCards(p, remaining);
       if (p.kind !== 'hand') return p;
       const index = players.findIndex((pl) => pl.id === p.ownerId);
       if (index === -1) return fresh ? withCards(p, []) : p;
@@ -396,15 +420,16 @@ const ACTIONS = {
   // D45: `action.kind` lets a host create any table-side pile TYPE, not
   // only a plain zone - defaults to 'zone' so every pre-D45 caller
   // (and every existing test) is unaffected. Validated against the
-  // registry rather than trusted: a `kind` that doesn't exist, or
-  // exists but isn't `tableSide` (deck/hand), is rejected rather than
-  // silently creating a broken pile no reducer path can ever reach.
+  // registry rather than trusted: a `kind` that doesn't exist, isn't
+  // `tableSide`, or is `hand` (never player-creatable, see below), is
+  // rejected rather than silently creating a broken pile no reducer path
+  // can ever reach.
   //
   // D46: gated behind GameConfig.allowsPlayerZones - the ONLY place
-  // that flag matters, since JOIN's personal zone and SPLIT_DECK's
-  // piles both call `makeTableSidePile`/`makeZonePile` directly (never
+  // that flag matters, since JOIN's per-player configured zones and
+  // SPLIT_DECK's piles both call `makeTableSidePile` directly (never
   // through this action), so a game that disallows player-added zones
-  // still gets its default table, personal zones, and split piles
+  // still gets its default table, configured zones, and split piles
   // exactly as before.
   CREATE_ZONE(state, action) {
     // `?.` + `=== false`, not `!state.gameConfig.allowsPlayerZones`: a
@@ -417,7 +442,12 @@ const ACTIONS = {
       throw new Error('This game does not allow players to add zones');
     }
     const kind = action.kind ?? 'zone';
-    if (!PILE_TYPES[kind]?.tableSide) {
+    // UX follow-up (direct user request): `hand` is `tableSide` now too
+    // (it renders at its owner's seat like any other table-side pile),
+    // but it must still never be player-creatable via Add Zone - exactly
+    // one hand pile per player, owned by `ensureHandPile`. That's its
+    // own explicit rejection now, no longer piggybacked on `tableSide`.
+    if (kind === 'hand' || !PILE_TYPES[kind]?.tableSide) {
       throw new Error(`Cannot create a zone of kind "${kind}"`);
     }
     return { ...state, piles: [...state.piles, makeTableSidePile(kind, action.name)] };
@@ -446,23 +476,21 @@ const ACTIONS = {
       atLeastOneEach: true,
       describeShortfall: (left) => `Cannot split into ${pileCount} piles: only ${left} cards left`,
     });
-    const piles = dealt.map((cards, i) => {
-      const pile = makeZonePile(`Pile ${i + 1}`);
-      // Face-down and unowned: a draw pile hidden from everyone, which
-      // is the redaction case D7 already covers - no new privacy rule.
-      // Every card after the first carries D21's `stack` layout, so a
-      // pile renders as an actual pile rather than N loose card-backs
-      // each with its own controls. This is exactly what the layout
-      // field is for - no new rendering concept, just reuse.
-      return withCards(pile, cards.map((card, i) => ({
-        ...card, owner: null, faceUp: false, ...(i > 0 ? { layout: 'stack' } : {}),
-      })));
-    });
-    // D24 invariant: the deck pile stays, now empty. Removing it would
-    // break every later DRAW/DEAL with an opaque undefined error.
+    // UX follow-up (direct user request): "one split should result in 2
+    // decks (not piles)." Now that `deckPile.tableSide` is real, a
+    // split pile can just BE a deck-kind pile - hidden visibility,
+    // count-only, no per-card owner/faceUp/layout fields needed at all
+    // (those were only ever there to make a zone-kind pile behave like
+    // a hidden draw pile; a real deck-kind pile already IS one).
+    const piles = dealt.map((cards, i) => withCards(makeTableSidePile('deck', `Pile ${i + 1}`), cards));
+    // D24 invariant: the ORIGINAL deck pile (`DECK_PILE_ID`) stays, now
+    // empty - matched by id, not kind, now that split piles are ALSO
+    // deck-kind (see `deckOf`'s own comment on why this matters).
+    // Removing the original would break every later DRAW/DEAL with an
+    // opaque undefined error.
     return {
       ...state,
-      piles: [...state.piles.map((p) => (p.kind === 'deck' ? withCards(p, remaining) : p)), ...piles],
+      piles: [...state.piles.map((p) => (p.id === DECK_PILE_ID ? withCards(p, remaining) : p)), ...piles],
     };
   },
 
@@ -621,7 +649,23 @@ const ACTIONS = {
         // Zone structure (player-created zones included) survives a
         // reset - only the cards inside each zone clear. A round reset
         // shouldn't force players to recreate their table layout.
-        ...zonesOf(state).map((z) => withCards(z, [])),
+        // UX follow-up (real bug, found live): `zonesOf` now ALSO
+        // matches the ORIGINAL deck pile (`deckPile.tableSide` is true
+        // now) - without this filter, `makeDeckPile()` above and this
+        // map would both produce a pile with `id: DECK_PILE_ID`, two
+        // piles claiming the same id (the exact thing D24's invariant
+        // exists to prevent). Secondary deck-kind piles (SPLIT_DECK's
+        // own, or a manually created one) are NOT the original and
+        // still get cleared like any other table-side pile.
+        //
+        // UX follow-up (real bug, found live, second one): `zonesOf` now
+        // ALSO matches every hand pile (`handPile.tableSide` is true too,
+        // as of the same change) - without excluding `kind === 'hand'`
+        // here, this would have kept every hand pile around with its
+        // cards cleared instead of dropping it outright, silently
+        // contradicting the comment (and `handsOf()`'s own contract)
+        // right above it.
+        ...zonesOf(state).filter((z) => z.id !== DECK_PILE_ID && z.kind !== 'hand').map((z) => withCards(z, [])),
       ],
       // Passing is round-scoped (D16, unlike scores) - explicitly
       // rezeroed here, not left to fall through via `...state`.
@@ -664,11 +708,47 @@ export function viewFor(state, playerId) {
       // only a count, so a hand's *size* stays public (needed for the
       // roster's card counts) while its cards never leave the host.
       case 'hidden':
-        deckCount = pile.cards.length;
+        // UX follow-up (real bug, found live): more than one deck-kind
+        // (hidden-visibility) pile can exist now (`deckPile.tableSide`)
+        // - this used to blindly overwrite `deckCount` with whichever
+        // hidden pile it saw LAST, silently showing the wrong count the
+        // instant a second one existed. `DECK_PILE_ID` names the ONE
+        // pile that IS "the deck" for that badge - `deckCount` is kept
+        // for the pre-game preview screen (`#host-deck-area`), which has
+        // no `zones`/piles concept at all.
+        //
+        // UX follow-up (direct user request): "a Deck is a specific
+        // kind of Pile... it is not a Zone at all" - the SAME dual-
+        // routing `myHand`/`otherHandCounts` already do for the hand
+        // pile (below): the main deck ALSO joins `zones` now (`cards:
+        // []`, `count` carries its size - `ui.js`'s `renderPile` reads
+        // `count` before falling back to `cards.length`), so it flows
+        // through the exact same generic Pile pipeline every other pile
+        // does, instead of being a special top-level `deckCount` field
+        // with its own bespoke render path in `main.js`.
+        if (pile.id === DECK_PILE_ID) deckCount = pile.cards.length;
+        zones.push({ id: pile.id, name: pile.name, ownerId: pile.ownerId ?? null, kind: pile.kind, cards: [], count: pile.cards.length });
         break;
       case 'in-hand':
         if (pile.ownerId === playerId) myHand = pile.cards;
         else otherHandCounts[pile.ownerId] = pile.cards.length;
+        // UX follow-up (direct user request): the D17 personal seat zone
+        // is retired - a hand pile is now ALSO a real seat-zone entry
+        // (`ui.js` renders every entry here as a `<zone-panel>`), so it
+        // needs an ownerId'd `zones` entry too, same as the `myHand`/
+        // `otherHandCounts` fields above still carry for every other
+        // consumer. NOTE (flagged, not yet done): `PILE_TYPES.hand.
+        // redactCard` is still a no-op, so this currently sends every
+        // OTHER player's real cards here too - a deliberate, temporary
+        // gap. Direct instruction was to get this rendering working
+        // first and fix the actual hiding as a following step.
+        zones.push({
+          id: pile.id,
+          name: pile.name,
+          ownerId: pile.ownerId ?? null,
+          kind: pile.kind,
+          cards: pile.cards.map((card) => PILE_TYPES[pile.kind].redactCard(card, playerId)),
+        });
         break;
       case 'mixed':
         zones.push({

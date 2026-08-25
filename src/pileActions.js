@@ -49,34 +49,22 @@ export const ACTION_SPECS = {
   // Card-level: act on the card under the cursor, offered in its hover
   // row. `target: null` means it happens in place, with no destination
   // to pick.
-  // D51 follow-up (direct user request): "play" and "play hidden" are
-  // two distinct actions now, not one gesture plus a separately-armed
-  // "Play as" dropdown. `play` is unconditionally public - the fast,
-  // default gesture (tap or drag), matching Draw's own "highest-
-  // frequency action gets a shortcut" precedent (D36); it keeps
+  // UX follow-up (direct user request): "Hide as"/Play Hidden removed
+  // entirely - `play` is the only hand-play action now, unconditionally
+  // public, the fast default gesture (tap or drag), matching Draw's own
+  // "highest-frequency action gets a shortcut" precedent (D36). Keeps
   // `target: 'zone'` because a native drag of the card itself DOES let
   // the drop location choose a destination zone (`highlightDragTargets`
-  // in ui.js reads this). `playHidden` is the deliberate, secondary
-  // case, reached ONLY via the card's radial menu, never draggable
-  // itself (no `draggable: true` passed to its `attachRadialMenu` call)
-  // - `target: null`, same as `reveal`/`rotate`, so a click dispatches
-  // it directly instead of opening the "choose a destination" targeting
-  // mode `openRadialMenu` would otherwise (wrongly) enter for a
-  // `target`-bearing action with no `targetsFor` wired for it - always
-  // plays to the same default zone `onPlay` does, no picker. Which
-  // visibility it actually plays as (shared vs. private face-down) is
-  // chosen by the remaining "Hide as" selector, which now only offers
-  // the two hidden modes (main.js).
-  play: { label: 'Play', target: 'zone', from: 'hand' },
-  playHidden: { label: 'Play hidden', target: null, from: 'hand' },
-  pickup: { label: 'Pick up', target: 'hand', from: 'zone' },
-  move: { label: 'Move', target: 'zone', from: 'zone' },
-  reveal: { label: 'Turn over', target: null, from: 'zone' },
+  // in ui.js reads this).
+  play: { label: 'Play', target: 'zone', from: 'hand', icon: '▶' },
+  pickup: { label: 'Pick up', target: 'hand', from: 'zone', icon: '↑' },
+  move: { label: 'Move', target: 'zone', from: 'zone', icon: '⇄' },
+  reveal: { label: 'Turn over', target: null, from: 'zone', icon: '👁' },
   // D48/D40: in-place like `reveal` (no destination to pick), but stays
   // a hover-row button rather than a tap gesture - `reveal`'s tap
   // conversion (Sprint 12/Phase 55) was its own dedicated Smith-gated
   // story, not a default every in-place action inherits.
-  rotate: { label: 'Rotate', target: null, from: 'zone' },
+  rotate: { label: 'Rotate', target: null, from: 'zone', icon: '⟳' },
 
   // Pile-level (D29): act on the whole pile, not the hovered card -
   // dealing does not act on the hovered card at all, it acts on the
@@ -87,11 +75,13 @@ export const ACTION_SPECS = {
     label: 'Deal',
     destructive: false,
     hint: 'Deal from the deck as it stands, without disturbing anyone\'s existing cards.',
+    icon: '⇉',
   },
   reshuffleDeal: {
     label: 'Reshuffle & deal',
     destructive: true,
     hint: 'Gather every card back, reshuffle, and deal a fresh hand to each player.',
+    icon: '↻',
   },
   // D34/D35: Draw generalized from a per-card action (dead - deck's
   // `cardActions` always returns []) to a pile-level one, matching how
@@ -116,19 +106,20 @@ export const ACTION_SPECS = {
     target: 'hand',
     from: 'deck',
     singleTarget: true,
+    icon: '↓',
   },
   // Hand pile-level actions (D34). No `target`/`singleTarget` - these
   // happen in place, so they are never draggable, matching how `reveal`
   // (target: null) already works above.
-  sortRank: { label: 'Sort by rank', destructive: false, hint: 'Sort your hand by rank.' },
-  sortSuit: { label: 'Sort by suit', destructive: false, hint: 'Sort your hand by suit.' },
-  pass: { label: 'Pass', destructive: false, hint: 'Toggle your own passed marker.' },
+  sortRank: { label: 'Sort by rank', destructive: false, hint: 'Sort your hand by rank.', icon: '#' },
+  sortSuit: { label: 'Sort by suit', destructive: false, hint: 'Sort your hand by suit.', icon: '♠' },
+  pass: { label: 'Pass', destructive: false, hint: 'Toggle your own passed marker.', icon: '⏭' },
   // Phase 56 (Sprint 12, T56.1): shuffle/split move onto the deck's own
   // pile anchor alongside deal/reshuffleDeal/draw, joining a table they
   // were never part of before (US-35/36 shipped as a standalone button
   // row, not through `pileLevelActions` at all).
-  shuffle: { label: 'Shuffle', destructive: false, hint: 'Shuffle the deck stock in place.' },
-  split: { label: 'Split into piles', destructive: false, hint: 'Split the deck into face-down draw piles.' },
+  shuffle: { label: 'Shuffle', destructive: false, hint: 'Shuffle the deck stock in place.', icon: '⇌' },
+  split: { label: 'Split into piles', destructive: false, hint: 'Split the deck into face-down draw piles.', icon: '✂' },
 };
 
 /**
@@ -172,7 +163,17 @@ export function targetsForAction(action, piles, { viewerId, fromPileId } = {}) {
         // D45: was `pile.kind !== 'zone'` - generalized the same way
         // state.js's `zonesOf` was, so a dragged play/move correctly
         // lights up a Discard pile too, not just plain zones.
-        if (!PILE_TYPES[pile.kind]?.tableSide) return false;
+        //
+        // UX follow-up (direct user request): a hand pile is `tableSide`
+        // now too (it renders at its owner's seat like any other
+        // table-side pile - `state.js`'s `viewFor`/`zonesOf`), but it
+        // must never light up as a generic play/move DESTINATION - only
+        // `pickup`'s own `target: 'hand'` branch above may ever target a
+        // hand, and only the viewer's OWN. Without this, dragging any
+        // visible card would offer every player's hand as a legal `move`
+        // drop, silently shoving raw table-card fields (owner/faceUp/
+        // layout) into a hand pile that should never carry them.
+        if (pile.kind === 'hand' || !PILE_TYPES[pile.kind]?.tableSide) return false;
         // Moving a card to the pile it's already in is a no-op offer, so
         // don't light it up. Playing from hand has no such exclusion.
         return action === 'move' ? pile.id !== fromPileId : true;
@@ -197,6 +198,38 @@ export function targetsForAction(action, piles, { viewerId, fromPileId } = {}) {
  */
 export function pileLevelActions(kind, ctx = {}) {
   return PILE_TYPES[kind]?.pileActions(ctx) ?? [];
+}
+
+/**
+ * UX follow-up (direct user request): "a Deck is a specific kind of
+ * Pile... it is not a Zone at all" - which of a pile's OWN offered
+ * actions are currently disabled (Deal, at zero cards) is a property of
+ * the pile TYPE (`src/piles/*.js`'s `disabledActions(count)`), read the
+ * same polymorphic way as `pileLevelActions`/`rowShapeFor`, not a
+ * `zone.kind === 'deck'` check inside the generic pile renderer.
+ *
+ * @param {string} kind
+ * @param {number} count
+ * @returns {string[]} action ids currently disabled
+ */
+export function disabledPileActionsFor(kind, count) {
+  return PILE_TYPES[kind]?.disabledActions?.(count) ?? [];
+}
+
+/**
+ * UX follow-up (direct user request): "a Deck is a specific kind of
+ * Pile... it is not a Zone at all" - a pile's cards render as a flat
+ * row by default, but a hand fans (`rowShape: 'fan'`) and a deck shows
+ * as a stack+badge (`rowShape: 'stack'`) instead - read from the pile
+ * TYPE (`src/piles/*.js`) the same polymorphic way `visibility`/
+ * `tableSide` already are, so `ui.js`'s generic pile renderer never
+ * needs a `zone.kind === 'hand'`/`'deck'` check of its own.
+ *
+ * @param {string} kind
+ * @returns {'flat'|'fan'|'stack'}
+ */
+export function rowShapeFor(kind) {
+  return PILE_TYPES[kind]?.rowShape ?? 'flat';
 }
 
 /**

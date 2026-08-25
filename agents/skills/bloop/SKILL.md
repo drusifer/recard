@@ -1,7 +1,7 @@
 ---
 name: bloop
-description: Top-level workflow loops (Bob Loops) that chain multiple personas autonomously. Use *fix, *review, *impl, *qa, or *plan sprint instead of manually invoking each persona in sequence.
-triggers: ["*fix", "*review", "*impl", "*qa", "*plan sprint", "*deploy"]
+description: Top-level workflow loops (Bob Loops) that chain multiple personas autonomously. Use *fix, *nit, *review, *impl, *qa, or *plan sprint instead of manually invoking each persona in sequence.
+triggers: ["*fix", "*nit", "*review", "*impl", "*qa", "*plan sprint", "*deploy"]
 requires: ["bob-protocol", "chat", "make"]
 ---
 
@@ -44,6 +44,26 @@ Chain: Neo → Trin → Morpheus
 - Anti-loop: if Neo fails twice → Oracle consult required before retry
 
 **Example:** `*fix auth token expiry bug`
+
+---
+
+### `*nit <thing>`
+**Nit loop** — abbreviated `*fix` for a small, targeted adjustment (a tweak, not a bug hunt). Two-persona chain, not three: no Morpheus review step, so it stays fast enough to run several times in a row for iterative back-and-forth adjustments — while still posting every step to CHAT.md, same as any other loop, so incremental tweaks stay in the record rather than happening off-log in a single freeform turn.
+
+```
+Chain: Neo → Trin
+```
+
+| Step | Persona | Action |
+|------|---------|--------|
+| 1 | Neo | Make the targeted change: `*swe fix <thing>` |
+| 2 | Trin | Targeted check, not a full UAT/e2e pass: `*qa test <thing>` |
+
+- If Trin's check fails → back to Neo (`*swe fix`), then Trin re-checks - same abbreviated two-step, no automatic escalation to `*fix`'s Morpheus step
+- Anti-loop still applies (bob-protocol): if Neo fails twice on the SAME nit → Oracle consult required before a third attempt
+- Use `*fix` instead when the change needs architecture sign-off, touches more than one area, or Trin's targeted check surfaces something that looks bigger than the nit itself
+
+**Example:** `*nit tighten the card fan overlap by 5%`
 
 ---
 

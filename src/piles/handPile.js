@@ -7,6 +7,13 @@
  * count (state.js's `viewFor`). */
 export const visibility = 'in-hand';
 
+/** UX follow-up (direct user request): a hand's cards fan out in a
+ * rotated arc (`ui.js`'s `<fan-pile>`), never a flat `.card-row` -
+ * `rowShapeFor` (`pileActions.js`) reads this the same polymorphic way
+ * `visibility`/`tableSide` are already read, instead of a `zone.kind
+ * === 'hand'` check inside the generic pile renderer. */
+export const rowShape = 'fan';
+
 /** A hand's own reorder goes through `handOrder.js` (D14), not
  * `dropTarget.js` - no halo geometry involved. D53: real method, not a
  * `dropRule` string. */
@@ -20,10 +27,21 @@ export function canAccept() {
   return true;
 }
 
-/** A hand is reached by id (`hand:<playerId>`), never by the
- * PLAY/MOVE_CARD "any table-side pile" existence check (D45) - it has
- * its own dedicated lookup already. */
-export const tableSide = false;
+/** Direct user request: a hand is now a real seat-zone entry in
+ * `zonesOf()`/`view.zones` (`state.js`) - the D17 personal seat zone is
+ * retired, and the hand pile itself renders at the seat instead, via
+ * the same generic `<zone-panel>` every other table-side pile uses. A
+ * hand still isn't reachable through `CREATE_ZONE` (that's a separate,
+ * explicit `kind === 'hand'` guard now, not this flag) - exactly one
+ * hand pile per player, created by `ensureHandPile`, never player-
+ * addable.
+ *
+ * NOTE (flagged, not yet done): `redactCard` below is still a no-op, so
+ * an opponent's hand cards are NOT hidden yet now that they flow
+ * through the same pipeline a `mixed`-visibility zone's cards do - a
+ * deliberate, temporary gap. Direct user instruction: get this
+ * rendering working first, fix the actual hiding as a following step. */
+export const tableSide = true;
 
 /** `viewFor` never calls this for an `in-hand` pile - present for
  * interface uniformity with `zonePile.redactCard` only. */

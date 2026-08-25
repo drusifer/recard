@@ -64,3 +64,53 @@ Nothing.
 
 ---
 *Last updated: 2026-08-15 13:29*
+
+## `*nit` loop added (2026-08-25)
+
+### Context
+User asked for a new skill via `/bob`: a targeted-fix loop, abbreviated
+from `*fix`, so incremental adjustments still get logged to CHAT.md
+instead of happening off-record in a single freeform turn.
+
+### Decision
+Added `*nit <thing>` to `agents/skills/bloop/SKILL.md` (the canonical
+copy - `.claude/skills/bloop` is a symlink to it): `Neo → Trin`, no
+Morpheus step. Neo's step is `*swe fix <thing>` (same as `*fix`);
+Trin's is `*qa test <thing>` (targeted, not `*qa uat` - a full
+acceptance-criteria pass would defeat the point of an abbreviated
+loop). Reused Trin's EXISTING `*qa test` command rather than inventing
+a new one - Trin's Command Interface already has `test`/`verify`/
+`report`/`review`/`repro`, no gap to fill.
+
+Updated `bob-protocol/SKILL.md`'s two loop-command lists (TLDR line,
+"multi-step workflows" line) to include `*nit` alongside `*fix`/
+`*impl`/`*qa`/`*review`/`*plan sprint`, so it's discoverable from
+either entry point.
+
+### Why 2-persona, not 3
+`*fix` (Neo→Trin→Morpheus) was the closest existing loop, but the
+user's framing - "incremental adjustments," run more than once in a
+row - meant Morpheus's architecture-review step would slow down
+exactly the iteration speed being asked for. Anti-loop protocol
+(Oracle consult after 2 failed Neo attempts) still applies unchanged;
+`*nit`'s own doc tells the user to fall back to `*fix` if Trin's
+targeted check surfaces something bigger than the nit itself.
+
+### Verified
+Read `agents/skills/bloop/SKILL.md` after editing to confirm the new
+section matches every other loop's format (chain diagram, step table,
+escalation rules, example). Did not run `setup_agent_links.py` - no
+new agent file was created, only an existing skill file edited, so
+there's nothing to link.
+
+## Next Steps
+### Immediate Next Action
+None - this was a single, complete skill addition. Watch for the
+user's first real `*nit` invocation to confirm the loop reads
+naturally in practice.
+
+### Waiting On
+Nothing.
+
+---
+*Last updated: 2026-08-25 (added *nit loop)*

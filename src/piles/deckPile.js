@@ -12,6 +12,25 @@
 /** Nobody sees a deck's cards - only its count (state.js's `viewFor`). */
 export const visibility = 'hidden';
 
+/** UX follow-up (direct user request): "a Deck is a specific kind of
+ * Pile... it is not a Zone at all" - a deck pile renders as a visual
+ * stack + count badge (`ui.js`'s `<deck-stack>`), never a `.card-row`
+ * of individual cards the way `visibility: 'hidden'` + `cards: []`
+ * would otherwise render as (nothing at all - a deck's cards never
+ * reach the view). One more per-kind property alongside `visibility`/
+ * `tableSide`, read the same polymorphic way (`rowShapeFor`,
+ * `pileActions.js`) instead of a `zone.kind === 'deck'` check inside
+ * the generic pile renderer. */
+export const rowShape = 'stack';
+
+/** The one deck action whose availability depends on the pile's OWN
+ * state, not just who's asking (`pileActions` above) - dealing from an
+ * empty deck has never made sense, so its button is disabled (not
+ * hidden - a host should still see it exists) at zero. */
+export function disabledActions(count) {
+  return count <= 0 ? ['deal'] : [];
+}
+
 /** No halo geometry is reachable for the deck today (D29's own strip
  * renders it, never `dropTarget.js`). D53: this is now a real method,
  * not a `dropRule` string `ui.js` branches on. */
@@ -27,8 +46,19 @@ export function canAccept() {
   return true;
 }
 
-/** The deck is never a PLAY/MOVE_CARD destination (D45). */
-export const tableSide = false;
+/** UX follow-up (direct user request): "make Deck a pile type so decks
+ * can go into zones" - was `false` (D45: "the deck is never a PLAY/
+ * MOVE_CARD destination"). A deck is a legal destination now, the same
+ * "table surface" category every other tableSide kind is - creatable
+ * via CREATE_ZONE{kind:'deck'}, draggable/repositionable like any other
+ * panel (`ui.js`'s `attachPanelDrag`), and a card dropped onto one gets
+ * shuffled into it face-down (deck's own `canAccept`, unconditional -
+ * already true before this changed). More than one deck-kind pile can
+ * exist now (SPLIT_DECK's own piles are deck-kind too, D53 follow-up) -
+ * `state.js`'s `deckOf()`/`DECK_PILE_ID` still name exactly ONE of them
+ * as THE draw pile DRAW/DEAL/SHUFFLE_DECK/SPLIT_DECK act on, matched by
+ * id now, not by kind. */
+export const tableSide = true;
 
 /** `viewFor` never calls this for a `hidden` pile - present for
  * interface uniformity with `zonePile.redactCard` only. */

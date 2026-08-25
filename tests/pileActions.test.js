@@ -34,6 +34,12 @@ test('every action (card-level and pile-level, ACTION_SPECS - D51) names a desti
   }
 });
 
+test('every action has an icon (UX follow-up: buttons are icon-only now, label/hint became tooltip text)', () => {
+  for (const [id, spec] of Object.entries(ACTION_SPECS)) {
+    assert.ok(spec.icon && spec.icon.length > 0, `${id} needs an icon`);
+  }
+});
+
 test('a hand offers actions only to its own owner', () => {
   assert.deepEqual(actionsForCard(myHand, { id: 'c' }, 'me'), ['play']);
   assert.deepEqual(actionsForCard(theirHand, { id: 'c' }, 'me'), [],
@@ -59,8 +65,8 @@ test("someone else's still-hidden private card offers nothing (matches the reduc
     'but its owner can do both');
 });
 
-test('targets: play and move light up every table-side pile (zones AND discard, D45), pickup lights up your own hand', () => {
-  assert.deepEqual(targetsForAction('play', ALL, { viewerId: 'me' }), ['table', 'z:me', 'discard']);
+test('targets: play and move light up every table-side pile (zones, discard AND deck - D45/UX follow-up), pickup lights up your own hand', () => {
+  assert.deepEqual(targetsForAction('play', ALL, { viewerId: 'me' }), ['deck', 'table', 'z:me', 'discard']);
   assert.deepEqual(targetsForAction('pickup', ALL, { viewerId: 'me' }), ['hand:me'],
     "never another player's hand");
 });
@@ -77,7 +83,7 @@ test('targets: draw (pile-level, D34) still lights up your own hand via targetsF
 test('move excludes the pile the card already sits in', () => {
   assert.deepEqual(
     targetsForAction('move', ALL, { viewerId: 'me', fromPileId: 'table' }),
-    ['z:me', 'discard'],
+    ['deck', 'z:me', 'discard'],
     'lighting up the pile it is already in would offer a no-op',
   );
 });
@@ -90,7 +96,7 @@ test('an in-place action has no targets to highlight', () => {
 test('targets (D53): foundation and cascade generalize tableSide for free, same as discard did in D45', () => {
   assert.deepEqual(
     targetsForAction('move', [...ALL, foundation, cascade], { viewerId: 'me', fromPileId: 'table' }),
-    ['z:me', 'discard', 'f:hearts', 'c:1'],
+    ['deck', 'z:me', 'discard', 'f:hearts', 'c:1'],
   );
 });
 

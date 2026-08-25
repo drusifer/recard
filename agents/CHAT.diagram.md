@@ -15,7 +15,8 @@ sequenceDiagram
     participant Mouse
     participant Oracle
     participant User
-    Note over Cypher,User: 📅 2026-08-20
+    participant Bob
+    Note over Cypher,Bob: 📅 2026-08-20
     Cypher->>All: "pm launch"
     Note right of Cypher: "*pm launch recard-<br/>sprint-11. A host reload<br/>no longer costs anyone<br/>their game. Hands are<br/>saved and come back to<br/>their owners, players'<br/>clien…"
     Neo->>Trin: "swe handoff"
@@ -70,7 +71,7 @@ sequenceDiagram
     Note right of Trin: "UAT phase 59 PASSED,<br/>independently re-run<br/>(218/218) + mutation<br/>check: stripped<br/>handPile's isOwner<br/>guard, exactly 1 test<br/>failed on purpose (…"
     Morpheus->>Neo: "lead handoff"
     Note right of Morpheus: "Phase 59 review<br/>APPROVED. Clean, exactly<br/>the shape D42 called for<br/>- pure modules, zero<br/>DOM, characterization-<br/>tested against the<br/>still-live…"
-    Note over Cypher,User: 📅 2026-08-21
+    Note over Cypher,Bob: 📅 2026-08-21
     Neo->>Trin: "swe handoff"
     Note right of Neo: "Phase 60 done.<br/>state.js/pileActions.js<br/>read PILE_TYPES now, old<br/>parallel tables deleted <br/>(PILE_VISIBILITY/redactM<br/>iddleCard/actionsForPile<br/>Kin…"
     Trin->>Morpheus: "qa handoff"
@@ -121,10 +122,10 @@ sequenceDiagram
     Note right of Morpheus: "Morpheus retro: capture-<br/>phase for<br/>beginTargeting's click<br/>listener is the right<br/>general fix, not a hand-<br/>only patch - a pile-<br/>target's own cli…"
     Cypher->>All: "pm launch"
     Note right of Cypher: "*pm launch e2e-fix-<br/>for-D52. D51/D52's<br/>table-unification<br/>redesign (bigger cards,<br/>hand-as-zone, unified<br/>radial action menu,<br/>drop-target parit…"
-    Note over Cypher,User: 📅 2026-08-22
+    Note over Cypher,Bob: 📅 2026-08-22
     Morpheus->>All: "state save"
     Note right of Morpheus: "State saved across all<br/>persona files before<br/>session shutdown<br/>(2026-08-22): stale<br/>Sprint 5/6-era files (mo<br/>use/cypher/oracle/neo/tr<br/>in/smith/m…"
-    Note over Cypher,User: 📅 2026-08-24
+    Note over Cypher,Bob: 📅 2026-08-24
     User->>All: "init"
     Note right of User: "Bob Protocol initialized<br/>(cold start). Last<br/>session ended clean:<br/>Sprint e2e-fix-for-D52<br/>launched, branch touch-<br/>targets-and-pile-<br/>actions-spr…"
     Morpheus->>All: "resume"
@@ -195,4 +196,55 @@ sequenceDiagram
     Note right of Trin: "*qa uat: usesMiddle<br/>retired from presets.js<br/>(dead since Sprint 2,<br/>D7/D8 shipped, nothing<br/>ever read it - confirmed<br/>by grep before<br/>deleting).…"
     Cypher->>All: "pm launch"
     Note right of Cypher: "*pm launch: usesMiddle<br/>field retired from<br/>presets.js - dead weight<br/>since Sprint 2, no<br/>reader anywhere. Real<br/>cleanup, not a behavior<br/>change.…"
+    Neo->>All: "swe fix"
+    Note right of Neo: "Resolved: *fix loop for<br/>4 UX items (card size<br/>-25%, player UX<br/>vertical-left-of-hand,<br/>zone flex-not-scroll<br/>regression, hand/player<br/>zone over…"
+    Note over Cypher,Bob: 📅 2026-08-25
+    Neo->>All: "resume"
+    Note right of Neo: "Resuming after context<br/>clear: found substantial<br/>uncommitted UX-follow-up<br/>work in progress (card<br/>-25%, player-info<br/>vertical column, table<br/>fl…"
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "*swe fix: 34 stale unit-<br/>test expectations<br/>updated to match the<br/>deck-as-tableSide-pile<br/>follow-up<br/>(deckPile.tableSide true<br/>now, zonesOf/CREAT…"
+    Neo->>Morpheus: "swe finding"
+    Note right of Neo: "Finding, disclosed not<br/>fixed: moving the deck<br/>panel inside #table-area<br/>(UX follow-up) adds 2<br/>new phone-width overlap<br/>violations (Deck vs Bo…"
+    Neo->>All: "swe impl"
+    Note right of Neo: "*swe impl: resize<br/>handles added, direct<br/>user follow-up to the<br/>panel-move feature.<br/>RESIZE_PANEL action +<br/>state.layout[id].w<br/>(mirrors MOVE_PA…"
+    Neo->>All: "swe impl"
+    Note right of Neo: "*swe impl: 3 direct<br/>follow-ups. (1) Resize<br/>now both axes - corner<br/>handle drags w+h<br/>together (RESIZE_PANEL).<br/>(2) Resize promoted to a<br/>base Z…"
+    Neo->>All: "swe impl"
+    Note right of Neo: "*swe impl: 2 follow-ups.<br/>(1) Fixed real bug -<br/>#table-area's missing<br/>align-items:flex-start<br/>meant flex default<br/>stretch grew SIBLING<br/>zones wh…"
+    Neo->>All: "swe impl"
+    Note right of Neo: "*swe impl: DOM flattened<br/>- table-surface -><br/>#zones -> .zone, no<br/>table-center/table-<br/>area/seat-zones split.<br/>Move+resize merged into<br/>one inter…"
+    Bob->>All: "prompt new"
+    Note right of Bob: "*prompt new: *nit added<br/>to bloop skill -<br/>abbreviated 2-step loop<br/>(Neo swe fix -> Trin qa<br/>test), no Morpheus<br/>review, for small<br/>targeted adju…"
+    User->>All: "request"
+    Note right of User: "*chat @neo *nit adjust<br/>the presets for the new<br/>layout settings"
+    Neo->>Trin: "swe fix"
+    Note right of Neo: "*swe fix: preset-<br/>declared<br/>(GameConfig.zones)<br/>shared/perPlayer zones<br/>now get deterministic<br/>ids (kind, or kind-N, or<br/>kind-N-playerId)<br/>instead…"
+    Trin->>Cypher: "qa test"
+    Note right of Trin: "*qa test: 307/307 unit<br/>green (3 new<br/>deterministic-id cases),<br/>stylelint clean. Checked<br/>for id-collision risk:<br/>configured-zone kinds<br/>(foundat…"
+    User->>All: "request"
+    Note right of User: "*chat @neo *nit remove<br/>special deck-area css -<br/>consistent semantics for<br/>all zone types"
+    Neo->>Trin: "swe fix"
+    Note right of Neo: "*swe fix: removed #game-<br/>deck-area's dead ID rule<br/>(position/margin, now<br/>provided by .zone +<br/>#zones's justify-<br/>content:center like<br/>every other…"
+    Trin->>Cypher: "qa test"
+    Note right of Trin: "*qa test: 307/307 unit<br/>green, stylelint clean,<br/>screenshot confirms zero<br/>visual regression - deck<br/>panel position/border/ce<br/>ntering all still…"
+    User->>All: "request"
+    Note right of User: "*chat @neo *nit remove<br/>'hand-zone-controls'<br/>completely"
+    Neo->>Trin: "swe fix"
+    Note right of Neo: "*swe fix: hand-zone-<br/>controls (Hide As<br/>select) removed<br/>completely - index.html<br/>div gone, main.js's play<br/>AsEl/selectedVisibility/<br/>onPlayHidden…"
+    Trin->>Cypher: "qa test"
+    Note right of Trin: "*qa test: 307/307 unit<br/>green, stylelint clean,<br/>design-lint fully clean<br/>(6 viewports). Verified<br/>visually - #play-<br/>as/#hand-zone-controls<br/>both…"
+    User->>All: "request"
+    Note right of User: "*chat @neo *nit get rid<br/>of own-zone-content and<br/>other non-zone elements<br/>from #zones, use derived<br/>zone/pile types for<br/>special zones like Sco…"
+    Morpheus->>Neo: "lead decision"
+    Note right of Morpheus: "*lead decision: native<br/>Web Components<br/>(customElements, light<br/>DOM, no shadow root, no<br/>build step) become the<br/>standard pattern for<br/>'special'…"
+    Neo->>Trin: "swe fix"
+    Note right of Neo: "*swe fix: own-zone-<br/>content/info/pseudo<br/>score-zone removed -<br/>Score is a real Web<br/>Component now<br/>(ScoreZone.js). Major<br/>finding: designLint's o…"
+    Trin->>Cypher: "qa test"
+    Note right of Trin: "*qa test: 307/307 unit<br/>green, stylelint clean,<br/>design-lint down from a<br/>false-positive-clean<br/>state to 6 real<br/>(disclosed, phone-width-<br/>only) v…"
+    Neo->>All: "status"
+    Note right of Neo: "*swe status: prepping<br/>for context clear. All<br/>work this session is<br/>UNCOMMITTED (git status:<br/>16 modified, 3 new files<br/>- src/components/, src/…"
+    Neo->>Trin: "swe impl"
+    Note right of Neo: "*swe impl: <deck-zone> -<br/>second Web Component,<br/>wraps existing<br/>renderDeck() internally<br/>(props: count/is-<br/>host/deal-<br/>count/interactive,<br/>events:…"
+    Trin->>Cypher: "qa test"
+    Note right of Trin: "*qa test: 307/307 unit<br/>green, stylelint clean,<br/>design-lint 6 known<br/>phone-width violations<br/>unchanged (no new<br/>regressions). Verified<br/>draw (de…"
 ```

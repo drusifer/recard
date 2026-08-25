@@ -52,11 +52,17 @@ test('resolveDropTarget (D53, replaces the dropRule enum): deck/hand/discard hav
     { targetCardId: 'a', side: 'after', layout: 'stack' });
 });
 
-test('tableSide (D45): zone and discard are PLAY/MOVE_CARD destinations, deck and hand are not', () => {
+test('tableSide (D45, UX follow-up): zone, discard, deck AND hand are all table-side now', () => {
   assert.equal(zonePile.tableSide, true);
   assert.equal(discardPile.tableSide, true);
-  assert.equal(deckPile.tableSide, false);
-  assert.equal(handPile.tableSide, false);
+  assert.equal(deckPile.tableSide, true, 'UX follow-up: a deck can now be created inside a zone');
+  // UX follow-up (direct user request): "get rid of seat panel and
+  // replace with a reg zone with a handpile" - a hand pile renders at
+  // its owner's seat through the same generic `<zone-panel>` machinery
+  // every other table-side pile does now. It's still never
+  // CREATE_ZONE-able though - `state.js`'s CREATE_ZONE rejects `kind
+  // === 'hand'` explicitly, no longer piggybacking on this flag.
+  assert.equal(handPile.tableSide, true);
 });
 
 // --- cardActions: characterized against pileActions.js's actionsForCard ---

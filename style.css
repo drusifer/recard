@@ -25,9 +25,12 @@
      for shrinking cards on short viewports no longer applies here. If a
      real mobile pass ever resumes, this needs its own reasoned re-visit,
      not just re-adding the old clamp. */
-  --card-w: 3.6rem;
+  /* UX follow-up (direct user request): -25% off the D51 desktop size
+     (3.6rem/4.9rem -> 2.7rem/3.675rem). Rounded to 2 decimal places so
+     the exact -25% ratio survives, not eyeballed. */
+  --card-w: 2.7rem;
   --table-min-h: 30rem;
-  --card-h: 4.9rem;
+  --card-h: 3.68rem;
   --card-gap: 0.5rem;
   --card-peek: 0.85rem;
   --radius-sm: 0.45rem;
@@ -113,8 +116,7 @@ body {
   #screen-game h2 { margin: 0 0 0.2rem; font-size: 0.9rem; }
   #screen-game .btn-row { margin-top: 0.2rem; gap: 0.3rem; }
   .game-code-bar { margin-bottom: 0.1rem; }
-  #hand-area { padding-top: 0.1rem; }
-  #hand-area .card-row { padding-top: 0.2rem; }
+  fan-pile { padding-top: 0.1rem; }
 }
 
 @media (max-height: 700px) {
@@ -128,7 +130,7 @@ body {
   #screen-game > .panel { padding: 0.4rem 0.5rem; }
   #screen-game h2 { margin: 0 0 0.25rem; font-size: 0.9rem; }
   #screen-game .btn-row { margin-top: 0.25rem; gap: 0.25rem; }
-  #hand-area { padding-top: 0.2rem; }
+  fan-pile { padding-top: 0.2rem; }
   .game-code-bar { margin-bottom: 0; font-size: 0.75rem; }
 }
 
@@ -428,21 +430,37 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   opacity: 1;
 }
 
-.hand-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.3rem;
+/* UX follow-up (direct user request): "create WebComponents for the
+   different pile types... fix the fan layout issue by implementing
+   FanPile." `<fan-pile>` (`src/components/FanPile.js`) replaces the
+   old `renderHand`/`#hand-area`/`.hand-card`-specific rendering this
+   block used to style - `.middle-card` (the ONE wrapper class every
+   pile's cards use now, `renderZoneCards`) already provides the base
+   flex/gap/position layout, so this only adds what a FANNED row needs
+   on top of that. */
+.fan-row .middle-card {
   /* Fan pivot (US-30): rotates from the bottom, like cards actually held
      in a hand, not around the wrapper's own center. */
   transform-origin: bottom center;
   /* D51 follow-up: the fan spread (per-card rotate/translateY, set as
-     the `--raise-base` custom property in ui.js's `renderHand`) applies
-     through this plain class rule rather than an inline `transform`, so
-     the shared `.pile-hover-host:hover` rule (also class-based) can
-     compose its own raise on top instead of losing to an inline style
-     regardless of specificity - same pattern `.seat-zone` uses. */
+     the `--raise-base` custom property in `renderZoneCards`'s `opts.fan`
+     branch) applies through this plain class rule rather than an inline
+     `transform`, so the shared `.pile-hover-host:hover` rule (also
+     class-based) can compose its own raise on top instead of losing to
+     an inline style regardless of specificity - same pattern `.seat-zone`
+     uses. */
   transform: var(--raise-base, none);
+}
+
+/* UX follow-up (direct user request): "tighten up that fan... more
+   overlap." Same formula shape as the table's own overlap layout
+   (`.middle-card[data-layout='overlap']` below) - proportional to
+   `--card-w` (not a fixed rem) so this stays correct if the card size
+   ever changes again, unlike that rule's own fixed `1.7rem`. Reveals
+   35% of each covered card - still enough for the corner rank/suit and
+   an individual click target, just a tighter fan than the first pass. */
+.fan-row .middle-card + .middle-card {
+  margin-left: calc(-1 * (var(--card-w) * 0.65) - var(--card-gap));
 }
 
 /* Headroom for the fan's rotation/arc (US-30) so rotated card corners
@@ -451,12 +469,39 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    row (the plain .card-row behavior) broke that into two disconnected-
    looking rows once rotation was applied, so scroll horizontally
    instead of wrapping (real cards in a big hand fan out sideways past
-   the edge of your view too, not stack into rows). */
-#hand-area {
-  padding: 0.6rem 0.4rem 0;
+   the edge of your view too, not stack into rows).
+   `.fan-row.card-row` (two classes, not one): `<fan-pile>` carries BOTH
+   (`FanPile.js`), and `.seat-zone .card-row { flex-wrap: wrap; overflow:
+   visible; }` (below, and its 1024/1440px media-query duplicates) is the
+   SAME specificity as a bare `.fan-row` would be - this needs to
+   outrank it unconditionally, not win-by-declaration-order against
+   three separate copies of that rule. */
+.seat-zone .fan-row.card-row {
+  /* UX follow-up (direct user request): "fan-pile needs to adjust
+     height for a fanned cards" - the fan droops DOWN (`renderZoneCards`'s
+     `opts.fan` branch sets a positive `translateY`, pivoting from
+     `transform-origin: bottom center`), so the row's own bottom edge is
+     what needs the real clearance, not the top - a bare `min-height`
+     sized to one flat card (`.card-row`'s own base rule) clipped the
+     lowest-dipped outer cards otherwise. 1.75rem covers the current
+     droop formula (`Math.abs(offset) * 0.35rem`) for a hand up to
+     ~10 cards with room to spare - re-check this if that multiplier
+     changes again.
+     UX follow-up (earlier, still true): "nothing should have
+     scrollbars... the zone must expand to fit its piles" - dropped the
+     `overflow-x: auto` scroll this used to fall back to (`renderHand`'s
+     original reasoning: a fan can't wrap onto a second row without
+     breaking the single-arc look). `.seat-zone`'s own `width: max-
+     content` already grows to fit an un-wrapped row instead of clipping
+     it now that it has real room to (`min(94vw, 48rem)`, not the old
+     9rem cap) - scrolling is no longer needed to reach a card that
+     doesn't fit, because the row isn't clipped in the first place.
+     `flex-wrap: nowrap` stays: wrapping is still the wrong failure mode
+     for a fan specifically (a second row reads as two disconnected
+     fans, not one continuous arc). */
+  padding: 0.4rem 0.4rem 1.75rem;
   flex-wrap: nowrap;
-  overflow-x: auto;
-  overflow-y: visible;
+  overflow: visible;
 }
 
 .hand-card-fd-row {
@@ -550,48 +595,47 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   border-color: var(--accent);
 }
 
-/* The card's own z-index above is scoped to #table-center's LOCAL
-   stacking context - #table-center gets one of its own via `transform`
-   (desktop centring, D24), and no descendant z-index can escape that to
-   outrank #seat-zones, a SEPARATE stacking-context SIBLING at the same
-   level. Confirmed live: a hovered card in the shared pot still lost to
-   a personal zone's `.card-row` with z-index:7 already applied. `:has()`
-   promotes the CONTAINER itself whenever it holds a hovered/focused
-   card, which is the level stacking is actually decided at. */
-#table-center:has(.middle-card:hover),
-#table-center:has(.middle-card:focus-within) {
-  z-index: 7;
+/* UX follow-up (direct user request): "remove the transparent border
+   effect from the cards." The discoverability border above was built
+   for piles/zones/the deck - things with no border of their own that
+   otherwise don't look interactive at rest. A `.middle-card` wrapper
+   (every pile's cards, fanned or not, since `renderHand`'s dedicated
+   `.hand-card` class was retired) carries `.pile-hover-host` too (for
+   the shared hover-raise behavior below, via `attachActionRow`), but
+   the actual `.card` inside it already has its own opaque border - the
+   wrapper's own border sat just outside that, on an unfilled
+   background, reading as a faint transparent-looking ring around every
+   card at rest, not just an interactive-piles cue. Opted card wrappers
+   out of the border/padding only - the hover raise/z-index escalation
+   is unaffected, and the wrapper never relied on this padding for
+   spacing (it already sets its own `gap`/`position: relative`). */
+.middle-card.pile-hover-host {
+  border: none;
+  padding: 0;
 }
 
-/* Sprint 12 established this fix for the deck's pile-level controls
-   (originally `.deck-controls-strip`, D29) getting swallowed by a
-   sibling's z-index inside #table-center's trapped stacking context
-   (`transform`, D24) - a personal zone's empty `.card-row` (z-index:1),
-   then a roster seat `<li>` (z-index:2, `.roster li.seat`) at a
-   different popover position, both confirmed live. D51: retargeted from
-   `.pile-anchor` (removed - the deck's action row is hover-revealed now,
-   same mechanism a card's popup already used) to the same
-   `:hover`/`:focus-within` condition the row's own reveal uses -
-   correct since the row (and the click-interception risk) only exists
-   while it's open, not permanently the way the old persistent anchor
-   was. z-index 8 matches `.pile-hover-host`'s own raised z-index
-   (both need to win against the same z-index:1/2 siblings). */
-#table-center:has(.pile-hover-host:hover),
-#table-center:has(.pile-hover-host:focus-within) {
-  z-index: 8;
-}
+/* UX follow-up (direct user request): "just have table-surface -> zone"
+   - every pile/zone panel (shared, personal, deck) is now a direct
+   child of one flat `#zones` container, no `#table-center` wrapper
+   trapping shared zones in their own local stacking context (it used
+   to get one via `transform`, D24's desktop centring). The whole
+   `:has()` z-index-escalation dance that lived here existed ONLY to
+   promote that wrapper past `#seat-zones`/`.roster li.seat` whenever a
+   descendant was hovered - with no wrapper (and no `transform`) left to
+   trap anything, `.middle-card`/`.pile-hover-host`'s own z-index
+   (7/8, below) ranks directly against those siblings in one shared
+   stacking context, which is all this was ever really deciding. */
 
 /* Drag cursor affordance (US-28, Smith Sprint 4 close-out finding #1):
    the only visual hint a mouse user has that a card is draggable at all
-   - hand cards are always draggable, middle-cards only where MOVE_CARD's
-   own authorization allows it (the `[draggable="true"]` attribute
-   selector already tracks that exactly, no separate condition needed). */
-.hand-card,
+   - every `.middle-card` (hand cards included, now that they're plain
+   `.middle-card`s too) only where MOVE_CARD's own authorization allows
+   it (the `[draggable="true"]` attribute selector already tracks that
+   exactly, no separate condition needed). */
 .middle-card[draggable='true'] {
   cursor: grab;
 }
 
-.hand-card:active,
 .middle-card[draggable='true']:active {
   cursor: grabbing;
 }
@@ -703,14 +747,35 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   padding: 0.4rem 0.6rem;
   margin-bottom: 0.5rem;
   background: rgba(0, 0, 0, 0.15);
+  /* UX follow-up: a containing block for `.panel-resize-handle`
+     (`right: 0; bottom: 0`) - every zone type needs this now that
+     resize is a base zone feature (`renderZonePanel`), not just
+     personal zones (`.seat-zone` already sets `position: absolute`,
+     which still wins over this for that case - later in the cascade,
+     same specificity). */
+  position: relative;
+  /* UX follow-up: explicit now that a zone-shaped panel isn't always a
+     plain `<div>` - a custom element (`<score-zone>`,
+     `src/components/ScoreZone.js`) defaults to `display: inline`
+     otherwise, which silently breaks its box (padding/border still
+     apply, but it sizes to a text line instead of its content). Every
+     existing `.zone` is already a `<div>` (block by default), so this
+     changes nothing for them. */
+  display: block;
 }
 
 .zone:last-child { margin-bottom: 0; }
 
 /* Drop-target affordance (US-28, Smith Gate 1 - Nielsen #1): a zone
    needs to visibly say "droppable here" while a drag is over it, since
-   native drag-and-drop otherwise gives no feedback at all until release. */
-.zone.zone-drag-over {
+   native drag-and-drop otherwise gives no feedback at all until release.
+   UX follow-up (direct user request): "zone is one thing, pile is
+   another" - a card is always dropped onto a specific PILE now
+   (`renderPile`, `ui.js`), never generically "the zone", so
+   `.pile-section.zone-drag-over` needs the same feedback `.zone.
+   zone-drag-over` already gives a standalone zone. */
+.zone.zone-drag-over,
+.pile-section.zone-drag-over {
   border-color: var(--accent);
   background: rgba(79, 157, 255, 0.12);
 }
@@ -729,8 +794,6 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   padding: 0.25rem 0.35rem;
   min-height: 2.75rem;
 }
-
-#new-zone-name { flex: 1; min-width: 0; }
 
 /* Top-down table surface (US-26, D18): one visual "table" instead of
    separate stacked Table/Players panels. Rounded rather than a strict
@@ -760,24 +823,50 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   padding: 1rem 0.5rem;
   border-radius: 999px / 12%;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.04), transparent 70%);
+  /* *nit "use that nice dark green for the table top color" - the felt
+     tint (`--felt`, already used for the surrounding `.panel-felt`
+     table SECTION) is now the table SURFACE's own background too, not
+     just a faint inherited tint through the highlight gradient sitting
+     on top of it. */
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.06), transparent 70%), var(--felt);
 }
 
-/* Shared zones (US-19) stay in a bounded, centered "pot" rather than
-   flowing full-width - personal zones (D17/US-27) sit in a ring around
-   this at a smaller radius than the seats, and without a fixed footprint
-   here the two would grow into each other and physically overlap (a
-   real bug: it broke click-through, not just looked messy - caught by
-   the e2e suite actually clicking a zone button that was covered). */
-#game-deck-area {
-  position: relative;
-  max-width: 13rem;
-  margin: 0 auto;
-}
+/* UX follow-up (direct user request - *nit "consistent semantics for
+   all zone types"): `#game-deck-area`'s own rule (`position: relative;
+   margin: 0 auto;`) used to live here, but the deck panel carries the
+   `.zone` class too (`main.js`) and gets both from there now like every
+   other zone type - `#zones`'s `justify-content: center` (below) is
+   what actually centers it, the same as any other in-flow panel. An
+   ID-scoped rule duplicating what the shared class already provides is
+   exactly the inconsistent-semantics case this removed. */
 
-#table-area {
-  position: relative;
-  max-width: 13rem;
+/* UX follow-up (direct user request): "just have table-surface -> zone"
+   / "remove all the *-area elements" - one flat container now, direct
+   child of `#table-surface`, holding EVERY pile/zone panel (shared,
+   personal, the deck) as its own direct child - no `#table-center`/
+   `#table-area`/`#seat-zones` split. It does two jobs at once, which
+   used to be two separate elements: a normal flex-wrap flow for
+   in-flow (unmoved) panels, same as `#table-area` did, AND the
+   positioning context for absolutely-positioned ones (any panel once
+   dragged/resized, `.panel-moved` - and every personal zone by
+   default, same ring math `#seat-zones` used to host).
+   UX follow-up (real bug, found live): `width/height: 100%` here does
+   NOT do that - `#table-surface` has no explicit `height`, only a
+   `min-height` floor, and a percentage height only resolves against a
+   DEFINITE parent height (the exact same quirk `attachPanelResize`'s
+   own comment already documents for zone resize). The visible result:
+   `#zones`'s real box collapsed to its in-flow CONTENT height (~100px)
+   instead of the surface's real height (~700px), so every personal
+   zone's ring percentage (`seatPosition`'s topPct 24%/76%) resolved
+   against that tiny box and landed right on top of the shared zones -
+   confirmed live with 2 players, invisible with 1 (nothing else to
+   overlap). `position: absolute; inset: 0;` is what `#seat-zones` used
+   for this exact purpose before the flattening and it worked - matching
+   that here instead of a percentage size sidesteps the question
+   entirely, same fix shape as the pixel-based resize one. */
+#zones {
+  position: absolute;
+  inset: 0;
   margin: 0 auto;
   /* NO max-height / overflow-y here, again - REVERSED a second time,
      2026-08-20, same day as the first reversal, and the reason is the
@@ -804,7 +893,37 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  align-content: flex-start;
+  /* UX follow-up (real bug, found live): `#zones` fills the FULL
+     surface now (personal zones' percentage ring math needs that), not
+     a small `max-width`-clamped box the old `#table-center` VERTICALLY
+     centered via `top: 50%; transform: translate(-50%, -50%)`. Left at
+     `flex-start` (this rule's own pre-flattening value, when the
+     in-flow content WAS that small centered box), the shared-zone
+     cluster pinned to the TOP of the now-full-height container instead
+     - directly into personal zones ringed near the top of the surface
+     (`seatPosition`'s own topPct ~24% for an opposite-seat player).
+     `center` is what actually reproduces the old visual center point;
+     the design-lint zone-overlap check that should have caught this
+     immediately was itself silently broken (querying two ids the same
+     flattening pass had already removed) until fixed alongside this. */
+  align-content: center;
+  /* Centers the in-flow (unmoved shared/deck) panels as a cluster,
+     since the container itself now fills the full surface width rather
+     than a `max-width`-clamped "pot" the way `#table-area` was -
+     `.panel-moved` panels are absolutely positioned and ignore this
+     entirely, same as they ignore every other flex property here. */
+  justify-content: center;
+  /* UX follow-up (real bug, found live): missing here, so flex's
+     default `align-items: stretch` applied - two zones sharing the same
+     wrapped flex LINE (Deck and Table are exactly this at common widths)
+     stretched to match whichever was TALLEST, so playing enough cards
+     to wrap Table's own card-row visibly grew/moved the Deck panel too,
+     though nothing was ever added to it ("zones move weirdly when
+     moving a card"). `flex-start` is the same normalized convention
+     `.own-zone` already uses for its own flex column (it never had this
+     bug) - every zone's height comes from its own content only now,
+     never a sibling's. */
+  align-items: flex-start;
 }
 
 
@@ -857,51 +976,63 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   box-shadow: 0 0 0 1px var(--accent);
 }
 
-/* Personal zones (D17, US-27) - positioned "in front of" their owner's
-   seat, same absolute-overlay pattern as #game-roster. */
-#seat-zones {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
 .seat-zone .card-row { flex-wrap: wrap; overflow: visible; }
 
+/* UX follow-up (direct user request): "let's not conflate Piles and
+   Zones. Piles are a collection of 1+ cards within a Zone. The zone
+   must expand to fit its piles, and nothing should have scrollbars."
+   `.seat-zone` IS the zone a hand pile lives in - it needs the exact
+   room the old `.own-zone` (retired along with `buildOwnPanel`) already
+   had to earn the hard way, since every seat now holds real cards the
+   D17 personal zone never did (that was empty of hand cards by design).
+   Folded `.own-zone`'s width/anchor/z-index fixes in here rather than
+   leaving them stranded on a class nothing applies any more. */
 .seat-zone {
   position: absolute;
-  /* D51: `--raise-base` is what the shared `.pile-hover-host:hover` rule
-     (above) composes its raise transform onto, so the hand zone
-     (`.seat-zone.hand-zone`) doesn't lose its own centering transform on
-     hover - see that rule's own comment. */
-  --raise-base: translate(-50%, -50%);
+  /* UX follow-up (real regression, confirmed live, same fix `.own-zone`
+     already proved): centering a box on its anchor point in BOTH axes
+     means a TALL box grows upward too, straight into whatever's above
+     it (the bottom seat sits near the ring's lower edge, seatPosition's
+     topPct 50+radius). Anchoring the TOP-CENTER instead makes it grow
+     downward only, into the table surface's own empty margin below the
+     ring, never up into a neighbor. */
+  --raise-base: translate(-50%, 0%);
   transform: var(--raise-base);
   width: max-content;
-  max-width: 9rem;
+  /* "The zone must expand to fit its piles": no tight cap here any
+     more - `min(94vw, 48rem)` only exists so a big hand can never force
+     page-level horizontal scroll (design-lint's own "no forced scroll"
+     check), not to shrink-and-clip a pile that fits well within it. */
+  max-width: min(94vw, 48rem);
   margin: 0;
-  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  /* D52 follow-up, found live (`.own-zone`'s own history): a wide/tall
+     seat genuinely overlaps other panels once enough cards exist -
+     one level above the highest hover escalation
+     (`.pile-hover-host:hover`'s own z-index: 8) so this panel always
+     wins regardless of what else is hovered. */
+  z-index: 9;
   pointer-events: auto;
 }
 
-/* D51: the hand needs real room - a full hand of cards plus its own
-   controls - unlike a typical personal zone (a handful of played
-   cards). Overrides `.seat-zone`'s 9rem cap, which was sized for that
-   smaller case. */
-.hand-zone {
-  max-width: min(92vw, 44rem);
-  width: max-content;
-  /* D52 follow-up, found live: a big hand (44rem wide) genuinely
-     overlaps `#table-center`'s own content once enough zones/cards
-     exist there - `.seat-zone`'s baseline `z-index: 1` isn't enough to
-     win that fight once `#table-center` is itself escalated (up to 8,
-     `.pile-hover-host:hover`'s own rule above) by whatever's hovered
-     inside it. A hand card underneath then silently ate the hover/click
-     meant for `#hand-zone-name`, the same trapped-stacking-context
-     class of bug as every other `#table-center:has(...)` escalation in
-     this file - fixed the same way, one level higher than the highest
-     existing escalation (8) so the hand zone always wins regardless of
-     what else is hovered. */
-  z-index: 9;
+/* UX follow-up (direct user request): "get rid of own-zone-content and
+   all other non-zone elements from #zones" - Score is a real sibling
+   `<score-zone>` Web Component now (`src/components/ScoreZone.js`,
+   `main.js`), not a nested pseudo-zone inside the own-panel, so it
+   picks up `.zone`'s own border/padding/background for free instead of
+   duplicating them here. Name/connection folded into the own-panel's
+   existing heading text (`ui.js`'s `buildOwnPanel`) - no separate info
+   column left either. */
+.score-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text);
+  text-align: center;
 }
+
+.hand-heading { margin-top: 0.4rem; }
 
 /* D52 follow-up, found live: `#hand-zone-name` is a thin one-line text
    heading, and the shared `.pile-hover-host:hover` raise (`translateY(
@@ -922,16 +1053,52 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   transform: none;
 }
 
-.hand-zone-controls { margin-top: 0.4rem; }
-
-/* Visual deck stack (US-20) instead of a bare "N cards left" line. */
+/* Visual deck stack (US-20) instead of a bare "N cards left" line.
+   UX follow-up: now a COLUMN (the action header row, then this original
+   row) instead of the row itself directly - see `ui.js`'s `renderDeck`
+   and `.deck-area-row` below. Widened so a 5-button header (Draw/Deal/
+   Reshuffle & deal/Shuffle/Split) has room to wrap onto 2-3 lines
+   instead of 1-per-line. */
+/* UX follow-up: also carries the `.zone` class now (border/padding/
+   background/margin-bottom/position:relative all come from there, same
+   as every other table panel) - this rule only adds what's specific to
+   the deck: its own internal column layout (a stack visualization, not
+   a `.card-row`) and content-sized width instead of the flex-grow every
+   other zone type gets from `#zones > .zone:not(.seat-zone)`. */
 .deck-area {
-  position: relative;
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+  /* Sizes to its content now (the action header, or the stack+count-
+     inputs row, whichever is wider) instead of a fixed column width -
+     a fixed width was exactly what forced the header's icon buttons to
+     wrap onto extra rows before they needed to. */
+  width: max-content;
+  max-width: min(90vw, 20rem);
+}
+
+/* The stack + its persistent count inputs (Deal's cards-per-player,
+   Split's pile count), side by side - this is `.deck-area`'s entire
+   layout before the action header existed, just scoped one level in
+   now so widening the outer column for the header doesn't stretch
+   these apart from each other too. */
+.deck-area-row {
+  display: flex;
   align-items: center;
   height: 3.7rem;
-  padding-left: 0.4rem;
-  margin-bottom: 0.75rem;
+}
+
+/* UX follow-up (real bug, found live): `.deck-stack-card`'s `position:
+   absolute` was always relative to `.deck-area` (the nearest positioned
+   ancestor) - harmless while `.deck-area` was one flat row (its origin
+   WAS the stack's intended position), but once the action header became
+   a flow child above the stack (same follow-up), that origin moved and
+   the stack rendered on top of the header instead of below it. Scoping
+   the positioning context to `.deck-stack` itself - where it visually
+   lives - fixes it at the actual cause. */
+.deck-stack {
+  position: relative;
 }
 
 .deck-stack-card {
@@ -1052,6 +1219,11 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   padding: 0.3rem 0.5rem;
   font-size: 1rem;
   background: var(--surface-2);
+  /* UX follow-up (direct user request): "de-blob the score buttons" -
+     same override as `.pile-action-btn`/`.card-action-btn`: the base
+     `button{}` rule's `border-radius: var(--radius-md)` (0.75rem) reads
+     as a rounded pill on a small control, not a crisp square. */
+  border-radius: 0.15rem;
 }
 
 .roster {
@@ -1158,48 +1330,26 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
      footprint (fewer permanently-reserved per-card controls), which is
      the pile-actions redesign already flagged as separate, larger work. */
   .table-surface { --table-min-h: max(36rem, calc(100vh - 14.5rem)); } /* D51: bigger cards need more ring clearance; also grow with a tall window, not just cap at a fixed rem (direct user request) */
-  /* Centred *in the surface* rather than left in normal flow. The pot
-     had been flowing just under the deck area near the top, while
-     personal zones ring the surface's true centre
-     (`seatPosition(..., 26)`) - so the two were never concentric and the
-     seat opposite the viewer (topPct 24%) sat on top of the pot. That
-     collision is real and pre-existing, measured on the committed
-     baseline at every width. Centring is what makes the geometry match
-     the model the rest of the table already assumes, and what makes
-     D24's clearance budget valid.
-     Scoped to this breakpoint up: applying it below 1024px measurably
-     made the already-over-subscribed phone layout *worse* (one
-     overlapping zone became two), and D24 commits to leaving that tier
-     alone for the open mobile-density item to address properly. */
-  #table-center {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    display: flex;
-    align-items: flex-start;
-    gap: 1rem;
-    /* D51: widened from a fixed 42rem alongside #screen-game itself
-       filling the window - the inner content needs to actually reach
-       the wider outer container, not just leave it as blank margin. */
-    max-width: calc(100vw - 10rem);
-  }
-  #table-area { margin: 0; max-width: calc(100vw - 24rem); }
   /* Wide and short: cards run across instead of wrapping downward, so a
      zone costs the table width (which it has) rather than height (which
      it doesn't). min-width matters as much as max - without it an empty
      or single-card zone collapses to a tall narrow box, the one shape
      the table has least room for. Desktop-only: below 1024px the ring
      has no spare room at all (D24). */
-  .seat-zone { min-width: 14rem; max-width: 26rem; }
+  /* UX follow-up (direct user request): "the zone must expand to fit
+     its piles" - `max-width` dropped here (the base `.seat-zone` rule's
+     `min(94vw, 48rem)` already covers every breakpoint; this used to
+     cap a seat SMALLER than that at desktop widths, exactly the
+     shrink-and-clip behavior the user asked to stop). `min-width`
+     stays - an empty/single-card seat still shouldn't collapse to a
+     tall narrow box, the one shape the table has least room for. */
+  .seat-zone { min-width: 14rem; }
   .seat-zone .card-row { flex-wrap: wrap; overflow: visible; }
 }
 
 @media (min-width: 1440px) {
   .table-surface { --table-min-h: max(36rem, calc(100vh - 14.5rem)); } /* D51: bigger cards need more ring clearance; also grow with a tall window, not just cap at a fixed rem (direct user request) */
-  #table-center { max-width: calc(100vw - 12rem); }
-  #table-area { max-width: calc(100vw - 28rem); }
-  .seat-zone { min-width: 16rem; max-width: 30rem; }
+  .seat-zone { min-width: 16rem; }
   .seat-zone .card-row { flex-wrap: wrap; overflow: visible; }
 }
 
@@ -1208,23 +1358,55 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    behind the pot's own scroll - you could create four piles and see one.
    Flowing them side by side spends D24's new width on the thing that
    needed it. Zones keep their own labels/borders, so this changes
-   arrangement only, not what a zone is (Smith Gate 1, US-19). */
-#table-area .zone {
+   arrangement only, not what a zone is (Smith Gate 1, US-19).
+   `:not(.seat-zone)` - a personal zone has its own, different sizing
+   (`.seat-zone`'s own rule, below) and must not be widened/flex-grown
+   the way a shared/deck panel is; `#zones > .zone` alone would win that
+   fight by specificity (id+class beats a single class) regardless of
+   source order without this. */
+#zones > .zone:not(.seat-zone) {
   flex: 1 1 auto;
   min-width: 11rem;
   margin-bottom: 0;
 }
 
-/* The armed play-visibility control (replaces the per-card icon pair). */
-.play-as-label {
-  flex-direction: row;
-  align-items: center;
-  gap: 0.4rem;
-  margin: 0;
-  font-size: 0.85rem;
+/* UX follow-up (direct user request): "zone is one thing, pile is
+   another - don't overload zone-panel to do everything." A Zone
+   (`.zone`, `<zone-panel>`) draws its OWN box and holds one or more
+   Piles (`.pile-section`, `<pile-panel>`) inside a `.zone-body` -
+   replicates `#zones`'s own flex-row layout and its member-sizing rule
+   one level in, so a Pile living inside a Zone's body looks/behaves
+   the same as a standalone Zone did living directly in `#zones`. */
+.zone-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: flex-start;
 }
 
-.play-as-label select { font-size: 0.85rem; padding: 0.4rem 0.5rem; }
+.zone-body > .pile-section {
+  flex: 1 1 auto;
+  min-width: 11rem;
+}
+
+/* UX follow-up (direct user request): "make zones and piles visually
+   distinct" (then, immediately after, "put the border around the
+   piles back") - a Pile is its own real, bordered region INSIDE the
+   Zone's own box, not identical to the Zone (dashed and a lighter/
+   subtler color keeps it visually distinct from the Zone's solid
+   `var(--border)` outline) and not un-styled either. Addressable/
+   droppable exactly like a Zone is - `pileElement`/`touchTargetAt` key
+   off `.pile-section[data-zone-id]`, and the drag-over highlight below
+   applies to `.pile-section` too - but it never draws a SECOND
+   zone-shaped box or wires its own move/resize; a Pile always lives
+   inside exactly one Zone, which owns both of those once. */
+.pile-section {
+  position: relative;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  padding: 0.35rem 0.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-sm);
+}
 
 /* One horizontal control row per zone card, rather than each control
    stacked under the card. Two 44px rows per card made every zone about
@@ -1260,8 +1442,9 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   margin-bottom: 0;
 }
 
-/* Deck + its controls as one column in the centred cluster. */
-.deck-column { display: flex; flex-direction: column; align-items: flex-start; gap: 0.3rem; }
+/* .deck-column (UX follow-up: retired) - the deck lives inside
+   #zones as one of its own zone-like panels now, not in a separate
+   column beside it. */
 
 /* Every pile that can receive the chosen action lights up, so the valid
    destinations are visible rather than guessed (Nielsen #1/#6). */
@@ -1278,15 +1461,6 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   background: rgba(79, 157, 255, 0.1);
   cursor: pointer;
   position: relative;
-  z-index: 4;
-}
-
-/* Same trapped-stacking-context cause the deck's own escalation exists
-   for (`#table-center`'s `transform`, D24): a `.pile-target` INSIDE
-   `#table-center` (a shared zone in `#table-area`) still can't outrank
-   `#seat-zones`/`#game-roster` siblings without promoting the ancestor
-   too - `.pile-target`'s own z-index above only wins locally. */
-#table-center:has(.pile-target) {
   z-index: 4;
 }
 
@@ -1388,58 +1562,99 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 
 /* --- Pile-level and card-level actions (US-41, D29; generalized D34/D37;
-   unified D51; radial D52) ------------------------------------------
-   D52 (direct user request): actions no longer appear in an edge-
-   anchored popover at all - hovering an actionable card or pile opens
-   a small ring of buttons CENTERED ON THE POINTER (`ui.js`'s
-   `openRadialMenu`), not on the actor's own box. This is also why the
-   z-index fights this project fought all through D24/D51
-   (`#table-center:has(...)` escalations, `.pile-target`'s own z-index)
-   mostly stop mattering here: `position: fixed` at the pointer's own
-   screen coordinates isn't nested inside anyone's stacking context to
-   lose a fight in. */
-.radial-menu {
-  position: fixed;
-  z-index: 20;
-  /* The menu's own (0,0) IS the pointer position `ui.js` passed in -
-     each button is placed by its own `transform: translate(...)`
-     (trig, computed in JS), not by flow layout. */
-  width: 0;
-  height: 0;
+   unified D51; radial D52; RETIRED in favor of plain buttons, direct
+   user request 2026-08-24: "the radials are not working... use a
+   header on Piles and Zones to display the actions ... as a set of
+   buttons next to the title.") ---------------------------------------
+   Every pile/zone's own heading (`.zone-name`) doubles as its action
+   header now (`ui.js`'s `renderActionHeader`) - the actions it offers
+   are always-visible buttons next to the title, not something you have
+   to hover to discover. No more `position: fixed`-at-pointer menu, no
+   more per-render open/close/reposition state to get wrong. */
+/* UX follow-up (direct user request): "remove all that crazy padding
+   around the buttons ... a nice crisp header bar with the action
+   buttons compact and aligned with the title." The old `margin-right:
+   auto` on the title pushed buttons to the far edge of whatever width
+   the header happened to have, which read as a big gap before them
+   (and unpredictable wrapping) rather than "next to the title." Plain
+   flow with a small fixed gap puts them immediately after the title
+   instead - the header's own width (`.deck-area`, below) sizing to
+   content rather than a fixed column is what actually lets them sit on
+   one row when they fit, not the margin trick. */
+.pile-action-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
 }
 
-.radial-menu-btn {
-  position: absolute;
-  /* Centers each button ON its computed point rather than at its
-     top-left corner - without this every button's ring radius would be
-     off by half a button, worse for the ones further from (0,0) where
-     it's least visually forgiving. */
-  translate: -50% -50%;
-  min-width: 44px;
-  min-height: 44px;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  padding: 0.3rem;
-  line-height: 1.15;
-  text-align: center;
-  white-space: normal;
+/* UX follow-up (direct user request): "small square icons ... tool tip
+   style hover text ... keep each button the same size." Shared by
+   `.pile-action-btn` (header buttons) and `.card-action-btn` (card
+   hover row) below - one fixed square, same for every action, the
+   glyph is the only thing that changes (`ACTION_SPECS[id].icon`, the
+   full name moved to `title`/`aria-label` - see `ui.js`'s
+   `applyIconButton`). 2.75rem keeps the existing 44px touch-target
+   floor exactly, just square instead of pill-shaped now. */
+.pile-action-btn,
+.card-action-btn {
+  /* UX follow-up (direct user request, 2026-08-24): "the button is still
+     HUGE... needs to be the same size or smaller than the title text."
+     A deliberate override of the base `button{}` rule's 44px touch-
+     target floor (`min-width`/`min-height` reset to 0 below, same
+     override pattern `button.card` already used for playing cards) -
+     sized to `.zone-name`'s own `font-size: 0.8rem`, not the floor.
+     `tests/designLint.check.mjs`'s 44px check is exempted for both
+     classes to match, same reasoning as its existing `.card` exemption. */
+  width: 1.3rem;
+  height: 1.3rem;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  line-height: 1;
   background: var(--surface-2);
   border-color: var(--accent);
-  box-shadow: 0 4px 14px rgb(0 0 0 / 45%);
-  /* D52 ("maybe animate the radial menu for some flare", user request):
-     each button pops out from the pointer to its own ring position.
-     `--radial-delay` (set per-button in `ui.js`) staggers them into a
-     small fan-out instead of every button popping at once. Only plays
-     once, on creation - the menu is a brand-new element each time it
-     opens (`openRadialMenu` always builds fresh), never reused, so
-     there's no need to reset/replay it manually. */
-  animation: radial-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
-  animation-delay: var(--radial-delay, 0s);
+  /* UX follow-up: "not round though - square." The base `button{}`
+     rule's `border-radius: var(--radius-md)` (0.75rem) is more than
+     half this button's own size, rounding it into a circle/pill - even
+     `--radius-sm` (0.45rem) is still a third of this button's own
+     size, visibly rounded. A small explicit corner reads as a crisp
+     square instead, not scaled off either shared token. */
+  border-radius: 0.15rem;
 }
 
-@keyframes radial-pop {
-  from { opacity: 0; scale: 0.4; }
-  to { opacity: 1; scale: 1; }
+/* A card's own actions (Reveal is a direct tap, not a button here - see
+   `performReveal`): a small row directly below the card on hover,
+   never a permanent fixture (a real card is too small to carry 2-4
+   buttons at all times without becoming mostly button). Positioned
+   relative to the card itself now, not the pointer, so it needs none of
+   the old radial menu's trapped-stacking-context escapes. */
+.card-action-row {
+  /* `position: fixed`, not `absolute` inside the card - `ui.js`'s
+     `attachActionRow` sets `left`/`top` from the card's own
+     `getBoundingClientRect()`. Escapes a fanned row's clipping (real
+     bug, found live: its horizontal scroll, `overflow-x: auto`, needed
+     for the fan, forces `overflow-y` to compute as `auto` too, not
+     `visible` - a genuine CSS rule, a non-`visible` value on one axis
+     pulls the other off `visible` - so a row anchored INSIDE that box
+     and extending past its edge was silently clipped invisible).
+     Body-level fixed positioning is exactly why D52's own radial menu
+     used it, for the same underlying reason - reused here for a plain
+     row, not the ring. */
+  position: fixed;
+  translate: -50% -100%;
+  margin-top: -0.25rem;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  width: max-content;
+  max-width: 9rem;
+  justify-content: center;
 }
 
 /* The follow-mode label (`beginTargetingWithGhost`) - "the card follows
@@ -1512,3 +1727,105 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .restore-waiting .returner-missing::before { content: "… "; }
 
 #resume-anyway-btn { min-height: 44px; }
+
+/* UX follow-up (direct user request): move is a base zone feature now -
+   every pile/zone panel (shared, personal, deck) switches to this,
+   plain `position: absolute` with NO transform, the first time it's
+   actually dragged (`ui.js`'s `attachPanelDrag`). Before that, each
+   panel keeps its own default mechanism unchanged - a personal zone's
+   `.seat-zone`/`.own-zone` centering `--raise-base` transform, or a
+   shared/deck panel's normal flex-wrap flow (`#zones`). `--raise-base:
+   none` matters even though `transform` alone would look right at
+   rest: `.pile-hover-host:hover` COMPOSES `var(--raise-base, none)`
+   with its own raise - leaving the old centering transform in that
+   custom property would silently re-apply it (a visible jump) the
+   moment a moved panel is hovered. `.zone.panel-moved` (not just
+   `.panel-moved`) outranks `.seat-zone`'s own same-specificity rule
+   regardless of source order. */
+.zone.panel-moved {
+  position: absolute;
+  transform: none;
+  --raise-base: none;
+}
+
+/* UX follow-up (direct user request): "grab bars and click title...
+   grabbing the title to move the panel to a different place on the
+   table." A panel's own title (`.zone-name`) is the drag handle
+   (`ui.js`'s `attachPanelDrag`) - a real cursor affordance beats a
+   silent draggable area. */
+.panel-drag-handle {
+  cursor: grab;
+}
+
+.panel-dragging {
+  cursor: grabbing;
+  z-index: 15;
+  opacity: 0.92;
+}
+
+/* Set on <body> for the duration of a drag so the cursor reads
+   "grabbing" everywhere, not just while directly over the panel (no
+   pointer capture is taken - this is the cheap equivalent). */
+body.panel-drag-active {
+  cursor: grabbing;
+}
+
+/* UX follow-up (direct user request): a resize handle alongside the
+   existing move handle - "grab areas for resize... a slight border
+   around resizable zones or piles would help provide visual
+   indication." Two parts: `.panel-resizable` marks the panel itself so
+   it reads as resizable at rest, before the pointer ever finds the
+   small corner grip; `.panel-resize-handle` is that grip. */
+.panel-resizable {
+  /* Deliberately subtler than the accent-colored `.zone-drag-over`
+     drop-target highlight (which means something is actively
+     happening) - this means "you CAN do something here", a standing
+     affordance, not a live state change. */
+  border-color: rgba(79, 157, 255, 0.4);
+}
+
+.panel-resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 1rem;
+  height: 1rem;
+  /* A plain <div>, not a <button> - designLint's 44px floor only checks
+     `button` elements (tests/designLint.check.mjs), the same reason
+     `.panel-drag-handle` (the title bar) never needed an exemption
+     either. Deliberately smaller than a tap target: mouse-only, like
+     every other panel-drag affordance in this pass. */
+  min-width: 0;
+  min-height: 0;
+  cursor: nwse-resize;
+  /* Three short diagonal grip lines in the corner, same visual language
+     as a native OS resize handle - a repeating gradient rather than a
+     background image so it stays crisp at any zoom/DPI with no asset. */
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(230, 236, 245, 0.55) 0 1.5px,
+    transparent 1.5px 4px
+  );
+  background-position: bottom right;
+  background-repeat: no-repeat;
+  background-size: 0.7rem 0.7rem;
+  border-radius: 0 0 var(--radius-md) 0;
+  opacity: 0.6;
+}
+
+.panel-resizable:hover .panel-resize-handle,
+.panel-resize-handle:hover {
+  opacity: 1;
+}
+
+.panel-resizing {
+  z-index: 15;
+  opacity: 0.92;
+}
+
+/* Set on <body> for the duration of a resize so the cursor reads
+   "resize" everywhere, not just while directly over the small handle -
+   same reasoning/technique as `body.panel-drag-active` above. */
+body.panel-resize-active {
+  cursor: nwse-resize;
+}

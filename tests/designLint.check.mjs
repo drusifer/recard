@@ -96,10 +96,37 @@ try {
   );
   await host.fill('#cards-per-player', '7');
   await host.click('#deal-btn');
-  await host.waitForFunction(() => document.querySelectorAll('#hand-area .card').length === 7, undefined, { timeout: 15000 });
+  // UX follow-up (direct user request): "get rid of seat panel and
+  // replace with a reg zone with a handpile" (then "remember hand is a
+  // pile not a zone") - there is no more `#hand-area`/own-zone special
+  // case; a hand pile is a bare `[data-kind="hand"]` zone-panel now
+  // (`src/components/PlayerZone.js` groups it with any other pile the
+  // owner has), same generic `.middle-card .card` shape as any other
+  // zone's cards. The host's own hand pile is created first (host joins/
+  // deals before the guest), so it's the FIRST one in DOM order on the
+  // host's own page.
+  await host.waitForFunction(
+    () => document.querySelector('[data-kind="hand"]')?.querySelectorAll('.card').length === 7,
+    undefined, { timeout: 15000 },
+  );
   // A card in the pot, matching the state the original regression was
   // found under (an empty pot doesn't exercise the overlap check at all).
-  await host.locator('#hand-area .card').first().click();
+  // UX follow-up: the fan's tightened overlap (`.hand-card + .hand-card`
+  // in style.css) now covers most of every card EXCEPT the last one in
+  // DOM order (later siblings paint on top with no explicit z-index) -
+  // `.first()`'s center point is genuinely obstructed by the card after
+  // it, so Playwright's own default-center click times out waiting for
+  // it to become clickable, matching what a real click there would hit.
+  // `.last()` is always the fully unobstructed top card of the fan.
+  //
+  // UX follow-up (direct user request): clicks the `.middle-card`
+  // WRAPPER now, not the inner `.card` button - a hand card's face is a
+  // disabled button now that tap-to-play was retired (`cardEl`'s
+  // `disabled` path, `ui.js`), which Playwright refuses to `.click()`.
+  // The wrapper is what this check actually cares about anyway: is the
+  // last fanned card obstructed by a sibling, not whether tapping it
+  // does anything.
+  await host.locator('zone-panel.seat-zone').first().locator('[data-kind="hand"] .middle-card').last().click();
   await host.waitForTimeout(300);
 
   for (const vp of VIEWPORTS) {
@@ -108,8 +135,32 @@ try {
 
     const g = await host.evaluate(() => ({
       docScrollHeight: document.documentElement.scrollHeight,
-      handRect: document.getElementById('hand-area')?.getBoundingClientRect(),
-      zones: [...document.querySelectorAll('#seat-zones .zone, #table-area .zone')].map((el) => ({
+      // UX follow-up (direct user request): no more single `#hand-area` -
+      // every seated player's hand is its own bare `[data-kind="hand"]`
+      // pile now, grouped into that player's own Zone (`<zone-panel
+      // class="seat-zone">`, `src/components/ZonePanel.js`) alongside
+      // any other pile that owner has. Checked for ALL of them (not
+      // just "mine", which the DOM no longer marks distinctly), so this
+      // stays a real check rather than silently matching nothing the
+      // way the `#seat-zones`/`#table-area` selector below once did.
+      handRects: [...document.querySelectorAll('[data-kind="hand"]')].map((el) => el.getBoundingClientRect()),
+      // UX follow-up (real bug, found live): this selector still named
+      // `#seat-zones`/`#table-area`, both retired by the DOM-flattening
+      // pass ("table-surface -> #zones -> .zone", no more container
+      // split) - since neither id exists any more, this had been
+      // silently matching ZERO zones and reporting "no overlap" no
+      // matter what, not because it was actually clean.
+      //
+      // UX follow-up (direct user request): "zone is one thing, pile is
+      // another" - a Zone (`<zone-panel>`, one bordered/positioned panel
+      // per Table Zone / player / standalone shared zone) is the ONLY
+      // thing that ever carries `.zone` now; a Pile living inside one
+      // (`<pile-panel>`) carries `.pile-section` instead, never `.zone`
+      // - so this plain query already only ever matches independent
+      // Zones, with no exclusion needed for a Zone's own members the
+      // way an earlier cut of this check (when piles still borrowed the
+      // `.zone` class) required.
+      zones: [...document.querySelectorAll('#zones .zone')].map((el) => ({
         label: el.querySelector('.zone-name')?.textContent?.trim() || el.className,
         rect: el.getBoundingClientRect(),
       })),
@@ -136,7 +187,14 @@ try {
       // reflowed element and genuinely trigger `:hover` by accident -
       // exposing a real, pre-existing gap in this exemption, not a new
       // regression to fix in the app.
-      buttons: [...document.querySelectorAll('button:not([hidden]):not(.card):not(.action-btn)')]
+      // UX follow-up (direct user request, 2026-08-24): `.pile-action-btn`/
+      // `.card-action-btn` (the icon buttons in pile/zone headers and a
+      // card's hover row) are deliberately sized to the title text, NOT
+      // the 44px floor - same "user explicitly overrode it" reasoning as
+      // `.card` above, not a regression this checker should flag.
+      buttons: [...document.querySelectorAll(
+        'button:not([hidden]):not(.card):not(.action-btn):not(.pile-action-btn):not(.card-action-btn)',
+      )]
         .filter((b) => {
           const r = b.getBoundingClientRect();
           return r.width > 0 && r.height > 0; // skip genuinely hidden/collapsed ones
@@ -153,10 +211,13 @@ try {
       report(vp.name, `page forces ${overflow}px of scroll (document ${g.docScrollHeight}px vs viewport ${vp.height}px)`);
     }
 
-    // Check 2: the hand stays visible without scrolling - the user's
+    // Check 2: every hand stays visible without scrolling - the user's
     // literal ask ("see the table and my cards at the same time").
-    if (g.handRect && !fitsViewport(g.handRect, { width: vp.width, height: vp.height })) {
-      report(vp.name, 'the hand is not fully visible without scrolling');
+    for (const rect of g.handRects) {
+      if (!fitsViewport(rect, { width: vp.width, height: vp.height })) {
+        report(vp.name, 'a hand is not fully visible without scrolling');
+        break;
+      }
     }
 
     // Check 3: no zone (shared or personal) overlaps another - D24's

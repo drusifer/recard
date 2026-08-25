@@ -10,7 +10,7 @@ Orchestrates multi-persona AI coordination through a shared chat log using the `
 TLDR:
     Routes `*chat` messages to the right specialist persona — by explicit `@mention` or auto-selection.
     Each persona loads state on entry, executes one task, saves state on exit, posts to `agents/CHAT.md`.
-    For full workflow chains use loop commands (*fix, *impl, *qa, *review, *plan sprint) — see bloop skill.
+    For full workflow chains use loop commands (*fix, *nit, *impl, *qa, *review, *plan sprint) — see bloop skill.
     Key rule: no third fix attempt without Oracle consult + user sign-off.
 
 # Bob Protocol — Multi-Persona Coordination
@@ -73,7 +73,7 @@ Analyze the request and route to the best persona:
 | Agent creation, prompt improvement | Bob (`*prompt`) |
 | UX review, usability, sprint gates | Smith (`*user`) |
 
-For multi-step workflows, use a Bloop command instead: `*fix`, `*impl`, `*qa`, `*review`, `*plan sprint`.
+For multi-step workflows, use a Bloop command instead: `*fix`, `*nit`, `*impl`, `*qa`, `*review`, `*plan sprint`.
 
 ### Step 4: Load Persona and Execute
 1. Read `agents/<name>.docs/SKILL.md`

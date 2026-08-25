@@ -1,5 +1,8 @@
 import { step as touchDragStep, HOLD_MS } from './touchDrag.js';
-import { ACTION_SPECS, actionsForCard, pileLevelActions, targetsForAction, resolveDropTargetFor } from './pileActions.js';
+import {
+  ACTION_SPECS, actionsForCard, pileLevelActions, targetsForAction, resolveDropTargetFor,
+  disabledPileActionsFor, rowShapeFor,
+} from './pileActions.js';
 import { seatPosition } from './seating.js';
 
 const SUIT_SYMBOL = { clubs: '♣', diamonds: '♦', hearts: '♥', spades: '♠' };
@@ -71,9 +74,12 @@ const GHOST_LIFT_PX = 28;
 function touchTargetAt(x, y) {
   const el = document.elementFromPoint(x, y);
   if (!el) return null;
-  const handCard = el.closest('#hand-area .hand-card');
-  if (handCard) return { kind: 'hand', el: handCard };
-  const zone = el.closest('.zone[data-zone-id]');
+  // UX follow-up (direct user request): the hand's own local reorder
+  // (`performHandReorder`, the old `.hand-card`-specific 'hand' target
+  // kind) is gone along with `renderHand`/`#hand-area` - the hand pile
+  // is a plain `.pile-section[data-zone-id]` now, same as any other
+  // pile, so the generic branch below already finds it.
+  const zone = el.closest('.pile-section[data-zone-id]');
   if (zone) return { kind: 'zone', el: zone, row: zone.querySelector('.card-row') };
   return null;
 }
@@ -186,11 +192,7 @@ function attachTouchDrag(sourceEl, card, ctx) {
       ctx.onHandMotion?.(false);
       ctx.onCardDrag?.(null, 0, 0);
       if (!target) return; // dropped in dead space: a no-op, same as mouse
-      if (target.kind === 'hand') {
-        // A card that isn't in the hand resolves to nothing here, which
-        // is the same no-op the native path gives it.
-        performHandReorder(target.el.parentElement, card.id, target.el, ctx.onReorder);
-      } else if (ctx.onDropCard) {
+      if (ctx.onDropCard) {
         performZoneDrop(target.el, target.row, target.el.dataset.zoneId, card.id,
           { x: ev.x, y: ev.y }, ctx.onDropCard, target.el.dataset.kind);
       }
@@ -248,113 +250,13 @@ function attachTouchDrag(sourceEl, card, ctx) {
   }, { passive: false });
 }
 
-/**
- * D28: the one implementation of "reorder my hand", called by both the
- * native `drop` listener and the touch recognizer. Extracted before any
- * touch code existed, specifically so there can never be two of these -
- * two placement paths would drift, and only the mouse one is covered by
- * the e2e suite.
- *
- * `beforeEl` is the hand card the dragged card lands in front of, or
- * null to move it to the end.
- */
-function performHandReorder(container, draggedId, beforeEl, onReorder) {
-  if (!draggedId) return;
-  const draggedEl = container.querySelector(`[data-card-id="${CSS.escape(draggedId)}"]`)?.closest('.hand-card');
-  if (!draggedEl || draggedEl === beforeEl) return;
-  container.insertBefore(draggedEl, beforeEl);
-  const newOrder = [...container.children].map((el) => el.querySelector('.card').dataset.cardId);
-  onReorder?.(newOrder);
-}
-
-/**
- * Renders your own hand. Cards are draggable so you can reorder your own
- * view of your hand (a purely local/cosmetic preference - hand order isn't
- * part of authoritative state). `onHandMotion` fires on drag start/end so
- * the caller can broadcast a best-effort "organizing hand" cue (US-11) -
- * it never reveals which/how many cards moved, just that motion happened.
- *
- * Playing a card is one tap, or a drag onto a zone. Face-down play used
- * to be a pair of icon buttons under *every* card; with drag-and-drop
- * (US-28/32/33) that per-card clutter cost the whole hand vertical room
- * for a rarely-used option, so it moved to one control in the hand
- * toolbar that sets what the *next* play does. The capability is
- * unchanged - US-12/13/14 community and hole cards still work - it's
- * just stated once instead of 2xN times.
- *
- * `onReorder(newOrderIds)` fires after a manual drag-reorder completes,
- * so the caller can fold the result into the same order list the sort
- * buttons write to (D14) - sorting and dragging share one source of
- * truth instead of fighting each other (Smith Gate 1).
- */
-export function renderHand(container, cards, { onPlay, onPlayHidden, onHandMotion, onReorder, onCardDrag, onDropCard, zones } = {}) {
-  container.innerHTML = '';
-  cards.forEach((card, i) => {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'hand-card';
-    // US-30: a fanned spread via rotation + a slight arc, not horizontal
-    // overlap - overlap would shrink covered cards' tap targets below
-    // the 44px floor (Smith Gate 1), rotation/arc alone doesn't touch
-    // hit-testing at all, so every card stays fully, individually
-    // tappable no matter how many are in hand.
-    const center = (cards.length - 1) / 2;
-    const offset = i - center;
-    // D51 follow-up: the fan-spread transform is set via the
-    // `--raise-base` CUSTOM PROPERTY only, never the `transform`
-    // property directly - style.css's `.hand-card { transform:
-    // var(--raise-base, none); }` applies it as a plain class rule,
-    // which the shared `.pile-hover-host:hover` rule (also a class
-    // rule) can then outrank on hover. An inline `transform` would have
-    // always won regardless of specificity, silently making the new
-    // "Play hidden" hover row's raise effect never apply here - the
-    // exact `.seat-zone` conflict already fixed once this same pass,
-    // now avoided here by never using inline `transform` in the first
-    // place rather than composing inside it.
-    wrapper.style.setProperty('--raise-base', `rotate(${offset * 4}deg) translateY(${Math.abs(offset) * 0.35}rem)`);
-    wrapper.draggable = true;
-    wrapper.addEventListener('dragstart', (e) => {
-      e.dataTransfer.setData('text/plain', card.id);
-      onHandMotion?.(true);
-      // D51: every table-side zone lights up as a legal `play` target
-      // for the whole drag - same "compatible drop targets must appear
-      // droppable while holding a card" mechanism the zone-card dragstart
-      // above uses, applied to the hand's own side of it.
-      if (zones) highlightDragTargets(['play'], zones.map((z) => ({ id: z.id, kind: z.kind, ownerId: z.ownerId ?? null })), {});
-    });
-    // US-29/D19: live position while actually dragging (not just the
-    // start/end boolean onHandMotion already sends) - card is a plain
-    // hand card with no `faceUp` field, which `cardDragPayload` treats
-    // the same as `faceUp: false` (never reveals identity), by design.
-    wrapper.addEventListener('drag', (e) => onCardDrag?.(card, e.clientX, e.clientY));
-    wrapper.addEventListener('dragend', () => {
-      onHandMotion?.(false);
-      onCardDrag?.(null, 0, 0); // signals "stopped" - see main.js's onCardDrag
-      clearPileTargets();
-    });
-    wrapper.addEventListener('dragover', (e) => e.preventDefault());
-    wrapper.addEventListener('drop', (e) => {
-      e.preventDefault();
-      performHandReorder(container, e.dataTransfer.getData('text/plain'), wrapper, onReorder);
-    });
-    // US-40/D28: the same three things a mouse drag does - play onto a
-    // zone, reorder within the hand, broadcast live motion - now reachable
-    // with a finger, through the same functions.
-    attachTouchDrag(wrapper, card, { onDropCard, onReorder, onCardDrag, onHandMotion });
-
-    wrapper.appendChild(cardEl(card, { onClick: onPlay }));
-
-    // D51 follow-up: "Play hidden" is the deliberate, secondary action -
-    // reached by hovering the card (same mechanism every other
-    // actionable pile/card uses now), never a tap/drag shortcut, so it
-    // can't be triggered by accident the way the fast default (plain
-    // tap/drag = public play, D36-style) can be.
-    if (onPlayHidden) {
-      attachRadialMenu(wrapper, card.id, () => ['playHidden'], { onAction: () => onPlayHidden(card) });
-    }
-
-    container.appendChild(wrapper);
-  });
-}
+// NOTE (flagged, not yet done): `renderHand`/`performHandReorder` (the
+// fanned, drag-reorderable own-hand rendering) are retired along with
+// the merged own-zone panel - a hand pile's cards render through the
+// exact same generic `renderZoneCards` every other pile's do now (`<seat-
+// zone>`, `src/components/SeatZone.js`). Direct instruction was to get
+// that working first; the fan/reorder/sort/pass polish this drops is a
+// deliberate, temporary gap, not an oversight.
 
 /**
  * A "move to another zone" control - only rendered when there's actually
@@ -415,12 +317,12 @@ export function clearPileTargets() {
 }
 
 /** The element standing in for a pile id, for highlighting/clicking.
- * D51: the hand highlights as its own zone-styled container
- * (`#hand-zone`, not the inner `#hand-area` card row) now that it has
- * one, the same visual `.pile-target` every other zone gets. */
+ * UX follow-up (direct user request): "zone is one thing, pile is
+ * another" - a Pile (`renderPile`, above) is what's addressable by pile
+ * id, never the Zone it lives in (a Zone can hold several piles, so it
+ * has no single pile id of its own to be found by). */
 function pileElement(pileId) {
-  if (pileId === HAND_PILE_ID) return document.getElementById('hand-zone');
-  return document.querySelector(`.zone[data-zone-id="${CSS.escape(pileId)}"]`);
+  return document.querySelector(`.pile-section[data-zone-id="${CSS.escape(pileId)}"]`);
 }
 
 /**
@@ -442,8 +344,6 @@ function highlightDragTargets(actionIds, piles, ctx) {
   for (const id of ids) pileElement(id)?.classList.add('pile-target');
 }
 
-const HAND_PILE_ID = '__hand__';
-
 /**
  * Highlights every pile that accepts `action` and waits for a click.
  * Escape or a click anywhere else cancels, so the user is never stuck in
@@ -459,9 +359,8 @@ function beginTargeting(action, targetIds, onChoose) {
     const el = e.currentTarget;
     e.preventDefault();
     e.stopPropagation();
-    const id = el.id === 'hand-zone' ? HAND_PILE_ID : el.dataset.zoneId;
     clearPileTargets();
-    onChoose(id);
+    onChoose(el.dataset.zoneId);
   };
   const onEscape = (e) => { if (e.key === 'Escape') clearPileTargets(); };
   const onElsewhere = () => clearPileTargets();
@@ -528,212 +427,158 @@ function beginTargetingWithGhost(action, targetIds, label, onChoose) {
 }
 
 /**
- * D52 (real bug fix, direct user report): the menu used to reopen
- * itself at the CURRENT pointer position on every `pointerenter` -
- * including a `pointerenter` fired by a brand-new DOM node this app's
- * own wholesale re-renders (`renderZoneCards`/`renderGameFromView` etc.,
- * on every state/motion broadcast) insert right under a mouse that
- * hasn't actually moved anywhere. Each re-render's fresh node re-fired
- * the "just started hovering" event, silently teleporting the menu to
- * wherever the mouse happened to be at that instant - "a race to click
- * it" in the user's own words, because it could relocate mid-click.
- *
- * The fix is identity, not timing: track WHAT the open menu belongs to
- * by a caller-supplied stable `key` (a card id, or a fixed string like
- * `'deck'`) rather than by DOM node reference, which re-renders don't
- * preserve. A `pointerenter` for the SAME key is a re-render artifact,
- * not a new hover - it's ignored outright, so the menu stays exactly
- * where it opened until one of the three things the user asked for
- * actually happens.
+ * UX follow-up (direct user request, 2026-08-24): "small square icons
+ * ... with tool tip style hover text ... keep each button the same
+ * size." The button's visible content is just `spec.icon` now - the
+ * full name (an override from `labels`, or `spec.label`) moves to
+ * `title` (a native tooltip) and `aria-label` (so the icon-only button
+ * still has a real accessible name, not just a glyph). Shared by both
+ * `renderActionHeader` (piles/zones) and `attachActionRow` (cards) so
+ * the icon-button contract can't drift between the two.
  */
-let radialMenuKey = null;
+function applyIconButton(btn, spec, labelOverride) {
+  const label = labelOverride ?? spec.label;
+  btn.textContent = spec.icon;
+  btn.title = label;
+  btn.setAttribute('aria-label', label);
+}
 
 /**
- * D52: a pointer-centered radial menu of `actionIds`, replacing the
- * D34-era edge-anchored popover. `position: fixed` at the pointer's OWN
- * screen coordinates (never the host element's box) sidesteps this
- * project's whole history of trapped-stacking-context bugs (D24/D51's
- * `#table-center:has(...)` escalations) at the source, rather than
- * fixing them one more time for a new host shape - a menu that isn't
- * inside any pile's own box can't lose a z-index fight to one.
+ * UX follow-up (direct user request, 2026-08-24): "the radials are not
+ * working... use a header on Piles and Zones to display the actions
+ * ... as a set of buttons next to the title." Retires D52's pointer-
+ * centered radial menu entirely for pile/zone-level actions - the
+ * heading itself IS the action row now, always visible, no hover state
+ * to get wrong. Dispatch keeps D51/D36's split: an in-place action or a
+ * STATIC `singleTarget` action (Draw) fires the moment it's clicked;
+ * every pile-level action today is one of those two shapes (none needs
+ * a "choose a destination" step - see `renderPileAnchor`'s own note),
+ * so no targeting-mode branch is needed here at all.
  *
- * Dispatch mirrors D51's existing split: an in-place
- * action (`target` null/undefined) or a STATIC `singleTarget` action
- * (D36 - Draw's own "don't make the highest-frequency action need an
- * extra step" rule, preserved exactly here too) dispatches the moment
- * it's clicked. Anything else opens `beginTargetingWithGhost` - the
- * card-follows-cursor-until-you-confirm behavior.
+ * UX follow-up (continuing the Web Components pass): takes `container`
+ * instead of creating its own `<div>`, same shape as `renderDeck`/
+ * `renderZoneCards` - so `<header-actions>` (`src/components/
+ * HeaderActions.js`) can call this against `this`, the same "thin
+ * adapter around proven logic" every other component in this pass uses.
  *
- * Persists once open (direct user request) until: an action is
- * clicked, a click lands anywhere else (the deferred document
- * listener below), or the pointer genuinely moves to a DIFFERENT
- * actionable thing (a new `key` arrives via `attachRadialMenu`).
- *
- * @param {string} key stable identity of what's opening this menu (a
- *   card id, or a fixed string per pile) - see the doc comment above.
+ * @param {HTMLElement} container
+ * @param {string} titleText e.g. "Hand (7)"
  * @param {string[]} actionIds
- * @param {number} cx @param {number} cy pointer screen coordinates
  * @param {{labels?: Record<string,string>, disabled?: string[],
- *   targetsFor: (actionId: string) => string[],
- *   onAction: (actionId: string, targetPileId?: string) => void}} opts
+ *   onAction: (actionId: string) => void, draggable?: boolean,
+ *   headingId?: string, headingClass?: string}} opts
  */
-function openRadialMenu(key, actionIds, cx, cy, opts) {
-  // D52 real bug (found live, right after the "don't reposition" fix
-  // above): a re-render's `pointerenter` for the SAME key must keep the
-  // menu's POSITION, but still needs to rebuild its CONTENT - the
-  // re-render might be exactly what changed which actions are legal
-  // (drawing the last card disables Deal, mid-hover). Reusing the
-  // existing menu's own coordinates instead of the new event's is what
-  // "same key, don't move" actually means; skipping the rebuild
-  // entirely would have left a stale, wrong action list on screen.
-  const reopeningSameKey = radialMenuEl && radialMenuKey === key;
-  if (reopeningSameKey) {
-    cx = parseFloat(radialMenuEl.style.left);
-    cy = parseFloat(radialMenuEl.style.top);
-  }
-  closeRadialMenu();
-  const ids = actionIds.filter((id) => !opts.disabled?.includes(id));
-  if (!ids.length) return;
+export function renderActionHeader(container, titleText, actionIds, opts = {}) {
+  container.innerHTML = '';
+  container.className = `zone-name pile-action-header${opts.headingClass ? ` ${opts.headingClass}` : ''}`;
+  if (opts.headingId) container.id = opts.headingId;
 
-  const menu = document.createElement('div');
-  menu.className = 'radial-menu';
-  menu.style.left = `${cx}px`;
-  menu.style.top = `${cy}px`;
+  const label = document.createElement('span');
+  label.className = 'zone-name-text';
+  label.textContent = titleText;
+  container.appendChild(label);
 
-  const n = ids.length;
-  // D52: brought closer in (user request #1: "bring the radial menu
-  // into the card interface, overlap or just get closer") - also
-  // shortens how far the mouse has to travel to reach a button, which
-  // matters more now that the menu is stable (not fighting to relocate
-  // out from under a moving cursor) but still worth minimizing travel.
-  const radius = 3 * 16; // px
-  ids.forEach((id, i) => {
+  for (const id of actionIds) {
+    if (opts.disabled?.includes(id)) continue;
     const spec = ACTION_SPECS[id];
-    const angle = (2 * Math.PI * i) / n - Math.PI / 2; // first item points up
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'radial-menu-btn' + (spec.destructive ? ' btn-danger' : '');
-    btn.style.transform = `translate(${Math.round(Math.cos(angle) * radius)}px, ${Math.round(Math.sin(angle) * radius)}px)`;
-    // D52 flare: a small stagger so the ring fans out rather than
-    // popping in as one flat block - style.css's `radial-pop` keyframe
-    // reads this per-button delay.
-    btn.style.setProperty('--radial-delay', `${i * 0.025}s`);
-    btn.dataset.action = id;
-    btn.textContent = opts.labels?.[id] ?? spec.label;
-    if (spec.hint) btn.title = spec.hint;
+    btn.className = 'pile-action-btn' + (spec.destructive ? ' btn-danger' : '');
+    applyIconButton(btn, spec, opts.labels?.[id]);
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       if (spec.destructive && !window.confirm(
         `${spec.hint}\n\nEvery player's current hand will be cleared. Continue?`)) return;
-      closeRadialMenu();
-      if (spec.target == null || spec.singleTarget) {
-        opts.onAction(id);
-      } else {
-        beginTargetingWithGhost(id, opts.targetsFor(id), spec.label, (targetId) => opts.onAction(id, targetId));
-      }
+      opts.onAction(id);
     });
-    // D35/D51/D52: a `target`-bearing pile action (today, only `draw`)
-    // keeps its own action-token drag protocol ALONGSIDE the new
-    // click-to-follow gesture above - not a replacement. Cards never
-    // need this (a card's own element is what gets dragged for
-    // move/pickup/play), only pile-level actions.
+    // D35: `draw`'s own action-token drag protocol, unrelated to the
+    // menu it used to live in - preserved as-is, just hosted on a plain
+    // button now instead of a radial one.
     if (opts.draggable && spec.target) {
       btn.draggable = true;
-      btn.addEventListener('dragstart', (e) => {
-        e.dataTransfer.setData('text/plain', pileActionToken(id));
-        closeRadialMenu();
-      });
+      btn.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', pileActionToken(id)));
       attachPileActionTouchDrag(btn, id, () => opts.onAction(id));
     }
-    menu.appendChild(btn);
-  });
-  // D52 real bug, found live: the menu is a child of `document.body`,
-  // positioned by `position: fixed` at the pointer's coordinates - NOT
-  // a descendant of `hostEl`. Moving the mouse from the host onto a
-  // button fires `pointerleave` on the host with nothing to catch it,
-  // closing the menu out from under the click before it lands. Giving
-  // the menu its OWN enter/leave that cancels/reschedules the same
-  // close (deferred one tick, so a leave-then-immediately-enter pair
-  // between two disjoint elements doesn't close in between) is the fix
-  // - "hovering the host OR the menu" is what should keep it open, not
-  // just the host alone.
-  menu.addEventListener('pointerenter', cancelRadialClose);
-  menu.addEventListener('pointerleave', scheduleRadialClose);
-  document.body.appendChild(menu);
-  radialMenuEl = menu;
-  radialMenuKey = key;
-
-  // D52 user request #2b: "a click anywhere besides the action buttons"
-  // closes it - mirrors `beginTargeting`'s own `onElsewhere` (deferred
-  // so the SAME click that opened the menu, via a card's own click-to-
-  // reveal path elsewhere in this app, doesn't immediately close it).
-  setTimeout(() => document.addEventListener('click', onRadialElsewhere, { once: true }), 0);
-}
-
-function onRadialElsewhere(e) {
-  if (!e.target.closest('.radial-menu')) closeRadialMenu();
-}
-
-let radialMenuEl = null;
-let radialCloseTimer = null;
-
-function cancelRadialClose() {
-  clearTimeout(radialCloseTimer);
-  radialCloseTimer = null;
-}
-
-function scheduleRadialClose() {
-  cancelRadialClose();
-  radialCloseTimer = setTimeout(closeRadialMenu, 0);
-}
-
-function closeRadialMenu() {
-  cancelRadialClose();
-  document.removeEventListener('click', onRadialElsewhere);
-  radialMenuEl?.remove();
-  radialMenuEl = null;
-  radialMenuKey = null;
+    container.appendChild(btn);
+  }
 }
 
 /**
- * Wires `hostEl` to open a radial menu of `getActionIds()` on mouse
- * hover, centered on the pointer. Desktop/mouse-only, matching D51's
- * own explicit scope for this whole redesign pass (`e.pointerType`
- * gates it, same as `attachTouchDrag`'s own mouse-vs-touch split) - no
- * touch equivalent was built or attempted.
+ * UX follow-up: a card's own actions as a small row directly above it
+ * on hover - replaces D52's radial ring for the CARD case specifically
+ * (piles/zones get `renderActionHeader` above; a card has no title bar
+ * to host buttons next to, and is too small to carry them permanently).
+ * A target-bearing action still opens `beginTargetingWithGhost`
+ * unchanged - only the TRIGGER visual changed, not the destination-
+ * choosing mechanic underneath it.
  *
- * @param {HTMLElement} hostEl
- * @param {string} key stable identity for this host - see
- *   `openRadialMenu`'s own doc comment for why this exists (re-render
- *   churn, not DOM reference, is what "still the same card" means here).
- * @param {() => string[]} getActionIds computed fresh on every hover,
- *   not cached, since what a card offers can change between renders.
- * @param {object} opts see `openRadialMenu`'s own `opts`.
+ * Appended to `document.body` (`position: fixed`, computed from
+ * `hostEl.getBoundingClientRect()` once on open) rather than as a plain
+ * absolutely-positioned child of the card - a real bug, found live: a
+ * hand card lives inside `#hand-area`, whose horizontal scroll
+ * (`overflow-x: auto`, needed for the fan) forces `overflow-y` to
+ * compute as `auto` too, not `visible` (a genuine CSS rule: a non-
+ * `visible` value on one axis pulls the other off `visible`) - so a
+ * row anchored INSIDE that box was silently clipped invisible on
+ * either side, not just below. Body-level fixed positioning is exactly
+ * why D52's own radial menu used it, for the same underlying reason
+ * (trapped stacking/clipping contexts) - reused here for a plain row,
+ * not reintroducing the ring.
+ *
+ * @param {HTMLElement} hostEl the card's own wrapper.
+ * @param {() => string[]} getActionIds computed fresh on every hover.
+ * @param {{labels?: Record<string,string>,
+ *   targetsFor: (actionId: string) => string[],
+ *   onAction: (actionId: string, targetPileId?: string) => void}} opts
  */
-function attachRadialMenu(hostEl, key, getActionIds, opts) {
-  // `.pile-hover-host` still drives a plain CSS `:hover` raise (a small
-  // lift + shadow on the actor itself, style.css) as the "this is
-  // actionable" cue - independent of the radial menu's own open/closed
-  // state, which is JS-driven (needs real pointer coordinates, which
-  // `:hover` alone can't give). `tabIndex` is the same low-cost,
-  // unverified touch nicety D51 already noted - not a real touch
-  // equivalent, no effort spent confirming it.
+function attachActionRow(hostEl, getActionIds, opts) {
   hostEl.classList.add('pile-hover-host');
   if (hostEl.tabIndex < 0 || hostEl.tabIndex == null) hostEl.tabIndex = 0;
+  let rowEl = null;
+  let closeTimer = null;
+
+  const cancelClose = () => { clearTimeout(closeTimer); closeTimer = null; };
+  const close = () => { rowEl?.remove(); rowEl = null; };
+  const scheduleClose = () => { cancelClose(); closeTimer = setTimeout(close, 0); };
+
+  const open = () => {
+    close();
+    const ids = getActionIds();
+    if (!ids.length) return;
+    rowEl = document.createElement('div');
+    rowEl.className = 'card-action-row';
+    for (const id of ids) {
+      const spec = ACTION_SPECS[id];
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'card-action-btn' + (spec.destructive ? ' btn-danger' : '');
+      applyIconButton(btn, spec, opts.labels?.[id]);
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        close();
+        if (spec.target == null || spec.singleTarget) {
+          opts.onAction(id);
+        } else {
+          beginTargetingWithGhost(id, opts.targetsFor(id), spec.label, (targetId) => opts.onAction(id, targetId));
+        }
+      });
+      rowEl.appendChild(btn);
+    }
+    rowEl.addEventListener('pointerenter', cancelClose);
+    rowEl.addEventListener('pointerleave', scheduleClose);
+    document.body.appendChild(rowEl);
+    const rect = hostEl.getBoundingClientRect();
+    rowEl.style.left = `${rect.left + rect.width / 2}px`;
+    rowEl.style.top = `${rect.top}px`;
+  };
+
   hostEl.addEventListener('pointerenter', (e) => {
     if (e.pointerType !== 'mouse') return;
-    cancelRadialClose();
-    openRadialMenu(key, getActionIds(), e.clientX, e.clientY, { targetsFor: () => [], ...opts });
+    cancelClose();
+    open();
   });
   hostEl.addEventListener('pointerleave', () => {
-    // A menu still open (nothing clicked yet) closes when the pointer
-    // leaves both the host AND the menu itself (`scheduleRadialClose`
-    // is cancelable - see the menu's own pointerenter in
-    // `openRadialMenu`); targeting already in progress (a target-
-    // bearing action was clicked) stays open regardless of where the
-    // pointer wanders - that's the whole point of "the card follows
-    // the mouse".
-    if (!cancelTargeting) scheduleRadialClose();
+    if (!cancelTargeting) scheduleClose();
   });
 }
 
@@ -754,46 +599,53 @@ function performReveal(card, viewerId, onReveal) {
 }
 
 /**
- * The radial action menu for one card in a zone (D52) - `attachRadialMenu`
- * wired for the card case: a `target`-bearing action opens the card-
- * follows-cursor targeting mode since a card may have several legal
- * destinations (`move` among zones); an in-place action (`target: null`
- * - today just `rotate`) dispatches directly. `reveal` is deliberately
- * excluded (Phase 55 moved it to a direct tap on the card - see
- * `performReveal` and its call site in `renderZoneCards`).
+ * A card's own hover action row (UX follow-up, retires D52's radial for
+ * this case) - `attachActionRow` wired for the card case: a
+ * `target`-bearing action opens the card-follows-cursor targeting mode
+ * since a card may have several legal destinations (`move` among
+ * zones); an in-place action (`target: null` - today just `rotate`)
+ * dispatches directly. `reveal` is deliberately excluded (Phase 55
+ * moved it to a direct tap on the card - see `performReveal` and its
+ * call site in `renderZoneCards`).
  *
  * @param {HTMLElement} wrapper the card's own `.middle-card` element -
- *   `attachRadialMenu` opens the menu on hovering it, centered on the
- *   pointer.
+ *   `attachActionRow` opens the row on hovering it.
  */
 function actionMenuEl(wrapper, zone, card, allZones, opts) {
-  const { viewerId, onPickup, onMoveCard, onRotate } = opts;
+  const { viewerId, onPickup, onMoveCard, onRotate, onPlay } = opts;
   // D45: both were hardcoded `kind: 'zone'` - real bugs the moment a
   // second table-side type exists, same class as `renderZoneCards`'s.
   const pile = { id: zone.id, kind: zone.kind, ownerId: zone.ownerId ?? null };
   const available = actionsForCard(pile, card, viewerId).filter((a) => a !== 'reveal');
   if (available.length === 0) return;
 
-  const piles = [
-    ...allZones.map((z) => ({ id: z.id, kind: z.kind, ownerId: z.ownerId ?? null })),
-    { id: HAND_PILE_ID, kind: 'hand', ownerId: viewerId },
-  ];
+  // UX follow-up (direct user request): a hand pile is a real,
+  // addressable entry in `allZones` now (`view.zones`) - no more
+  // synthetic `HAND_PILE_ID` stand-in needed for `pickup`'s `target:
+  // 'hand'` lookup below.
+  const piles = allZones.map((z) => ({ id: z.id, kind: z.kind, ownerId: z.ownerId ?? null }));
 
-  attachRadialMenu(wrapper, card.id, () => available, {
+  attachActionRow(wrapper, () => available, {
     targetsFor: (action) => targetsForAction(action, piles, { viewerId, fromPileId: zone.id }),
     onAction: (action, targetId) => {
-      // D48: an in-place action has no destination to pick - `openRadialMenu`
-      // dispatches it directly (no `targetId` argument) rather than going
-      // through targeting, since `targetsForAction` would return `[]` for
-      // a null-target action anyway (a no-op click, not a bug in either).
+      // D48: an in-place action has no destination to pick - dispatched
+      // directly (no `targetId` argument) rather than going through
+      // targeting, since `targetsForAction` would return `[]` for a
+      // null-target action anyway (a no-op click, not a bug in either).
       if (action === 'rotate') onRotate?.(card.id);
       else if (action === 'pickup') onPickup?.(card.id);
       else if (action === 'move') onMoveCard?.(card.id, targetId);
+      // UX follow-up (direct user request): 'play' is offered by
+      // `cardActions` for a hand pile's own owner (`handPile.js`) but
+      // had no dispatcher wired here before - the merged own-zone panel
+      // used to be the only way to play a card. Generic now, same
+      // click-a-lit-target flow as `move`.
+      else if (action === 'play') onPlay?.(card.id, targetId);
     },
   });
 }
 
-function renderZoneCards(container, zone, allZones, opts = {}) {
+export function renderZoneCards(container, zone, allZones, opts = {}) {
   const { resolveOwnerName, onMoveCard, onCardLift, onCardDrag } = opts;
   container.innerHTML = '';
   // D45: was hardcoded `kind: 'zone'` below - harmless while zone was
@@ -802,9 +654,38 @@ function renderZoneCards(container, zone, allZones, opts = {}) {
   // in this function would have been evaluated against ZONE's rules
   // even for a discard pile's own cards.
   const pile = { id: zone.id, kind: zone.kind, ownerId: zone.ownerId ?? null };
-  for (const card of zone.cards) {
+  // UX follow-up (direct user request): "create WebComponents for the
+  // different pile types... fix the fan layout issue by implementing
+  // FanPile." `opts.fan` (set by `<fan-pile>`, `src/components/
+  // FanPile.js`) is the ONLY difference from the plain flat-row case -
+  // every other per-card behavior (drag/actions/reveal/redaction) is
+  // identical, so this stays ONE function rather than a forked copy.
+  // The fan math (rotate + arc, pivoting from the bottom like cards
+  // actually held in a hand) is exactly `renderHand`'s old formula,
+  // just applied generically by index instead of being hand-specific.
+  zone.cards.forEach((card, i) => {
     const wrapper = document.createElement('div');
     wrapper.className = 'middle-card';
+    if (opts.fan) {
+      // UX follow-up (direct user request): "lower the peak a bit so
+      // it's a more gradual curve" - then, immediately after: "it still
+      // looks triangular rather than a steady curve." The rotation
+      // (5deg/card) was already linear in `offset`, which is correct - a
+      // real fanned hand's cards ARE spaced at roughly equal angles. The
+      // droop wasn't: `Math.abs(offset) * k` is linear too, and a linear
+      // vertical drop paired with a pivot around each card's OWN
+      // bottom-center reads as a sharp V (two straight edges meeting at
+      // the center card), not a rounded arc. Squaring `offset` instead
+      // is what actually curves it - small offsets near the center barely
+      // droop, larger ones toward the ends droop increasingly more,
+      // tracing a parabola instead of two lines. `.fan-row`'s own bottom
+      // padding (style.css) is sized to this exact formula's max droop,
+      // not just eyeballed - see that rule's own comment if this changes
+      // again.
+      const center = (zone.cards.length - 1) / 2;
+      const offset = i - center;
+      wrapper.style.setProperty('--raise-base', `rotate(${offset * 5}deg) translateY(${offset * offset * 0.08}rem)`);
+    }
     // US-32/33: `data-card-id` makes the wrapper hit-testable for
     // drop-region detection; `data-layout` is what style.css keys the
     // stacked/overlapped rendering off, so the visual is driven straight
@@ -849,10 +730,10 @@ function renderZoneCards(container, zone, allZones, opts = {}) {
     const cardActions = actionsForCard(pile, card, opts.viewerId);
     if (onMoveCard && cardActions.length > 0) {
       wrapper.draggable = true;
-      const piles = [
-        ...allZones.map((z) => ({ id: z.id, kind: z.kind, ownerId: z.ownerId ?? null })),
-        { id: HAND_PILE_ID, kind: 'hand', ownerId: opts.viewerId },
-      ];
+      // UX follow-up (direct user request): a hand pile is a real,
+      // addressable entry in `allZones` now - no more synthetic
+      // `HAND_PILE_ID` stand-in needed.
+      const piles = allZones.map((z) => ({ id: z.id, kind: z.kind, ownerId: z.ownerId ?? null }));
       wrapper.addEventListener('dragstart', (e) => {
         e.dataTransfer.setData('text/plain', card.id);
         // D51: every zone (and the hand, if this card is pickup-eligible)
@@ -860,8 +741,10 @@ function renderZoneCards(container, zone, allZones, opts = {}) {
         // whole drag - not just whichever one the pointer happens to be
         // over mid-drag (`showZoneDragOver`'s existing per-hover cue,
         // unchanged, still layers on top of this once you're over one).
+        // UX follow-up: 'play' joins 'move'/'pickup' here now that a
+        // hand pile's own cards flow through this same generic path.
         highlightDragTargets(
-          cardActions.filter((a) => a === 'move' || a === 'pickup'),
+          cardActions.filter((a) => a === 'move' || a === 'pickup' || a === 'play'),
           piles,
           { viewerId: opts.viewerId, fromPileId: zone.id },
         );
@@ -913,7 +796,15 @@ function renderZoneCards(container, zone, allZones, opts = {}) {
       if (canReveal) face.classList.add('revealable');
       wrapper.appendChild(face);
       if (card.owner) wrapper.appendChild(ownerTag(resolveOwnerName?.(card.owner) ?? card.owner));
-      if (!card.faceUp) {
+      // UX follow-up (real bug, found live via a screenshot): a plain
+      // hand card has no `faceUp` field at all (visibility is a
+      // PILE-level "in-hand" rule, not per-card like a zone's) - `!card.
+      // faceUp` treated that missing field the same as an explicit
+      // `faceUp: false`, wrongly labeling every hand card "hidden from
+      // others" now that hand cards flow through this same generic
+      // renderer. `=== false` only fires for a zone-kind card that
+      // actually carries the field.
+      if (card.faceUp === false) {
         const hiddenTag = document.createElement('div');
         hiddenTag.className = 'owner-tag';
         hiddenTag.textContent = 'hidden from others';
@@ -924,7 +815,7 @@ function renderZoneCards(container, zone, allZones, opts = {}) {
     actionMenuEl(wrapper, zone, card, allZones, opts);
 
     container.appendChild(wrapper);
-  }
+  });
 }
 
 /**
@@ -1022,115 +913,500 @@ function performZoneDrop(zoneEl, row, zoneId, cardId, point, onDropCard, kind) {
  * successful `onDropCard` dispatch (and the resulting re-render) changes
  * what's on screen.
  */
-function renderZonePanel(zone, allZones, opts) {
-  const zoneEl = document.createElement('div');
-  zoneEl.className = 'zone';
-  zoneEl.dataset.zoneId = zone.id; // D25: addressable as a drop target
+/**
+ * UX follow-up (direct user request): move + resize as one shared,
+ * "normalized" wiring pass - EVERY pile/zone panel calls this exact
+ * function (`renderZonePanel` below, and `renderDeck`'s own caller in
+ * main.js), so the deck offers the identical resize/move interface a
+ * zone does rather than a bespoke copy. `id` keys `opts.layout`
+ * (`panelLayout.js`, local per-browser storage) and is whatever stable
+ * string the caller already uses elsewhere (a zone's own `id`, or
+ * `'deck'` for the draw pile). `headingEl` is the drag handle - `null`
+ * is fine, `attachPanelDrag` no-ops.
+ */
+export function wirePanelLayout(panelEl, id, headingEl, opts) {
+  if (opts.onResizePanel) {
+    panelEl.classList.add('panel-resizable');
+    const stored = opts.layout?.[id];
+    if (typeof stored?.w === 'number') panelEl.style.width = `${stored.w}px`;
+    if (typeof stored?.h === 'number') {
+      panelEl.style.height = `${stored.h}px`;
+      // A resized-short panel needs somewhere for overflow to go rather
+      // than spilling past its own border - scroll, not clip, so cards
+      // already in it are never simply hidden.
+      panelEl.style.overflowY = 'auto';
+    }
+    attachPanelResize(panelEl, id, opts.onResizePanel);
+  }
+  if (opts.onMovePanel) {
+    const stored = opts.layout?.[id];
+    if (typeof stored?.x === 'number' && typeof stored?.y === 'number') {
+      panelEl.classList.add('panel-moved');
+      panelEl.style.left = `${stored.x}px`;
+      panelEl.style.top = `${stored.y}px`;
+    }
+    attachPanelDrag(headingEl, panelEl, id, opts.onMovePanel);
+  }
+}
+
+/**
+ * UX follow-up (direct user request): "pile-panel and header-actions
+ * should be internalized in the fan-pile webcomponent... same for all
+ * Pile type components." A specialized row shape (`<fan-pile>`,
+ * `<deck-stack>`) is a COMPLETE Pile on its own now, not a "row"
+ * `renderPile` wraps with a separately-built header - each one calls
+ * this shell directly against itself. `renderPileShell` is what's
+ * actually shared: the "Actionable" title bar (`<header-actions>`,
+ * pile-level actions), the addressability (`data-zone-id`/`data-kind`),
+ * and the drop-target wiring every Pile needs REGARDLESS of how its
+ * cards are drawn - `buildRow(container)` is the one thing that
+ * differs, building whatever content sits below the header and
+ * returning the element drop hit-testing should measure against.
+ *
+ * Never draws a Zone's own box (border/padding/background) and never
+ * wires its own move/resize - a Pile always lives inside a Zone
+ * (`renderZonePanel`, below), which owns both of those exactly once for
+ * everything inside it.
+ */
+export function renderPileShell(container, zone, allZones, opts, buildRow) {
+  container.innerHTML = '';
+  container.className = 'pile-section';
+  container.dataset.zoneId = zone.id; // D25: addressable as a drop target
   // D45/D53: the kind travels with the element so the touch-drag path
   // (which only has the DOM node, not the view object, at drop time)
   // can resolve its own drop-target geometry too - see
   // touchTargetAt/attachTouchDrag.
-  zoneEl.dataset.kind = zone.kind;
+  container.dataset.kind = zone.kind;
 
-  const heading = document.createElement('div');
-  heading.className = 'zone-name';
-  heading.textContent = `${zone.name} (${zone.cards.length})`;
-  zoneEl.appendChild(heading);
+  // UX follow-up (direct user request): "like zones, Piles are
+  // Actionable and should have a title bar with action buttons for
+  // that pile type" - every pile's own heading is a real
+  // `renderActionHeader` now (the same builder the deck's own title bar
+  // already used), not a plain text div. `pileLevelActions(zone.kind,
+  // ...)` returns `[]` for every kind with nothing pile-level to offer
+  // (zone/discard/foundation/cascade/rankAdjacent today), so this is a
+  // pure superset of the old plain-text heading for those - no visual
+  // change unless a kind actually has pile-level actions.
+  //
+  // NOTE (flagged, not yet done): `sortRank`/`sortSuit` are filtered out
+  // here even though `handPile.pileActions` offers them to a hand's
+  // owner - they used to reorder a CLIENT-ONLY local view of the hand
+  // (D14, `handOrder.js`), which had no home left once `renderHand`'s
+  // bespoke rendering was retired (a hand's cards render in `zone.
+  // cards`' own order now, same as any other pile). Showing the buttons
+  // without a working sort behind them would be a false affordance -
+  // left out until sort becomes a real thing to wire up (either a
+  // client-side order layer reintroduced generically, or a real reducer
+  // action, now that a hand is state-level).
+  const heading = document.createElement('header-actions');
+  container.appendChild(heading);
+  heading.render(
+    `${zone.name} (${zone.count ?? zone.cards.length})`,
+    pileLevelActions(zone.kind, { isOwner: zone.ownerId === opts.viewerId, isHost: opts.isHost })
+      .filter((id) => id !== 'sortRank' && id !== 'sortSuit'),
+    {
+      // `pile-title`, not `panel-title` - a Pile's own heading is never
+      // a Zone's move/resize drag handle (`renderZonePanel` wires that
+      // once, on the Zone's OWN heading instead), so it needs a
+      // different class than the one `attachPanelDrag`/`wirePanelLayout`
+      // look for.
+      headingClass: 'pile-title',
+      draggable: true,
+      // UX follow-up (direct user request): "a Deck is a specific kind
+      // of Pile" - which of ITS OWN offered actions are disabled (Deal,
+      // at zero cards) is now read polymorphically per pile type
+      // (`disabledPileActionsFor`), not a `zone.kind === 'deck'` check
+      // hardcoded here.
+      disabled: disabledPileActionsFor(zone.kind, zone.count ?? zone.cards.length),
+      onAction: (id) => opts.onPileAction?.(zone.id, id),
+    },
+  );
 
-  const row = document.createElement('div');
-  row.className = 'card-row';
-  zoneEl.appendChild(row);
-  renderZoneCards(row, zone, allZones, opts);
+  const row = buildRow(container);
 
   if (opts.onDropCard) {
-    zoneEl.addEventListener('dragover', (e) => {
+    container.addEventListener('dragover', (e) => {
       e.preventDefault();
-      showZoneDragOver(zoneEl, row, { x: e.clientX, y: e.clientY }, zone.kind);
+      showZoneDragOver(container, row, { x: e.clientX, y: e.clientY }, zone.kind);
     });
-    zoneEl.addEventListener('dragleave', () => clearZoneDragOver(zoneEl, row));
-    zoneEl.addEventListener('drop', (e) => {
+    container.addEventListener('dragleave', () => clearZoneDragOver(container, row));
+    container.addEventListener('drop', (e) => {
       e.preventDefault();
-      performZoneDrop(zoneEl, row, zone.id, e.dataTransfer.getData('text/plain'),
+      // UX follow-up (direct user request): a dragged pile-level action
+      // token (Draw's own drag protocol, D35) can now land on ANY pile,
+      // including a hand - this used to only be handled by the merged
+      // own-zone panel's own bespoke hand-drop listener. Checked here,
+      // generically, before falling back to the ordinary card-drop
+      // path, so Draw dropped on a hand pile draws instead of being
+      // misread as a bogus card id.
+      const pileAction = pileActionFromDrop(e.dataTransfer);
+      if (pileAction) { opts.onPileActionDrop?.(pileAction, zone.id); return; }
+      performZoneDrop(container, row, zone.id, e.dataTransfer.getData('text/plain'),
         { x: e.clientX, y: e.clientY }, opts.onDropCard, zone.kind);
     });
   }
-
-  return zoneEl;
 }
 
 /**
- * Renders every zone as its own labeled sub-panel (US-19, D12) - zone
- * names/counts are always shown, per Smith's Gate 1 requirement that a
- * zone never be identifiable only by position. `allZones` (defaults to
- * `zones`) is what the "Move to…" dropdown offers as destinations - the
- * caller passes the *full*, unfiltered zone list here when `zones` has
- * been filtered down to just the shared ones (D17/US-27: personal zones
- * render separately via `renderSeatZones`, but must still appear as
- * valid move-to targets).
+ * The FLAT row shape (`rowShapeFor(kind) === 'flat'` - every kind
+ * except a hand's fan or a deck's stack) - `<pile-panel>`'s own thin
+ * wrapper around `renderPileShell`, same shape `<fan-pile>`/
+ * `<deck-stack>` now have for their own row shapes.
  */
-export function renderZones(container, zones, opts = {}, allZones = zones) {
-  container.innerHTML = '';
-  for (const zone of zones) {
-    container.appendChild(renderZonePanel(zone, allZones, opts));
+export function renderPile(container, zone, allZones, opts = {}) {
+  renderPileShell(container, zone, allZones, opts, (c) => {
+    const row = document.createElement('div');
+    row.className = 'card-row';
+    c.appendChild(row);
+    renderZoneCards(row, zone, allZones, opts);
+    return row;
+  });
+}
+
+/**
+ * UX follow-up (direct user request): "zone is one thing, pile is
+ * another." Renders a ZONE: the bordered/padded/positioned box, ONE
+ * title bar (`title` - the ZONE'S OWN name, distinct from any pile
+ * inside it - `null` for the common single-pile case, where the lone
+ * pile's own heading doubles as the drag handle instead of adding a
+ * redundant second one), and every Pile it holds as its own
+ * `<pile-panel>` child (`piles`, always a non-empty array - even a
+ * "plain" shared zone like a CREATE_ZONE'd one or a Solitaire
+ * foundation is a Zone holding exactly one Pile now, not a Zone/Pile
+ * hybrid). `id` keys `opts.layout` (`panelLayout.js`) - the STABLE
+ * identity of this Zone, independent of which/how many piles it holds.
+ *
+ * Move/resize (`wirePanelLayout`) is wired EXACTLY ONCE, here, for the
+ * whole Zone - "Piles move with their containing Zone." A Pile
+ * (`renderPile`, above) never wires its own.
+ */
+export function renderZonePanel(zoneEl, id, title, piles, allZones, opts) {
+  zoneEl.innerHTML = '';
+  zoneEl.className = 'zone';
+  // The Zone's own stable identity (`opts.layout` key) - distinct from
+  // any one pile's own `data-zone-id` (`renderPile`), since a Zone can
+  // hold several piles and so has no single pile id of its own.
+  zoneEl.dataset.groupId = id;
+
+  let dragHandle;
+  if (title) {
+    const heading = document.createElement('header-actions');
+    zoneEl.appendChild(heading);
+    heading.render(title, [], { headingClass: 'panel-title' });
+    dragHandle = heading;
   }
+
+  const body = document.createElement('div');
+  body.className = 'zone-body';
+  zoneEl.appendChild(body);
+
+  // UX follow-up (direct user request): "a Deck is a specific kind of
+  // Pile... it is not a Zone at all" / "pile-panel and header-actions
+  // should be internalized in the fan-pile webcomponent, same for all
+  // Pile type components" - which ELEMENT renders a pile is decided
+  // here, off the pile TYPE's own `rowShape` (`rowShapeFor`,
+  // `pileActions.js`), never a `zone.kind === 'hand'` check inside any
+  // one component. `<fan-pile>`/`<deck-stack>` are now fully self-
+  // contained Piles (their own header+row+drop wiring, via
+  // `renderPileShell`) - `<pile-panel>` is just the flat-row case's own
+  // equally-thin wrapper, not a generic container the other two nest
+  // inside any more.
+  const PILE_TAGS = { flat: 'pile-panel', fan: 'fan-pile', stack: 'deck-stack' };
+  for (const zone of piles) {
+    const el = document.createElement(PILE_TAGS[rowShapeFor(zone.kind)]);
+    body.appendChild(el);
+    el.render(zone, allZones, opts);
+    // No separate Zone-level title for the common single-pile case -
+    // the lone pile's own heading (`.pile-title`) is the drag handle
+    // instead, so this Zone doesn't show two headings saying almost the
+    // same thing.
+    if (!dragHandle) dragHandle = el.querySelector('.pile-title');
+  }
+
+  wirePanelLayout(zoneEl, id, dragHandle, opts);
 }
 
+
 /**
- * Personal zones (D17, US-27) render "in front of" their owning
- * player's seat instead of in the flat shared-zone stack - same
- * `seatPosition()` geometry `renderRoster`'s seats use, at a smaller
- * radius so they sit toward the table's center rather than its edge.
+ * UX follow-up (direct user request): "zone is one thing, pile is
+ * another - don't overload zone-panel to do everything." One generic
+ * `<zone-panel>` element type builds EVERY Zone now (the shared Table
+ * Zone, each player's Zone, and every standalone shared zone), varying
+ * only in which/how many Piles it's given:
+ * - The shared Table pile (`id === 'table'`), any discard-kind pile(s),
+ *   and every deck-kind pile (the main deck, D53's `deckPile.rowShape`
+ *   stack-rendered - AND any SPLIT_DECK pile, same kind) - none ever
+ *   `ownerId`-carrying - group into ONE Zone titled "Table Zone".
+ * - Every pile sharing one `ownerId` (a player's hand, plus any
+ *   personal pile a GameConfig declares - Spit's per-player stock,
+ *   D53) groups into ONE Zone per owner, titled with the owner's NAME.
+ * - Every other shared pile (a player-CREATE_ZONE'd zone, Solitaire's
+ *   foundations/cascades, Spit's rank-adjacent pile) gets its own Zone
+ *   holding exactly that one pile - no separate Zone-level title in
+ *   this case (`renderZonePanel`'s `title: null`), since the lone
+ *   pile's own heading already says the same thing a redundant second
+ *   one would.
+ *
+ * A personal Zone renders "in front of" its owner's seat by default -
+ * same `seatPosition()` geometry `renderRoster`'s seats use, at a
+ * smaller radius so it sits toward the table's center rather than its
+ * edge; a shared Zone defaults to normal flex-wrap flow (`#zones`'s own
+ * CSS). Either kind switches to an absolutely-positioned, plain
+ * top-left `panel-moved` panel the first time it's dragged/resized
+ * (`wirePanelLayout`, `opts.layout` - a LOCAL, per-browser preference,
+ * `panelLayout.js`, not replicated game state).
+ *
  * `seatedPlayers` must be in the same seat order used to render the
- * roster (viewer first, D18), so a zone lands at the SAME seat its
- * owner's roster entry is drawn at.
+ * roster (viewer first, D18), so a personal Zone lands at the SAME
+ * seat its owner's roster entry is drawn at; one with no seated owner
+ * (shouldn't happen) is skipped defensively.
  */
-export function renderSeatZones(container, personalZones, allZones, seatedPlayers, opts = {}) {
+export function renderZones(container, zones, seatedPlayers, opts = {}) {
   container.innerHTML = '';
-  for (const zone of personalZones) {
-    const seatIndex = seatedPlayers.findIndex((p) => p.id === zone.ownerId);
+
+  const grouped = zones.filter((z) => !z.ownerId && (z.id === 'table' || z.kind === 'discard' || z.kind === 'deck'));
+  if (grouped.length > 0) {
+    const tableZoneEl = document.createElement('zone-panel');
+    container.appendChild(tableZoneEl);
+    // UX follow-up (real bug, found live via a preset layout that
+    // silently failed to apply): this id is `opts.layout`'s key
+    // (`panelLayout.js`) - it must be `'table-zone'` to match what
+    // every preset's own `layout` field, this project's own docs, and
+    // a player's own drag-to-move already call it, NOT the Table
+    // PILE's own id (`'table'`, one of `grouped`'s members, already
+    // addressable by ITS OWN `data-zone-id`).
+    tableZoneEl.render('table-zone', 'Table Zone', grouped, zones, opts);
+  }
+
+  // UX follow-up (direct user request): every pile sharing one ownerId
+  // groups into one Zone, positioned/moved/resized once for the whole
+  // group - mirrors the Table Zone's own grouping exactly, just keyed
+  // by owner instead of by "shared".
+  const byOwner = new Map();
+  for (const zone of zones) {
+    if (grouped.includes(zone) || !zone.ownerId) continue;
+    if (!byOwner.has(zone.ownerId)) byOwner.set(zone.ownerId, []);
+    byOwner.get(zone.ownerId).push(zone);
+  }
+  for (const [ownerId, piles] of byOwner) {
+    const seatIndex = seatedPlayers.findIndex((p) => p.id === ownerId);
     if (seatIndex === -1) continue; // owner not in the current roster (shouldn't happen) - skip defensively
 
-    const zoneEl = renderZonePanel(zone, allZones, opts);
-    zoneEl.classList.add('seat-zone');
-    const { leftPct, topPct } = seatPosition(seatIndex, seatedPlayers.length, 26);
-    zoneEl.style.left = `${leftPct}%`;
-    zoneEl.style.top = `${topPct}%`;
+    const playerZoneEl = document.createElement('zone-panel');
+    container.appendChild(playerZoneEl);
+    const ownerName = opts.resolveOwnerName?.(ownerId) ?? ownerId;
+    playerZoneEl.render(`player-${ownerId}`, ownerName, piles, zones, opts);
+    // AFTER `.render()`, not before - `renderZonePanel`'s own first line
+    // (`zoneEl.className = 'zone'`) would otherwise wipe this class out.
+    playerZoneEl.classList.add('seat-zone');
+    // `wirePanelLayout` (called inside `render` above) only ever sets
+    // `left`/`top` once a REAL stored position exists - a player zone
+    // with none yet still needs its ring-position default, same as it
+    // always has.
+    if (!playerZoneEl.classList.contains('panel-moved')) {
+      const { leftPct, topPct } = seatPosition(seatIndex, seatedPlayers.length, 26);
+      playerZoneEl.style.left = `${leftPct}%`;
+      playerZoneEl.style.top = `${topPct}%`;
+    }
+  }
 
+  // Every remaining shared pile (ownerless, not part of the Table Zone
+  // group) - a player-CREATE_ZONE'd zone, Solitaire's foundations/
+  // cascades, Spit's rank-adjacent pile - gets its own Zone holding
+  // that one pile, exactly as before.
+  for (const zone of zones) {
+    if (grouped.includes(zone) || zone.ownerId) continue;
+
+    const zoneEl = document.createElement('zone-panel');
     container.appendChild(zoneEl);
+    zoneEl.render(zone.id, null, [zone], zones, opts);
   }
 }
 
 /**
- * D51 (table-unification pass): positions the hand zone at the VIEWER's
- * own seat - same `seatPosition()` geometry `renderSeatZones` uses for
- * every other personal zone, at the same radius, so the hand visually
- * belongs to the same ring. The viewer is always seat index 0 (D18's
- * per-viewer rotation - "the viewer always lands at the bottom"), so
- * this is always `seatPosition(0, seatCount, 26)`, but takes an explicit
- * `seatIndex` rather than hardcoding 0 so a future caller isn't forced
- * to agree with that assumption silently.
- *
- * A plain positioning helper, not a `render*` function: `#hand-zone`
- * lives as a *static* sibling of `#seat-zones` in `index.html` (that
- * container is wiped wholesale every render by `renderSeatZones` - a
- * child would be destroyed each call), so its own contents (`#hand-area`
- * etc.) are rendered by the existing `renderHand`/`renderPileAnchor`
- * calls in `main.js`, unchanged - this only ever touches position.
+ * UX follow-up (direct user request): "grab bars and click title...
+ * grabbing the title to move the panel to a different place on the
+ * table." `headingEl` (a panel's own `.zone-name`) is the drag handle;
+ * `panelEl` is what actually moves (`left`/`top`, percentages of
+ * `#table-surface` - the same coordinate convention `seating.js`'s
+ * `seatPosition()` already uses for everything absolutely positioned
+ * there). Mouse-only (`e.pointerType`), matching this whole redesign
+ * pass's established desktop-only scope. Dispatches `onMove(id, x, y)`
+ * ONCE, on release, not on every pointermove - the position only needs
+ * to persist to `localStorage` (`panelLayout.js`) once the gesture is
+ * done, not on every intermediate pixel; the live drag itself is purely
+ * a local style update until then.
  */
-export function positionHandZone(el, seatIndex, seatCount) {
-  const { leftPct, topPct } = seatPosition(seatIndex, seatCount, 26);
-  el.style.left = `${leftPct}%`;
-  el.style.top = `${topPct}%`;
+function attachPanelDrag(headingEl, panelEl, id, onMove) {
+  if (!headingEl) return;
+  headingEl.classList.add('panel-drag-handle');
+  headingEl.addEventListener('pointerdown', (e) => {
+    // Buttons in the header (pile-action-btn, score +/-) must keep
+    // working as plain clicks, not become a drag's starting point.
+    if (e.pointerType !== 'mouse' || e.target.closest('button')) return;
+    e.preventDefault();
+    // `offsetParent`, not a hardcoded `#table-surface`: every panel is a
+    // direct child of `#zones` now, but this still generalizes correctly
+    // regardless of what any panel's positioning ancestor actually is.
+    const parentRect = (panelEl.offsetParent || document.getElementById('table-surface')).getBoundingClientRect();
+    const startRect = panelEl.getBoundingClientRect();
+    // Offset from the pointer to the panel's own top-left, so the panel
+    // doesn't jump to re-center itself on the cursor the instant the
+    // drag starts - it moves exactly as far as the pointer does.
+    const grabDx = e.clientX - startRect.left;
+    const grabDy = e.clientY - startRect.top;
+    // UX follow-up (real bug, found live): a panel that has never been
+    // moved is still positioned by its OWN default mechanism (a personal
+    // zone's seatPosition ring math + centering transform, a shared
+    // zone's normal flex-wrap flow) - taking it out of that flow onto a
+    // plain top-left `position: absolute` needs an anchor computed from
+    // where it's ACTUALLY sitting right now, or it jumps the instant the
+    // drag starts. Idempotent for a panel already in `panel-moved` mode
+    // (a second drag, or a personal zone whose position was already
+    // stored) - this produces the same left/top it already had.
+    panelEl.classList.add('panel-moved');
+    panelEl.style.left = `${startRect.left - parentRect.left}px`;
+    panelEl.style.top = `${startRect.top - parentRect.top}px`;
+
+    panelEl.classList.add('panel-dragging');
+    document.body.classList.add('panel-drag-active');
+
+    const onPointerMove = (ev) => {
+      const x = ev.clientX - grabDx - parentRect.left;
+      const y = ev.clientY - grabDy - parentRect.top;
+      panelEl.style.left = `${x}px`;
+      panelEl.style.top = `${y}px`;
+      panelEl.dataset.dragX = x;
+      panelEl.dataset.dragY = y;
+    };
+    const onPointerUp = () => {
+      document.removeEventListener('pointermove', onPointerMove);
+      document.removeEventListener('pointerup', onPointerUp);
+      panelEl.classList.remove('panel-dragging');
+      document.body.classList.remove('panel-drag-active');
+      const x = Number(panelEl.dataset.dragX);
+      const y = Number(panelEl.dataset.dragY);
+      delete panelEl.dataset.dragX;
+      delete panelEl.dataset.dragY;
+      if (Number.isFinite(x) && Number.isFinite(y)) onMove(id, x, y);
+    };
+    document.addEventListener('pointermove', onPointerMove);
+    document.addEventListener('pointerup', onPointerUp);
+  });
 }
+
+/** Never let a resize shrink a panel past the point its own content
+ * (a card, a heading) stops fitting - matches `.seat-zone`'s own CSS
+ * `min-width` floor for the un-resized case, just enforced here too so
+ * a resize can't undercut it. */
+const MIN_PANEL_WIDTH_PX = 160;
+/** Same idea for height - tall enough for the heading plus one row of
+ * cards, so a vertical resize can't collapse a zone to an unusable
+ * sliver (the `overflow-y: auto` `renderZonePanel` sets handles a
+ * SHORTER-than-content panel gracefully; this stops it going shorter
+ * than makes sense at all). */
+const MIN_PANEL_HEIGHT_PX = 90;
+
+/**
+ * UX follow-up (direct user request): a resize handle in the panel's
+ * own bottom-right corner, alongside the title-bar move handle
+ * (`attachPanelDrag`) - and, per a follow-up ask, BOTH axes, not just
+ * width, from the one corner handle (matching its own `nwse-resize`
+ * cursor, which already implied two-way). Same local, dispatch-once-
+ * on-release shape as `attachPanelDrag` - `onResize(id, w, h)` fires on
+ * pointerup, not on every pointermove. `w`/`h` are PLAIN PIXELS, not a
+ * percentage - real bug, found live: a shared (`#table-area`) zone is
+ * still in normal flex flow, whose own height is intrinsic/content-
+ * driven, and CSS only resolves a percentage `height` against a
+ * DEFINITE ancestor height (a well-known quirk - percentage widths
+ * mostly "just work" against auto-width containers, percentage heights
+ * do not). That silently no-opped every vertical resize on a shared
+ * zone while width (and personal zones, already `position: absolute`
+ * either way) looked fine. Plain pixels sidestep the whole question.
+ */
+function attachPanelResize(panelEl, id, onResize) {
+  const handle = document.createElement('div');
+  handle.className = 'panel-resize-handle';
+  handle.title = 'Drag to resize';
+  panelEl.appendChild(handle);
+
+  handle.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    e.preventDefault();
+    e.stopPropagation(); // don't also let this bubble into a move-drag
+    // `offsetParent`, not a hardcoded `#table-surface`: a personal zone's
+    // is `#seat-zones` (which exactly overlays `#table-surface`, so the
+    // numbers agree either way), but a shared zone's is `#table-area` -
+    // a smaller, offset box within it. The clamp below only needs SOME
+    // stable outer bound to avoid an unbounded resize, not that specific
+    // element.
+    const bound = (panelEl.offsetParent || document.getElementById('table-surface')).getBoundingClientRect();
+    const startRect = panelEl.getBoundingClientRect();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    panelEl.classList.add('panel-resizing');
+    document.body.classList.add('panel-resize-active');
+
+    const onPointerMove = (ev) => {
+      const w = Math.min(
+        Math.max(startRect.width + (ev.clientX - startX), MIN_PANEL_WIDTH_PX),
+        bound.width * 0.9,
+      );
+      const h = Math.min(
+        Math.max(startRect.height + (ev.clientY - startY), MIN_PANEL_HEIGHT_PX),
+        bound.height * 0.9,
+      );
+      panelEl.style.width = `${w}px`;
+      panelEl.style.height = `${h}px`;
+      panelEl.style.overflowY = 'auto';
+      panelEl.dataset.resizeW = w;
+      panelEl.dataset.resizeH = h;
+    };
+    const onPointerUp = () => {
+      document.removeEventListener('pointermove', onPointerMove);
+      document.removeEventListener('pointerup', onPointerUp);
+      panelEl.classList.remove('panel-resizing');
+      document.body.classList.remove('panel-resize-active');
+      const w = Number(panelEl.dataset.resizeW);
+      const h = Number(panelEl.dataset.resizeH);
+      delete panelEl.dataset.resizeW;
+      delete panelEl.dataset.resizeH;
+      if (Number.isFinite(w) && Number.isFinite(h)) onResize(id, w, h);
+    };
+    document.addEventListener('pointermove', onPointerMove);
+    document.addEventListener('pointerup', onPointerUp);
+  });
+}
+
+// positionHandZone (D51) retired, UX follow-up: the hand no longer has
+// its own separately-positioned element - it renders inside the
+// viewer's own zone panel now (`renderSeatZones`'s `opts.own`, above),
+// which is already positioned by that same function. Nothing left to
+// position separately.
 
 /**
  * Renders the draw deck as a small face-down stack with a count badge
- * (US-20) instead of just a text counter - purely presentational, draw
+ * (US-20) instead of just a text counter, plus (when relevant) the
+ * always-visible Deal count input - purely presentational, draw
  * mechanics (US-7) are unchanged.
+ *
+ * UX follow-up (direct user request): "a Deck is a specific kind of
+ * Pile... it is not a Zone at all" - this is now ONLY the deck's row
+ * content (the stack + count input), the same role `<fan-pile>` plays
+ * for a hand - the heading (title + Draw/Deal/Reshuffle/Shuffle/Split
+ * buttons) is built generically by `renderPile` now, via
+ * `pileLevelActions('deck', ...)`, same as any other pile's heading.
+ * Used both as `<deck-stack>`'s row inside `renderPile` (`opts.isHost`
+ * set) and directly by the pre-game preview screen (`#host-deck-area`,
+ * no opts - no host controls exist on that screen at all).
  */
-export function renderDeck(container, count, opts = {}) {
+export function renderDeckStack(container, count, opts = {}) {
   container.innerHTML = '';
-  container.hidden = false;
+  // `classList.add`, not `className =` - `#host-deck-area` (the pre-game
+  // preview screen) already carries `.deck-area` from static markup and
+  // must keep it; `<deck-stack>` (inside `renderPile`) starts with none,
+  // so adding is equivalent to setting there.
+  container.classList.add('deck-area-row');
 
   // D29: the stack and the controls are SIBLINGS. The empty-deck
   // short-circuit below therefore hides the cards only - it used to hide
@@ -1159,46 +1435,23 @@ export function renderDeck(container, count, opts = {}) {
   }
   container.appendChild(stack);
 
+  // Deal's count input stays persistent/always-visible - unchanged from
+  // D52. UX follow-up (direct user request): "just make the split action
+  // always split in half" - no count input for split any more, it's a
+  // one-click action like every other deck action now.
   const actions = pileLevelActions('deck', { isHost: opts.isHost === true });
-  if (!actions.length || !opts.onPileAction) return;
-
-  // D52: count inputs (how many cards to Deal, how many piles to Split
-  // into) moved OUT of the action menu and onto the deck itself,
-  // persistent/always-visible rather than nested inside a transient
-  // radial menu - there's no natural way to embed a text field in a
-  // ring of buttons, and these are settings you set ahead of clicking
-  // the action, not part of the action's own identity.
   if (actions.includes('deal') || actions.includes('reshuffleDeal')) {
     container.appendChild(pileCountInput({
       value: opts.dealCount ?? 1, onChange: opts.onDealCountChange,
       min: 1, max: 20, ariaLabel: 'Cards to deal each player', inputId: 'deck-deal-count',
     }));
   }
-  if (actions.includes('split')) {
-    container.appendChild(pileCountInput({
-      value: opts.splitCount ?? 2, onChange: opts.onSplitCountChange,
-      min: 2, max: 20, ariaLabel: 'Number of piles', inputId: 'deck-split-count',
-    }));
-  }
-
-  // Phase 56 (T56.1): every deck action - draw, deal, reshuffleDeal,
-  // shuffle, split - lives on one menu (Phase 54 gave it only `draw`;
-  // the legacy strip carried the rest until this phase). D52: that menu
-  // is now the pointer-centered radial menu, hosted on `container`
-  // (`#game-deck-area`) itself, not a separate anchor slot - hovering
-  // the deck's own stack/empty state opens it, the same mechanism a
-  // card's hover menu already used.
-  attachRadialMenu(container, 'deck', () => actions, {
-    onAction: (id) => opts.onPileAction(id),
-    disabled: count <= 0 ? ['deal'] : [], // nothing left to deal from
-    draggable: true,
-  });
 }
 
 /** D52: a small, always-visible number input for a pile-level action's
- * count setting (Deal's cards-per-player, Split's pile count) - see
- * `renderDeck`'s own comment for why this lives outside the radial
- * menu now. */
+ * count setting (Deal's cards-per-player) - see `renderDeck`'s own
+ * comment for why this lives outside the radial menu now. UX follow-up:
+ * Split no longer has one - it always splits into 2, no count to set. */
 function pileCountInput({ value, onChange, min, max, ariaLabel, inputId }) {
   const input = document.createElement('input');
   input.type = 'number';
@@ -1210,35 +1463,6 @@ function pileCountInput({ value, onChange, min, max, ariaLabel, inputId }) {
   input.setAttribute('aria-label', ariaLabel ?? 'Count');
   input.addEventListener('input', () => onChange?.(Number(input.value)));
   return input;
-}
-
-/**
- * D52: a pile's own radial action menu (Draw, Deal, Sort, Pass, ...) -
- * `attachRadialMenu` wired for the pile case: dispatch is always direct
- * (no "choose a destination"/follow mode, ever - even `draw`'s
- * `singleTarget` case just means there's only one legal destination,
- * D36), and `target`-bearing actions (today, only `draw`) also keep
- * their own action-token drag protocol (D35) alongside the new click.
- *
- * @param {HTMLElement} hostEl the pile's own visual container (e.g.
- *   `#game-deck-area`, `#hand-zone`) - `attachRadialMenu` opens the menu
- *   on hovering this element, centered on the pointer, not the element's
- *   own box.
- * @param {string[]} actions ids from `pileLevelActions()`.
- * @param {{onPileAction: (id: string) => void,
- *   labels?: Record<string,string>, disabled?: string[]}} opts
- */
-export function renderPileAnchor(hostEl, actions, opts = {}) {
-  // 'hand-pile' is a fixed key, not per-instance: today's only caller
-  // (main.js) always uses this for the SAME logical pile (the viewer's
-  // own hand) - see `openRadialMenu`'s doc comment for why a stable key
-  // (not the DOM node) is what "still the same thing" means here.
-  attachRadialMenu(hostEl, 'hand-pile', () => actions, {
-    labels: opts.labels,
-    disabled: opts.disabled,
-    draggable: true,
-    onAction: (id) => opts.onPileAction?.(id),
-  });
 }
 
 const PILE_ACTION_TOKEN_PREFIX = 'pile-action:';
@@ -1353,9 +1577,15 @@ function renderMiniHand(container, count) {
  * viewer's own seat (Smith Gate 1: position alone is ambiguous).
  * `players` must already be in seat order (viewer first) when seated.
  */
-export function renderRoster(container, players, { movingIds, scores, onAdjustScore, myId, passed, seated } = {}) {
+export function renderRoster(container, players, { movingIds, scores, onAdjustScore, myId, passed, seated, hideId } = {}) {
   container.innerHTML = '';
   players.forEach((p, i) => {
+    // UX follow-up: the viewer's own seat now lives in the merged
+    // hand+zone panel (`renderSeatZones`'s `opts.own`), not the ring -
+    // skipping the `<li>` here (not filtering `players` itself) keeps
+    // everyone ELSE's seat index/angle math unchanged, since it's still
+    // computed against the real roster length and position.
+    if (p.id === hideId) return;
     const li = document.createElement('li');
     li.className = `roster-player roster-${p.connection}`;
     if (seated) {

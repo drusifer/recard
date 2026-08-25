@@ -3,30 +3,40 @@ import { createInitialState, reduce, viewFor } from './state.js';
 import { makeStateMessage, makeMotionMessage, createMotionThrottler, cardDragPayload } from './protocol.js';
 import { renderShareCode, wireCopyCode } from './qrcode.js';
 import {
-  renderHand,
   renderZones,
-  renderSeatZones,
   renderRoster,
   renderRulesPanel,
   renderBanner,
-  renderDeck,
+  renderDeckStack,
+  wirePanelLayout,
   showScreen,
   updateRemoteCursor,
   removeRemoteCursor,
   setCardLifted,
   updateCardDragGhost,
   removeCardDragGhost,
-  renderPileAnchor,
-  pileActionFromDrop,
-  positionHandZone,
 } from './ui.js';
 import { pileLevelActions } from './pileActions.js';
 import { PRESETS } from './presets.js';
 import { RULES_REFERENCE } from './rulesReference.js';
-import { reconcileOrder, sortByRank, sortBySuit } from './handOrder.js';
-import { seatedOrder } from './seating.js';
+import { seatedOrder, seatPosition } from './seating.js';
 import { save as saveGame, load as loadGame, clear as clearGame, describeAge, expectedReturners } from './persistence.js';
 import { CLIENT_KEY_STORAGE, resolvePlayer, peerFor, rememberSession, recallSession, forgetSession } from './identity.js';
+import { loadPanelLayout, savePanelPosition, savePanelSize, applyPresetLayout } from './panelLayout.js';
+// UX follow-up (direct user request): Score is a native Web Component
+// (customElements, light DOM) - importing it (and every pile/zone
+// component below) for its registration side effect
+// (`customElements.define(...)`), same as any other module that just
+// needs to run once at load. `renderDeckStack` (above, from './ui.js')
+// stays imported too - `#host-deck-area` (the pre-game preview screen,
+// not a `#zones` panel) calls it directly on a plain div, no component
+// needed there.
+import './components/ScoreZone.js';
+import './components/ZonePanel.js';
+import './components/PilePanel.js';
+import './components/FanPile.js';
+import './components/DeckStack.js';
+import './components/HeaderActions.js';
 
 const MOTION_FLUSH_MS = 50;
 const MOTION_TTL_MS = 2000; // auto-clear a stale "organizing hand" cue if the end-event is dropped
@@ -39,32 +49,19 @@ const screens = {
 };
 const bannerEl = document.getElementById('banner');
 
-const handAreaEl = document.getElementById('hand-area');
-const handZoneEl = document.getElementById('hand-zone');
-const handZoneNameEl = document.getElementById('hand-zone-name');
-const tableAreaEl = document.getElementById('table-area');
-const gameRosterEl = document.getElementById('game-roster');
-const resetBtn = document.getElementById('reset-btn');
-const resetScoresBtn = document.getElementById('reset-scores-btn');
-const playAsEl = document.getElementById('play-as');
-
-/** US-34 follow-up: what the next play/drop does, armed once in the hand
- *  toolbar rather than chosen per card. */
-function selectedVisibility() {
-  return playAsEl.value;
-}
-
-let handOrderIds = []; // D14: persists hand display order across state updates
-
-// D14: reconciles handOrderIds against the current hand (existing cards
-// keep position, new ones append, gone ones drop) so sort buttons and
-// manual drag-reorder share one source of truth instead of fighting.
-function orderedHand(myHand) {
-  handOrderIds = reconcileOrder(handOrderIds, myHand);
-  const byId = new Map(myHand.map((c) => [c.id, c]));
-  return handOrderIds.map((id) => byId.get(id));
-}
-
+// UX follow-up (direct user request): "just have table-surface -> zone"
+// - every pile/zone panel (shared, personal, the deck) is a direct
+// child of this one flat container now, no `#table-center`/
+// `#table-area`/`#seat-zones` split.
+const zonesEl = document.getElementById('zones');
+// Only ever built for the VIEWER's own score (other players' scores
+// show in the roster list, `renderRoster`'s own thing) - one browser,
+// one own-score panel, so a single fixed id is enough.
+const SCORE_PANEL_ID = 'score';
+// Every id `deckPile.pileActions` can ever offer - `zoneOpts.onPileAction`
+// (below) uses this to route a click to `dealFromDeck` instead of the
+// hand's `pass`, without needing to know which pile kind is asking.
+const DECK_ACTION_IDS = new Set(['draw', 'deal', 'reshuffleDeal', 'shuffle', 'split']);
 let role = null; // 'host' | 'join'
 let session = null;
 let myId = null;
@@ -602,25 +599,24 @@ document.getElementById('create-table').addEventListener('click', async () => {
   document.getElementById('host-deck-config').textContent = `Deck: ${describeDeckConfig(deckConfig)}`;
   if (selectedPreset) {
     document.getElementById('cards-per-player').value = String(selectedPreset.cardsPerPlayer);
+    // UX follow-up (direct user request): "update the preset to use
+    // this layout... and preset the layouts for the other games too" -
+    // a preset's own `layout` (its shared, deterministically-id'd
+    // panels only - never a per-player one) seeds this browser's local
+    // panel arrangement (`panelLayout.js`) the moment its table is
+    // actually created, not merely previewed in the dropdown.
+    applyPresetLayout(window.localStorage, selectedPreset.layout);
   }
   renderRosterOnly();
 
   wireHostSession();
 });
 
-resetBtn.addEventListener('click', () => {
-  dispatch({ type: 'RESET' });
-});
-
-resetScoresBtn.addEventListener('click', () => {
-  // Confirm-gated, consistent with revealing a private card - both are
-  // irreversible and lose state a player can't easily reconstruct
-  // (Smith Gate-close finding: this precedent already existed for
-  // Reveal, Reset Scores just hadn't followed it).
-  if (window.confirm('Reset everyone\'s score to 0? This cannot be undone.')) {
-    dispatch({ type: 'RESET_SCORES' });
-  }
-});
+// UX follow-up (direct user request): Reset/Reset Scores/Add Zone
+// controls removed from the bottom of the screen. RESET/RESET_SCORES/
+// CREATE_ZONE stay real, dispatchable, fully-tested reducer actions
+// (state.test.js, e2e) - only their UI entry points are gone, disclosed
+// to the user as a real functionality gap, not silently dropped.
 
 function adjustScore(targetPlayerId, delta) {
   if (sessionEnded) return;
@@ -845,24 +841,41 @@ function endSessionForGood(message, { retryable = false } = {}) {
   forgetSession(window.localStorage);
   renderBanner(bannerEl, retryable ? `${message} Reload to try again.` : message);
   sessionEnded = true;
-  resetScoresBtn.disabled = true;
   // Re-render with no action handlers so every control (hand cards,
   // reveal/pickup buttons) is inert, and force the roster to reflect
   // reality instead of the last-known (now stale) connection states
   // (Smith Gate-close finding #1 — don't leave any control looking
   // live once the session is actually over).
   if (latestView) {
-    renderHand(handAreaEl, orderedHand(latestView.myHand), {});
     const nameById = new Map(latestView.players.map((p) => [p.id, p.id === myId ? 'You' : p.name]));
-    const frozenOpts = { resolveOwnerName: (ownerId) => nameById.get(ownerId) ?? ownerId };
-    renderZones(tableAreaEl, latestView.zones.filter((z) => !z.ownerId), frozenOpts, latestView.zones);
-    renderSeatZones(
-      document.getElementById('seat-zones'),
-      latestView.zones.filter((z) => z.ownerId),
-      latestView.zones,
-      seatedOrder(latestView.players, myId),
-      frozenOpts,
-    );
+    const frozenOpts = {
+      resolveOwnerName: (ownerId) => nameById.get(ownerId) ?? ownerId,
+    };
+    // UX follow-up (direct user request): "a Deck is a specific kind of
+    // Pile" - the deck is a real pile in `latestView.zones` now, so this
+    // one `renderZones` call renders it too (grouped into the Table
+    // Zone, inert - `frozenOpts` has no `isHost`/`onPileAction`, so
+    // `pileLevelActions('deck', {isHost: false})` offers only `draw`,
+    // and even that has nothing to dispatch to), matching every other
+    // control in this frozen re-render. No separate `<deck-zone>`
+    // element to build here any more.
+    renderZones(zonesEl, latestView.zones, seatedOrder(latestView.players, myId), frozenOpts);
+    // Same inert Score panels the live render builds (one per seated
+    // player with a score, "need a score zone for our opponent" too),
+    // just no move/resize/adjust wiring - the session is over.
+    const frozenSeated = seatedOrder(latestView.players, myId);
+    for (const [seatIndex, player] of frozenSeated.entries()) {
+      if (latestView.scores?.[player.id] === undefined) continue;
+      const scoreEl = document.createElement('score-zone');
+      scoreEl.score = latestView.scores[player.id];
+      if (player.id !== myId) scoreEl.label = `${player.name} Score`;
+      scoreEl.classList.add('panel-moved');
+      const seatDefault = seatPosition(seatIndex, frozenSeated.length, 26);
+      scoreEl.style.position = 'absolute';
+      scoreEl.style.left = `${seatDefault.leftPct}%`;
+      scoreEl.style.top = `${Math.max(seatDefault.topPct - 14, 4)}%`;
+      zonesEl.appendChild(scoreEl);
+    }
   }
   renderRosterOnly();
 }
@@ -893,116 +906,138 @@ function renderRosterOnly() {
     // No control strip here (Smith Gate 2 #2): this screen already has
     // "Deal & Start", and two adjacent deal controls with different
     // semantics is worse than the one badly-placed control we started with.
-    renderDeck(document.getElementById('host-deck-area'), view.deckCount);
+    renderDeckStack(document.getElementById('host-deck-area'), view.deckCount);
   }
-  const seated = seatedOrder(players, myId);
-  renderRoster(gameRosterEl, seated, { ...opts, seated: true });
+  // UX follow-up (direct user request): the in-game roster ring
+  // (`#game-roster`) is retired entirely - every player's seat is its
+  // own `<zone-panel>` now (grouping the hand pile, plus any other
+  // personal pile), `renderGameFromView`/`renderZones` already builds
+  // inside `#zones`. Nothing here rebuilds that; this function only
+  // still owns `#host-roster` (the pre-game screen, which has no
+  // piles/zones concept at all) and the seat-count CSS var below.
+  //
   // Scales the table surface's size with player count (style.css) so
   // seats have room to spread out - confirmed necessary at 8 players,
   // not just a theoretical density concern (Phase 26 T26.3 finding).
   document.getElementById('table-surface').style.setProperty('--seat-count', players.length);
-  // D51: the hand zone sits at the VIEWER's own seat - always index 0
-  // in `seatedOrder`'s per-viewer rotation (D18: "the viewer always
-  // lands at the bottom"). Repositioned here (not only on full game
-  // re-renders) since this runs on every roster change too, and player
-  // count changing the ring's radius/spacing is exactly when the hand's
-  // own seat position needs to move with it.
-  positionHandZone(handZoneEl, 0, seated.length);
-  handZoneNameEl.textContent = `Hand (${view.myHand.length})`;
-  // US-41/D29: dealing lives on the deck, where the cards are - the whole
-  // point of the story. Host-only; `pileLevelActions` enforces that.
-  renderDeck(document.getElementById('game-deck-area'), view.deckCount, {
-    isHost: role === 'host',
-    dealCount: lastDealCount,
-    splitCount: lastSplitCount,
-    onDealCountChange: (n) => { lastDealCount = n; },
-    onSplitCountChange: (n) => { lastSplitCount = n; },
-    // D52: the radial menu no longer threads a count through the click
-    // itself (there's no natural place for a number field in a ring of
-    // buttons) - `lastDealCount`/`lastSplitCount` are already the live
-    // source of truth for the persistent count inputs `renderDeck` now
-    // renders beside the deck, so reading them directly here is not a
-    // new source of truth, just no longer relaying an already-current
-    // value back to itself.
-    onPileAction: (action) => dealFromDeck(action, action === 'split' ? lastSplitCount : lastDealCount),
-  });
-  // Sprint 12 (D34/D37, T53.2/T58.1): the hand's own pile anchor - Sort
-  // by rank/suit and Pass, one control instead of three. D51: hosted on
-  // `handZoneEl` itself (the hand zone's own container) rather than a
-  // separate small anchor slot - hovering the hand zone reveals it, the
-  // same mechanism a card's hover row already used.
-  // D51 fix: hosted on the heading (`handZoneNameEl`), not the whole
-  // zone - hovering ANY card to interact with it also counts as
-  // hovering `#hand-zone`, which raised the whole zone (shifting cards
-  // under the cursor) and popped the Sort/Pass row over them, blocking
-  // normal card interaction (direct user report). The heading has no
-  // competing interactive content, so it's a safe, discoverable,
-  // narrower hover target instead.
-  renderPileAnchor(handZoneNameEl, pileLevelActions('hand', { isOwner: true }), {
-    labels: { pass: view.passed?.[myId] ? 'Unpass' : 'Pass' },
-    onPileAction: (id) => {
-      if (id === 'sortRank') sortHandByRank();
-      else if (id === 'sortSuit') sortHandBySuit();
-      else if (id === 'pass') togglePass();
-    },
-  });
 }
 
 function renderGameFromView(view) {
   const nameById = new Map(view.players.map((p) => [p.id, p.id === myId ? 'You' : p.name]));
 
-  renderHand(handAreaEl, orderedHand(view.myHand), {
-    // D51 follow-up (direct user request): Play and Play Hidden are two
-    // separate actions now, not one gesture plus a separately-armed
-    // "Play as" dropdown. Tap is always public - the fast default,
-    // matching Draw's own precedent (D36). Play Hidden is the card's
-    // own hover-row action; which hidden mode it uses is still chosen
-    // by `selectedVisibility()`, which now only offers the two hidden
-    // modes (index.html's `#play-as`, relabeled "Hide as").
-    onPlay: (card) => playCard(card.id, 'public'),
-    onPlayHidden: (card) => playCard(card.id, selectedVisibility()),
-    onHandMotion: (active) => motionThrottler.schedule('hand', { active }),
-    onReorder: (newOrderIds) => {
-      handOrderIds = newOrderIds;
-    },
-    onCardDrag: broadcastCardDrag,
-    // US-40/D28: on mouse the destination zone handles the drop, so the
-    // hand never needed this. A touch drag is captured by the source
-    // element, so the hand card is the one that has to dispatch it.
-    onDropCard: (cardId, toZoneId, placement) => dropCardOnZone(cardId, toZoneId, placement),
-    zones: view.zones,
-  });
+  // UX follow-up (direct user request): "get rid of seat panel and
+  // replace with a reg zone with a handpile" - the hand is a real
+  // `hand`-kind pile now (`state.js`), rendered through the exact same
+  // generic `renderZoneCards`/`actionMenuEl` machinery as any other
+  // pile's cards (as a `<pile-panel>` grouped into the owner's own
+  // `<zone-panel>`, `src/components/PilePanel.js`/`ZonePanel.js`). No
+  // separate `handOpts`/`own` object, no bespoke fan/reorder/motion/
+  // sort/pass wiring - `onPlay` below is the one new callback the
+  // generic per-card action menu needs (`play` was always in
+  // `cardActions` for a hand's owner, nothing dispatched it
+  // yet).
+  //
+  // NOTE (flagged, not yet done): hand-order persistence (D14), sort/
+  // pass, and the "organizing hand" motion cue are all temporarily gone
+  // - direct instruction was to get the pile rendering working first,
+  // parity/polish is a following step.
   const zoneOpts = {
     viewerId: myId,
     resolveOwnerName: (ownerId) => nameById.get(ownerId) ?? ownerId,
+    onPlay: sessionEnded ? null : (cardId, targetId) => playCard(cardId, 'public', targetId),
     onReveal: (cardId) => revealCard(cardId),
     onRotate: (cardId) => rotateCard(cardId),
     onPickup: (cardId) => pickupCard(cardId),
     onMoveCard: (cardId, toZoneId) => moveCard(cardId, toZoneId),
     onCardLift: (cardId, active) => motionThrottler.schedule('card-lift', { cardId, active }),
     onDropCard: (cardId, toZoneId, placement) => dropCardOnZone(cardId, toZoneId, placement),
+    // D35: a dragged pile-action token (Draw is the only draggable one
+    // today) dropped on any zone panel - generalizes what used to be the
+    // merged own-zone panel's own bespoke hand-drop check.
+    onPileActionDrop: sessionEnded ? null : (actionId) => { if (actionId === 'draw') performDraw(); },
+    // UX follow-up (direct user request): "like zones, Piles are
+    // Actionable and should have a title bar with action buttons for
+    // that pile type" - every pile's heading is a real action header now
+    // (`renderPile`, `ui.js`), dispatched generically through one
+    // callback regardless of which pile kind offered the action.
+    // `pileLevelActions('hand', {isOwner})`'s other two (sortRank/
+    // sortSuit) are filtered out before they ever reach here (see
+    // `renderPile`'s own note) - `pass` and every deck action
+    // (`dealFromDeck` already handles draw/deal/reshuffleDeal/shuffle/
+    // split generically) are the two real dispatch tables today.
+    onPileAction: sessionEnded ? null : (zoneId, actionId) => {
+      if (actionId === 'pass') togglePass();
+      else if (DECK_ACTION_IDS.has(actionId)) dealFromDeck(actionId, lastDealCount);
+    },
+    isHost: role === 'host',
+    // US-41/D29: dealing lives on the deck, where the cards are - the
+    // whole point of the story. Read/written here since the deck now
+    // renders through the exact same generic pile pipeline (`<deck-
+    // stack>`, `renderPile`'s row) as any other pile, not a bespoke
+    // `<deck-zone>` element with its own property surface any more.
+    dealCount: lastDealCount,
+    onDealCountChange: sessionEnded ? null : (value) => { lastDealCount = value; },
     onCardDrag: broadcastCardDrag,
+    // UX follow-up (direct user request): panel position/size is a
+    // local, per-browser preference (`panelLayout.js`) - read fresh on
+    // every render so a drag/resize persisted by `movePanel`/
+    // `resizePanel` above shows up on the very next render, same as it
+    // did when this was replicated state. Overrides the computed
+    // default position when present; `movePanel`/`resizePanel` are what
+    // a title-bar drag/corner-handle drag (`ui.js`'s `attachPanelDrag`/
+    // `attachPanelResize`) call on release.
+    layout: loadPanelLayout(window.localStorage),
+    onMovePanel: movePanel,
+    onResizePanel: resizePanel,
   };
-  // D17/US-27: personal zones render at their owner's seat, not in the
-  // shared flat stack - both still list every zone (this array, passed
-  // as allZones) as a "Move to…" destination.
-  const sharedZones = view.zones.filter((z) => !z.ownerId);
-  const personalZones = view.zones.filter((z) => z.ownerId);
-  renderZones(tableAreaEl, sharedZones, zoneOpts, view.zones);
-  renderSeatZones(document.getElementById('seat-zones'), personalZones, view.zones, seatedOrder(view.players, myId), zoneOpts);
-  resetBtn.hidden = role !== 'host';
-  resetScoresBtn.hidden = role !== 'host';
-  // D50: hides the control instead of only rejecting the click - D46
-  // already gated the ACTION (CREATE_ZONE throws when disallowed), but
-  // `GameConfig` never reached the view until now, so every player saw
-  // Add Zone regardless of the game's own config. Applies to every
-  // role, not just guests - unlike resetBtn above, this isn't a
-  // host/guest split, it's a per-GAME capability the host themselves
-  // set up, so they get no special exemption from their own choice.
-  document.getElementById('add-zone-row').hidden = !view.gameConfig.allowsPlayerZones;
-  // Sprint 12 (T56.1): shuffle/split moved onto the deck's own pile
-  // anchor - this legacy row stays permanently hidden (not deleted)
-  // per the same pattern as Phase 53/54/55's own migrated controls.
+  // UX follow-up (direct user request): "just have table-surface ->
+  // zone" - one render call builds every pile/zone panel (shared AND
+  // personal, D17/US-27's per-seat placement included) as a direct
+  // child of `#zones`, no separate shared-vs-personal container split.
+  // UX follow-up (direct user request): "a Deck is a specific kind of
+  // Pile... it is not a Zone at all" - the deck is a real pile in
+  // `view.zones` now (`state.js`'s `viewFor`), so this ONE call also
+  // builds and groups it into the Table Zone, exactly like Table/
+  // Discard - no separate `<deck-zone>` element/property wiring needed
+  // here any more (`<deck-stack>`, `src/components/DeckStack.js`, is
+  // what `renderPile` uses for its row instead - see `zoneOpts.
+  // dealCount`/`onDealCountChange` above for the one piece of deck-
+  // specific state this file still owns: the Deal count input's value).
+  renderZones(zonesEl, view.zones, seatedOrder(view.players, myId), zoneOpts);
+  // UX follow-up (direct user request): Score is a real sibling
+  // `<score-zone>` Web Component now (`src/components/ScoreZone.js`),
+  // not content nested inside the own-zone panel - built the same
+  // "fresh element, wired through wirePanelLayout" way the deck is.
+  // UX follow-up (direct user request): "need a score zone for our
+  // opponent" - every seated player with a score entry gets their own
+  // `<score-zone>` now (not just the viewer's own), same component,
+  // labeled with their name and positioned near THEIR OWN seat instead
+  // of always seat 0. Anyone may adjust anyone's score (`onAdjustScore`
+  // was never owner-gated even back when this lived in the roster).
+  const seated = seatedOrder(view.players, myId);
+  for (const [seatIndex, player] of seated.entries()) {
+    if (view.scores?.[player.id] === undefined) continue;
+    const isMe = player.id === myId;
+    const scoreEl = document.createElement('score-zone');
+    scoreEl.score = view.scores[player.id];
+    scoreEl.adjustable = !sessionEnded;
+    if (!isMe) scoreEl.label = `${player.name} Score`;
+    scoreEl.addEventListener('score-adjust', (e) => adjustScore(player.id, e.detail.delta));
+    zonesEl.appendChild(scoreEl);
+    const panelId = isMe ? SCORE_PANEL_ID : `score-${player.id}`;
+    wirePanelLayout(scoreEl, panelId, scoreEl.querySelector('.panel-title'), zoneOpts);
+    if (!scoreEl.classList.contains('panel-moved')) {
+      // No stored position yet - default near THIS player's own seat
+      // ring point (same one their personal zone uses), offset up so it
+      // doesn't land exactly on top of it before either panel has ever
+      // been moved.
+      const seatDefault = seatPosition(seatIndex, seated.length, 26);
+      scoreEl.classList.add('panel-moved');
+      scoreEl.style.position = 'absolute';
+      scoreEl.style.left = `${seatDefault.leftPct}%`;
+      scoreEl.style.top = `${Math.max(seatDefault.topPct - 14, 4)}%`;
+    }
+  }
   renderRosterOnly();
 }
 
@@ -1023,6 +1058,25 @@ function rotateCard(cardId) {
   if (sessionEnded) return;
   if (role === 'host') dispatch({ type: 'ROTATE_CARD', playerId: myId, cardId });
   else session.send({ type: 'action', action: { type: 'ROTATE_CARD', cardId } });
+}
+
+// UX follow-up (direct user request): panel positions/sizes are LOCAL,
+// per-browser preference now, not replicated game state - every table
+// starts from the same computed default arrangement, and each viewer's
+// own drag/resize adjustments are theirs alone (`panelLayout.js`,
+// `window.localStorage`). Dragging a panel's title dispatches this on
+// release; the drag itself already applied the style live (`ui.js`),
+// so this just persists it for the NEXT render (`renderGameFromView`
+// reads `loadPanelLayout` fresh every time) - nothing to send anywhere.
+function movePanel(id, x, y) {
+  savePanelPosition(window.localStorage, id, x, y);
+}
+
+// The resize-handle counterpart to movePanel above - same local-only
+// shape. Both axes together (the corner handle always drags width AND
+// height at once, matching its own two-way cursor).
+function resizePanel(id, w, h) {
+  savePanelSize(window.localStorage, id, w, h);
 }
 
 function pickupCard(cardId) {
@@ -1057,49 +1111,26 @@ function dropCardOnZone(cardId, targetZoneId, placement = {}) {
     // its own explicit action (the hand card's hover row), never
     // reachable by dragging.
     playCard(cardId, 'public', targetZoneId, placement);
-  } else {
-    moveCard(cardId, targetZoneId, placement);
+    return;
   }
+  // UX follow-up (direct user request): the hand pile is a real,
+  // addressable zone now (`view.zones`), so a table card dropped onto
+  // it needs PICKUP's own semantics (strips owner/faceUp/layout), not a
+  // generic MOVE_CARD - dropping this into the plain `moveCard` branch
+  // would leave those table-only fields sitting on a card that's
+  // supposed to be a plain hand card.
+  const targetZone = view.zones.find((z) => z.id === targetZoneId);
+  if (targetZone?.kind === 'hand' && targetZone.ownerId === myId) {
+    pickupCard(cardId);
+    return;
+  }
+  moveCard(cardId, targetZoneId, placement);
 }
 
-/** Transient, beside the Add Zone row - same "where the click that caused
- * it happened" pattern as `showDeckError` (US-41). */
-function showZoneError(message) {
-  const el = document.getElementById('zone-error');
-  el.textContent = message;
-  el.hidden = false;
-  clearTimeout(showZoneError.timer);
-  showZoneError.timer = setTimeout(() => { el.hidden = true; }, 4000);
-}
-
-document.getElementById('create-zone-btn').addEventListener('click', () => {
-  if (sessionEnded) return;
-  const nameInput = document.getElementById('new-zone-name');
-  const name = nameInput.value.trim();
-  if (!name) return; // Smith Gate 1: zones need a real name, no silent auto-numbering
-  // D45: kind travels with the request - CREATE_ZONE (state.js) is the
-  // actual authority on which kinds are legal, this is just what's on
-  // the wire.
-  const kind = document.getElementById('new-zone-kind').value;
-  if (role === 'host') {
-    // D46: CREATE_ZONE can now be rejected (GameConfig.allowsPlayerZones
-    // false) - was an uncaught throw straight out of this handler before
-    // D46 gave it a real way to fail (same gap US-41 named for Deal
-    // before that story fixed it). A GUEST's rejected request has no
-    // local exception to catch at all (the host's `reduce` runs remotely
-    // and only `console.warn`s - the existing, established pattern for
-    // every other rejected guest action, e.g. an invalid MOVE_CARD today).
-    try {
-      dispatch({ type: 'CREATE_ZONE', name, kind });
-    } catch (err) {
-      showZoneError(err.message);
-      return;
-    }
-  } else {
-    session.send({ type: 'action', action: { type: 'CREATE_ZONE', name, kind } });
-  }
-  nameInput.value = '';
-});
+// UX follow-up (direct user request): the Add Zone control (name input,
+// kind selector, button, its transient error text) is removed from the
+// bottom of the screen. CREATE_ZONE stays a real, dispatchable,
+// fully-tested reducer action - only this manual UI entry point is gone.
 
 // Sprint 12 (T56.1): named so the deck's pile anchor calls the same
 // implementation the legacy shuffle/split buttons did.
@@ -1107,10 +1138,14 @@ function performShuffle() {
   if (sessionEnded) return;
   dispatch({ type: 'SHUFFLE_DECK' });
 }
-function performSplit(pileCount) {
+// UX follow-up (direct user request): "just make the split action
+// always split in half. One split should result in 2 piles." No count
+// to choose any more - always exactly 2.
+const SPLIT_PILE_COUNT = 2;
+function performSplit() {
   if (sessionEnded) return;
   try {
-    dispatch({ type: 'SPLIT_DECK', pileCount });
+    dispatch({ type: 'SPLIT_DECK', pileCount: SPLIT_PILE_COUNT });
   } catch (err) {
     // Nielsen #9: say what went wrong and what would work, in the same
     // place the action was taken - not a silent no-op.
@@ -1126,61 +1161,28 @@ function performDraw() {
   else session.send({ type: 'action', action: { type: 'DRAW' } });
 }
 
-// D35: the hand is Draw's one static, legal drop target (D36's whole
-// point - it never needs computing). `preventDefault` is unconditional
-// here because real browsers don't expose `dataTransfer` values during
-// `dragover`, only at `drop` (see `pileActionFromDrop`'s own note) - so
-// there is nothing to branch on yet; an ordinary card dropped on empty
-// hand space (not on a reorder target) already falls through to a safe
-// no-op the same way it did before this listener existed.
-handAreaEl.addEventListener('dragover', (e) => e.preventDefault());
-handAreaEl.addEventListener('drop', (e) => {
-  e.preventDefault();
-  if (pileActionFromDrop(e.dataTransfer) === 'draw') performDraw();
-});
+// D35/D51 (both drop behaviors): Draw's action-token drop is
+// `zoneOpts.onPileActionDrop` above; a dragged table card landing on the
+// hand pile is `dropCardOnZone`'s own kind==='hand' check - both
+// generic, handled by whichever zone-panel the drop actually lands on,
+// not a bespoke listener on a dedicated hand element any more.
 
-// D51: the hand is now a real drop target for a dragged TABLE card too
-// (`pickup`'s `target: 'hand'`, `ACTION_SPECS` - always existed as a
-// click-menu action, never as something you could drag a card onto
-// until the hand became a zone with its own container to drop on).
-// Bound on `handZoneEl` (the whole bordered zone, not just the inner
-// `#hand-area` card row) so dropping anywhere in the zone works, the
-// same as any other zone's drop area. `handAreaEl`'s own listener above
-// still owns the Draw pile-action-token case unchanged.
-handZoneEl.addEventListener('dragover', (e) => e.preventDefault());
-handZoneEl.addEventListener('drop', (e) => {
-  e.preventDefault();
-  const cardId = e.dataTransfer.getData('text/plain');
-  if (!cardId || pileActionFromDrop(e.dataTransfer)) return; // a pile-action token, or nothing real
-  const view = currentView();
-  if (view && !view.myHand.some((c) => c.id === cardId)) pickupCard(cardId);
-});
-
-// --- Hand sort (US-23, D14): local-only, never broadcast. Writes into
-// the same handOrderIds that manual drag-reorder writes into, so the two
-// never fight (Smith Gate 1). Named so the pile anchor (Sprint 12,
-// T53.2) has one implementation to call. ---
-function sortHandByRank() {
-  const view = currentView();
-  if (!view) return;
-  handOrderIds = sortByRank(view.myHand);
-  renderGameFromView(view);
-}
-function sortHandBySuit() {
-  const view = currentView();
-  if (!view) return;
-  handOrderIds = sortBySuit(view.myHand);
-  renderGameFromView(view);
-}
+// NOTE (flagged, not yet done): hand sort (US-23, D14) had no UI trigger
+// left once the merged own-zone panel (and its always-visible Sort/Pass
+// buttons) was retired for the plain seat-zone pile - `handOrder.js`
+// (`reconcileOrder`/`sortByRank`/`sortBySuit`) is unused by `main.js` now,
+// not deleted, since restoring pile-level action buttons generically
+// (matching `pileLevelActions`) is exactly the kind of follow-up this
+// pass deferred.
 
 // --- Deal More (US-24): host-only, adds to existing hands without a
 // reset. Deliberately a different label/section/style than "Deal &
 // Start" so a mid-game host can't mis-tap into a reset (Smith Gate 1). ---
-/** Remembers the host's last deal/split counts so a re-render doesn't
- *  reset an input the host already typed into - `renderDeck` rebuilds
- *  the pile anchor wholesale on every state broadcast. */
+/** Remembers the host's last deal count so a re-render doesn't reset an
+ *  input the host already typed into - `renderZones`/`<deck-stack>`
+ *  rebuild the deck pile wholesale on every state broadcast. Split has
+ *  no count of its own any more (`SPLIT_PILE_COUNT`, always 2). */
 let lastDealCount = 1;
-let lastSplitCount = 2;
 
 /**
  * US-41/D29, Phase 56 (T56.1): every deck pile-level action - the deck's
@@ -1194,7 +1196,7 @@ function dealFromDeck(action, count) {
   if (sessionEnded) return;
   if (action === 'draw') return performDraw();
   if (action === 'shuffle') return performShuffle();
-  if (action === 'split') { lastSplitCount = count; return performSplit(count); }
+  if (action === 'split') return performSplit();
   lastDealCount = count;
   try {
     if (action === 'reshuffleDeal') {
@@ -1285,8 +1287,9 @@ function markCardDragStale(playerId) {
 
 // US-29/D19: broadcasts live position while dragging, extending D13's
 // existing throttled channel with one new kind. `card: null` is the
-// dragend "stopped" signal (see renderHand/renderZoneCards' dragend
-// handlers) - sent as `active: false` so receivers clear the ghost
+// dragend "stopped" signal (see renderZoneCards' dragend handlers,
+// which now cover the hand's cards too) - sent as `active: false` so
+// receivers clear the ghost
 // promptly instead of waiting out the full TTL after a normal drop.
 function broadcastCardDrag(card, clientX, clientY) {
   if (!card) {
