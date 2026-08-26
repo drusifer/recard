@@ -233,3 +233,52 @@ Current state: branch `touch-targets-and-pile-actions-sprint`, working
 tree has Sprint 22's uncommitted diff (not yet committed - awaiting
 Smith close-out + user sign-off), 288/288 unit tests green, e2e green
 (2 clean runs). `docs/ARCHITECTURE.md` is current through D53.
+
+## D56 groom (2026-08-26)
+
+Groomed after Morpheus approved D56 (Pile/Zone real class hierarchy
+rewrite) - Trin UAT and Morpheus review both already passed with
+independent verification (mutation tests, LOC count) before this
+groom, nothing to re-litigate.
+
+- `agents/oracle.docs/lessons.md`: 2 new lessons - scoped-vs-blanket
+  `git stash` for before/after isolation (a real mistake caught and
+  redone mid-session, worth keeping so it isn't relearned), and
+  checking an architecture doc's own premise against the actual code
+  before implementing from it (the mixin-rejection finding).
+- `agents/oracle.docs/memory.md`: repository-structure note updated
+  (`src/piles/`/`src/zones/` file lists were stale, still naming the
+  pre-D56 flat modules); 2 new Major Decisions rows added (D55 Sprint
+  23 Zone-as-entity, D56 the class rewrite) - the table had a gap
+  after D54 despite two real decisions having landed since.
+- `docs/ARCHITECTURE.md`: D56 itself is already complete and correct
+  as written (includes its own mid-implementation corrections -
+  `HandPile.tableSide`, the mixin rejection - written in place rather
+  than needing backfill here). No open-items-list change: D56 didn't
+  resolve any of the pre-existing disclosed items (per-seat-anchor
+  geometry, stale `e2e.smoke.mjs`, `handPile.redactCard` privacy gap)
+  - it was a pure internal-structure refactor, confirmed zero
+  behavior change via lint:design.
+- `docs/DECISIONS.md`: untouched again, same standing reason as every
+  groom since Sprint 14 (superseded by `ARCHITECTURE.md`'s per-sprint
+  sections).
+- **CHAT.md archived**: 77 messages (Sprint 23 Phase 68-71 close +
+  D56's full cycle) - `bobp chat-report --moniker sprint23_D56`,
+  archived to `agents/chat_archive/CHAT_sprint23_D56.md`/`.diagram.md`,
+  CHAT.md reset.
+
+Current state: branch `touch-targets-and-pile-actions-sprint`, working
+tree carries Phase 68-71 + D56's full diff, all uncommitted (not yet
+committed - matches this project's existing pattern of committing at
+a user-directed point, not automatically). 341/341 unit tests green,
+`lint:design` at its known pre-existing 5-violation baseline (not
+introduced by this work, confirmed twice). `docs/ARCHITECTURE.md` is
+current through D56.
+
+### Next Steps
+@Smith: `*user test` - end-to-end usability pass. D56 itself has no
+new UI surface to test (pure internal refactor), so this is really
+about Sprint 23's Phase 68-71 UI (split/take/hide/show buttons,
+Zone-entity rendering) which hasn't had a Smith end-to-end pass since
+Phase 70's live spot-check. Phase 72 (pile-title drag-drop) remains
+unimplemented - not in scope for this test pass.

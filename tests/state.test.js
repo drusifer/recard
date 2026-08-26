@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createInitialState, reduce, viewFor, deckOf, handOf, handsOf, zonesOf, pileVisibility } from '../src/state.js';
+import { PILE_TYPES } from '../src/piles/pileTypes.js';
 
 function withPlayers(state, ids) {
   return ids.reduce(
@@ -1451,4 +1452,198 @@ test('viewFor: carries zoneRecords (the real Zone registry) and each pile-view i
   assert.deepEqual(view.zoneRecords, [{ id: 'table-zone', name: 'Table Zone', ownerId: null, type: 'shared' }]);
   assert.equal(view.zones.find((z) => z.id === 'table').zoneId, 'table-zone');
   assert.equal(view.zones.find((z) => z.id === 'deck').zoneId, 'table-zone');
+});
+
+// --- Sprint 23, Phase 68: SPLIT_PILE + TAKE_PILE (US-60/61) ---
+
+function dealPublicCardsTo(state, playerId, zoneId, count) {
+  for (let i = 0; i < count; i++) {
+    const cardId = handOf(state, playerId)[0].id;
+    state = reduce(state, { type: 'PLAY', playerId, cardId, zoneId, visibility: 'public' });
+  }
+  return state;
+}
+
+test('SPLIT_PILE: splits roughly in half, original keeps the extra card on an odd count', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Pool', kind: 'discard' });
+  const pool = zonesOf(state).find((z) => z.name === 'Pool');
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 5 });
+  state = dealPublicCardsTo(state, 'p1', pool.id, 5);
+
+  state = reduce(state, { type: 'SPLIT_PILE', pileId: pool.id, playerId: 'p1' });
+  const original = zonesOf(state).find((z) => z.id === pool.id);
+  const created = zonesOf(state).find((z) => z.kind === 'discard' && z.id !== pool.id);
+  assert.ok(created, 'a new sibling pile exists');
+  assert.equal(original.cards.length, 3, 'original keeps the extra card (ceil)');
+  assert.equal(created.cards.length, 2, 'new pile gets the smaller half (floor)');
+  assert.equal(created.zoneId, pool.zoneId, 'lands in the same Zone as the source, a sibling');
+  assert.equal(original.cards.length + created.cards.length, 5, 'no card lost');
+});
+
+test('SPLIT_PILE: rejects a pile with fewer than 2 cards, with a clear message', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Pool', kind: 'discard' });
+  const pool = zonesOf(state).find((z) => z.name === 'Pool');
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
+  state = dealPublicCardsTo(state, 'p1', pool.id, 1);
+
+  assert.throws(() => reduce(state, { type: 'SPLIT_PILE', pileId: pool.id, playerId: 'p1' }), /only 1 card/);
+});
+
+test('SPLIT_PILE: rejects deck/hand/foundation kinds - only zone/discard are eligible', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 2 });
+  assert.throws(() => reduce(state, { type: 'SPLIT_PILE', pileId: 'deck', playerId: 'p1' }), /Cannot split/);
+  assert.throws(() => reduce(state, { type: 'SPLIT_PILE', pileId: 'hand:p1', playerId: 'p1' }), /Cannot split/);
+});
+
+test('SPLIT_PILE: a personal pile can only be split by its own owner', () => {
+  let state = createInitialState({}, () => 0.5, {
+    piles: [{ kind: 'zone', ownerId: 'perPlayer', count: 1 }],
+  });
+  state = withPlayers(state, ['p1', 'p2']);
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 2 });
+  const stock = zonesOf(state).find((z) => z.kind === 'zone' && z.ownerId === 'p1');
+  state = dealPublicCardsTo(state, 'p1', stock.id, 2);
+
+  assert.throws(
+    () => reduce(state, { type: 'SPLIT_PILE', pileId: stock.id, playerId: 'p2' }),
+    /not authorized/,
+  );
+  assert.doesNotThrow(() => reduce(state, { type: 'SPLIT_PILE', pileId: stock.id, playerId: 'p1' }));
+});
+
+test('TAKE_PILE: transfers every card into the acting player\'s hand, in order, stripped of zone-only fields', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Pool', kind: 'discard' });
+  const pool = zonesOf(state).find((z) => z.name === 'Pool');
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 3 });
+  state = dealPublicCardsTo(state, 'p1', pool.id, 3);
+  const order = zonesOf(state).find((z) => z.id === pool.id).cards.map((c) => c.id);
+
+  state = reduce(state, { type: 'TAKE_PILE', pileId: pool.id, playerId: 'p1' });
+  assert.deepEqual(zonesOf(state).find((z) => z.id === pool.id).cards, [], 'pile is empty now');
+  const hand = handOf(state, 'p1');
+  assert.deepEqual(hand.map((c) => c.id), order, 'landed in the hand in the pile\'s own order');
+  assert.ok(hand.every((c) => !('owner' in c) && !('faceUp' in c) && !('layout' in c)), 'zone-only fields stripped, same as PICKUP');
+});
+
+test('TAKE_PILE: a pile containing a card the viewer cannot see blocks the WHOLE take - no partial-take', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1', 'p2']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Pool', kind: 'discard' });
+  const pool = zonesOf(state).find((z) => z.name === 'Pool');
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 2 });
+  state = dealPublicCardsTo(state, 'p1', pool.id, 1);
+  // A private-facedown card, owned by p1, is hidden from p2 - and per
+  // zonePile's own `pickup` rule, hidden even from p1 (identity must be
+  // visible to be taken, matching a single-card pickup's own rule).
+  const cardId = handOf(state, 'p1')[0].id;
+  state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId, zoneId: pool.id, visibility: 'private-facedown' });
+
+  assert.throws(
+    () => reduce(state, { type: 'TAKE_PILE', pileId: pool.id, playerId: 'p2' }),
+    /cannot see/,
+  );
+  // No mutation happened - the guard runs before any card moves.
+  assert.equal(zonesOf(state).find((z) => z.id === pool.id).cards.length, 2);
+});
+
+test('TAKE_PILE: works on a discard pile specifically - its own cardActions is always empty, a different question from bulk take', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Pool', kind: 'discard' });
+  const pool = zonesOf(state).find((z) => z.name === 'Pool');
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 2 });
+  state = dealPublicCardsTo(state, 'p1', pool.id, 2);
+
+  assert.doesNotThrow(() => reduce(state, { type: 'TAKE_PILE', pileId: pool.id, playerId: 'p1' }));
+});
+
+test('TAKE_PILE: rejects deck/hand kinds - only zone/discard are eligible', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
+  assert.throws(() => reduce(state, { type: 'TAKE_PILE', pileId: 'deck', playerId: 'p1' }), /Cannot take/);
+  assert.throws(() => reduce(state, { type: 'TAKE_PILE', pileId: 'hand:p1', playerId: 'p1' }), /Cannot take/);
+});
+
+test('zonePile/discardPile pileActions: split/take open to any player on a shared pile, owner-only on a personal one', () => {
+  assert.deepEqual(PILE_TYPES.zone.pileActions({ isShared: true }), ['split', 'take']);
+  assert.deepEqual(PILE_TYPES.zone.pileActions({ isOwner: true }), ['split', 'take']);
+  assert.deepEqual(PILE_TYPES.zone.pileActions({ isOwner: false, isShared: false }), []);
+  assert.deepEqual(PILE_TYPES.discard.pileActions({ isShared: true }), ['split', 'take']);
+  assert.deepEqual(PILE_TYPES.discard.pileActions({}), []);
+});
+
+// --- Sprint 23, Phase 69: SET_PILE_ORIENTATION (US-62, hide/show) ---
+
+test('SET_PILE_ORIENTATION: sets every card in the pile face-up or face-down uniformly', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Pool', kind: 'discard' });
+  const pool = zonesOf(state).find((z) => z.name === 'Pool');
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 3 });
+  state = dealPublicCardsTo(state, 'p1', pool.id, 3);
+
+  state = reduce(state, { type: 'SET_PILE_ORIENTATION', pileId: pool.id, playerId: 'p1', faceUp: false });
+  assert.ok(zonesOf(state).find((z) => z.id === pool.id).cards.every((c) => c.faceUp === false), 'every card face-down');
+
+  state = reduce(state, { type: 'SET_PILE_ORIENTATION', pileId: pool.id, playerId: 'p1', faceUp: true });
+  assert.ok(zonesOf(state).find((z) => z.id === pool.id).cards.every((c) => c.faceUp === true), 'every card face-up again');
+});
+
+test('SET_PILE_ORIENTATION: rejects deck/hand kinds - only zone/discard are eligible', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
+  assert.throws(
+    () => reduce(state, { type: 'SET_PILE_ORIENTATION', pileId: 'deck', playerId: 'p1', faceUp: false }),
+    /Cannot set orientation/,
+  );
+  assert.throws(
+    () => reduce(state, { type: 'SET_PILE_ORIENTATION', pileId: 'hand:p1', playerId: 'p1', faceUp: false }),
+    /Cannot set orientation/,
+  );
+});
+
+test('SET_PILE_ORIENTATION: a personal pile can only be set by its own owner - reducer re-checks, not just the offer layer', () => {
+  let state = createInitialState({}, () => 0.5, {
+    piles: [{ kind: 'zone', ownerId: 'perPlayer', count: 1 }],
+  });
+  state = withPlayers(state, ['p1', 'p2']);
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 2 });
+  const stock = zonesOf(state).find((z) => z.kind === 'zone' && z.ownerId === 'p1');
+  state = dealPublicCardsTo(state, 'p1', stock.id, 2);
+
+  assert.throws(
+    () => reduce(state, { type: 'SET_PILE_ORIENTATION', pileId: stock.id, playerId: 'p2', faceUp: false }),
+    /not authorized/,
+  );
+  assert.doesNotThrow(
+    () => reduce(state, { type: 'SET_PILE_ORIENTATION', pileId: stock.id, playerId: 'p1', faceUp: false }),
+  );
+});
+
+test('SET_PILE_ORIENTATION: a shared pile can only be set by the host - reducer re-checks, not just the offer layer', () => {
+  // p1 joins first - the host, by construction (D3: only the host ever
+  // runs `reduce`, and it always joins its own table before anyone else
+  // can reach it via the share code).
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1', 'p2']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Pool', kind: 'discard' });
+  const pool = zonesOf(state).find((z) => z.name === 'Pool');
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 2 });
+  state = dealPublicCardsTo(state, 'p1', pool.id, 2);
+
+  assert.throws(
+    () => reduce(state, { type: 'SET_PILE_ORIENTATION', pileId: pool.id, playerId: 'p2', faceUp: false }),
+    /not authorized/,
+  );
+  assert.doesNotThrow(
+    () => reduce(state, { type: 'SET_PILE_ORIENTATION', pileId: pool.id, playerId: 'p1', faceUp: false }),
+  );
+});
+
+test('zonePile/discardPile pileActions: hide/show are mutually exclusive, keyed off the pile\'s own current orientation', () => {
+  const faceUp = (n) => Array.from({ length: n }, (_, i) => ({ id: `c${i}`, faceUp: true }));
+  const faceDown = (n) => Array.from({ length: n }, (_, i) => ({ id: `c${i}`, faceUp: false }));
+  assert.deepEqual(PILE_TYPES.zone.pileActions({ isShared: true, cards: faceUp(2) }).filter((a) => a === 'hide' || a === 'show'), ['hide']);
+  assert.deepEqual(PILE_TYPES.zone.pileActions({ isShared: true, cards: faceDown(2) }).filter((a) => a === 'hide' || a === 'show'), ['show']);
+  assert.deepEqual(PILE_TYPES.zone.pileActions({ isShared: true, cards: [] }).filter((a) => a === 'hide' || a === 'show'), [], 'an empty pile offers neither');
 });

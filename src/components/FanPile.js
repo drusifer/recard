@@ -10,7 +10,7 @@ import { renderPileShell, renderZoneCards } from '../ui.js';
  * cards, its own drop-target wiring - not a bare row that `<pile-panel>`
  * used to wrap with a separately-built header. `renderZones` (`ui.js`)
  * picks this element directly for any pile whose TYPE declares
- * `rowShape: 'fan'` (`handPile.js`, read via `rowShapeFor`), the same
+ * `static component = 'fan-pile'` (`HandPile.js`, read via `componentFor`), the same
  * way it picks `<deck-stack>` for `'stack'` and `<pile-panel>` for the
  * default `'flat'` case - three equally-thin components now, none
  * nesting inside another.

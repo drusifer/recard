@@ -471,3 +471,28 @@ This file contains critical lessons and rules derived from past errors, technica
   quadratic) wasn't visible from eyeballing alone. Same standing lesson
   as the fan-clipping and density-measurement precedents, reapplied to
   a new shape of claim.
+- **A `git stash` used to isolate "before vs. after" must scope to the
+  exact files under test, not the whole working tree.** D56's first
+  lint:design before/after comparison stashed everything uncommitted,
+  which also reverted Sprint 23's own separate in-flight Phase 68-70
+  work (already in the tree) - producing a "before" that was actually a
+  different, older code state, not "this change absent." The apparent
+  9-violation improvement was entirely Phase 68-70's doing, unrelated
+  to D56. Caught by re-running with `git stash push -- <exact files
+  touched>` instead of a bare `git stash` - the correct isolation gave
+  an identical count both ways (the true, reassuring result). Any
+  before/after measurement on a branch that already has other
+  uncommitted work needs a scoped stash, never a blanket one.
+- **Check an architecture doc's own premise against the actual code
+  before building what it proposes - a plausible-sounding rationale can
+  still be wrong.** D56 proposed `Actionable`/`Movable`/`Resizable`
+  mixins on the stated premise that "each of 6 components does its own
+  subset by hand." A two-minute grep before writing any mixin code
+  found the opposite: every component already calls one shared
+  `renderPileShell`/`wirePanelLayout` - the duplication the mixins were
+  meant to remove didn't exist, and building them anyway would have
+  been pure ceremony. The doc also cited a mechanism (D52's radial
+  menu) that had already been retired by later work - it had quietly
+  drifted from the code it was describing. Read the code the doc claims
+  to summarize before implementing from the doc alone, especially for
+  a section written speculatively rather than from a direct code read.

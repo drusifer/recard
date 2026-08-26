@@ -708,6 +708,22 @@ hardcode deletion. Neither correction touches Phase 68-70/73's designs
 (SPLIT_PILE/TAKE_PILE/SET_PILE_ORIENTATION) - those don't reference
 Zone-as-container at all.
 
+## Phase 68 review (2026-08-25)
+
+APPROVED. SPLIT_PILE/TAKE_PILE reducer cases, zone/discard gain both in
+pileActions. Two real mid-build corrections, both right calls: (1)
+TAKE_PILE's guard diverged from the plan's spec'd `cardActions(...)
+.includes('pickup')` check - discardPile's cardActions is
+unconditionally empty by design (D45's drop-only rule), which would
+have made discard-take permanently impossible, the story's own named
+use case; built as its own bulk visibility check instead. (2) A real
+gap in the original plan - offering `take` with no matching
+`ACTION_SPECS` entry crashed the app - caught and fixed pre-ship, not
+left for Trin. `lint:design` 14->15 (one phone-width overlap) disclosed
+honestly, correctly bucketed with an existing open item rather than
+either hidden or over-scoped into a new fix. Handed to Neo for
+whichever of Phase 69/70/72 the user picks up next.
+
 ### Lesson worth remembering for next time
 When a premise-check finds what looks like "X and Y are actually the
 same thing" from reading data-layer naming/shortcuts alone, cross-check
@@ -730,3 +746,129 @@ Resume with `*swe impl phase 62` (Neo), then `*qa uat phase 62` (Trin),
 then back here for code review, before Phase 63 begins. Context was
 getting large this turn — recommend `/clear` before starting Phase 62's
 actual implementation if not already done.
+
+## D56: Pile/Zone real class hierarchies + capability mixins (2026-08-25)
+
+User ran `*arch` directly asking for the path off today's flat-module
+`PILE_TYPES`/`ZONE_TYPES` registries onto real `class X extends Pile`/
+`extends Zone` hierarchies, plus `Actionable`/`Movable`/`Resizable`
+capability interfaces and 1:1-by-render-shape Web Component pairing.
+Confirmed the "mess" complaint is real before designing anything:
+`redactCard`/`canRemoveCard`/`removeCard`/the reveal-pickup-move-rotate
+`cardActions` rule are copy-pasted byte-for-byte across
+`discardPile.js`/`foundationPile.js`/`cascadePile.js`/`Pile.js` today.
+
+**Full design + 3 Mermaid class diagrams: `docs/ARCHITECTURE.md` D56.**
+Chat broadcast (truncated to 512 chars, doc has the full reasoning):
+CHAT.md 22:55.
+
+### Key calls made, each with a rejected alternative on record in D56
+1. `FoundationPile extends RunPile extends MeldPile` — Solitaire's
+   ascending-from-Ace foundation IS a same-suit sequential run, a
+   special case, not a sibling concept. `SetPile` added as a
+   documented, tested-empty placeholder (Rummy-style same-rank melds)
+   — NOT built speculatively; this project's own "don't build for
+   hypothetical requirements" standard applies to the architecture doc.
+2. Cascade vs RankAdjacent flagged as a possible further merge
+   (adjacency-with-a-side-constraint, parameterizable) but NOT
+   collapsed in this pass — needs real tests in hand, not a blind call
+   from reading two files.
+3. Rejected `StockPile` as a class — same concept as `DeckPile`
+   (already has `DECK_PILE_ID`/`deckOf()` machinery), would be a pure
+   duplicate name. Direct application of the user's own anti-
+   duplication ask.
+4. Rejected persisted `YouZone`/`OpponentZone` classes — `state.zones`
+   is shared/replicated state (D7/D17), one record per zone regardless
+   of viewer; a per-viewer class would mean re-tagging every zone per
+   `viewFor` call, redesigning the redaction boundary to solve what's
+   actually a rendering concern. Corrected to `Zone.viewerRelation
+   (zone, viewerId)`, a pure function centralizing today's inline
+   `ownerId === viewerId` checks already scattered through `ui.js`.
+5. `ScoreZone extends PerPlayerZone` — NEW, folds today's fully
+   parallel `<score-zone>`/`renderScorePanel` per-player loop (built
+   directly off `state.scores`, outside the Zone model entirely) into
+   a real `state.zones` entity. The one phase with genuine new visible
+   behavior surface — needs Smith's read specifically.
+6. Rejected 1:1 component-per-data-class — component tag encodes
+   render SHAPE (`pile-panel`/`fan-pile`/`deck-stack`/`zone-panel`/
+   `score-zone`), multiple data classes legitimately share one tag
+   (matches D51's own `rowShape` precedent, just de-indirected onto a
+   `static component` field read directly instead of through
+   `rowShapeFor()`'s lookup table).
+7. Rejected big-bang rewrite — 5-phase migration proposed (Pile
+   classes → Zone classes → ScoreZone → capability mixins →
+   SetPile-stays-a-placeholder), each phase regression-gated before the
+   next, matching D42/D53/D55's own established discipline. Named why:
+   D31's `.btn-row[hidden]` bug and D51's card-drag callback-arity bug
+   were BOTH found only by running the app between phases, never by
+   reading a mechanical-refactor diff — nothing about this migration's
+   size argues for skipping that.
+
+### Current Task
+**Status:** Design recorded, migration approach revised per direct
+user correction, no code touched yet.
+
+### Correction (2026-08-26): no phased migration
+User rejected the 5-phase, regression-gated migration plan outright:
+"I don't want a 5 phase migration. It's okay to break things, we don't
+need to be backward compatible, and we can delete tests that are no
+longer relevant." Rewrote D56's Migration section in
+`docs/ARCHITECTURE.md` accordingly — this is now a **single
+implementation pass**, not a sized sprint with gates between steps.
+Breaking changes and deleting stale tests are both explicitly
+sanctioned (matches the project's existing D51 "no compatibility
+shim" precedent, just applied at the class-hierarchy level). Full
+suite + `lint:design` still run once at the end; `ScoreZone` still
+gets a live visual check since it's the one piece with real new
+visible behavior. `SetPile` stays an unbuilt placeholder — that call
+is unrelated to the process correction and still holds.
+
+### Next Steps
+@Smith: `*user review` on `ScoreZone` specifically (the only real
+visible-behavior change in this rewrite). Then straight to @Neo to
+implement the whole rewrite as one pass — no Mouse sprint-sizing step,
+no phase gates. Keep this separate from Sprint 23's in-flight Phase
+72/73 pile-actions work (different epic), but do not block it behind a
+planning ceremony.
+
+## D56 code review (2026-08-26) - APPROVED
+
+Reviewed after Trin's UAT pass (341/341, mutation-verified, PASS).
+
+- **LOC check, not just a vibes call**: the 7 old flat modules
+  (`zonePile`/`deckPile`/`handPile`/`discardPile`/`foundationPile`/
+  `cascadePile`/`rankAdjacentPile` at HEAD) totaled 614 lines. The new
+  hierarchy (11 files, including `MeldPile`/`RunPile`'s new abstraction
+  layer AND the unused `SetPile` placeholder, both net-new) totals 595
+  - a real reduction despite ADDING two new classes nothing required
+  before. The duplicated blocks (`redactCard`/`canRemoveCard`/
+  `cardActions`'s reveal-pickup-move-rotate rule) are gone from every
+  file that used to carry a copy.
+- `FoundationPile extends RunPile extends MeldPile` is exactly the
+  right shape - Solitaire's ascending-from-Ace rule really is a
+  same-suit-run's special case, expressed as one overridden method plus
+  a `super` call, not a rewritten sibling.
+- One deliberate, acceptable exception to "don't restate an inherited
+  default": `HandPile.tableSide = true` restates `Pile`'s own default
+  verbatim. Correct call, not a miss - it's the exact flag whose
+  earlier wrong value (`false`) caused a real caught bug this session;
+  making it explicit here is a guard against re-introducing that
+  mistake, not decorative duplication. This is the kind of one-line,
+  deliberate redundancy that's fine - different in kind from the
+  multi-line duplicated rule-bodies this rewrite actually targeted.
+- Both of Neo's scope calls (mixin rejection, ScoreZone ruled out) hold
+  up under review - checked the same `renderPileShell`/
+  `wirePanelLayout` sharing myself, agree there's no real duplication
+  left at the component layer to justify a mixin.
+- Trin's one non-blocking finding (11 `AP-VIA-READ` flags this
+  session) - noted, not something to re-litigate here; a workflow
+  discipline gap, not a code-quality one.
+
+**Verdict: APPROVED. D56 is done.** No further phases - this was the
+whole scope per the user's own no-phase-gate directive.
+
+### Next Steps
+@Oracle: groom - update docs/decisions as needed, archive if CHAT.md is
+getting long. No open D56 work remains; ScoreZone-as-a-real-Zone is a
+separate future feature request if wanted, not a D56 follow-up (see
+`docs/ARCHITECTURE.md` D56's own closing section).

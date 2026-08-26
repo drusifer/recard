@@ -1,7 +1,7 @@
 import { step as touchDragStep, HOLD_MS } from './touchDrag.js';
 import {
   ACTION_SPECS, actionsForCard, pileLevelActions, targetsForAction, resolveDropTargetFor,
-  disabledPileActionsFor, rowShapeFor,
+  disabledPileActionsFor, componentFor,
 } from './pileActions.js';
 import { seatPosition } from './seating.js';
 import { ZONE_TYPES } from './zones/zoneTypes.js';
@@ -488,8 +488,19 @@ export function renderActionHeader(container, titleText, actionIds, opts = {}) {
     applyIconButton(btn, spec, opts.labels?.[id]);
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (spec.destructive && !window.confirm(
-        `${spec.hint}\n\nEvery player's current hand will be cleared. Continue?`)) return;
+      // US-61 (Sprint 23), Smith's ruling (Phase 70): each spec's own
+      // `hint` already states its real consequence (reshuffleDeal's own
+      // hint says it deals a fresh hand to each player; take's says it
+      // takes every card) - a second, hardcoded "every player's hand
+      // will be cleared" sentence bolted on here was WRONG for every
+      // destructive action except reshuffleDeal, silently inherited by
+      // `take` the moment it became destructive (Phase 68). One prompt,
+      // built from the actual action's own hint, for all of them.
+      // `opts.noConfirm` (a 1-card `take`, Smith's ruling) skips the
+      // dialog entirely - identical in effect to that card's own
+      // un-confirmed single-card `pickup`.
+      if (spec.destructive && !opts.noConfirm?.includes(id) &&
+        !window.confirm(`${spec.hint}\n\nContinue?`)) return;
       opts.onAction(id);
     });
     // D35: `draw`'s own action-token drag protocol, unrelated to the
@@ -1003,7 +1014,19 @@ export function renderPileShell(container, zone, allZones, opts, buildRow) {
   container.appendChild(heading);
   heading.render(
     `${zone.name} (${zone.count ?? zone.cards.length})`,
-    pileLevelActions(zone.kind, { isOwner: zone.ownerId === opts.viewerId, isHost: opts.isHost })
+    pileLevelActions(zone.kind, {
+      isOwner: zone.ownerId === opts.viewerId,
+      isHost: opts.isHost,
+      // US-60/61 (Sprint 23): a shared (ownerless) zone/discard pile's
+      // split/take are open to any player - `zonePile`/`discardPile`'s
+      // own `pileActions` can't tell "shared" from "someone else's
+      // personal pile" from `isOwner` alone (both are simply `false`).
+      isShared: zone.ownerId == null,
+      // US-62 (Sprint 23): hide/show are mutually exclusive, keyed off
+      // the pile's OWN current orientation (`zonePile`/`discardPile`'s
+      // `orientationActions`) - needs the actual cards, not just counts.
+      cards: zone.cards,
+    })
       .filter((id) => id !== 'sortRank' && id !== 'sortSuit'),
     {
       // `pile-title`, not `panel-title` - a Pile's own heading is never
@@ -1019,6 +1042,10 @@ export function renderPileShell(container, zone, allZones, opts, buildRow) {
       // (`disabledPileActionsFor`), not a `zone.kind === 'deck'` check
       // hardcoded here.
       disabled: disabledPileActionsFor(zone.kind, zone.count ?? zone.cards.length),
+      // US-61 (Sprint 23), Smith's ruling (Phase 70): `take` confirms
+      // unconditionally EXCEPT a 1-card pile, where it's identical in
+      // effect to that card's own un-confirmed single-card `pickup`.
+      noConfirm: (zone.cards?.length ?? zone.count) === 1 ? ['take'] : [],
       onAction: (id) => opts.onPileAction?.(zone.id, id),
     },
   );
@@ -1049,7 +1076,7 @@ export function renderPileShell(container, zone, allZones, opts, buildRow) {
 }
 
 /**
- * The FLAT row shape (`rowShapeFor(kind) === 'flat'` - every kind
+ * The FLAT row shape (`componentFor(kind) === 'pile-panel'` - every kind
  * except a hand's fan or a deck's stack) - `<pile-panel>`'s own thin
  * wrapper around `renderPileShell`, same shape `<fan-pile>`/
  * `<deck-stack>` now have for their own row shapes.
@@ -1105,16 +1132,15 @@ export function renderZonePanel(zoneEl, id, title, piles, allZones, opts) {
   // Pile... it is not a Zone at all" / "pile-panel and header-actions
   // should be internalized in the fan-pile webcomponent, same for all
   // Pile type components" - which ELEMENT renders a pile is decided
-  // here, off the pile TYPE's own `rowShape` (`rowShapeFor`,
+  // here, off the pile CLASS's own `static component` (D56, `componentFor`,
   // `pileActions.js`), never a `zone.kind === 'hand'` check inside any
   // one component. `<fan-pile>`/`<deck-stack>` are now fully self-
   // contained Piles (their own header+row+drop wiring, via
   // `renderPileShell`) - `<pile-panel>` is just the flat-row case's own
   // equally-thin wrapper, not a generic container the other two nest
   // inside any more.
-  const PILE_TAGS = { flat: 'pile-panel', fan: 'fan-pile', stack: 'deck-stack' };
   for (const zone of piles) {
-    const el = document.createElement(PILE_TAGS[rowShapeFor(zone.kind)]);
+    const el = document.createElement(componentFor(zone.kind));
     body.appendChild(el);
     el.render(zone, allZones, opts);
     // No separate Zone-level title for the common single-pile case -

@@ -1,0 +1,20 @@
+/**
+ * FoundationPile (D56 - real subclass, was `foundationPile.js`'s flat
+ * module). Solitaire's foundation: same-suit, strictly ascending,
+ * append-only, starting at Ace. `extends RunPile` - the only rule that
+ * differs from a general same-suit run is the empty-pile case (must be
+ * an Ace, not "anything"); every other member (`cardActions`,
+ * `canRemoveCard`, `pileActions`, `resolveDropTarget`, `insertCard`,
+ * `redactCard`) is inherited from `RunPile`/`MeldPile`/`Pile` rather
+ * than duplicated.
+ */
+import { RunPile } from './RunPile.js';
+
+export class FoundationPile extends RunPile {
+  /** US-56: empty foundation accepts only an Ace; otherwise defers to
+   * `RunPile`'s "same suit, next rank" rule. */
+  static canAccept(pile, card) {
+    if (pile.cards.length === 0) return card.rank === 'A';
+    return super.canAccept(pile, card);
+  }
+}

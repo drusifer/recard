@@ -26,6 +26,8 @@ This file serves as a consolidated index of project-wide decisions, historical c
 | 2026-08-24 | (table gap, D21-D52: Sprints 6-21 shipped via background agents, tracked in CHAT.md/ARCHITECTURE.md/USER_STORIES.md rather than backfilled here - see each persona's state.md "Shutdown prep catch-up" note) | | |
 | 2026-08-24 | Sprint 22: `dropRule` enum retired for real polymorphism (`canAccept`/`resolveDropTarget` owned per pile module); 3 new Pile kinds (`foundation`/`cascade`/`rankAdjacent`) proven against Solitaire + Spit specifically; `GameConfig.zones` lets a preset auto-build its table (D53) | User asked to "complete the refactor to Zone/Pile APIs" - checked for a concrete driver first (none existed for D38's original separate Zone-type catalog), user's follow-up reframed the real ask as polymorphism + two named games | 6-phase sprint (62-67), zero regressions on any existing kind, 288/288 unit + 2 clean e2e runs; one pre-existing e2e flake found+disclosed (not caused by this sprint), see `docs/USER_STORIES.md` backlog |
 | 2026-08-25 | Zone and Pile split into genuinely separate Web Components (`renderPileShell`/`renderZonePanel`); Deck becomes a real Pile routed through `view.zones` instead of a bespoke `<deck-zone>` (D54) | Prior renderer conflated box-drawing, move/resize wiring, and pile-card rendering in one function - user drove the split incrementally across several corrections until Zone/Pile were separate in code, matching what D53 had already made separate in data | 303->308 unit green, stylelint clean, `lint:design` tracked 33->12->10->7->6 (back to pre-session baseline); found+fixed 2 real pre-existing bugs (table-zone's own wirePanelLayout id, seat-zone className wipe); `tests/e2e.smoke.mjs` NOT updated (flagged, deferred), `handPile.redactCard` privacy gap still open, see `docs/ARCHITECTURE.md` D54 |
+| 2026-08-25 | Sprint 23: `SPLIT_PILE`/`TAKE_PILE`/`SET_PILE_ORIENTATION` generalized onto `zone`/`discard` piles; Zone becomes a real, declaratively-configured `state.zones` entity with its own `type` (D55) | User's 4th direct correction mid-design: Zone needed real named/typed entities in `GameConfig`, not a pile-level `groupId` field - Morpheus caught+fixed its own earlier "Zone IS Pile" premise error against D54's own prior work before shipping | 322/322 unit green, `lint:design` 14/14 identical, live-verified Solitaire+Gin Rummy; Phases 68-71 landed, Phase 72 (pile-title drag-drop between zones) still open in `task.md` |
+| 2026-08-26 | D56: `Pile`/`Zone` flat per-kind modules rewritten as real `extends Pile`/`extends Zone` class hierarchies (`FoundationPile extends RunPile extends MeldPile`) | User: "the code is a mess... lay down the path to only using derived types" - confirmed real duplication first (`redactCard`/`cardActions` copy-pasted across 4+ files) before designing; user then rejected the drafted 5-phase migration outright ("okay to break things, no backward compat, delete stale tests") - landed as one direct pass instead | 341/341 unit green, `lint:design` unchanged at its pre-existing 5-violation baseline (isolated via a correctly-SCOPED `git stash`, see lessons.md); `Actionable`/`Movable`/`Resizable` mixins REJECTED after checking the components already share `renderPileShell`/`wirePanelLayout` - no real duplication there to remove; `ScoreZone`/`SetPile` are documented, unwired placeholders - folding score into replicated state is a separate future feature request, not part of this cleanup; Trin UAT + Morpheus review both passed with independent verification (mutation tests, LOC count), see `docs/ARCHITECTURE.md` D56 |
 
 ## Repository Structure Memory
 - `agents/`: Contains persona-specific documentation and state.
@@ -40,8 +42,13 @@ This file serves as a consolidated index of project-wide decisions, historical c
   qrcode.js, presets.js, rulesReference.js, handOrder.js (v1.2, D14),
   seating.js (v1.3, D18), panelLayout.js (local per-viewer panel
   move/resize + preset layout seeding), touchDrag.js, pileActions.js,
-  main.js; `src/piles/{pileTypes,deckPile,handPile,zonePile,...}.js`
-  (D42/D53) - foundation/cascade/rankAdjacent added D53;
+  main.js; `src/piles/{Pile,DeckPile,HandPile,DiscardPile,CascadePile,
+  RankAdjacentPile,MeldPile,RunPile,FoundationPile,SetPile,pileTypes}.js`
+  (D42/D53/**D56**) - real `extends Pile` class hierarchy as of D56,
+  replacing the earlier flat-module-per-kind shape;
+  `src/zones/{Zone,SharedZone,PerPlayerZone,ScoreZone,zoneTypes}.js`
+  (D55/**D56**) - same treatment; `SetPile`/`ScoreZone` are documented,
+  unwired placeholders, not live features.
   `src/components/` (D54) - `<zone-panel>`, `<pile-panel>`, `<fan-pile>`,
   `<deck-stack>`, `<score-zone>`, `<header-actions>` as native Web
   Components.

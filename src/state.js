@@ -228,6 +228,13 @@ export function createInitialState(deckConfig = {}, rng = Math.random, gameConfi
     players: [],
     scores: {},
     passed: {},
+    // US-62 (Sprint 23, Phase 69): the ONLY identity SET_PILE_ORIENTATION
+    // needs to re-check a shared pile's host-only authorization itself
+    // (D43 discipline - reducer, not just the offer layer). Set once, by
+    // the first JOIN (below) - the host always joins its own table
+    // before a share code exists for anyone else to reach it (D3), so
+    // "first player ever to join" and "the host" are the same fact.
+    hostId: null,
   };
 }
 
@@ -466,6 +473,7 @@ const ACTIONS = {
               )));
     return {
       ...state,
+      hostId: state.hostId ?? action.playerId,
       players: [
         ...state.players.filter((p) => p.id !== action.playerId),
         { id: action.playerId, name: action.name, connection: 'connected' },
@@ -599,6 +607,123 @@ const ACTIONS = {
       ...state,
       zones,
       piles: state.piles.map((p) => (p.id === action.pileId ? { ...p, zoneId: targetZoneId } : p)),
+    };
+  },
+
+  /**
+   * US-60 (Sprint 23): splits a pile roughly in half into a new sibling
+   * pile of the same kind, in the same Zone. Only `zone`/`discard` -
+   * same eligibility as `MOVE_PILE`/`take` (Smith's Gate 1 ruling) -
+   * write-side re-checked here, not just trusted from the offer layer
+   * (D43's standing discipline). Odd count: the ORIGINAL pile keeps the
+   * extra card (Smith's ruling) - `Math.floor` sizing the new pile
+   * naturally leaves the remainder with the original.
+   */
+  SPLIT_PILE(state, action) {
+    const pile = state.piles.find((p) => p.id === action.pileId);
+    if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
+    if (pile.kind !== 'zone' && pile.kind !== 'discard') {
+      throw new Error(`Cannot split a "${pile.kind}" pile`);
+    }
+    if (pile.ownerId && pile.ownerId !== action.playerId) {
+      throw new Error(`Player ${action.playerId} is not authorized to split pile ${action.pileId}`);
+    }
+    if (pile.cards.length < 2) {
+      throw new Error(`Cannot split pile ${action.pileId}: only ${pile.cards.length} card(s)`);
+    }
+
+    const half = Math.floor(pile.cards.length / 2);
+    const newCards = pile.cards.slice(pile.cards.length - half);
+    const keptCards = pile.cards.slice(0, pile.cards.length - half);
+    const newPile = withCards(
+      makeTableSidePile(pile.kind, `${pile.name} 2`, pile.ownerId, null, pile.zoneId),
+      newCards,
+    );
+    return {
+      ...state,
+      piles: [...state.piles.map((p) => (p.id === action.pileId ? withCards(p, keptCards) : p)), newPile],
+    };
+  },
+
+  /**
+   * US-61 (Sprint 23): takes an entire pile into the acting player's
+   * hand at once. Only `zone`/`discard`, same eligibility/ownership
+   * guard as `SPLIT_PILE` above.
+   *
+   * Deliberately NOT built on `transferCard` (the single-card MOVE_CARD/
+   * PICKUP machinery): `discardPile.canRemoveCard` is unconditionally
+   * false (D45's "drop-only" design - no card ever leaves individually),
+   * which would make a discard pile untakeable through that path no
+   * matter what action name was passed - the wrong outcome, since
+   * "drop-only" is a statement about the single-card gesture, not about
+   * this bulk operation. The real gate here is pile-level: every card
+   * must be visible to the acting player (the same `{owner, faceUp}`
+   * "hidden" predicate `zonePile`/`discardPile` both already duplicate
+   * for their own per-card rules) - not `cardActions(...).includes
+   * ('pickup')`, which would wrongly reject every discard-pile take.
+   */
+  TAKE_PILE(state, action) {
+    const pile = state.piles.find((p) => p.id === action.pileId);
+    if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
+    if (pile.kind !== 'zone' && pile.kind !== 'discard') {
+      throw new Error(`Cannot take a "${pile.kind}" pile`);
+    }
+    if (pile.ownerId && pile.ownerId !== action.playerId) {
+      throw new Error(`Player ${action.playerId} is not authorized to take pile ${action.pileId}`);
+    }
+    const isHidden = (card) => card.faceDown === true || card.faceUp === false;
+    if (pile.cards.some(isHidden)) {
+      throw new Error(`Player ${action.playerId} cannot take pile ${action.pileId}: it contains a card they cannot see`);
+    }
+
+    // Same D7 "a hand pile's cards are plain" transform PICKUP already
+    // applies (state.js's PICKUP case) - the zone-only owner/faceUp/
+    // layout fields come back off on the way into a hand.
+    const plainCards = pile.cards.map(({ owner, faceUp, layout, ...plainCard }) => plainCard);
+    const piles = ensureHandPile(state.piles, action.playerId).map((p) => {
+      if (p.id === action.pileId) return withCards(p, []);
+      if (p.id === handPileId(action.playerId)) return withCards(p, [...p.cards, ...plainCards]);
+      return p;
+    });
+    return { ...state, piles };
+  },
+
+  /**
+   * US-62 (Sprint 23): flips every card in a pile face-up or face-down
+   * uniformly (`hide`/`show`, mutually exclusive per the pile's current
+   * orientation - `zonePile`/`discardPile`'s own `pileActions`). Only
+   * `zone`/`discard`, same eligibility as `SPLIT_PILE`/`TAKE_PILE` above.
+   *
+   * Authorization is a NEW axis for this reducer, not a copy of
+   * `SPLIT_PILE`/`TAKE_PILE`'s: those are "shared content, open to
+   * anyone" (matching `move`/`pickup`'s philosophy); a whole pile's
+   * orientation is closer to the deck's `deal`/`shuffle` - host-only for
+   * a SHARED pile, owner-only for a personal one. Unlike DEAL/
+   * SHUFFLE_DECK (host-only in the OFFER layer only, `ui.js`'s `isHost`
+   * ctx flag - `state.js` has never tracked host identity at all), this
+   * re-checks for real (D43 discipline, direct user request): `hostId`
+   * (set once, at the first JOIN) is compared against `action.playerId`
+   * here, not just trusted from whichever button rendered.
+   */
+  SET_PILE_ORIENTATION(state, action) {
+    const pile = state.piles.find((p) => p.id === action.pileId);
+    if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
+    if (pile.kind !== 'zone' && pile.kind !== 'discard') {
+      throw new Error(`Cannot set orientation of a "${pile.kind}" pile`);
+    }
+    if (pile.ownerId) {
+      if (pile.ownerId !== action.playerId) {
+        throw new Error(`Player ${action.playerId} is not authorized to set orientation of pile ${action.pileId}`);
+      }
+    } else if (action.playerId !== state.hostId) {
+      throw new Error(`Player ${action.playerId} is not authorized to set orientation of pile ${action.pileId}`);
+    }
+
+    return {
+      ...state,
+      piles: state.piles.map((p) => (p.id === action.pileId
+        ? withCards(p, p.cards.map((c) => ({ ...c, faceUp: action.faceUp })))
+        : p)),
     };
   },
 

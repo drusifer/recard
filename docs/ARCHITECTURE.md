@@ -2766,6 +2766,10 @@ cover (visual/UX judgment calls, not just functional correctness).
   growth (Deck joining it) produces real overlaps against seat/score
   panels at several desktop widths; needs a per-seat anchor direction
   based on ring position, not the one constant direction used today.
+  Sprint 23 Phase 68 (split/take buttons widening the Table Zone header)
+  added one more instance at `phone-390x844` (`lint:design` 14 → 15,
+  confirmed new via `git stash`, not fixed there — same root cause/
+  bucket as this item, not a distinct defect).
 - **`tests/e2e.smoke.mjs` is substantially out of date** relative to the
   D53/D54 DOM (missing `#game-deck-area`, predates the Zone/Pile
   component split) — deliberately deferred all of D54's session, needs
@@ -2779,3 +2783,304 @@ cover (visual/UX judgment calls, not just functional correctness).
   after Sprint 3.
 - Max players — soft cap at 8, enforced in UI copy only, not hard-blocked.
 - Custom card backs/themes — deferred.
+
+### D56. Pile and Zone become real ES class hierarchies; Actionable/Movable/Resizable as capability mixins shared with their paired Web Components
+
+Direct user request (`*arch`): "the code is a mess at the moment... lay
+down the path to only using derived types for data and logic with
+corresponding webcomponents for ux." Confirmed the mess is real, not a
+perception problem: `redactCard`/`canRemoveCard`/`removeCard`, and the
+`['reveal','pickup','move','rotate']` `cardActions` rule, are byte-
+identical copies across `discardPile.js`/`foundationPile.js`/
+`cascadePile.js`/`Pile.js` today. D42/D53 moved *dispatch* onto a
+registry (`PILE_TYPES[kind]`) but never finished the move onto
+*inheritance* — each "type" is still a flat module of exported
+functions, not a subclass overriding only what differs. `ZONE_TYPES`
+(D55) is the same half-step one layer younger. Score is further behind
+still: `<score-zone>` (D-era UX follow-up) isn't a `state.zones` entity
+at all — a fully parallel per-player rendering path built directly off
+`state.scores`, outside the Zone model entirely.
+
+This is the architecture to finish that move. **Design only — no code
+changes in this pass.** Sequenced as its own sprint (see Migration
+below), not applied unilaterally mid-review.
+
+#### Pile hierarchy
+
+```mermaid
+classDiagram
+    class Pile {
+        <<concrete, kind: 'pile'>>
+        $visibility = 'mixed'
+        $tableSide = true
+        $rowShape = 'flat'
+        $component = 'pile-panel'
+        $reparentable = true
+        $redactCard(card, viewerId)
+        $cardActions(pile, card, viewerId)
+        $pileActions(ctx)
+        $canRemoveCard(pile, card, viewerId, action)
+        $removeCard(pile, cardId)
+        $insertCard(pile, card, placement)
+        $canAccept(pile, card)
+        $resolveDropTarget(cardBoxes, point)
+        $disabledActions(ctx)
+    }
+    Pile <|-- DeckPile
+    Pile <|-- HandPile
+    Pile <|-- DiscardPile
+    Pile <|-- RankAdjacentPile
+    Pile <|-- MeldPile
+    MeldPile <|-- RunPile
+    MeldPile <|-- SetPile
+    RunPile <|-- FoundationPile
+
+    class DeckPile {
+        $visibility = 'hidden'
+        $rowShape = 'stack'
+        $component = 'deck-stack'
+        $reparentable = false
+        $pileActions() draw/deal/shuffle/split, host-gated
+        $disabledActions() deal@0
+    }
+    class HandPile {
+        $visibility = 'in-hand'
+        $rowShape = 'fan'
+        $component = 'fan-pile'
+        $tableSide = true
+        $reparentable = false
+        $cardActions() owner-only: play
+        $pileActions() sortRank/sortSuit/pass
+        note "tableSide stays TRUE - a hand renders\nat its seat via the same generic\nzonesOf()/view.zones machinery every\nother table-side pile uses. 'Never a\ngeneric drop destination' is a\nSEPARATE rule (targetsForAction's own\nkind==='hand' exclusion), not this flag."
+    }
+    class DiscardPile {
+        note "inherits Pile's cardActions/redactCard\nunchanged; overrides only the drop-only rule"
+        $cardActions() always empty
+    }
+    class MeldPile {
+        <<abstract>>
+        note "shared 'this is a locked/rule-checked\npile' shape: empty cardActions,\ncanRemoveCard false, append-only insertCard.\nSubclasses override only canAccept."
+        $cardActions() empty
+        $canRemoveCard() false
+        $insertCard() append-only
+    }
+    class RunPile {
+        note "same-suit, sequential.\nFoundationPile IS a RunPile:\nAce-start + single-direction\nis the special case, not a\nseparate concept."
+        $canAccept(pile, card) same suit, rank ± 1
+    }
+    class SetPile {
+        note "NEW - not yet built by any\nsprint. Same rank, distinct suits.\nPlaceholder in the hierarchy,\nnot a commitment to build it now."
+        $canAccept(pile, card) same rank, suit not yet present
+    }
+    class FoundationPile {
+        $canAccept() RunPile rule, ascending from Ace only
+    }
+    class RankAdjacentPile {
+        note "Spit's rule: rank ± 1,\nsuit irrelevant - NOT a RunPile\n(no suit constraint), stays a\ndirect Pile sibling"
+        $canAccept(pile, card) rank ± 1
+    }
+```
+
+**Cascade is dropped as a distinct class, folded into RankAdjacent's
+family — correction, not oversight.** Re-checked `cascadePile.js`
+against `rankAdjacentPile.js` while drafting this: Cascade's rule
+(alternating color, rank − 1) and RankAdjacent's (rank ± 1, suit
+irrelevant) are both "adjacency with a color/suit side-constraint,"
+parameterizable rather than two hand-written `canAccept` bodies. **Not
+collapsing this pass** — flagging it as a candidate simplification for
+whoever implements this migration to evaluate with real tests in hand,
+not deciding it blind here. Kept as two boxes in the diagram above
+until that's actually checked.
+
+**`StockPile` rejected as a name — direct application of the user's own
+"avoid duplication" ask.** Stock (a face-down draw pile) and Deck are
+the same concept this codebase already has a name, an id-matching
+mechanism (`DECK_PILE_ID`/`deckOf()`), and D53-follow-up history for
+(`SPLIT_DECK` already produces more than one deck-kind pile). A second
+class would be a synonym, not a specialization — declining to add it.
+
+#### Zone hierarchy
+
+```mermaid
+classDiagram
+    class Zone {
+        <<base>>
+        $className = null
+        $defaultPosition(seatIndex, seatedCount)
+        $contentComponent = 'zone-panel'
+        viewerRelation(zone, viewerId) "you" | "opponent" | null
+    }
+    Zone <|-- SharedZone
+    Zone <|-- PerPlayerZone
+    PerPlayerZone <|-- ScoreZone
+
+    class SharedZone {
+        note "today's 'shared' module, unchanged behavior"
+        $defaultPosition() null - normal flex flow
+    }
+    class PerPlayerZone {
+        note "today's 'perPlayer' module, unchanged behavior.\nHand IS a PerPlayerZone's pile (D51), not\na separate zone type."
+        $className = 'seat-zone'
+        $defaultPosition() seatPosition(idx, count, 26)
+    }
+    class ScoreZone {
+        note "NEW - folds today's parallel\n<score-zone>/renderScorePanel\nloop into the real Zone model.\nReuses PerPlayerZone's per-owner\nseat-relative positioning."
+        $contentComponent = 'score-zone'
+        score field replaces cards field
+    }
+```
+
+**"YouZone"/"OpponentZone" are corrected out of the class hierarchy —
+found while designing, not assumed going in.** `state.zones` is
+replicated shared state (D7/D17): a `PerPlayerZone` record has exactly
+one shape regardless of who's looking at it, and every viewer receives
+the *same* record via `viewFor` (redaction happens per-*card*, not
+per-zone-type). Making You/Opponent real persisted subclasses would
+mean picking a class for a zone before knowing who's asking, which is
+incoherent for shared state, and would require re-tagging every zone
+on every `viewFor` call per viewer — a real, unnecessary redesign of
+the redaction boundary to solve a problem that's actually about
+*rendering*, not data. Kept as `Zone.viewerRelation(zone, viewerId)` —
+a pure function (`zone.ownerId === viewerId ? 'you' : zone.ownerId ?
+'opponent' : null`), the same shape as today's inline `isOwner:
+zone.ownerId === opts.viewerId` in `ui.js`, just named and centralized
+instead of recomputed ad hoc at each call site. The paired Web
+Component reads it as a `viewer-relation` attribute to vary styling
+(e.g. "You" badge, border highlight — already real behavior, D18) —
+never a second data class.
+
+#### Capability interfaces: Actionable, Movable, Resizable — REJECTED on implementation, premise was wrong
+
+**Correction, found while implementing, not assumed going in.** This
+section originally proposed formal `Actionable`/`Movable`/`Resizable`
+mixins because the draft's premise was "each of today's 6 component
+files does its own subset by hand." Checked that premise directly
+before building the mixins (grepped every component in
+`src/components/` for its wiring calls) and it's **false**: every
+pile-shape component (`DeckStack`, `FanPile`, `PilePanel`) already
+calls one shared `renderPileShell`/`renderActionHeader` (`ui.js`) for
+the Actionable case, and every panel (`ZonePanel`, plus `main.js`'s
+deck panel and `ScoreZone`) already calls one shared `wirePanelLayout`/
+`attachPanelDrag`/`attachPanelResize` for Movable+Resizable. This
+sharing was already done — by an earlier UX follow-up ("`pile-panel`
+and `header-actions` should be internalized... same for all Pile type
+components", `ui.js`'s own comment on `renderPileShell`) — as free
+functions rather than class mixins, but the *duplication this section
+was written to remove does not exist*. Also stale: this section named
+D52's radial menu as part of Actionable's mechanism; D52 was itself
+retired since (an always-visible `<header-actions>` title bar replaced
+it, per `renderActionHeader`'s own doc comment) - the doc had drifted
+from the code even before this correction.
+
+Converting `renderPileShell`/`wirePanelLayout` from shared free
+functions into formal ES mixins would be a pure style change - same
+behavior, same call graph, zero duplication removed - and this
+project's own standing rule (Phase 31's finding, repeated at several
+points in this file) is not to add an abstraction that doesn't earn
+its keep. **Not building it.** The data-layer half of this ask is
+still real and already shipped: `Pile.reparentable`/`Zone`'s own
+structure already express which kinds may be dragged/reparented/
+resized-eligible; that's the part of "Actionable/Movable/Resizable"
+that was actually load-bearing.
+
+#### Web Component pairing — one component per render SHAPE, not per data class
+
+Direct 1:1 (one `HTMLElement` per Pile/Zone subclass) would be
+over-engineering: `DiscardPile`/`FoundationPile`/`RankAdjacentPile`/
+`RunPile`/`SetPile`/base `Pile` all render as an identical flat card
+row today — giving each its own component would duplicate DOM code for
+zero visual difference. The rule stays what `rowShape`/`PILE_TAGS`
+already prove works (D51 comment: "a specialized row shape... is a
+COMPLETE Pile on its own now"), just de-indirected: **`static
+component` lives directly on the Pile/Zone subclass** (`'pile-panel'`,
+`'fan-pile'`, `'deck-stack'`, `'zone-panel'`, `'score-zone'`), and
+`ui.js` reads `PileClass.component` instead of routing through
+`rowShapeFor()` → the `PILE_TAGS` lookup table. Multiple data classes
+pointing at the same component tag is correct and expected — the
+component renders a *shape*, the class encodes the *rule*.
+
+#### Migration — one direct rewrite, not a phased sprint (revised, direct user correction)
+
+**Superseded below: the original D56 draft proposed a 5-phase,
+regression-gated migration sized as its own sprint (D42/D53/D55-style
+sequencing).** Direct user rejection: "I don't want a 5 phase
+migration. It's okay to break things, we don't need to be backward
+compatible, and we can delete tests that are no longer relevant." That
+overrides the phased plan below outright, not just its sizing.
+
+**Revised directive:** implement the whole class/mixin rewrite as one
+continuous pass, not a sequence of separately-gated phases with
+sign-offs between them:
+
+- `Pile`/`Zone` real subclasses, the `Actionable`/`Movable`/
+  `Resizable` mixins, `ScoreZone`, and the `component`-field
+  de-indirection all land together, in whatever internal order is
+  mechanically convenient for whoever implements it — no requirement
+  to stop and get a gate signature between "Pile classes done" and
+  "Zone classes done."
+- **Breaking changes are allowed.** No compatibility aliases, no
+  keeping `PILE_TYPES`/`ZONE_TYPES`'s old module-shape callable
+  alongside the new classes "just in case" — this project already has
+  a standing rule against exactly that (D51: "no compatibility shim,
+  one interface, old names deleted everywhere"); this migration is
+  the same rule applied at the type-system level instead of the
+  interface-table level.
+- **Delete tests that no longer describe anything real**, rather than
+  contorting them to keep passing against a shape that no longer
+  exists (e.g. a test asserting `foundationPile.redactCard` exists as
+  its own export, once that behavior is correctly inherited from
+  `Pile` and never overridden). A test asserting *behavior* that
+  still holds (e.g. "a foundation only accepts an ascending same-suit
+  card") should still pass unmodified regardless of which class now
+  answers it — those are the ones worth keeping.
+- Still run the full test suite (and `lint:design`) once the rewrite
+  is complete, and still fix anything that's actually broken — "okay
+  to break things" means no ceremony around *how* the change lands,
+  not that the game may end up in a broken state. The bar is "the app
+  works and the tests that still mean something pass," not "nothing
+  in the diff ever failed transiently along the way."
+- `SetPile` stays a documented, untested-behavior placeholder (no
+  `canAccept` implementation) until a real sprint asks for the Rummy
+  meld feature itself — this one holds: it's a "don't build
+  speculative features" call, unrelated to the migration-process
+  correction above.
+
+**Consequence, disclosed:** without phase gates, a regression is more
+likely to be caught only by the end-of-rewrite full-suite run rather
+than pinned to a specific small diff — accepted tradeoff per the
+user's explicit call, not something to silently re-impose caution
+around.
+
+#### Status: implemented, with two scope corrections found along the way
+
+The rewrite landed as one pass. `Pile`/`Zone` real class hierarchies,
+inheritance eliminating the proven duplication, and the `component`
+de-indirection are all done and verified (341/341 unit green,
+`lint:design` confirmed at its pre-existing 5-violation baseline via a
+scoped-stash isolation, zero regressions). Two pieces of the original
+draft did NOT ship, both for reasons found only by actually attempting
+them, not by re-litigating the "no phase gates" call:
+
+1. **The `Actionable`/`Movable`/`Resizable` mixins are REJECTED, not
+   deferred** — see the Capability Interfaces section above. The
+   duplication they were meant to remove doesn't exist; every
+   component already calls one shared `renderPileShell`/
+   `wirePanelLayout`. Building them would have been a pure style
+   change with no reduction in real duplication - this project's own
+   "no unearned abstraction" rule applies.
+2. **`ScoreZone` stays a documented placeholder, ruled out of THIS
+   refactor's scope, not merely unstarted.** Folding today's separate
+   `<score-zone>` rendering loop into `state.zones` is a real feature
+   change to already-working replicated state (wire shape,
+   `SNAPSHOT_VERSION`, host-authoritative creation timing) - it is not
+   a mechanical duplication removal, which is what this refactor was
+   actually about (the user's own framing: "the code is a mess...
+   lay down the path to only using derived types"). Folding score into
+   the Zone model is a legitimate FUTURE feature request in its own
+   right; treating it as part of "completing" this cleanup would be
+   scope creep in the other direction from what got corrected earlier
+   in this doc. If wanted, it should be asked for directly as its own
+   piece of work, not inherited from D56 by default.
+
+D56 is complete as scoped: the class hierarchies exist, the
+duplication is gone, nothing is broken.

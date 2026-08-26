@@ -119,7 +119,26 @@ export const ACTION_SPECS = {
   // were never part of before (US-35/36 shipped as a standalone button
   // row, not through `pileLevelActions` at all).
   shuffle: { label: 'Shuffle', destructive: false, hint: 'Shuffle the deck stock in place.', icon: '⇌' },
-  split: { label: 'Split into piles', destructive: false, hint: 'Split the deck into face-down draw piles.', icon: '✂' },
+  // Sprint 23 (US-60): `split` is no longer deck-only - `zonePile`/
+  // `discardPile` offer it too now (`pileActions.js`'s per-type
+  // `pileActions`), so the hint is generic rather than naming the deck
+  // specifically. Label/behavior unchanged for the deck's own callers.
+  split: { label: 'Split into piles', destructive: false, hint: 'Split this pile roughly in half into a new pile of the same kind.', icon: '✂' },
+  // Sprint 23 (US-61): pile-level, no `target` - a button, not a drag
+  // gesture, same shape as `deal`/`shuffle`/`split` above. `destructive:
+  // true` unconditionally, no size-based exception (Smith's Gate 1
+  // ruling - a size-gated confirm is a worse, less-predictable
+  // affordance than a consistent one) - the single-card skip Smith also
+  // specified is a UI-layer nuance for whoever wires the confirm click
+  // handler (`ui.js`), not something this spec table can express.
+  take: { label: 'Take', destructive: true, hint: 'Take every card in this pile into your hand.', icon: '↥' },
+  // Sprint 23 (US-62): pile-level, no `target` - in place, same shape as
+  // `reveal`/`rotate` above but at the PILE level. Not destructive - a
+  // pile's own `pileActions` never offers both at once (`zonePile`/
+  // `discardPile`'s `orientationActions`), so there's no accidental
+  // "flip it back" cost the way `take`/`reshuffleDeal` have.
+  hide: { label: 'Hide', destructive: false, hint: 'Turn every card in this pile face-down.', icon: '🙈' },
+  show: { label: 'Show', destructive: false, hint: 'Turn every card in this pile face-up.', icon: '👁' },
 };
 
 /**
@@ -191,9 +210,13 @@ export function targetsForAction(action, piles, { viewerId, fromPileId } = {}) {
  * viewerId, ctx)` - checked both real call sites (`ui.js`/`main.js`)
  * first and neither has a real pile object or viewerId in scope, only
  * a kind string and a precomputed boolean (see ARCHITECTURE.md D42).
+ * `isShared` (Sprint 23, US-60/61) joined the same ctx for the same
+ * reason - `zonePile`/`discardPile`'s `pileActions` can't otherwise
+ * tell a shared (ownerless) pile from someone else's personal one,
+ * since both make `isOwner` simply `false`.
  *
- * @param {'deck'|'hand'|'zone'} kind
- * @param {{isHost?: boolean, isOwner?: boolean}} ctx
+ * @param {'deck'|'hand'|'zone'|'discard'} kind
+ * @param {{isHost?: boolean, isOwner?: boolean, isShared?: boolean}} ctx
  * @returns {string[]} action ids
  */
 export function pileLevelActions(kind, ctx = {}) {
@@ -205,7 +228,7 @@ export function pileLevelActions(kind, ctx = {}) {
  * Pile... it is not a Zone at all" - which of a pile's OWN offered
  * actions are currently disabled (Deal, at zero cards) is a property of
  * the pile TYPE (`src/piles/*.js`'s `disabledActions(count)`), read the
- * same polymorphic way as `pileLevelActions`/`rowShapeFor`, not a
+ * same polymorphic way as `pileLevelActions`/`componentFor`, not a
  * `zone.kind === 'deck'` check inside the generic pile renderer.
  *
  * @param {string} kind
@@ -217,19 +240,17 @@ export function disabledPileActionsFor(kind, count) {
 }
 
 /**
- * UX follow-up (direct user request): "a Deck is a specific kind of
- * Pile... it is not a Zone at all" - a pile's cards render as a flat
- * row by default, but a hand fans (`rowShape: 'fan'`) and a deck shows
- * as a stack+badge (`rowShape: 'stack'`) instead - read from the pile
- * TYPE (`src/piles/*.js`) the same polymorphic way `visibility`/
- * `tableSide` already are, so `ui.js`'s generic pile renderer never
- * needs a `zone.kind === 'hand'`/`'deck'` check of its own.
+ * D56: which Web Component tag renders this pile kind's row - read
+ * directly off the pile class's own `static component` (no `rowShape`
+ * string + separate `PILE_TAGS` lookup table indirection anymore; a
+ * component renders a render SHAPE, so several pile classes may
+ * legitimately share one tag).
  *
  * @param {string} kind
- * @returns {'flat'|'fan'|'stack'}
+ * @returns {string} a custom element tag name
  */
-export function rowShapeFor(kind) {
-  return PILE_TYPES[kind]?.rowShape ?? 'flat';
+export function componentFor(kind) {
+  return PILE_TYPES[kind]?.component ?? 'pile-panel';
 }
 
 /**

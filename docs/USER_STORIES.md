@@ -2297,3 +2297,22 @@ closed out. Both disclosed rather than fixed here - see
    up" over "Table (1)"). Not a functional blocker - the menu paints on
    top and stays clickable - but a real readability rough edge, not
    just a cosmetic nit worth ignoring.
+
+---
+
+## Backlog: ScoreZone as a real Zone entity (2026-08-26, from D56)
+
+Today's score panel (`<score-zone>`) is a fully separate rendering loop
+in `main.js`, built directly off `view.scores` - outside the
+`state.zones`/`Pile` model D55/D56 established for everything else on
+the table. `src/zones/ScoreZone.js` exists as a documented, unwired
+class placeholder (`extends PerPlayerZone`) for exactly this, but was
+deliberately NOT integrated as part of D56 - folding it in means a real
+change to already-working replicated state (wire shape,
+`SNAPSHOT_VERSION`, host-authoritative creation timing), not a
+mechanical duplication fix, which is what D56 was actually scoped to.
+If wanted: a real story with its own AC (does score move/resize the
+same way other zones do? does it get a `viewerRelation`-driven "You"
+badge the way personal zones already do?), sized and sequenced like any
+other feature, not inherited from D56 by default. See
+`docs/ARCHITECTURE.md` D56's closing section for the full reasoning.

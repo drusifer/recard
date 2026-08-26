@@ -581,3 +581,63 @@ PASSED - real Zone entity (state.zones/zoneId), MOVE_PILE reducer case,
 user mid-design). 318/318 unit independently re-run, lint:design 14/14
 byte-identical to git-stash baseline, mutation-verified the zone/discard
 eligibility guard has teeth. Handed to Morpheus for code review.
+
+## Phase 68 UAT (2026-08-25)
+PASSED - SPLIT_PILE/TAKE_PILE reducer cases. 331/331 independently
+re-run, mutation-verified SPLIT_PILE's ownership guard. Reviewed Neo's
+two mid-build corrections (TAKE_PILE can't reuse cardActions('pickup')
+- discardPile's is always empty by design; the ACTION_SPECS crash catch
+pre-ship) - both correct. lint:design 14->15 (one phone-width overlap,
+Table Zone header grew from new buttons) confirmed real via git-stash,
+same bucket as the existing per-seat-anchor item. Handed to Morpheus.
+
+## D56 UAT (2026-08-26) - PASSED
+
+Independent verification, not a re-read of Neo's claims:
+
+- `npm test`: 341/341 green, independently re-run (not trusted from the
+  handoff message).
+- `npm run lint`: stylelint clean; `lint:design` 5 violations,
+  confirmed same list Neo already isolated as pre-existing (Phase
+  68-70 baseline, unrelated to D56).
+- Grepped for stray references to the 7 deleted flat-module files
+  (`zonePile.js`/`deckPile.js`/etc.) - none survive except comments and
+  one unrelated local variable name (`discardPile` in a test), no live
+  imports.
+- **Mutation-verified two load-bearing points, not assumed from a green
+  suite:**
+  1. `FoundationPile.canAccept`'s `super.canAccept(pile, card)` call
+     (the `RunPile` inheritance) - broke it (`return false` instead),
+     confirmed a real test fails, restored, confirmed green again.
+     `extends RunPile` is doing real work, not decorative.
+  2. `HandPile.tableSide` (Neo's own self-caught bug) - flipped back to
+     `false`, confirmed `tests/state.test.js:711`'s zone-count
+     assertion fails (5 vs 3, same failure Neo described catching),
+     restored, confirmed green. The fix is real and the test that
+     caught it is real, not a coincidence.
+- **Test pyramid, per the user's explicit reminder:** this is a pure
+  logic/duplication refactor with zero DOM change - the added coverage
+  is correctly ALL at the unit layer (`tests/piles.test.js`, no
+  Playwright, no DOM). `state.test.js`'s existing reducer-level tests
+  already exercise `PILE_TYPES[kind]` through the real dispatch path
+  (a thin integration layer above the unit tests), and needed zero
+  changes - itself a signal the class rewrite kept its call-site
+  contract intact. No `e2e.smoke.mjs` run - correctly skipped per this
+  project's own standing "frugal e2e" rule, and justified here
+  specifically: no DOM/CSS/rendering code changed, confirmed via
+  `lint:design`'s live-browser render being byte-identical before/
+  after.
+- Reviewed both of Neo's scope calls (mixins rejected, ScoreZone ruled
+  out) - agree with both. The mixin rejection is backed by a real grep
+  showing the shared functions already exist; not asserted, checked.
+- **One real, disclosable finding, not blocking:** ran
+  `python3 agents/tools/trace_annotate.py --date 2026-08-26` per this
+  project's own gate practice - 11 `AP-VIA-READ` flags this session
+  (via is declared `enabled` in `agents/PROJECT.md`, but Read/Grep were
+  used for codebase exploration throughout the Morpheus arch pass and
+  Neo's implementation instead of `via`). Not a rule false-positive -
+  genuinely didn't use `via`. Not blocking D56's correctness, but
+  worth the team's attention since it's a repeat pattern, not a
+  one-off.
+
+**Verdict: PASS.** No blockers. Handed to Morpheus for code review.

@@ -9,8 +9,8 @@ import { renderPileShell, renderDeckStack } from '../ui.js';
  * (Draw/Deal/Reshuffle/Shuffle/Split), its own stack+badge visual, its
  * own drop-target wiring - not a bare row `<pile-panel>` used to wrap
  * with a separately-built header. `renderZones` (`ui.js`) picks this
- * element directly for any pile whose TYPE declares `rowShape: 'stack'`
- * (`deckPile.js`, read via `rowShapeFor`), the same way it picks
+ * element directly for any pile whose CLASS declares `static component = 'deck-stack'`
+ * (`DeckPile.js`, read via `componentFor`), the same way it picks
  * `<fan-pile>` for `'fan'` and `<pile-panel>` for the default `'flat'`
  * case - three equally-thin components now, none nesting in another.
  *

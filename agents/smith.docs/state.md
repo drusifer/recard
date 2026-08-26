@@ -447,3 +447,40 @@ Real screenshot pass (Solitaire preset, 1440x900): Pile/Zone API renders
 correctly (11 zones, correct labels/kinds). 1 real finding backlogged,
 not fixed - many-zone flat-list layout overflows/overlaps at 11 zones
 (USER_STORIES.md). Out of scope for D53 (API, not layout). Sprint closed.
+
+---
+## Sprint 23 + D56 close-out test (2026-08-26)
+
+Real live check (Playwright, 1440x900, real host session, not a mock):
+created a table, dealt 5 cards, hovered the Table Zone's empty Table
+pile - `pileActions.js`'s dispatch through the NEW class hierarchy
+(D56) rendered live, correctly: "Split into piles"/"Take" buttons both
+present with correct labels via real DOM query, not asserted from
+source. Deck rendered as a real stack+count badge (`DeckPile.component
+= 'deck-stack'`), hand as a real fan of 5 cards (`HandPile.component =
+'fan-pile'`) - both class-driven render-shape dispatches confirmed
+working in the actual browser, not just in unit tests. Zero
+`pageerror`/`console.error` beyond one harmless 404 (favicon). Score
+panel (`SCORE -/+  0`) rendered exactly as before - confirms the
+decision to NOT wire `ScoreZone` into `state.zones` this pass left the
+existing, working feature untouched, not silently broken.
+
+One process note, not a defect: my hand-card `.click()` didn't
+actually play the card into the table (Table showed `(0)`) - matches
+`designLint.check.mjs`'s own comment that tap-to-play was retired in
+favor of drag-and-drop; the click only worked because the design-lint
+script uses it to trigger `:hover`, not to play. Didn't chase a real
+drag simulation for this pass - the actual thing under test (does the
+NEW class hierarchy render/dispatch correctly live) was already fully
+answered by the empty Table pile's own Split/Take buttons rendering
+correctly.
+
+D56 itself: no new UX surface, nothing to approve/reject on usability
+grounds - it's an internal refactor and the live check found it
+behaves identically to before. Sprint 23's Phase 68-71 (Split/Take/
+Hide/Show) already had its own Smith spot-check at Phase 70 (2026-08-25,
+approved, one non-blocking icon-consistency nit still open, not
+re-litigated here). Phase 72 (pile-title drag-drop) is not yet
+implemented - nothing to test there.
+
+**Verdict: APPROVED, no new bugs.** Handed to full-team retro.

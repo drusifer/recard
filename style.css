@@ -1585,7 +1585,27 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.25rem;
+  gap: 0.1rem;
+}
+
+/* *nit (direct user request, 2026-08-25): "put PileAction buttons in a
+   row below the Pile Title" - the title (`.zone-name-text`) forced to
+   its own full-width line makes every button wrap onto the next line
+   as a row underneath it, via the same `flex-wrap` the header already
+   had (no new wrapper element, no JS change).
+   Scoped to `.pile-title` specifically (`ui.js`'s `headingClass:
+   'pile-title'`, the ONLY header actually built from `pileActions.js`)
+   rather than the shared `.pile-action-header` every header (including
+   `<score-zone>`'s own -/+ adjuster, `ScoreZone.js`) reuses for its
+   base button/label styling - a real regression, found live via
+   `npm run lint:design`: forcing every reused header onto 2 lines grew
+   the Score panel enough (~20px) to overlap its neighboring seat zone
+   at several packed desktop widths (1280x800, 1024x768, 1280x720),
+   which the pre-existing baseline (14 violations) didn't have. Score's
+   title+2-button row already fit on one line and was never what "Pile
+   Title" meant here. */
+.pile-title .zone-name-text {
+  flex: 1 0 100%;
 }
 
 /* UX follow-up (direct user request): "small square icons ... tool tip

@@ -1065,46 +1065,110 @@ pure) before 72 (its drag-and-drop UI) — Morpheus's D55 sequencing note:
 US-63 is strictly larger than the other three and depends on nothing
 they build, so it gets its own pure/UI pair rather than folding into 70.
 
-### Phase 68 — `SPLIT_PILE` + `TAKE_PILE` reducer cases, `zone`/`discard` gain both in `pileActions` (pure)
-- [ ] `SPLIT_PILE(pileId)`: guard `cards.length >= 2` (throw, same
-      `describeShortfall`-style message as `SPLIT_DECK`); original pile
-      keeps `ceil(n/2)`, new pile (`makeTableSidePile(pile.kind, name,
-      pile.ownerId)`) gets `floor(n/2)`, inserted as a sibling in
-      `state.piles`.
-- [ ] `TAKE_PILE(pileId)`: every card must satisfy `cardActions(pile,
-      card, viewerId).includes('pickup')` or the whole action throws
-      (no partial-take); transfers all cards, in order, into the
-      viewer's hand via `insertCard`.
-- [ ] `zonePile.pileActions`/`discardPile.pileActions` gain `split`/
-      `take`, gated `ctx.isOwner` (personal) or unconditionally open
-      (shared) — matches `move`/`pickup`'s existing philosophy per D55.
+### Phase 68 — `SPLIT_PILE` + `TAKE_PILE` reducer cases, `zone`/`discard` gain both in `pileActions` ✅ DONE
+- [x] `SPLIT_PILE(pileId)`: guards kind (`zone`/`discard` only, same
+      eligibility as `MOVE_PILE`) + ownership (personal pile: owner
+      only) + `cards.length >= 2` (throw with a clear message);
+      original pile keeps `ceil(n/2)`, new pile (`makeTableSidePile`,
+      same `zoneId` - a sibling in the source's own Zone) gets
+      `floor(n/2)`.
+- [x] **Real design correction found mid-implementation, not in the
+      original plan:** `TAKE_PILE`'s guard is NOT "every card satisfies
+      `cardActions(...).includes('pickup')`" as originally specced -
+      `discardPile.cardActions` is unconditionally empty by design
+      (D45's "drop-only" single-card rule), so that check would make
+      `take` permanently impossible on every discard pile, including
+      Gin Rummy's - the story's own named use case ("picking up all of
+      a discard pile"). Real fix: `TAKE_PILE` checks per-card
+      visibility directly (`faceDown`/`faceUp`, the same "hidden"
+      predicate `zonePile`/`discardPile` each already duplicate) and is
+      NOT built on `transferCard` (the single-card MOVE_CARD/PICKUP
+      machinery) at all - it's a genuinely different, bulk pile-level
+      operation with its own ownership+visibility guard. Full record:
+      `src/state.js`'s `TAKE_PILE` doc comment.
+- [x] `zonePile.pileActions`/`discardPile.pileActions` gain `split`/
+      `take`, gated `ctx.isOwner` (personal) or `ctx.isShared` (a new
+      ctx field, `ui.js`'s call site - `isOwner` alone can't tell
+      "shared" from "someone else's personal pile", both are `false`).
       `deck`/`hand`/`foundation`/`cascade`/`rankAdjacent` unchanged.
-- [ ] TDD: reducer tests for both guards (too-small split, un-takeable
-      card blocks the whole take), plus the odd-card-count rounding.
+- [x] **Real bug caught before it shipped, not left for Trin to find:**
+      offering `take` without a matching `ACTION_SPECS.take` entry
+      crashed the entire app on deal (`ACTION_SPECS[id].destructive`
+      reading `.destructive` off `undefined`) - `pileActions.js` gained
+      a minimal `take` spec (`destructive: true`, no `target` - a
+      button, not a drag gesture, same shape as `deal`/`shuffle`) as
+      part of this phase rather than deferring the whole spec to Phase
+      70, since the offer-layer change alone was already live and
+      broken without it. `split`'s existing spec hint also generalized
+      (was deck-specific wording) since `zone`/`discard` share it now.
+- [x] TDD: 8 new tests (kind/ownership/size guards for both actions,
+      odd-card rounding, no-partial-take, discard-pile-specifically,
+      `pileActions` ctx dispatch). Mutation-verified the hidden-card
+      guard has teeth.
+- [x] **Disclosed, not fixed - grows an already-tracked backlog item:**
+      `lint:design` 14 -> 15 at `phone-390x844` only (`Table Zone`
+      newly overlaps `Bob Score-+`) - the new split/take buttons widen
+      the Table Zone's header at narrow widths. Confirmed via
+      `git stash` this is new to this diff, not pre-existing drift.
+      Same root cause/category as the already-open "Table Zone overlap
+      sizing"/per-seat anchor geometry items (`docs/ARCHITECTURE.md`
+      Open Items) - one more entry in that same bucket, not a new
+      distinct defect; not fixed here, that item's own scope.
 
-### Phase 69 — `SET_PILE_ORIENTATION` reducer case (pure)
-- [ ] `SET_PILE_ORIENTATION(pileId, faceUp)`: sets every card's
+### Phase 69 — `SET_PILE_ORIENTATION` reducer case (pure) ✅ DONE
+- [x] `SET_PILE_ORIENTATION(pileId, faceUp)`: sets every card's
       `faceUp` uniformly. Reducer independently re-checks Smith's
       host-only(shared)/owner-only(personal) rule — not just trusting
       the offer layer, same D43 discipline as every other write-side
-      guard.
-- [ ] `zonePile.pileActions`/`discardPile.pileActions` gain `hide`/
-      `show` (mutually exclusive per current pile state).
-- [ ] TDD: authorization tests (non-host on shared pile rejected,
-      non-owner on personal pile rejected), redaction proven via the
-      existing `redactCard` path (no new redaction logic needed).
+      guard. New `state.hostId` field (set once, at the first JOIN —
+      the host always joins its own table before a share code exists
+      for anyone else to reach it, D3) is what makes this check
+      possible; DEAL/SHUFFLE_DECK deliberately NOT retrofitted with the
+      same check (disclosed scope boundary, not an oversight).
+- [x] `zonePile.pileActions`/`discardPile.pileActions` gain `hide`/
+      `show` (mutually exclusive per current pile state — an all-face-up
+      pile offers `hide`, anything else offers `show`, an empty pile
+      offers neither).
+- [x] TDD: authorization tests (non-host on shared pile rejected,
+      non-owner on personal pile rejected), kind-eligibility test,
+      redaction proven via the existing `redactCard` path (no new
+      redaction logic needed). 336/336 unit green, both new guards
+      mutation-verified.
 
-### Phase 70 — Split/Take/Hide/Show reach the UI
-- [ ] `ACTION_SPECS` gains `take` (`target: 'hand'`, `destructive:
-      true`) and `hide`/`show` (`target: null`, `destructive: false`).
-      `split` reuses the deck's existing spec entry, now also offered
-      by `zone`/`discard`.
-- [ ] Confirm-dialog wiring: `take` confirms unconditionally EXCEPT a
+### Phase 70 — Split/Take/Hide/Show reach the UI ✅ DONE
+- [x] `ACTION_SPECS` gains `hide`/`show` (`target: null`, `destructive:
+      false`). `take` already had a spec (Phase 68's crash-fix); `split`
+      reuses the deck's existing entry, now also offered by `zone`/
+      `discard`.
+- [x] **Real bug found and fixed, not in the original plan:** the
+      confirm dialog's hardcoded "Every player's current hand will be
+      cleared" sentence (written for `reshuffleDeal` specifically) was
+      silently inherited by `take` the moment it became `destructive`
+      (Phase 68) - nonsensical for a pile take. Fixed for real: the
+      confirm text is now built from each spec's own `hint` (which
+      already states its real consequence), not a second hardcoded
+      sentence.
+- [x] Confirm-dialog wiring: `take` confirms unconditionally EXCEPT a
       1-card pile (Smith's ruling — identical in effect to that card's
-      own un-confirmed `pickup`).
-- [ ] Verify live: split/take/hide/show each render in the pile's
-      `<header-actions>` row per D54, same mechanism `deal`/`shuffle`
-      already use.
+      own un-confirmed `pickup`) via a new `opts.noConfirm` list,
+      computed at the `renderPile` call site from the pile's own card
+      count.
+- [x] `main.js`: `onPileAction` now resolves the acted-upon pile's own
+      `kind` before dispatching `split` — the deck's `SPLIT_DECK` and a
+      zone/discard's `SPLIT_PILE` share the action id but are different
+      reducer actions. New `performSplitPile`/`performTakePile`/
+      `performSetPileOrientation`, host-local + guest-relay branched
+      (open to any player, unlike the deck's host-only actions) with a
+      try/catch + `window.alert` on the host-local path (Nielsen #9,
+      matching `performSplit`'s existing precedent).
+- [x] Verified live via real Playwright browser session (not just unit
+      tests): played a card into the Table zone, confirmed
+      Split/Take/Hide render in its `<header-actions>` row, clicked
+      Hide → button flips to Show and the card's DOM gains `card-back`
+      (real redaction round-trip), clicked Split on an empty pile →
+      the reducer's rejection reaches the user via `window.alert` with
+      its real message. Zero console/page errors. 336/336 unit green,
+      `lint:design` unchanged (5, same pre-existing baseline).
 
 ### Phase 71 — real `Zone` entity (`state.zones`), `zoneId` field, `MOVE_PILE` reducer case, `<table-zone>` hardcode removed ✅ DONE
 - [x] **Corrected mid-plan (direct user rejection of the original

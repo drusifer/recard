@@ -972,9 +972,20 @@ function renderGameFromView(view) {
     // `renderPile`'s own note) - `pass` and every deck action
     // (`dealFromDeck` already handles draw/deal/reshuffleDeal/shuffle/
     // split generically) are the two real dispatch tables today.
-    onPileAction: sessionEnded ? null : (zoneId, actionId) => {
-      if (actionId === 'pass') togglePass();
-      else if (DECK_ACTION_IDS.has(actionId)) dealFromDeck(actionId, lastDealCount);
+    onPileAction: sessionEnded ? null : (pileId, actionId) => {
+      if (actionId === 'pass') return togglePass();
+      // Sprint 23: `split` is offered by BOTH the deck (`SPLIT_DECK`,
+      // deck-only pile count) and a zone/discard pile (`SPLIT_PILE`,
+      // this specific pile in half) - the same action id means a
+      // different reducer action depending on WHICH pile's own header
+      // it was clicked in, so that's resolved by the acted-upon pile's
+      // own kind, not the id alone.
+      const pile = view.zones.find((z) => z.id === pileId);
+      if (pile?.kind === 'deck' && DECK_ACTION_IDS.has(actionId)) return dealFromDeck(actionId, lastDealCount);
+      if (actionId === 'split') return performSplitPile(pileId);
+      if (actionId === 'take') return performTakePile(pileId);
+      if (actionId === 'hide') return performSetPileOrientation(pileId, false);
+      if (actionId === 'show') return performSetPileOrientation(pileId, true);
     },
     isHost: role === 'host',
     // US-41/D29: dealing lives on the deck, where the cards are - the
@@ -1166,6 +1177,39 @@ function performDraw() {
   if (sessionEnded) return;
   if (role === 'host') dispatch({ type: 'DRAW', playerId: myId });
   else session.send({ type: 'action', action: { type: 'DRAW' } });
+}
+
+// Sprint 23 (US-60/61/62, Phase 70): unlike `performSplit`/`performDraw`
+// above (the DECK's own actions), these act on a `zone`/`discard` pile
+// named by `pileId`, open to any player (owner or a shared pile) - so
+// they need the same host-local/guest-relay branch `performDraw`/
+// `togglePass` already use, not `performSplit`'s bare host-only
+// `dispatch` (a zone/discard action can come from a GUEST). Wrapped in
+// try/catch + `window.alert` on the host-local path, same Nielsen #9
+// precedent as `performSplit` - the reducer's authorization/eligibility
+// throws would otherwise run silently off the click handler.
+function performSplitPile(pileId) {
+  if (sessionEnded) return;
+  if (role === 'host') {
+    try { dispatch({ type: 'SPLIT_PILE', playerId: myId, pileId }); }
+    catch (err) { window.alert(err.message); }
+  } else session.send({ type: 'action', action: { type: 'SPLIT_PILE', pileId } });
+}
+
+function performTakePile(pileId) {
+  if (sessionEnded) return;
+  if (role === 'host') {
+    try { dispatch({ type: 'TAKE_PILE', playerId: myId, pileId }); }
+    catch (err) { window.alert(err.message); }
+  } else session.send({ type: 'action', action: { type: 'TAKE_PILE', pileId } });
+}
+
+function performSetPileOrientation(pileId, faceUp) {
+  if (sessionEnded) return;
+  if (role === 'host') {
+    try { dispatch({ type: 'SET_PILE_ORIENTATION', playerId: myId, pileId, faceUp }); }
+    catch (err) { window.alert(err.message); }
+  } else session.send({ type: 'action', action: { type: 'SET_PILE_ORIENTATION', pileId, faceUp } });
 }
 
 // D35/D51 (both drop behaviors): Draw's action-token drop is
