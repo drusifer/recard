@@ -81,12 +81,13 @@ function describeDeckConfig({ type, numDecks, jokers }) {
   return `${numDecks} ${typePrefix}${deckWord}, ${jokers} ${jokerWord}`;
 }
 
-/** D53: a one-line summary of a preset's declared `zones` (Solitaire's
- * 4 foundations + 7 cascades, Spit's 2 rank-adjacent piles + a stock
- * per player), or `''` for every pre-Sprint-22 preset that has none. */
-function describeConfiguredZones(zones) {
-  if (!zones?.length) return '';
-  return zones
+/** D53: a one-line summary of a preset's declared `piles` (renamed from
+ * `zones` - D55; Solitaire's 4 foundations + 7 cascades, Spit's 2
+ * rank-adjacent piles + a stock per player), or `''` for every
+ * pre-Sprint-22 preset that has none. */
+function describeConfiguredZones(pileDecls) {
+  if (!pileDecls?.length) return '';
+  return pileDecls
     .map(({ kind, ownerId, count = 1 }) => {
       const word = count === 1 ? kind : `${kind}s`;
       return ownerId === 'perPlayer' ? `${count} ${word}/player` : `${count} ${word}`;
@@ -133,7 +134,7 @@ presetSelect.addEventListener('change', () => {
   // says so in the preview too, same "prefill on select" spirit as the
   // deck/deal fields above - the host sees what they're getting before
   // clicking Create Table, not only after.
-  const zonesText = describeConfiguredZones(preset.zones);
+  const zonesText = describeConfiguredZones(preset.piles);
   previewEl.textContent = `${describeDeckConfig(preset)}, ${preset.cardsPerPlayer} ${cardsWord}/player`
     + (zonesText ? ` — table: ${zonesText}` : '');
   previewEl.hidden = false;
@@ -566,11 +567,17 @@ document.getElementById('create-table').addEventListener('click', async () => {
     numDecks: Number(document.getElementById('host-num-decks').value),
     jokers: Number(document.getElementById('host-jokers').value),
   };
-  // D46: GameConfig's first real field. D53: `zones` comes from the
-  // selected preset (if any) - no manual host UI for it this sprint,
-  // matching the AC ("a preset MAY declare a starting layout").
+  // D46: GameConfig's first real field. D53: `piles` (renamed from
+  // `zones` - D55, that name now belongs to the real Zone-entity list)
+  // comes from the selected preset (if any) - no manual host UI for it
+  // this sprint, matching the AC ("a preset MAY declare a starting
+  // layout"). `zones` carries any Zone entities the preset itself
+  // declares (e.g. none today reach beyond the always-present Table
+  // Zone - Gin Rummy's discard only ever references it, never declares
+  // a new one).
   const gameConfig = {
     allowsPlayerZones: document.getElementById('host-allow-player-zones').checked,
+    piles: selectedPreset?.piles ?? [],
     zones: selectedPreset?.zones ?? [],
   };
 
@@ -859,7 +866,7 @@ function endSessionForGood(message, { retryable = false } = {}) {
     // and even that has nothing to dispatch to), matching every other
     // control in this frozen re-render. No separate `<deck-zone>`
     // element to build here any more.
-    renderZones(zonesEl, latestView.zones, seatedOrder(latestView.players, myId), frozenOpts);
+    renderZones(zonesEl, latestView.zones, seatedOrder(latestView.players, myId), latestView.zoneRecords, frozenOpts);
     // Same inert Score panels the live render builds (one per seated
     // player with a score, "need a score zone for our opponent" too),
     // just no move/resize/adjust wiring - the session is over.
@@ -1003,7 +1010,7 @@ function renderGameFromView(view) {
   // what `renderPile` uses for its row instead - see `zoneOpts.
   // dealCount`/`onDealCountChange` above for the one piece of deck-
   // specific state this file still owns: the Deal count input's value).
-  renderZones(zonesEl, view.zones, seatedOrder(view.players, myId), zoneOpts);
+  renderZones(zonesEl, view.zones, seatedOrder(view.players, myId), view.zoneRecords, zoneOpts);
   // UX follow-up (direct user request): Score is a real sibling
   // `<score-zone>` Web Component now (`src/components/ScoreZone.js`),
   // not content nested inside the own-zone panel - built the same

@@ -20,6 +20,48 @@
   "never approve based on spec alone") — mid-phase `*user test` and the
   Gate 2 architecture review, then full `*user test` at sprint close.
 
+## Sprint 23 ("pile-level actions, generalized") — Gate 1, 2026-08-25
+
+*user review US-60..63: APPROVED with 5 resolutions written directly
+into the AC (docs/USER_STORIES.md), not left as open questions for
+Morpheus to guess at:
+1. US-60 split rounding: original pile keeps the extra card (matches
+   shipped `SPLIT_DECK` precedent).
+2. US-61 take-pile confirm: `destructive: true` unconditionally, no
+   size threshold - a sometimes-confirms affordance is worse than a
+   consistent one; exception for a 1-card pile (identical to a plain
+   `pickup`, which never confirms).
+3. US-62 naming: `hide`/`show`, not `reveal`/`conceal` - `reveal` is
+   already the per-card action's label, reusing it for a pile-wide
+   action was a real collision risk.
+4. US-62 authorization: host-only (shared pile) / owner-only (personal
+   pile) - matches `deal`/`sortRank`'s existing split, not `move`/
+   `rotate`'s open-to-all (flipping a whole pile's visibility is
+   shared-knowledge-changing, closer to `reshuffleDeal`'s weight).
+5. US-63 eligibility: `zone`/`discard` only, PLUS explicitly excluding
+   `deck` too (not just hand/foundation/cascade/rankAdjacent as
+   Cypher's draft had it) - `state.js` finds the deck by fixed identity,
+   not search; relocating it would silently break that. Merge-vs-
+   sibling: sibling, confirmed.
+
+No blockers. @Morpheus *lead arch sprint 23
+
+## Gate 2, D55 (2026-08-25)
+
+*user feedback D55: APPROVED with 2 UX notes, neither blocking:
+1. `groupId` drag needs the SAME drop-target highlight affordance a
+   card drag already gets (`.zone-drag-over`) when hovering a target
+   Zone's box during a title-bar drag — otherwise a player has no
+   feedback about where the pile will land before releasing. Matches
+   existing precedent, not a new interaction language.
+2. Ungrouping (dragging a grouped pile's title back out to open table)
+   should be an explicit, equally-visible drop target (e.g. an empty
+   area of `#zones`), not just "the only way out is into another
+   group" — a pile that joined a group by mistake needs an equally
+   easy way back out.
+Both are UI-layer details for whoever implements US-63, not new open
+architecture questions - approving D55's shape as-is. @Mouse *sm plan sprint 23
+
 ## Current Task
 **Status:** Gate 1 complete, watching for Gate 2 (post-architecture)
 **Assigned to:** Smith

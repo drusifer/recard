@@ -3,6 +3,59 @@ import { PILE_TYPES } from './piles/pileTypes.js';
 
 const DEFAULT_ZONE_ID = 'table';
 const DECK_PILE_ID = 'deck';
+const TABLE_ZONE_ID = 'table-zone';
+
+/** A player's Zone id - shared by their hand pile and any personal
+ * declared pile (Spit's per-player stock, D53), one Zone per owner. */
+function playerZoneId(playerId) {
+  return `player-${playerId}`;
+}
+
+/**
+ * D55: **Zone and Pile are different types, and Zone is a real entity**
+ * (direct user request - "we need an entity for zone - so zones can
+ * have names and types in the config"). A Pile is cards + behavior
+ * (`kind`, `ownerId`, `cards`); a Zone is a named, typed place on the
+ * table a Pile renders inside (`<zone-panel>`'s box, D54) - a Zone can
+ * hold more than one Pile (the Table Zone holds Deck+Table+Discard).
+ * `state.zones` is the real, independent registry of Zone records
+ * (`{id, name, ownerId, type}`); every table-side pile's own `zoneId`
+ * field names which Zone record it belongs to.
+ *
+ * `type` (`'shared'` | `'perPlayer'`) is a Zone's own DERIVED TYPE,
+ * dispatched through `src/zones/zoneTypes.js`'s `ZONE_TYPES` registry -
+ * the same one-module-per-type pattern `PILE_TYPES` already uses for
+ * Piles (D42), instead of `ui.js` branching on whether `ownerId`
+ * happens to be set. A shared Zone is declared config (`GameConfig`'s
+ * own `zones` list, below); a perPlayer Zone is an intrinsic fact of
+ * this app (every joined player gets one, always) created at `JOIN`,
+ * never preset-declared - its concrete id/owner can't exist before a
+ * real player does.
+ *
+ * NOT the same `zoneId` as `PLAY`/`MOVE_CARD`'s `action.zoneId`/
+ * `toZoneId`, or `findZoneAndCard`'s returned `zoneId` below - those
+ * predate this field and (despite the name) mean "which PILE", per
+ * `zonesOf`'s own doc comment. Two different things share this word by
+ * historical accident; this comment exists so nobody re-derives D55's
+ * original mistake (conflating them) from the collision.
+ *
+ * **Every declared pile's `zoneId` is validated, not just accepted**
+ * (`buildPiles`, below): referencing a Zone id that isn't in the
+ * registry (the seeded Table Zone, plus whatever `GameConfig.zones`
+ * itself declares) throws at table-creation time, a real config error,
+ * not a silently-ignored typo. A pile declaration with no `zoneId` at
+ * all needs no matching Zone declared ahead of time - it gets a fresh,
+ * unambiguous Zone of its own, auto-registered, since "this pile, and
+ * only this pile" isn't something a config author could get wrong.
+ */
+const TABLE_ZONE_RECORD = { id: TABLE_ZONE_ID, name: 'Table Zone', ownerId: null, type: 'shared' };
+
+/** Adds a Zone record if `id` isn't already registered - idempotent, so
+ * every pile-creation call site can call it unconditionally. */
+function ensureZoneRecord(zones, id, name = null, ownerId = null, type = 'shared') {
+  if (zones.some((z) => z.id === id)) return zones;
+  return [...zones, { id, name, ownerId, type }];
+}
 
 /**
  * D23: **everything that holds cards is a Pile.** The draw stock, each
@@ -38,8 +91,17 @@ export function pileVisibility(pile) {
   return PILE_TYPES[pile.kind]?.visibility;
 }
 
-function makePile(kind, { id, name, ownerId = null, cards = [] }) {
-  return { id, kind, name, ownerId, cards };
+function makePile(kind, { id, name, ownerId = null, cards = [], zoneId = null }) {
+  // `makePile` itself knows NOTHING about which Zone anything defaults
+  // into beyond two universal facts: an owned pile joins its owner's
+  // Zone (ownership, not layout), and an undeclared pile is standalone
+  // (its own id). Every other Zone assignment - the deck and default
+  // Table's Table Zone membership included - is the CALLER's explicit
+  // `zoneId` argument, declared at the one place each pile is actually
+  // constructed (`createInitialState`, `buildPiles`) - no base-case
+  // lookup table lives in this shared primitive.
+  const resolvedZoneId = zoneId ?? (ownerId ? playerZoneId(ownerId) : id);
+  return { id, kind, name, ownerId, cards, zoneId: resolvedZoneId };
 }
 
 /**
@@ -48,25 +110,27 @@ function makePile(kind, { id, name, ownerId = null, cards = [] }) {
  * per-player stock, etc). `kind` defaults to `'zone'` for `CREATE_ZONE`'s
  * own default; every other caller passes an explicit one.
  */
-function makeTableSidePile(kind, name, ownerId = null, id = null) {
+function makeTableSidePile(kind, name, ownerId = null, id = null, zoneId = null) {
   const resolvedId = id ??
     (typeof crypto !== 'undefined' && crypto.randomUUID
       ? crypto.randomUUID()
       : `zone-${Date.now()}-${Math.random()}`);
-  return makePile(kind, { id: resolvedId, name, ownerId });
+  return makePile(kind, { id: resolvedId, name, ownerId, zoneId });
 }
 
-function makeDeckPile(deckConfig, rng) {
-  return makePile('deck', { id: DECK_PILE_ID, name: 'Deck', cards: shuffle(buildDeck(deckConfig), rng) });
+function makeDeckPile(deckConfig, rng, zoneId) {
+  return makePile('deck', { id: DECK_PILE_ID, name: 'Deck', cards: shuffle(buildDeck(deckConfig), rng), zoneId });
 }
 
 /**
- * D53 (Sprint 22): `GameConfig.zones` declares a starting table layout
- * (e.g. Solitaire's 4 foundations + 7 cascades) so a preset can build it
- * automatically instead of the host manually clicking Add Zone N times.
- * Only the SHARED (`ownerId: null`) entries build here - a `'perPlayer'`
- * entry's count isn't knowable until a player actually exists, so those
- * build at JOIN instead (below), on first join only.
+ * D53 (Sprint 22): `GameConfig.piles` (renamed from `zones` - D55, that
+ * name now belongs to the real Zone-entity list) declares a starting
+ * table layout (e.g. Solitaire's 4 foundations + 7 cascades) so a
+ * preset can build it automatically instead of the host manually
+ * clicking Add Zone N times. Only the SHARED (`ownerId: null`) entries
+ * build here - a `'perPlayer'` entry's count isn't knowable until a
+ * player actually exists, so those build at JOIN instead (below), on
+ * first join only.
  */
 /** "discard", 1 -> "Discard"; "cascade", 3 of 7 -> "Cascade 3" - only
  * numbered when there's more than one, so Gin Rummy's single discard
@@ -94,15 +158,33 @@ function configuredZoneId(kind, index, count, ownerId = null) {
   return ownerId ? `${base}-${ownerId}` : base;
 }
 
-function buildConfiguredZones(zones) {
+/**
+ * D55: a declared pile's starting `zoneId` is its OWN entry's `zoneId`
+ * field when present (e.g. Gin Rummy's discard declares `zoneId:
+ * 'table-zone'`) - and that id MUST already be a registered Zone
+ * (`zoneRegistry`, the Table Zone plus whatever `GameConfig.zones`
+ * itself declares) or this throws - never guessed from `kind`, never
+ * silently accepted if it doesn't match anything real. No `zoneId`
+ * declared means standalone: a fresh Zone of the pile's own, registered
+ * here since a 1:1 "this exact pile, alone" relationship needs no
+ * separate declaration to be unambiguous.
+ */
+function buildPiles(pileDecls, zoneRegistry) {
   const piles = [];
-  for (const { kind, ownerId, count = 1 } of zones) {
+  let zones = zoneRegistry;
+  for (const { kind, ownerId, count = 1, zoneId: declaredZoneId } of pileDecls) {
     if (ownerId === 'perPlayer') continue;
     for (let i = 0; i < count; i++) {
-      piles.push(makeTableSidePile(kind, configuredZoneName(kind, i, count), null, configuredZoneId(kind, i, count)));
+      const id = configuredZoneId(kind, i, count);
+      if (declaredZoneId && !zones.some((z) => z.id === declaredZoneId)) {
+        throw new Error(`GameConfig.piles: "${id}" declares zoneId "${declaredZoneId}", but no such Zone is declared in GameConfig.zones`);
+      }
+      const zoneId = declaredZoneId ?? id;
+      piles.push(makeTableSidePile(kind, configuredZoneName(kind, i, count), null, id, zoneId));
+      zones = ensureZoneRecord(zones, zoneId);
     }
   }
-  return piles;
+  return { piles, zones };
 }
 
 /**
@@ -122,14 +204,26 @@ function buildConfiguredZones(zones) {
  *   preset actually sets it" shape.
  */
 export function createInitialState(deckConfig = {}, rng = Math.random, gameConfig = {}) {
-  const zones = gameConfig.zones ?? [];
+  const pileDecls = gameConfig.piles ?? [];
+  const zoneDecls = gameConfig.zones ?? [];
+
+  // D55: the real Zone registry - the always-present Table Zone, plus
+  // whatever Zone entities this game's own `GameConfig.zones` declares
+  // (`{id, name, type}`). Every pile declaration's own `zoneId` (below)
+  // is validated against exactly this list - nothing implicit.
+  let zoneRegistry = ensureZoneRecord([], TABLE_ZONE_RECORD.id, TABLE_ZONE_RECORD.name, TABLE_ZONE_RECORD.ownerId, TABLE_ZONE_RECORD.type);
+  for (const z of zoneDecls) zoneRegistry = ensureZoneRecord(zoneRegistry, z.id, z.name ?? null, null, z.type ?? 'shared');
+
+  const built = buildPiles(pileDecls, zoneRegistry);
+
   return {
     deckConfig,
-    gameConfig: { allowsPlayerZones: gameConfig.allowsPlayerZones ?? true, zones },
+    gameConfig: { allowsPlayerZones: gameConfig.allowsPlayerZones ?? true, piles: pileDecls, zones: zoneDecls },
+    zones: built.zones,
     piles: [
-      makeDeckPile(deckConfig, rng),
-      makePile('zone', { id: DEFAULT_ZONE_ID, name: 'Table' }),
-      ...buildConfiguredZones(zones),
+      makeDeckPile(deckConfig, rng, TABLE_ZONE_ID),
+      makePile('zone', { id: DEFAULT_ZONE_ID, name: 'Table', zoneId: TABLE_ZONE_ID }),
+      ...built.piles,
     ],
     players: [],
     scores: {},
@@ -355,13 +449,14 @@ const ACTIONS = {
     // doesn't re-trigger one-time setup) is now asked directly of the
     // roster instead of inferred from personal-zone existence.
     const alreadyJoined = state.players.some((p) => p.id === action.playerId);
-    // D53: a GameConfig.zones entry with `ownerId: 'perPlayer'` (e.g.
-    // Spit's per-player stock) builds here, on first join - its count
-    // isn't knowable any earlier than this, since it's created once per
-    // actual player.
+    // D53: a GameConfig.piles entry (renamed from `zones` - D55, that
+    // name now belongs to the real Zone-entity list) with `ownerId:
+    // 'perPlayer'` (e.g. Spit's per-player stock) builds here, on first
+    // join - its count isn't knowable any earlier than this, since it's
+    // created once per actual player.
     const perPlayerPiles = alreadyJoined
       ? []
-      : (state.gameConfig?.zones ?? [])
+      : (state.gameConfig?.piles ?? [])
           .filter((z) => z.ownerId === 'perPlayer')
           .flatMap(({ kind, count = 1 }) =>
             Array.from({ length: count }, (_, i) =>
@@ -376,6 +471,11 @@ const ACTIONS = {
         { id: action.playerId, name: action.name, connection: 'connected' },
       ],
       piles: alreadyJoined ? state.piles : [...state.piles, ...perPlayerPiles],
+      // D55: every player gets a real Zone record for their own seat,
+      // seeded at JOIN (before their hand pile even exists - `ensureHandPile`
+      // still creates that lazily) so `zoneId: player-<id>` always
+      // resolves to something real once the hand pile does show up.
+      zones: alreadyJoined ? state.zones : ensureZoneRecord(state.zones, playerZoneId(action.playerId), null, action.playerId, 'perPlayer'),
       scores: { [action.playerId]: 0, ...state.scores },
       passed: { [action.playerId]: false, ...state.passed },
     };
@@ -450,7 +550,56 @@ const ACTIONS = {
     if (kind === 'hand' || !PILE_TYPES[kind]?.tableSide) {
       throw new Error(`Cannot create a zone of kind "${kind}"`);
     }
-    return { ...state, piles: [...state.piles, makeTableSidePile(kind, action.name)] };
+    const pile = makeTableSidePile(kind, action.name);
+    return {
+      ...state,
+      piles: [...state.piles, pile],
+      zones: ensureZoneRecord(state.zones, pile.zoneId),
+    };
+  },
+
+  /**
+   * US-63 (Sprint 23, D55): reparent a pile into a different Zone -
+   * `zoneId` is real, mutable data (see the comment above
+   * `TABLE_ZONE_RECORD` for why it has to be), so this is the
+   * whole implementation:
+   * find the pile, validate it's an eligible kind, resolve the target
+   * Zone, write the new `zoneId`. Dropping onto an existing Zone always
+   * adds this pile as an additional sibling there - never a merge
+   * (Smith's ruling, Sprint 23 Gate 1).
+   */
+  MOVE_PILE(state, action) {
+    const pile = state.piles.find((p) => p.id === action.pileId);
+    if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
+    // Smith's ruling (Sprint 23 Gate 1): only `zone`/`discard` piles are
+    // eligible to move at all. `deck`/`hand`/`foundation`/`cascade`/
+    // `rankAdjacent` are all rejected - `deck` explicitly, beyond what
+    // `tableSide` alone would allow, because `state.js` finds THE deck
+    // by fixed id (`DECK_PILE_ID`) elsewhere, not by searching zones.
+    if (pile.kind !== 'zone' && pile.kind !== 'discard') {
+      throw new Error(`Cannot move a "${pile.kind}" pile between zones`);
+    }
+
+    // No target, or a falsy one: "ungroup" - a fresh, standalone Zone
+    // of this pile's own, per Smith's Gate 2 note. Every table-side
+    // pile belongs to exactly one Zone always; there is no null/no-zone
+    // state to fall back to.
+    let targetZoneId = action.targetZoneId;
+    let zones = state.zones;
+    if (targetZoneId) {
+      if (!zones.some((z) => z.id === targetZoneId)) {
+        throw new Error(`Zone ${targetZoneId} does not exist`);
+      }
+    } else {
+      targetZoneId = pile.id;
+      zones = ensureZoneRecord(zones, targetZoneId);
+    }
+
+    return {
+      ...state,
+      zones,
+      piles: state.piles.map((p) => (p.id === action.pileId ? { ...p, zoneId: targetZoneId } : p)),
+    };
   },
 
   SHUFFLE_DECK(state, action) {
@@ -727,7 +876,7 @@ export function viewFor(state, playerId) {
         // does, instead of being a special top-level `deckCount` field
         // with its own bespoke render path in `main.js`.
         if (pile.id === DECK_PILE_ID) deckCount = pile.cards.length;
-        zones.push({ id: pile.id, name: pile.name, ownerId: pile.ownerId ?? null, kind: pile.kind, cards: [], count: pile.cards.length });
+        zones.push({ id: pile.id, name: pile.name, ownerId: pile.ownerId ?? null, kind: pile.kind, zoneId: pile.zoneId, cards: [], count: pile.cards.length });
         break;
       case 'in-hand':
         if (pile.ownerId === playerId) myHand = pile.cards;
@@ -747,6 +896,7 @@ export function viewFor(state, playerId) {
           name: pile.name,
           ownerId: pile.ownerId ?? null,
           kind: pile.kind,
+          zoneId: pile.zoneId,
           cards: pile.cards.map((card) => PILE_TYPES[pile.kind].redactCard(card, playerId)),
         });
         break;
@@ -761,6 +911,7 @@ export function viewFor(state, playerId) {
           // `ui.js` needs it to pick FAN vs. STACK drop behavior
           // (dropRuleFor(kind)) instead of assuming every zone is a fan.
           kind: pile.kind,
+          zoneId: pile.zoneId,
           // D42: `redactMiddleCard` moved to `PILE_TYPES.zone.redactCard`
           // - dispatched by `pile.kind` rather than hardcoded to zone,
           // so a future 'mixed'-visibility pile type redacts through
@@ -773,11 +924,12 @@ export function viewFor(state, playerId) {
 
   return {
     myHand, otherHandCounts, zones, deckCount, players: state.players, scores: state.scores, passed: state.passed,
-    // D50: only `allowsPlayerZones`, not the whole `GameConfig` object -
-    // it's the only field any client-side rendering needs today, and
-    // `?? true` mirrors CREATE_ZONE's own `state.gameConfig?.allowsPlayerZones
-    // === false` default (a pre-D46 restored snapshot has no `gameConfig`
-    // at all, and must default to "allowed" the same way here as there).
+    // D55: the real Zone registry (`{id, name, ownerId}`), named
+    // `zoneRecords` here specifically to avoid colliding with `zones`
+    // above (the per-pile view array) - `ui.js`'s `renderZones` groups
+    // that array by each entry's own `zoneId` and looks up its Zone's
+    // name/owner here, instead of re-deriving the grouping itself.
+    zoneRecords: state.zones,
     // D50: only `allowsPlayerZones`, not the whole `GameConfig` object -
     // it's the only field any client-side rendering needs today, and
     // `?? true` mirrors CREATE_ZONE's own `state.gameConfig?.allowsPlayerZones

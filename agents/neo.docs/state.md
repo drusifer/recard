@@ -2347,4 +2347,69 @@ redactCard/privacy, hand sort, whether other shared pile types should
 also group into a zone).
 
 ---
+## Sprint 23 Phase 71 — real Zone entity, `zoneId`, `MOVE_PILE` (2026-08-25)
+
+Implemented per D55 (corrected twice by the user mid-design - see
+morpheus.docs/state.md for the full record; short version: Zone and
+Pile are different types, and zone membership must come from config,
+not a hardcoded bundle).
+
+**state.js:**
+- `state.zones: [{id, name, ownerId}]` - new, real, independent
+  registry. `defaultZoneIdFor(kind, id, ownerId)` computes a newly
+  created pile's starting `zoneId`, reproducing every rule `ui.js` used
+  to hardcode (owned -> `player-<ownerId>`; the Table pile/any
+  deck-kind/any discard-kind -> `table-zone`; everything else -> its
+  own id). `makePile` auto-derives it when not given explicitly, so
+  `ensureHandPile`/`JOIN`'s perPlayerPiles/`SPLIT_DECK` all get correct
+  `zoneId`s for free, no per-call-site changes needed.
+- `ensureZoneRecord`/`CREATE_ZONE`/`JOIN` all register the Zone records
+  those piles actually need (idempotent - safe to call unconditionally).
+- New `MOVE_PILE(pileId, targetZoneId)` reducer case: `zone`/`discard`
+  only (Smith's ruling, `deck` explicitly excluded beyond that since
+  it's found by fixed id elsewhere in this file); no target = ungroup
+  (fresh standalone Zone, per Smith's Gate 2 note).
+- `viewFor` threads `zoneId` onto every pile-view and adds a new
+  `zoneRecords` field (deliberately NOT named `zones` - that name is
+  already taken by the per-pile view array in this same return object).
+- `persistence.js`: `SNAPSHOT_VERSION` 2->3 - an old snapshot's piles
+  have no `zoneId`, which would silently mis-render (every pile alone
+  in its own zone-of-one) rather than crash, so this is a real "shape
+  changed" bump, same reasoning as D31's hands bump, not just additive.
+
+**ui.js:** `renderZones` rewritten from three hardcoded predicates
+(the Table-pile/discard/deck bundle check, the by-owner Map, the
+"everything else" loop) into one generic operation: group `zones` by
+`zoneId`, look up each group's Zone record, render one `<zone-panel>`.
+Zero special-casing of `'table-zone'`/`'table'` left in `ui.js` at all.
+
+**Verified:** 318/318 unit green (10 new D55 tests - default zoneId
+assignment across every creation path, MOVE_PILE's eligibility/target/
+ungroup cases, viewFor's zoneRecords). `lint:design`: 14/14, confirmed
+byte-identical to the `git stash` baseline (not just same count).
+Live check (ad-hoc Playwright script, not full e2e - matches this
+project's frugal-e2e preference): Solitaire's preset-built table (11
+zones + Table Zone + hand) renders with the exact same grouping/labels
+as before, screenshot confirms pixel match.
+
+### Waiting On
+Nothing further - Trin UAT'd, Morpheus reviewed, then a 3rd user
+correction landed after review ("drop the old rules, layout is
+declarative now"): `defaultZoneIdFor` still branched on `kind`, just
+relocated the hardcode from `ui.js` into `state.js`. Fixed for real -
+only a plain id-keyed constant for the deck/Table's own Zone, every
+other pile's Zone comes from its own `GameConfig.zones` entry
+(`zoneId` field). Gin Rummy's discard declares it explicitly now.
+`CREATE_ZONE` (a live action, no declaration to read) is always
+standalone - a real, intentional behavior change from before. 319/319
+green, lint:design 14/14 identical, verified live (Gin Rummy + Solitaire
+screenshots both match). See `agents/oracle.docs/memory` (auto-memory)
+feedback_zone_pile_separation.md for the sharpened lesson.
+
+### Waiting On
+Nothing in flight. Phase 71 done. Next up per the sprint plan: Phase 68
+(Split/Take Pile, independent of 71/72) or Phase 72 (the drag UI for
+MOVE_PILE, now unblocked) - awaiting user direction.
+
+---
 *Last updated: 2026-08-25 (bare-pile correction: no nested zone boxes, lint:design back to the original 6-violation baseline)*

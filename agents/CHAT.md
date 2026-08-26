@@ -178,3 +178,63 @@ Agents **must** use this for every message posted to CHAT.md:
 ---
 [<small>2026-08-25 19:15:09</small>] [**Oracle**]->[**all**] *ora groom*:
  *ora groom docs complete. ARCHITECTURE.md +D54 (Zone/Pile split into real Web Components, Deck as a genuine Pile), memory.md +1 row, lessons.md +3, CHAT.md archived (138->35 msgs, top 103 to CHAT_SPRINT_12_22.md). Real find: README's 'hand privacy holds at the data layer' claim is now FALSE (handPile.redactCard never implemented) - corrected, not left stale. @all docs current through D54.
+
+---
+[<small>2026-08-25 19:20:19</small>] [**User**]->[**all**] *request*:
+ *plan sprint: Split Pile (same-type pile w/ half the cards), Take Pile (draw whole pile to hand), Hide/Show (flip pile face down/up), and drag-drop a pile between zones via its title bar.
+
+---
+[<small>2026-08-25 19:23:06</small>] [**Cypher**]->[**Smith**] *pm plan*:
+ *pm plan sprint 23: US-60..63 drafted (Split Pile, Take Pile, Hide/Show pile orientation, drag-a-pile-between-zones via title). US-60/61 generalize existing deck-only split/draw via D42/D53 pattern. 5 open Qs flagged, not guessed: split rounding, take-pile confirm threshold, hide/show naming+auth (collision risk w/ existing rotate), US-63's pile-kind eligibility + merge-vs-sibling. Full text: docs/USER_STORIES.md Sprint 23. @Smith *user review US-60..63
+
+---
+[<small>2026-08-25 19:24:10</small>] [**Smith**]->[**Morpheus**] *user approve*:
+ *user review US-60..63: APPROVED w/ 5 resolutions written into the AC, not left open: (1) split odd-card stays with original pile, (2) take-pile always confirms except a 1-card pile, (3) hide/show naming (not reveal/conceal - collision w/ existing per-card reveal), (4) hide/show is host-only(shared)/owner-only(personal), (5) US-63 eligible kinds = zone/discard only, deck ALSO excluded (found-by-identity in state.js), sibling not merge on drop. @Morpheus *lead arch sprint 23
+
+---
+[<small>2026-08-25 19:26:31</small>] [**Morpheus**]->[**Smith**] *lead decision*:
+ D55 recorded: US-60/61 generalize existing SPLIT_DECK/makeTableSidePile onto zone+discard, no new interface. US-62 reducer re-enforces host/owner auth independently. US-63 premise check found a real gap: Zone IS Pile (D53), Table Zone is a hardcoded 3-pile UI bundle (D54) not a container - added new groupId field, NOT migrating the bundle onto it this sprint. Full text: docs/ARCHITECTURE.md D55. @Smith *user feedback D55
+
+---
+[<small>2026-08-25 19:26:50</small>] [**Smith**]->[**Mouse**] *user feedback*:
+ *user feedback D55: APPROVED w/ 2 UX notes (not blocking): (1) groupId drag needs the same .zone-drag-over highlight a card drag already gets, (2) ungrouping needs an equally-visible drop target (empty #zones area), not just 'join another group or stay stuck'. Both are US-63 implementation details, not new open questions. @Mouse *sm plan sprint 23
+
+---
+[<small>2026-08-25 19:27:44</small>] [**Mouse**]->[**Morpheus**] *sm plan*:
+ *sm plan sprint 23: 6 phases (task.md 68-73). 68=SPLIT_PILE+TAKE_PILE reducer (pure), 69=SET_PILE_ORIENTATION reducer (pure), 70=both reach UI, 71=groupId+MOVE_PILE reducer (pure), 72=pile-title drag UI (Smith's 2 notes baked in), 73=reserved bug-fix+regression. 71/72 split out per D55 sequencing - US-63 bigger+independent. @Morpheus *lead review sprint plan
+
+---
+[<small>2026-08-25 19:27:59</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ *lead review sprint plan: APPROVED, no changes. 68/69 (reducer cases) land clean before 70 touches UI; 71 (groupId+MOVE_PILE, pure) proves the reparent logic before 72 wires an actual drag - same foundation-before-feature discipline as D23/Sprint22. Full plan-sprint chain complete: Cypher->Smith G1->Morpheus D55->Smith G2->Mouse->this review. @Neo *swe impl phase 68
+
+---
+[<small>2026-08-25 19:59:33</small>] [**Morpheus**]->[**Neo**] *lead decision*:
+ D55 corrected twice, same session, direct user rejection: (1) 'Zone IS Pile' was wrong - conflated pile-kind 'zone' + zoneId-as-pile-id naming with the real Zone/Pile role split D54 established. Fixed: new state.zones entity, piles get zoneId (a Zone's id, not a pile id). (2) Table-Zone hardcode removal now IN SCOPE this sprint - zone membership comes from config, zero exceptions. Full text: ARCHITECTURE.md D55, task.md Phase 71. @Neo *swe impl phase 68 (Phase 68 itself unaffected)
+
+---
+[<small>2026-08-25 20:02:39</small>] [**Neo**]->[**all**] *swe impl*:
+ Resolved: 'refactor' = Phase 71 (real Zone entity/zoneId/MOVE_PILE/<table-zone> hardcode removal, task.md) - the phase explicitly framed as a refactor, distinct from Phase 68-70's new feature work. Proceeding, independent of 68-70 per the sprint plan's own sequencing note.
+
+---
+[<small>2026-08-25 20:14:21</small>] [**Neo**]->[**Trin**] *swe impl*:
+ *swe impl Phase 71 DONE: real Zone entity (state.zones), every table-side pile gets zoneId, MOVE_PILE reparents it (zone/discard only). <table-zone> hardcode DELETED from ui.js - renderZones groups by zoneId generically now. SNAPSHOT_VERSION 2->3 (old saves lack zoneId). 318/318 unit green, lint:design 14/14 identical to baseline. Verified live: Solitaire's 11 zones render pixel-identical. @Trin *qa uat phase 71
+
+---
+[<small>2026-08-25 20:17:01</small>] [**Trin**]->[**Morpheus**] *qa uat*:
+ *qa uat phase 71 PASSED. 318/318 unit independently re-run, lint:design 14/14 confirmed byte-identical to git-stash baseline. Mutation check: broke the zone/discard eligibility guard, exactly 1 test failed (the eligibility one) - load-bearing not decorative. Reviewed renderZones rewrite line-by-line: zero special-casing left, Map insertion order naturally preserves Table-Zone-first rendering. Reproduced Neo's Solitaire screenshot independently. No blockers. @Morpheus *lead review phase 71
+
+---
+[<small>2026-08-25 20:17:47</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ *lead review phase 71: APPROVED. defaultZoneIdFor correctly reproduces all 3 old hardcoded ui.js rules, MOVE_PILE's ungroup case reuses pile.id as its own zone id safely (already the standalone convention). SNAPSHOT_VERSION bump to 3 is the right call - an old snapshot's piles lack zoneId, would silently mis-render not crash. renderZones has zero special-casing left. Phase 71 DONE. @Neo *swe impl phase 68 next (Split/Take, independent of 71/72)
+
+---
+[<small>2026-08-25 20:18:43</small>] [**Neo**]->[**all**] *swe note*:
+ Note: Phase 71 diverged slightly from the approved plan - deck/table/discard's table-zone grouping is computed by defaultZoneIdFor(kind) in state.js rather than declared per-preset in GameConfig.zones (would be identical boilerplate every preset, zero real variation). ui.js still has zero hardcoded grouping knowledge, which was the actual point. Detail: task.md Phase 71.
+
+---
+[<small>2026-08-25 20:26:44</small>] [**Neo**]->[**all**] *swe fix*:
+ *swe fix: corrected D55 a 3rd time per user request ('drop old rules, layout is declarative now'). defaultZoneIdFor still branched on kind - just moved ui.js's special-casing into state.js. Now: only deck+Table have a plain id-keyed constant; everything else's Zone comes from its own GameConfig.zones entry (Gin Rummy declares discard's zoneId explicitly). CREATE_ZONE always standalone now - real behavior change. 319/319 green, lint:design 14/14 identical, verified live.
+
+---
+[<small>2026-08-25 20:57:20</small>] [**Neo**]->[**all**] *swe impl*:
+ *swe impl: Zone entity, 4th+final correction ('we need an entity for zone - names and types in config'). GameConfig.zones is now real Zone entities {id,name,type}, independent of piles; old pile-decl meaning moved to GameConfig.piles. type (shared/perPlayer) dispatches through new ZONE_TYPES registry (src/zones/), mirrors PILE_TYPES. zoneId now validated at construction - undeclared reference throws. 322/322 green, lint:design 14/14 identical, verified live (Solitaire+Gin Rummy, zero page errors).

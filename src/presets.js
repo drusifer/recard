@@ -16,9 +16,11 @@
  * test, not a preset), ready for whenever a real preset actually needs
  * it.
  *
- * D53 (Sprint 22): `zones` is the same "supported, sparingly used" shape
- * as `allowsPlayerZones` above - `[{kind, ownerId: 'perPlayer'|null,
- * count}]`, additive, defaulting to `[]` when absent (every preset above
+ * D53 (Sprint 22): `piles` (renamed from `zones` - D55, that name now
+ * belongs to the real Zone-entity list a preset can separately declare)
+ * is the same "supported, sparingly used" shape as `allowsPlayerZones`
+ * above - `[{kind, ownerId: 'perPlayer'|null, count, zoneId?}]`,
+ * additive, defaulting to `[]` when absent (every preset above
  * Solitaire relies on that default unchanged). Solitaire/Spit are the
  * first presets that need a declared starting table (real Pile kinds
  * beyond deck/hand a player would otherwise have to Add Zone manually,
@@ -29,7 +31,7 @@
  * validate the Pile/Zone primitives (D53), not to be a full solitaire
  * engine; the host draws/moves cards into place same as any other game.
  *
- * Gin Rummy also declares `zones` (a single real `discard`-kind pile) -
+ * Gin Rummy also declares `piles` (a single real `discard`-kind pile) -
  * direct user follow-up to D53: replaces the generic shared Table zone
  * that used to stand in for a discard pile with the real thing, now
  * that a declared pile is one line instead of a manual Add Zone click.
@@ -98,7 +100,13 @@ export const PRESETS = [
     // D53 follow-up: a real discard pile, declared - not the generic
     // shared Table zone standing in for one (which is all this preset
     // had before Sprint 22's Pile/Zone framework existed to do better).
-    zones: [{ kind: 'discard', ownerId: null, count: 1 }],
+    // `zoneId: 'table-zone'` (D55, direct user request - "layout is
+    // declarative now"): the discard pile joins the Table Zone
+    // explicitly, by declaration - not by `ui.js` or `state.js`
+    // inferring it from `kind: 'discard'`. Matches this preset's own
+    // captured `layout` blob below, which has no separate 'discard'
+    // entry because it was captured with the discard grouped in.
+    piles: [{ kind: 'discard', ownerId: null, count: 1, zoneId: 'table-zone' }],
     // Direct user request: captured from an actual arranged table
     // (devtools -> `recard:panel-layout:v1`) rather than calibrated
     // like the other presets' below - kept verbatim, including several
@@ -162,7 +170,7 @@ export const PRESETS = [
     numDecks: 1,
     jokers: 0,
     cardsPerPlayer: 0,
-    zones: [
+    piles: [
       { kind: 'foundation', ownerId: null, count: 4 },
       { kind: 'cascade', ownerId: null, count: 7 },
     ],
@@ -185,7 +193,7 @@ export const PRESETS = [
     numDecks: 1,
     jokers: 0,
     cardsPerPlayer: 0,
-    zones: [
+    piles: [
       { kind: 'rankAdjacent', ownerId: null, count: 2 },
       { kind: 'cascade', ownerId: 'perPlayer', count: 1 },
     ],

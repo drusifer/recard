@@ -11,7 +11,7 @@
  */
 
 /** Bump when the snapshot shape changes; older blobs are then discarded. */
-export const SNAPSHOT_VERSION = 2; // 2 = hands included (D31); v1 blobs have none and are discarded
+export const SNAPSHOT_VERSION = 3; // 3 = real Zone entity + per-pile zoneId (D55); a v2 pile has neither, so `ui.js`'s zoneId-based grouping would put every pile in its own zone-of-one - discarded rather than silently mis-rendered, same reasoning as D31's hands bump
 
 export const STORAGE_KEY = 'recard:host-state:v1';
 
@@ -52,6 +52,7 @@ export function snapshot(state, code, hostName) {
     // actual prior behavior), so no SNAPSHOT_VERSION bump is needed -
     // unlike D31's hands, absence here isn't a semantic gap to disallow.
     gameConfig: state.gameConfig,
+    zones: state.zones,
     piles: state.piles,
     players: state.players,
     scores: state.scores,
@@ -107,7 +108,7 @@ export function load(storage) {
   // not have `piles`, and "you saved this in a newer version" is a more
   // useful thing to say than "your save is corrupt".
   if (parsed.version !== SNAPSHOT_VERSION) return { ok: false, reason: 'version' };
-  if (!Array.isArray(parsed.piles) || !Array.isArray(parsed.players)) {
+  if (!Array.isArray(parsed.piles) || !Array.isArray(parsed.players) || !Array.isArray(parsed.zones)) {
     return { ok: false, reason: 'corrupt' };
   }
 

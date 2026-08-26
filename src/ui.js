@@ -4,6 +4,7 @@ import {
   disabledPileActionsFor, rowShapeFor,
 } from './pileActions.js';
 import { seatPosition } from './seating.js';
+import { ZONE_TYPES } from './zones/zoneTypes.js';
 
 const SUIT_SYMBOL = { clubs: '♣', diamonds: '♦', hearts: '♥', spades: '♠' };
 const RED_SUITS = new Set(['diamonds', 'hearts']);
@@ -1128,31 +1129,23 @@ export function renderZonePanel(zoneEl, id, title, piles, allZones, opts) {
 
 
 /**
- * UX follow-up (direct user request): "zone is one thing, pile is
- * another - don't overload zone-panel to do everything." One generic
- * `<zone-panel>` element type builds EVERY Zone now (the shared Table
- * Zone, each player's Zone, and every standalone shared zone), varying
- * only in which/how many Piles it's given:
- * - The shared Table pile (`id === 'table'`), any discard-kind pile(s),
- *   and every deck-kind pile (the main deck, D53's `deckPile.rowShape`
- *   stack-rendered - AND any SPLIT_DECK pile, same kind) - none ever
- *   `ownerId`-carrying - group into ONE Zone titled "Table Zone".
- * - Every pile sharing one `ownerId` (a player's hand, plus any
- *   personal pile a GameConfig declares - Spit's per-player stock,
- *   D53) groups into ONE Zone per owner, titled with the owner's NAME.
- * - Every other shared pile (a player-CREATE_ZONE'd zone, Solitaire's
- *   foundations/cascades, Spit's rank-adjacent pile) gets its own Zone
- *   holding exactly that one pile - no separate Zone-level title in
- *   this case (`renderZonePanel`'s `title: null`), since the lone
- *   pile's own heading already says the same thing a redundant second
- *   one would.
+ * D55 (Sprint 23): Zone is a real, independently-declared entity -
+ * `zoneRecords` (`state.zones`, `viewFor`'s `zoneRecords`) is the real
+ * registry a pile's own `zoneId` points into, and each record's own
+ * `type` (`'shared'`/`'perPlayer'`, `src/zones/zoneTypes.js`) drives
+ * its default class/position - the same one-module-per-type dispatch
+ * `PILE_TYPES` already uses for Piles, instead of `ui.js` branching on
+ * whether `ownerId` happens to be truthy. This function has zero
+ * opinion about which Zone a pile starts in or how it got there
+ * (`state.js`'s `GameConfig.zones`/`buildPiles`/`MOVE_PILE` own that
+ * entirely) - it just groups `zones` (the piles) by `zoneId` and
+ * renders one generic `<zone-panel>` per group.
  *
- * A personal Zone renders "in front of" its owner's seat by default -
- * same `seatPosition()` geometry `renderRoster`'s seats use, at a
- * smaller radius so it sits toward the table's center rather than its
- * edge; a shared Zone defaults to normal flex-wrap flow (`#zones`'s own
- * CSS). Either kind switches to an absolutely-positioned, plain
- * top-left `panel-moved` panel the first time it's dragged/resized
+ * A `perPlayer`-type Zone renders "in front of" its owner's seat by
+ * default (its own type module's `defaultPosition`); a `shared`-type
+ * Zone defaults to normal flex-wrap flow (`#zones`'s own CSS). Either
+ * kind switches to an absolutely-positioned, plain top-left
+ * `panel-moved` panel the first time it's dragged/resized
  * (`wirePanelLayout`, `opts.layout` - a LOCAL, per-browser preference,
  * `panelLayout.js`, not replicated game state).
  *
@@ -1161,65 +1154,56 @@ export function renderZonePanel(zoneEl, id, title, piles, allZones, opts) {
  * seat its owner's roster entry is drawn at; one with no seated owner
  * (shouldn't happen) is skipped defensively.
  */
-export function renderZones(container, zones, seatedPlayers, opts = {}) {
+export function renderZones(container, zones, seatedPlayers, zoneRecords, opts = {}) {
   container.innerHTML = '';
 
-  const grouped = zones.filter((z) => !z.ownerId && (z.id === 'table' || z.kind === 'discard' || z.kind === 'deck'));
-  if (grouped.length > 0) {
-    const tableZoneEl = document.createElement('zone-panel');
-    container.appendChild(tableZoneEl);
-    // UX follow-up (real bug, found live via a preset layout that
-    // silently failed to apply): this id is `opts.layout`'s key
-    // (`panelLayout.js`) - it must be `'table-zone'` to match what
-    // every preset's own `layout` field, this project's own docs, and
-    // a player's own drag-to-move already call it, NOT the Table
-    // PILE's own id (`'table'`, one of `grouped`'s members, already
-    // addressable by ITS OWN `data-zone-id`).
-    tableZoneEl.render('table-zone', 'Table Zone', grouped, zones, opts);
-  }
-
-  // UX follow-up (direct user request): every pile sharing one ownerId
-  // groups into one Zone, positioned/moved/resized once for the whole
-  // group - mirrors the Table Zone's own grouping exactly, just keyed
-  // by owner instead of by "shared".
-  const byOwner = new Map();
+  const byZoneId = new Map();
   for (const zone of zones) {
-    if (grouped.includes(zone) || !zone.ownerId) continue;
-    if (!byOwner.has(zone.ownerId)) byOwner.set(zone.ownerId, []);
-    byOwner.get(zone.ownerId).push(zone);
+    if (!byZoneId.has(zone.zoneId)) byZoneId.set(zone.zoneId, []);
+    byZoneId.get(zone.zoneId).push(zone);
   }
-  for (const [ownerId, piles] of byOwner) {
-    const seatIndex = seatedPlayers.findIndex((p) => p.id === ownerId);
-    if (seatIndex === -1) continue; // owner not in the current roster (shouldn't happen) - skip defensively
 
-    const playerZoneEl = document.createElement('zone-panel');
-    container.appendChild(playerZoneEl);
-    const ownerName = opts.resolveOwnerName?.(ownerId) ?? ownerId;
-    playerZoneEl.render(`player-${ownerId}`, ownerName, piles, zones, opts);
-    // AFTER `.render()`, not before - `renderZonePanel`'s own first line
-    // (`zoneEl.className = 'zone'`) would otherwise wipe this class out.
-    playerZoneEl.classList.add('seat-zone');
-    // `wirePanelLayout` (called inside `render` above) only ever sets
-    // `left`/`top` once a REAL stored position exists - a player zone
-    // with none yet still needs its ring-position default, same as it
-    // always has.
-    if (!playerZoneEl.classList.contains('panel-moved')) {
-      const { leftPct, topPct } = seatPosition(seatIndex, seatedPlayers.length, 26);
-      playerZoneEl.style.left = `${leftPct}%`;
-      playerZoneEl.style.top = `${topPct}%`;
+  for (const [zoneId, piles] of byZoneId) {
+    // `zoneId` is a validated reference (`state.js`'s `buildPiles`
+    // throws at table-creation time on anything that isn't) - every
+    // group here has a real record, no defensive fallback needed.
+    const record = zoneRecords.find((z) => z.id === zoneId);
+    const zoneType = ZONE_TYPES[record.type];
+
+    let seatIndex = -1;
+    if (record.ownerId) {
+      seatIndex = seatedPlayers.findIndex((p) => p.id === record.ownerId);
+      if (seatIndex === -1) continue; // owner not in the current roster (shouldn't happen) - skip defensively
     }
-  }
-
-  // Every remaining shared pile (ownerless, not part of the Table Zone
-  // group) - a player-CREATE_ZONE'd zone, Solitaire's foundations/
-  // cascades, Spit's rank-adjacent pile - gets its own Zone holding
-  // that one pile, exactly as before.
-  for (const zone of zones) {
-    if (grouped.includes(zone) || zone.ownerId) continue;
 
     const zoneEl = document.createElement('zone-panel');
     container.appendChild(zoneEl);
-    zoneEl.render(zone.id, null, [zone], zones, opts);
+
+    if (record.ownerId) {
+      const ownerName = opts.resolveOwnerName?.(record.ownerId) ?? record.ownerId;
+      zoneEl.render(record.id, ownerName, piles, zones, opts);
+      // AFTER `.render()`, not before - `renderZonePanel`'s own first
+      // line (`zoneEl.className = 'zone'`) would otherwise wipe this
+      // class out.
+      if (zoneType.className) zoneEl.classList.add(zoneType.className);
+      // `wirePanelLayout` (called inside `render` above) only ever sets
+      // `left`/`top` once a REAL stored position exists - a player zone
+      // with none yet still needs its ring-position default, same as it
+      // always has.
+      if (!zoneEl.classList.contains('panel-moved')) {
+        const pos = zoneType.defaultPosition(seatIndex, seatedPlayers.length);
+        if (pos) {
+          zoneEl.style.left = `${pos.leftPct}%`;
+          zoneEl.style.top = `${pos.topPct}%`;
+        }
+      }
+    } else {
+      // `record.name` is `'Table Zone'` for the Table Zone group, and
+      // `null` for a standalone zone - the lone pile's own heading
+      // already says the same thing a redundant second title would
+      // (`renderZonePanel`'s own `title: null` handling, unchanged).
+      zoneEl.render(record.id, record.name, piles, zones, opts);
+    }
   }
 }
 

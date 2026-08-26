@@ -2513,6 +2513,181 @@ non-viewer seats (the "Table Zone overlaps Bob"-class findings), the
 cards currently leak to every viewer via `view.zones` — no privacy
 enforcement yet, the biggest real gap of the three).
 
+## v3.2 Decisions (Sprint 23, US-60..63)
+
+### D55. Split/Take/Hide/Show generalized onto `zone`+`discard`; Zone becomes a real, declaratively-configured entity
+
+Direct user request for four pile-level capabilities. Checked the
+premise on each before designing, per this project's own standing
+practice (D53's Zone-catalog check, D24's zone-cap premise).
+
+**US-60 (Split) and US-61 (Take) generalize existing deck-only
+mechanics, not new concepts:**
+- `SPLIT_DECK`/`makeTableSidePile` already do everything `split` needs
+  — `makeTableSidePile(pile.kind, name, pile.ownerId)` is already
+  kind-generic (checked its call sites: only ever invoked with
+  `pile.kind`/`ownerId` as data, no deck-specific assumption inside
+  it). New `SPLIT_PILE(pileId)` reducer case: guard `cards.length >= 2`
+  (error otherwise, same `describeShortfall`-style message as
+  `SPLIT_DECK`), original pile keeps `ceil(n/2)` (Smith's "extra card
+  stays" ruling), new pile gets `floor(n/2)` via `makeTableSidePile`,
+  inserted as a sibling in `state.piles` (no separate "zone" container
+  to insert into — see the D53 note below on what "Zone" actually is).
+- `TAKE_PILE(pileId)`: transfers every card into the acting viewer's
+  hand, in order, via each type's own `insertCard`. Guard (write-side,
+  independent of the read-side offer — same D43 discipline): every
+  card in the pile must satisfy `cardActions(pile, card, viewerId)
+  .includes('pickup')` or the action throws — no partial-take.
+- Both offered only by `zonePile`/`discardPile`'s `pileActions(ctx)`
+  (deck keeps its own pre-existing `split`/`draw`, unchanged; `hand`/
+  `foundation`/`cascade`/`rankAdjacent` get neither — consistent with
+  D53's own kind-by-kind scoping, not a blanket "every pile" grant).
+  `pileActions(kind, ctx)`'s existing no-pile-object shape (D42) means
+  neither can gate on live card count at the offer layer — `SPLIT_PILE`
+  on a too-small pile is always *offered*, and rejected by the reducer
+  guard above, same shape as `reshuffleDeal` on an empty deck today.
+- Actor eligibility (not asked of Smith — a technical consistency call,
+  not a fresh UX one): shared `zone`/`discard` piles are open to any
+  player, matching `move`/`pickup`'s existing "shared content, open
+  unless hidden-and-owned" philosophy; a personal zone's `split`/`take`
+  are owner-only (`ctx.isOwner`) — no new authorization shape invented.
+
+**US-62 (Hide/Show):** `SET_PILE_ORIENTATION(pileId, faceUp)` sets
+every card's `faceUp` uniformly; reducer independently re-checks
+Smith's host-only(shared)/owner-only(personal) rule (`pileActions`
+offering it is presentation only, per its own doc comment — the reducer
+is still the authority, D43's standing rule). Redaction is free —
+`zonePile.redactCard` already keys off each card's own `faceUp`.
+
+**US-63 (move-a-pile-between-zones) — corrected 2026-08-25, direct user
+rejection of the first draft below:** the original version of this
+entry claimed "Zone IS Pile" — wrong, and a real type confusion on
+Morpheus's part, not a defensible simplification. It came from reading
+`zonesOf`/`CREATE_ZONE`'s *implementation* (today, a standalone zone
+happens to be persisted as exactly one table-side pile) and mistaking
+that implementation shortcut for the *design*. Zone (a named place on
+the table, rendered as `<zone-panel>`'s box, D54) and Pile (cards +
+behavior, rendered as `<pile-panel>`/`<fan-pile>`/`<deck-stack>` inside
+that box) are different types, full stop — D54's own architecture
+already treats them as separate rendering roles; the user's repeated
+D54-session corrections ("don't conflate Piles and Zones") already
+established this and this entry should not have relitigated it.
+
+**The real gap** is narrower than the retracted claim: `state.js` has
+no *persisted* Zone record today — a standalone Zone is realized as
+implicitly-one-Pile, and the Table Zone's Deck+Table+Discard grouping
+(D54) is a hardcoded UI bundle in `main.js`/`ui.js`, not data. That's a
+missing first-class entity, not evidence the two concepts collapse into
+one type.
+
+**Decision:** give Zone real, independent identity. New additive
+`state.zones: [{id, name}]` array. Every table-side pile gains a
+required `zoneId` (a Zone's id — NOT another pile's id, unlike the
+retracted `groupId` design) naming which Zone it renders inside;
+multiple piles sharing a `zoneId` render together in that Zone's one
+`<zone-panel>` box, matching D54's box-holds-N-piles rendering exactly,
+now backed by real data instead of an implicit 1:1 assumption.
+`CREATE_ZONE` creates both a new Zone record and its first pile
+(unchanged from the user's perspective — "Add Zone" still adds one
+zone).
+
+**Corrected again, same session (direct user follow-up): the
+Table-Zone bundle migration is IN SCOPE for this sprint, not a deferred
+follow-up.** Once `zoneId` is real, `main.js`/`ui.js` hardcoding "Deck,
+Table, and Discard render together" is exactly the kind of
+special-cased branch this whole sprint (and D53/D54 before it) exists
+to remove — leaving it hardcoded while everything else goes through
+`zoneId` would be a second, needless source of zone membership sitting
+next to the real one. Every pile's zone membership comes from config,
+with no exceptions: `GameConfig`'s default table layout (today's
+implicit deck+table+discard-together assumption, made explicit) and
+every preset's `GameConfig.zones` declare `zoneId` groupings the same
+way they already declare pile kinds/counts (D53). `main.js`/`ui.js`
+read `zoneId` generically to decide what renders inside which
+`<zone-panel>` — `<table-zone>`'s bespoke bundling code is deleted, not
+kept as a parallel path.
+
+New `MOVE_PILE(pileId, targetZoneId)` reducer case sets the dragged
+pile's `zoneId` to `targetZoneId` directly (a real Zone id now, not a
+derived "target pile's own anchor"), restricted to `zone`/`discard`
+kinds only (Smith's ruling — `deck`/`hand`/`foundation`/`cascade`/
+`rankAdjacent` all rejected, `deck` explicitly called out beyond
+Smith's own list because `state.js` finds it by fixed identity, not
+search, elsewhere). Dropping onto a Zone always creates a new sibling
+pile there, never a merge (Smith's ruling, unchanged). Ungrouping
+(Smith's Gate 2 note) creates a fresh standalone Zone record for the
+dragged pile and points its `zoneId` there — every table-side pile
+belongs to exactly one Zone always, "ungrouped" is simply "alone in its
+own Zone," not a null/no-zone state.
+
+**Corrected a third time, same session (direct user follow-up: "drop
+the old rules, layout is declarative now"):** the implementation that
+landed for the correction above still computed a NEWLY CREATED pile's
+starting `zoneId` from a function branching on `kind` (`kind ===
+'deck'`, `kind === 'discard'` → the Table Zone) — real progress
+(`ui.js` no longer had this logic), but the branching itself hadn't
+actually moved to config, only moved *within* code, from `ui.js` to
+`state.js`. Corrected once more, for real this time: there is no
+kind-sniffing function left anywhere. The only grouping baked into code
+at all is a plain id-keyed constant naming the Zone the two
+ALWAYS-present structural piles (the deck, the default Table) start
+in — data, not a conditional. Every other pile's starting `zoneId`
+comes from its OWN declaration: a `GameConfig.zones` entry gains an
+optional `zoneId` field naming which Zone it joins (Gin Rummy's discard
+now declares `zoneId: 'table-zone'` explicitly in `presets.js`, instead
+of that grouping being inferred from `kind: 'discard'`); an entry with
+no `zoneId` is standalone. A live `CREATE_ZONE` (a player's own "Add
+Zone" click, not preset config) has no declaration to read at all, so
+it is ALWAYS standalone now, regardless of `kind` — including
+`kind: 'discard'`, which used to auto-join the Table Zone under the
+retracted rule. That is a real, intentional behavior change: a
+host-added discard zone today starts in its own box; joining another
+Zone is what `MOVE_PILE`/Phase 72's drag interaction is *for*.
+
+**Sequencing (revised):** US-63 depends on nothing US-60/61/62 build,
+and is now strictly larger than the original draft too — it carries the
+`zones` array, the `zoneId` field, `MOVE_PILE`, the drag-and-drop UI,
+AND the `<table-zone>` hardcode removal in the same arc. Split across
+two phases as before (pure data/reducer, then UI), but the pure phase
+now includes migrating every existing default/preset table layout onto
+real `zoneId` config before `<table-zone>`'s bespoke code can be
+deleted — that ordering is load-bearing (delete the hardcode only after
+its replacement is proven, same discipline as every other refactor in
+this project).
+
+**Corrected a fourth time, same session (direct user follow-up: "we
+need an entity for zone - so zones can have names and types in the
+config"):** the third correction's `GameConfig.zones` entries were
+still just PILE declarations that happened to carry an optional
+`zoneId` string — a Zone still had no independent existence in config,
+only in the runtime `state.zones` side effect of processing those pile
+declarations. Split for real: **`GameConfig.zones` now means Zone
+entities** — `{id, name, type}` — declared independently of any pile;
+the old meaning (pile declarations: `{kind, ownerId, count, zoneId}`)
+moved to **`GameConfig.piles`**, since one field can't mean both.
+
+- **`type`** (`'shared'` | `'perPlayer'`) is a Zone's own *derived
+  type* — dispatched through a new `src/zones/zoneTypes.js` `ZONE_TYPES`
+  registry, exactly the one-module-per-type pattern `PILE_TYPES`
+  already established for Piles (D42), rather than `ui.js` branching on
+  whether a record's `ownerId` happens to be truthy. `shared` (the
+  Table Zone, every standalone zone) has no default position — normal
+  flex flow. `perPlayer` (a player's own seat) renders via
+  `seatPosition()`'s ring math, wrapped in its own type module now
+  instead of being inlined in `renderZones`.
+- **Validated, not just accepted:** `buildPiles` (`state.js`) now
+  throws at table-creation time if a pile declaration's `zoneId`
+  doesn't match a Zone actually present in the registry (the seeded
+  Table Zone, plus whatever the game's own `GameConfig.zones` declares)
+  — a typo'd or forgotten Zone reference is a loud config error, not a
+  silently-accepted string. A pile with no `zoneId` at all still needs
+  no matching declaration — a 1:1 "this pile, alone" relationship is
+  unambiguous without one, so it auto-registers its own standalone Zone.
+- A `perPlayer`-type Zone is never itself something `GameConfig.zones`
+  declares — its concrete id/owner can't exist before a real player
+  does, so it stays an intrinsic engine fact created at `JOIN` (same
+  status as `ensureHandPile` already had), not a preset choice.
+
 ## Module Layout
 ```
 index.html              entry page, host/join screens, game screen

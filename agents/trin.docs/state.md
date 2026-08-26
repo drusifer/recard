@@ -574,3 +574,10 @@ unit suite) is the default for routine checks now.
 Current state: branch `touch-targets-and-pile-actions-sprint`, commit
 `44303e3`, clean, 260/260 unit tests green, e2e green as of last close.
 Two minor visual findings backlogged in `docs/USER_STORIES.md`, not fixed.
+
+## Sprint 23 Phase 71 UAT (2026-08-25)
+PASSED - real Zone entity (state.zones/zoneId), MOVE_PILE reducer case,
+`<table-zone>` hardcode removed from ui.js (D55, corrected twice by the
+user mid-design). 318/318 unit independently re-run, lint:design 14/14
+byte-identical to git-stash baseline, mutation-verified the zone/discard
+eligibility guard has teeth. Handed to Morpheus for code review.

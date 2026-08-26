@@ -165,6 +165,18 @@ piece of the framework epic never started) is waiting on real user
 product/UX input, not phase planning.
 
 ---
+## Sprint 23 phase plan — 2026-08-25
+
+6 phases (task.md 68-73), pure-logic-first: 68 SPLIT_PILE+TAKE_PILE
+reducer cases, 69 SET_PILE_ORIENTATION reducer case, 70 both reach the
+UI (ACTION_SPECS+confirm wiring), 71 groupId field+MOVE_PILE reducer
+(pure), 72 pile-title drag-and-drop UI (Smith's 2 Gate-2 notes baked
+in), 73 reserved bug-fix+regression. 71/72 split from 68/69/70 per
+Morpheus's D55 sequencing call - US-63 is strictly bigger and
+independent of the other three. Handed to Morpheus for sprint-plan
+review before Neo starts Phase 68.
+
+---
 ## Sprint 22 phase plan — 2026-08-24
 
 6 phases (task.md 62-67): 62 dropRule->polymorphism refactor (foundation,

@@ -1056,3 +1056,136 @@ Solitaire and Spit specifically per the user's own direction, `dropRule`
 enum fully retired in favor of real polymorphism. One pre-existing e2e
 flake found and disclosed (not caused by this sprint, not fixed here -
 see USER_STORIES.md backlog).
+
+## Sprint 23 ("pile-level actions, generalized") — US-60..63, D55 — PLANNED
+
+Pure-logic-first, same discipline as every prior sprint. 68/69 (reducer
+cases) before 70 (their UI). 71 (the new `groupId` field + `MOVE_PILE`,
+pure) before 72 (its drag-and-drop UI) — Morpheus's D55 sequencing note:
+US-63 is strictly larger than the other three and depends on nothing
+they build, so it gets its own pure/UI pair rather than folding into 70.
+
+### Phase 68 — `SPLIT_PILE` + `TAKE_PILE` reducer cases, `zone`/`discard` gain both in `pileActions` (pure)
+- [ ] `SPLIT_PILE(pileId)`: guard `cards.length >= 2` (throw, same
+      `describeShortfall`-style message as `SPLIT_DECK`); original pile
+      keeps `ceil(n/2)`, new pile (`makeTableSidePile(pile.kind, name,
+      pile.ownerId)`) gets `floor(n/2)`, inserted as a sibling in
+      `state.piles`.
+- [ ] `TAKE_PILE(pileId)`: every card must satisfy `cardActions(pile,
+      card, viewerId).includes('pickup')` or the whole action throws
+      (no partial-take); transfers all cards, in order, into the
+      viewer's hand via `insertCard`.
+- [ ] `zonePile.pileActions`/`discardPile.pileActions` gain `split`/
+      `take`, gated `ctx.isOwner` (personal) or unconditionally open
+      (shared) — matches `move`/`pickup`'s existing philosophy per D55.
+      `deck`/`hand`/`foundation`/`cascade`/`rankAdjacent` unchanged.
+- [ ] TDD: reducer tests for both guards (too-small split, un-takeable
+      card blocks the whole take), plus the odd-card-count rounding.
+
+### Phase 69 — `SET_PILE_ORIENTATION` reducer case (pure)
+- [ ] `SET_PILE_ORIENTATION(pileId, faceUp)`: sets every card's
+      `faceUp` uniformly. Reducer independently re-checks Smith's
+      host-only(shared)/owner-only(personal) rule — not just trusting
+      the offer layer, same D43 discipline as every other write-side
+      guard.
+- [ ] `zonePile.pileActions`/`discardPile.pileActions` gain `hide`/
+      `show` (mutually exclusive per current pile state).
+- [ ] TDD: authorization tests (non-host on shared pile rejected,
+      non-owner on personal pile rejected), redaction proven via the
+      existing `redactCard` path (no new redaction logic needed).
+
+### Phase 70 — Split/Take/Hide/Show reach the UI
+- [ ] `ACTION_SPECS` gains `take` (`target: 'hand'`, `destructive:
+      true`) and `hide`/`show` (`target: null`, `destructive: false`).
+      `split` reuses the deck's existing spec entry, now also offered
+      by `zone`/`discard`.
+- [ ] Confirm-dialog wiring: `take` confirms unconditionally EXCEPT a
+      1-card pile (Smith's ruling — identical in effect to that card's
+      own un-confirmed `pickup`).
+- [ ] Verify live: split/take/hide/show each render in the pile's
+      `<header-actions>` row per D54, same mechanism `deal`/`shuffle`
+      already use.
+
+### Phase 71 — real `Zone` entity (`state.zones`), `zoneId` field, `MOVE_PILE` reducer case, `<table-zone>` hardcode removed ✅ DONE
+- [x] **Corrected mid-plan (direct user rejection of the original
+      `groupId`-on-pile design, twice, same session):** Zone and Pile
+      are different types, not the same thing wearing two names, and
+      zone membership must come from config, not a hardcoded bundle in
+      `main.js`/`ui.js`. See `docs/ARCHITECTURE.md` D55's corrected
+      US-63 section for the full record of both corrections.
+- [x] New additive `state.zones: [{id, name, ownerId}]` array — a real,
+      independent entity. Every table-side pile gains a `zoneId` (a
+      Zone's id, not another pile's id) naming which Zone's
+      `<zone-panel>` box it renders inside.
+- [x] `CREATE_ZONE` creates a Zone record + its first pile together
+      (unchanged UX — "Add Zone" still adds one zone).
+- [x] **Reverted the divergence above, direct user correction ("drop
+      the old rules, layout is declarative now"):** `defaultZoneIdFor`
+      still branched on `kind` - it had moved the special-casing from
+      `ui.js` into `state.js`, not actually removed it. Replaced for
+      real: only the deck and the default Table pile (the two
+      ALWAYS-present structural piles) have their starting Zone named
+      by a plain id-keyed constant (data, not a conditional); every
+      other pile's Zone comes from its OWN declaration - Gin Rummy's
+      discard now declares `zoneId: 'table-zone'` explicitly in
+      `presets.js`. A live `CREATE_ZONE` (no declaration to read) is
+      ALWAYS standalone now, including `kind: 'discard'` - a real,
+      intentional behavior change from the retracted kind-based rule.
+      Full record: `docs/ARCHITECTURE.md` D55, third correction.
+- [x] **4th correction, direct user request ("we need an entity for
+      zone - so zones can have names and types in the config"):**
+      `GameConfig.zones` is now real Zone entities (`{id, name, type}`),
+      independent of pile declarations - the pile-declaration field
+      (old `zones` meaning) renamed to `GameConfig.piles`. `type`
+      (`'shared'`/`'perPlayer'`) is a Zone's own derived type, dispatched
+      through new `src/zones/zoneTypes.js` (`ZONE_TYPES`, mirrors
+      `PILE_TYPES`) instead of `ui.js` branching on `ownerId`. A pile's
+      `zoneId` is now VALIDATED against the declared registry at
+      table-creation time - an undeclared reference throws, a real
+      config error. Full record: `docs/ARCHITECTURE.md` D55, 4th
+      correction. 322/322 unit green (4 new tests incl. the validation
+      throw, mutation-verified), lint:design 14/14 identical, verified
+      live (Solitaire + Gin Rummy screenshots, zero page errors).
+- [x] `main.js`/`ui.js` read `zoneId` generically to group piles into
+      `<zone-panel>`s. `<table-zone>`'s bespoke Deck+Table+Discard
+      bundling code is DELETED - `renderZones` is one generic
+      group-by-`zoneId` operation now, zero special-casing.
+- [x] `MOVE_PILE(pileId, targetZoneId)` sets the dragged pile's
+      `zoneId` directly; restricted to `zone`/`discard` kinds only
+      (`deck`/`hand`/`foundation`/`cascade`/`rankAdjacent` rejected —
+      `deck` explicitly, per D55's found-by-identity note). Dropping
+      always creates a new sibling pile in the target Zone, never a
+      merge (Smith's ruling).
+- [x] Ungrouping = a fresh standalone Zone record created for the
+      dragged pile, `zoneId` pointed at it — every table-side pile
+      belongs to exactly one Zone always, never a null/no-zone state.
+- [x] TDD: 10 new tests (Zone creation across every pile-creation path,
+      `MOVE_PILE`'s eligibility/target/ungroup cases, `viewFor`'s
+      `zoneRecords`). Mutation-verified the eligibility guard has teeth.
+      `SNAPSHOT_VERSION` bumped 2->3 (an old snapshot's piles lack
+      `zoneId`, would silently mis-render). 318/318 unit green,
+      `lint:design` 14/14 confirmed byte-identical to the `git stash`
+      baseline. Live-verified via ad-hoc Playwright script + screenshot:
+      Solitaire's 11-zone table renders pixel-identical to before.
+
+### Phase 72 — Pile-title drag-and-drop between zones (UI)
+- [ ] Drag handle is the pile's own `<header-actions>` title bar (D54),
+      not the pile body — must not be confused with a card drag.
+- [ ] Drop-target highlight reuses `.zone-drag-over` (Smith's Gate 2
+      note #1) while dragging over an eligible target Zone's box.
+- [ ] An explicit, equally-visible "drop here to ungroup" target (an
+      open area of `#zones`) for pulling a grouped pile back out
+      (Smith's Gate 2 note #2) — creates a fresh standalone Zone per
+      Phase 71's ungrouping design.
+- [ ] Verify live via screenshot: drag a standalone `zone`/`discard`
+      pile's title into another Zone, confirm it renders as a sibling
+      there; drag it back out, confirm it's standalone again; confirm
+      the Table Zone (Deck+Table+Discard) still renders identically to
+      before, now via config instead of the deleted hardcode.
+
+### Phase 73 — reserved bug-fix + full regression
+- [ ] Full regression: unit + `npm run test:e2e` (only if Phase 72
+      genuinely changed rendered zone structure enough to risk
+      `tests/e2e.smoke.mjs` selectors — otherwise note explicitly why
+      not re-run, matching this project's own "frugal e2e" standing
+      preference) + `lint:design`.

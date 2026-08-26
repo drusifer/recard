@@ -13,7 +13,9 @@ sequenceDiagram
     participant Cypher
     participant Morpheus
     participant Oracle
-    Note over User,Oracle: 📅 2026-08-25
+    participant Smith
+    participant Mouse
+    Note over User,Mouse: 📅 2026-08-25
     User->>All: "request"
     Note right of User: "*chat @neo *nit remove<br/>'hand-zone-controls'<br/>completely"
     Neo->>Trin: "swe fix"
@@ -86,4 +88,34 @@ sequenceDiagram
     Note right of User: "*ora groom docs"
     Oracle->>All: "ora groom"
     Note right of Oracle: "*ora groom docs<br/>complete.<br/>ARCHITECTURE.md +D54<br/>(Zone/Pile split into<br/>real Web Components,<br/>Deck as a genuine Pile),<br/>memory.md +1 row,<br/>lesson…"
+    User->>All: "request"
+    Note right of User: "*plan sprint: Split Pile<br/>(same-type pile w/ half<br/>the cards), Take Pile<br/>(draw whole pile to<br/>hand), Hide/Show (flip<br/>pile face down/up), and<br/>d…"
+    Cypher->>Smith: "pm plan"
+    Note right of Cypher: "*pm plan sprint 23:<br/>US-60..63 drafted (Split<br/>Pile, Take Pile,<br/>Hide/Show pile<br/>orientation, drag-a-<br/>pile-between-zones via<br/>title). US-60/61 ge…"
+    Smith->>Morpheus: "user approve"
+    Note right of Smith: "*user review US-60..63:<br/>APPROVED w/ 5<br/>resolutions written into<br/>the AC, not left open:<br/>(1) split odd-card stays<br/>with original pile, (2)<br/>take…"
+    Morpheus->>Smith: "lead decision"
+    Note right of Morpheus: "D55 recorded: US-60/61<br/>generalize existing SPLI<br/>T_DECK/makeTableSidePile<br/>onto zone+discard, no<br/>new interface. US-62<br/>reducer re-enforces<br/>host…"
+    Smith->>Mouse: "user feedback"
+    Note right of Smith: "*user feedback D55:<br/>APPROVED w/ 2 UX notes<br/>(not blocking): (1)<br/>groupId drag needs the<br/>same .zone-drag-over<br/>highlight a card drag<br/>already ge…"
+    Mouse->>Morpheus: "sm plan"
+    Note right of Mouse: "*sm plan sprint 23: 6<br/>phases (task.md 68-73).<br/>68=SPLIT_PILE+TAKE_PILE<br/>reducer (pure),<br/>69=SET_PILE_ORIENTATION<br/>reducer (pure), 70=both<br/>reach…"
+    Morpheus->>Neo: "lead review"
+    Note right of Morpheus: "*lead review sprint<br/>plan: APPROVED, no<br/>changes. 68/69 (reducer<br/>cases) land clean before<br/>70 touches UI, 71<br/>(groupId+MOVE_PILE,<br/>pure) proves…"
+    Morpheus->>Neo: "lead decision"
+    Note right of Morpheus: "D55 corrected twice,<br/>same session, direct<br/>user rejection: (1)<br/>'Zone IS Pile' was wrong<br/>- conflated pile-kind<br/>'zone' + zoneId-as-pile-<br/>id nam…"
+    Neo->>All: "swe impl"
+    Note right of Neo: "Resolved: 'refactor' =<br/>Phase 71 (real Zone enti<br/>ty/zoneId/MOVE_PILE/<tab<br/>le-zone> hardcode<br/>removal, task.md) - the<br/>phase explicitly framed<br/>as…"
+    Neo->>Trin: "swe impl"
+    Note right of Neo: "*swe impl Phase 71 DONE:<br/>real Zone entity<br/>(state.zones), every<br/>table-side pile gets<br/>zoneId, MOVE_PILE<br/>reparents it<br/>(zone/discard only).<br/><ta…"
+    Trin->>Morpheus: "qa uat"
+    Note right of Trin: "*qa uat phase 71 PASSED.<br/>318/318 unit<br/>independently re-run,<br/>lint:design 14/14<br/>confirmed byte-identical<br/>to git-stash baseline.<br/>Mutation chec…"
+    Morpheus->>Neo: "lead review"
+    Note right of Morpheus: "*lead review phase 71:<br/>APPROVED.<br/>defaultZoneIdFor<br/>correctly reproduces all<br/>3 old hardcoded ui.js<br/>rules, MOVE_PILE's<br/>ungroup case reuses pil…"
+    Neo->>All: "swe note"
+    Note right of Neo: "Note: Phase 71 diverged<br/>slightly from the<br/>approved plan -<br/>deck/table/discard's<br/>table-zone grouping is<br/>computed by<br/>defaultZoneIdFor(kind)<br/>in…"
+    Neo->>All: "swe fix"
+    Note right of Neo: "*swe fix: corrected D55<br/>a 3rd time per user<br/>request ('drop old<br/>rules, layout is<br/>declarative now').<br/>defaultZoneIdFor still<br/>branched on kind…"
+    Neo->>All: "swe impl"
+    Note right of Neo: "*swe impl: Zone entity,<br/>4th+final correction<br/>('we need an entity for<br/>zone - names and types<br/>in config').<br/>GameConfig.zones is now<br/>real Zone…"
 ```

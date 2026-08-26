@@ -453,6 +453,26 @@ Current state: branch `touch-targets-and-pile-actions-sprint`, commit
 `44303e3`, clean, 260/260 unit tests green.
 
 ---
+## Sprint 23 ("pile-level actions, generalized") — 2026-08-25
+
+Drafted US-60..63 in USER_STORIES.md per direct user request: Split
+Pile, Take Pile, Hide/Show (pile-wide face orientation), and
+drag-a-pile-between-zones via its title bar. `split`/`draw` already
+exist deck-only (SPLIT_DECK/DRAW) - US-60/61 generalize them via the
+D42/D53 per-type module pattern rather than inventing parallel
+deck-only/generic paths. US-62/63 are new. Flagged 5 real open
+questions for Smith's Gate 1 rather than guessing: odd-card-count
+split rounding, take-pile confirm threshold, hide/show naming
+(collision risk with existing `rotate`) + authorization level, and
+US-63's two biggest calls - which pile kinds are eligible to move at
+all (proposed: zone/discard only, NOT hand/foundation/cascade/
+rankAdjacent), and merge-vs-sibling on drop.
+
+### Waiting On
+@Smith: Gate 1 on US-60..63, specifically the 5 flagged open questions.
+
+---
+
 ## Sprint 22 ("Zone/Pile polymorphism") — 2026-08-24
 
 Drafted US-56..59 in USER_STORIES.md per direct user request, but only

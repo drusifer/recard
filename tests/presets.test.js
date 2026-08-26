@@ -68,7 +68,7 @@ test('every rules-reference entry has the same consistent shape', () => {
 test('Solitaire preset: 4 foundations + 7 cascades, shared (not per-player)', () => {
   const preset = PRESETS.find((p) => p.name === 'Solitaire');
   assert.ok(preset);
-  assert.deepEqual(preset.zones, [
+  assert.deepEqual(preset.piles, [
     { kind: 'foundation', ownerId: null, count: 4 },
     { kind: 'cascade', ownerId: null, count: 7 },
   ]);
@@ -78,22 +78,22 @@ test('Solitaire preset: 4 foundations + 7 cascades, shared (not per-player)', ()
 test('Spit preset: 2 shared rank-adjacent piles + a cascade per player', () => {
   const preset = PRESETS.find((p) => p.name === 'Spit');
   assert.ok(preset);
-  assert.deepEqual(preset.zones, [
+  assert.deepEqual(preset.piles, [
     { kind: 'rankAdjacent', ownerId: null, count: 2 },
     { kind: 'cascade', ownerId: 'perPlayer', count: 1 },
   ]);
 });
 
-test('every preset without a declared zones field is unaffected (undefined, not [])', () => {
-  const declaresZones = ['Solitaire', 'Spit', 'Gin Rummy'];
+test('every preset without a declared piles field is unaffected (undefined, not [])', () => {
+  const declaresPiles = ['Solitaire', 'Spit', 'Gin Rummy'];
   for (const preset of PRESETS) {
-    if (declaresZones.includes(preset.name)) continue;
-    assert.equal(preset.zones, undefined, `${preset.name} should not declare zones`);
+    if (declaresPiles.includes(preset.name)) continue;
+    assert.equal(preset.piles, undefined, `${preset.name} should not declare piles`);
   }
 });
 
 test('Gin Rummy preset: a real discard pile, declared - not the generic shared Table zone standing in for one', () => {
   const preset = PRESETS.find((p) => p.name === 'Gin Rummy');
   assert.ok(preset);
-  assert.deepEqual(preset.zones, [{ kind: 'discard', ownerId: null, count: 1 }]);
+  assert.deepEqual(preset.piles, [{ kind: 'discard', ownerId: null, count: 1, zoneId: 'table-zone' }]);
 });

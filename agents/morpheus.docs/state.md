@@ -644,7 +644,81 @@ Full *plan sprint chain run: Cypher (US-56..59) → Smith Gate 1 (approved,
 (approved, 1 ask: preset-select should prefill the table visibly) → Mouse
 6-phase plan (task.md Phases 62-67) → Morpheus review: APPROVED.
 
+## Sprint 23 ("pile-level actions, generalized") — D55, 2026-08-25
+
+D55 recorded (docs/ARCHITECTURE.md): US-60 (`SPLIT_PILE`) and US-61
+(`TAKE_PILE`) generalize existing `SPLIT_DECK`/`makeTableSidePile`
+mechanics onto `zone`/`discard` piles' `pileActions`, no new interface
+method needed. US-62 (`SET_PILE_ORIENTATION`) reducer independently
+re-enforces Smith's host/owner-only ruling (presentation-layer offering
+is not a security boundary, D43's standing rule). US-63's premise check
+found a real gap, not just an open question: "Zone" IS "Pile" in this
+codebase (D53) and D54's Table Zone grouping is a hardcoded 3-pile UI
+bundle, not a generic container - so "drag a pile into another Zone"
+had no real reparent target to design against. Added one new additive
+field, `groupId` (nullable), as the actual generic mechanism; did NOT
+migrate D54's existing Table Zone bundle onto it this sprint (separate
+migration risk, zero new capability, tracked as its own follow-up).
+`MOVE_PILE(pileId, targetPileId)` sets `groupId`, restricted to
+`zone`/`discard` per Smith's ruling. US-63 sequenced as its own phase -
+strictly larger than the other three, depends on nothing they build.
+
 ### Current Task
+**Status:** D55 written, handing to Smith for Gate 2 (architecture
+review) before Mouse sizes the sprint plan.
+
+### Next Steps
+@Smith: Gate 2 on D55, specifically the `groupId` mechanism for US-63
+and the deck-identity-based exclusion. Then @Mouse for phase breakdown
+(4 stories, US-63 as its own phase per the sequencing note above), then
+back here for sprint-plan review, before Neo starts implementation.
+
+**Update:** Gate 2 approved (2 UX notes, both folded into Phase 72's
+own AC). Mouse's 6-phase plan (task.md 68-73) reviewed - APPROVED, no
+changes. Sequencing is right: 68/69 (reducer cases) land clean before
+70 (their UI) touches anything; 71 (groupId+MOVE_PILE, pure) proves the
+new field/reparent logic in isolation before 72 wires an actual drag
+gesture to it - same "foundation before feature" discipline as D23/
+Phase 29 and Sprint 22's own 62-before-63/64. Full *plan sprint chain
+done: Cypher (US-60..63, 5 open Qs flagged) → Smith Gate 1 (approved,
+all 5 resolved into the AC) → Morpheus D55 (found Zone==Pile premise
+gap, added groupId) → Smith Gate 2 (approved, 2 UX notes) → Mouse
+6-phase plan → this review. Handed to Neo for Phase 68.
+
+**Corrected twice, same session, direct user rejection - both about
+US-63/Phase 71 only, Phase 68-70/73 unaffected:**
+1. "Zone IS Pile" (my own D55 text) was wrong - a real type confusion,
+   not a defensible simplification. Root cause: I read `zonesOf`'s
+   *implementation* (today, a standalone zone happens to be persisted
+   as exactly one pile) and mistook that shortcut for the *design*.
+   D54's own architecture (which I wrote in the same session) already
+   treats Zone (the `<zone-panel>` box) and Pile (the content inside
+   it) as separate rendering roles - I should have caught the
+   contradiction against my own prior work before writing D55, not
+   after the user caught it.
+2. Follow-up correction: the `<table-zone>` hardcode's removal is now
+   IN SCOPE for Phase 71, not a deferred follow-up - zone membership
+   must come entirely from `GameConfig`/preset config, no exceptions,
+   once a real `zoneId` mechanism exists to express it.
+
+Fixed: `docs/ARCHITECTURE.md` D55 rewritten with a real `state.zones`
+entity + `zoneId` field (not `groupId`-on-pile); `task.md` Phase 71
+rewritten to match, now includes the config-driven default layout +
+hardcode deletion. Neither correction touches Phase 68-70/73's designs
+(SPLIT_PILE/TAKE_PILE/SET_PILE_ORIENTATION) - those don't reference
+Zone-as-container at all.
+
+### Lesson worth remembering for next time
+When a premise-check finds what looks like "X and Y are actually the
+same thing" from reading data-layer naming/shortcuts alone, cross-check
+it against this project's own already-shipped architecture for that
+exact pair before writing it down as a decision - D54 already answered
+the Zone-vs-Pile question explicitly, in the same session, and D55
+should have deferred to it rather than re-deriving a conflicting answer
+from a narrower slice of evidence (one state.js comment about naming).
+
+---
+
 **Status:** Planning complete, handed to Neo for Phase 62.
 Sequencing is load-bearing: Phase 62 (dropRule→polymorphism on the 4
 EXISTING kinds, zero behavior change) must land + pass full regression

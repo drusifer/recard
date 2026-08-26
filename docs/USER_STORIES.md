@@ -2103,6 +2103,147 @@ beyond pile accept-rules).
 
 ---
 
+## Sprint 23 ("pile-level actions, generalized") — drafted 2026-08-25
+
+Direct user request for four new pile-level capabilities. `split` and
+`draw` already exist today, but scoped narrowly to the deck
+(`SPLIT_DECK`/`DRAW`, `src/piles/deckPile.js`) — US-60/61 generalize
+each to any pile kind via the D42/D53 per-type module pattern, rather
+than inventing parallel deck-only and generic versions. US-62/63 are
+genuinely new capabilities. Each story below flags open questions for
+Smith's Gate 1 — these are real product/UX calls, not implementation
+details, and are called out rather than assumed.
+
+### US-60: Split Pile — any pile splits itself into two piles of its own kind
+
+**As** a player, **I want** to split a pile roughly in half into a
+second pile of the same kind, **so that** I'm not limited to the
+deck-only split (`SPLIT_DECK`) when a game needs multiple draw/discard/
+tableau piles from an existing one.
+
+**AC:**
+- New pile-level action `split`, offered by `PILE_TYPES[kind].pileActions(ctx)`
+  per type (mirrors `deal`/`shuffle`'s existing per-kind offer pattern)
+  rather than a `SPLIT_DECK`-only reducer case. `deckPile` keeps
+  offering it (today's exact behavior, unchanged); `zonePile`/
+  `discardPile` gain it as new callers.
+- Splits into exactly 2 piles, both the source pile's own kind — not
+  `SPLIT_DECK`'s "N piles, host chooses N" shape. If that flexibility
+  is still wanted for the deck specifically, `SPLIT_DECK` can stay as
+  its own, separate, more-general action; this story does not remove
+  it.
+- The new pile lands in the **same zone** as the source, as a sibling
+  pile (matches the D54 "N piles per zone" model) — not a new zone.
+- Not offered on a pile whose `canRemoveCard` is always `false`
+  (e.g. `foundation`) — nothing could ever leave the new pile either,
+  so splitting it is a dead end, not a real capability.
+- **Resolved (Smith Gate 1):** odd card count → original pile keeps the
+  extra card, matching `SPLIT_DECK`'s existing behavior exactly. No
+  reason for the new pile to differ from the precedent already shipped.
+
+### US-61: Take Pile — draw an entire pile into your hand at once
+
+**As** a player, **I want** to pull every card in a pile into my hand
+in one action, **so that** I'm not limited to `draw`'s one-card-at-a-
+time shape when a game calls for taking a whole pile (e.g. picking up
+all of a discard pile).
+
+**AC:**
+- New pile-level action `take`, `target: 'hand'` (mirrors `draw`'s
+  existing shape in `ACTION_SPECS` exactly, just moving every card
+  instead of the top one).
+- **Only offered when every card currently in the pile is individually
+  takeable by the acting viewer under that pile type's own existing
+  per-card rule** (`zonePile`'s `cardActions` already answers exactly
+  this for `pickup` card-by-card) — if the pile contains even one card
+  the viewer isn't allowed to see/take (someone else's still-hidden
+  card), `take` is not offered at all, same "fully available or not
+  offered" convention `foundation`'s empty `cardActions` already
+  established. No partial-take, no silent skip of ungrantable cards.
+- Order preserved: cards land in the hand in the pile's existing order,
+  same as a manual pickup-each-card-in-order would.
+- **Resolved (Smith Gate 1):** `destructive: true` unconditionally, no
+  size threshold. A size-gated confirm ("sometimes it asks, sometimes
+  it doesn't, depending on a count you can't see at a glance") is a
+  worse, less-predictable affordance than a consistent one — the same
+  reasoning `reshuffleDeal` already applies unconditionally. Exception:
+  a 1-card pile's `take` is identical in effect to that card's own
+  `pickup` (which never confirms) — skip the confirm only in that exact
+  case, so a single-card pile doesn't feel like a false alarm.
+
+### US-62: Hide/Show — flip every card in a pile face-down or face-up together
+
+**As** a player, **I want** to flip an entire pile's cards face-down or
+face-up as one action, **so that** I can turn a shared pile hidden or
+revealed as a group, instead of only being able to `reveal` one card
+at a time.
+
+**AC:**
+- New pile-level action(s), tentatively `hide`/`show` (two actions,
+  offered based on the pile's current state — like `deal`/
+  `reshuffleDeal` being two related-but-distinct entries in
+  `ACTION_SPECS` rather than one toggle) — sets every card's `faceUp`
+  uniformly.
+- **Resolved (Smith Gate 1) — naming:** `hide`/`show`, confirmed over
+  `reveal`/`conceal` specifically because `reveal` is already the
+  per-card action's label ("Turn over") — reusing that word for a
+  pile-wide action invites exactly the confusion this AC already
+  flagged. `hide`/`show` share no vocabulary with `reveal` or `rotate`.
+- **Resolved (Smith Gate 1) — authorization:** host-only for a shared
+  pile, owner-only for a personal one — mirrors the existing split
+  (`deal`/`shuffle` host-only on the shared deck; `sortRank`/`pass`
+  owner-only on a personal hand) rather than inventing a third
+  authorization shape. Not "open to all": flipping a pile's *entire*
+  visibility is a shared-knowledge-changing move for everyone still
+  looking at it, closer in weight to `reshuffleDeal` than to
+  `move`/`rotate`'s single-card, self-contained effect.
+- Redaction: once hidden, every card in the pile redacts exactly like
+  any other face-down card today (D7) — no new privacy rule, this
+  reuses the existing per-card `redactCard`.
+
+### US-63: Move a whole Pile between Zones by dragging its title bar
+
+**As** a player, **I want** to drag a pile by its own title bar and
+drop it into a different Zone, **so that** I can reorganize which Zone
+a pile lives in without it being fixed forever at creation.
+
+**AC:**
+- New interaction, distinct from `panelLayout.js`'s existing move/
+  resize: that system repositions a **Zone's box** locally (per-
+  browser, cosmetic only, D54-session addition) and never changes what
+  a pile's parent Zone *is* in shared state. This story changes actual
+  pile-to-zone membership — a real state change every viewer must see
+  the same way, not a local preference.
+- New reducer action (name TBD with Morpheus, e.g. `MOVE_PILE`)
+  reparents a pile from its current Zone to a target Zone in host
+  state, analogous in shape to `MOVE_CARD` but at the pile level
+  instead of the card level.
+- Drag handle is the pile's own `<header-actions>` title bar (D54) —
+  not the whole pile body, so a title-bar drag can't be confused with
+  dragging a card that happens to be near the top of the pile.
+- **Resolved (Smith Gate 1) — eligibility:** `zone`/`discard` only,
+  confirmed, PLUS an explicit exclusion of `deck` beyond what Cypher's
+  draft named: `state.js` itself documents the deck as "the one and
+  only pile" DRAW/DEAL/SHUFFLE_DECK/SPLIT_DECK act on by a fixed
+  identity, not by searching for it — moving it out of the Table Zone
+  would silently break that assumption for no real player benefit.
+  `hand`/`foundation`/`cascade`/`rankAdjacent` stay excluded exactly as
+  proposed. If a future request wants the deck relocatable, that's a
+  separate story that first fixes the "found by identity" assumption
+  — not a quiet side effect of this one.
+- **Resolved (Smith Gate 1) — merge vs. sibling:** sibling, confirmed.
+  Land as a new pile in the target Zone rather than merging into an
+  existing same-kind one; merge is real, separate, higher-risk scope
+  (per Cypher's own reasoning) and this story delivers the requested
+  capability without it.
+
+**Explicitly out of scope for all four stories:** any change to what a
+Solitaire/Spit table looks like by default (US-56..59 stand as shipped)
+— these are pile-level *capabilities* any applicable pile gains, not a
+change to which pile kinds exist.
+
+---
+
 ## Backlog: intermittent e2e flake in the guest-identity-reconnect scenario (2026-08-24)
 
 Found running Sprint 22's Phase 66 e2e gate, confirmed pre-existing (not

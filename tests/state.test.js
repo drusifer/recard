@@ -42,12 +42,12 @@ test('createInitialState: empty roster, full shuffled deck, one empty default zo
 
 test('createInitialState: gameConfig.allowsPlayerZones defaults true - matches every prior sprint\'s behavior exactly', () => {
   const state = createInitialState({}, () => 0.5);
-  assert.deepEqual(state.gameConfig, { allowsPlayerZones: true, zones: [] });
+  assert.deepEqual(state.gameConfig, { allowsPlayerZones: true, piles: [], zones: [] });
 });
 
 test('createInitialState: allowsPlayerZones can be set false via the third param', () => {
   const state = createInitialState({}, () => 0.5, { allowsPlayerZones: false });
-  assert.deepEqual(state.gameConfig, { allowsPlayerZones: false, zones: [] });
+  assert.deepEqual(state.gameConfig, { allowsPlayerZones: false, piles: [], zones: [] });
 });
 
 test('CREATE_ZONE: rejected when the game disallows player zones', () => {
@@ -601,13 +601,13 @@ test('JOIN: re-joining with the same playerId does not duplicate the player entr
 
 test('createInitialState: gameConfig.zones defaults to [] - zero behavior change for every preset before Solitaire/Spit', () => {
   const state = createInitialState({}, () => 0.5);
-  assert.deepEqual(state.gameConfig.zones, []);
+  assert.deepEqual(state.gameConfig.piles, []);
   assert.equal(zonesOf(state).length, 2, 'just the deck + the default table, nothing extra built');
 });
 
 test('createInitialState: shared (ownerId: null) configured zones build immediately, before any player joins', () => {
   const state = createInitialState({}, () => 0.5, {
-    zones: [{ kind: 'foundation', ownerId: null, count: 4 }, { kind: 'cascade', ownerId: null, count: 7 }],
+    piles: [{ kind: 'foundation', ownerId: null, count: 4 }, { kind: 'cascade', ownerId: null, count: 7 }],
   });
   assert.equal(zonesOf(state).filter((z) => z.kind === 'foundation').length, 4);
   assert.equal(zonesOf(state).filter((z) => z.kind === 'cascade').length, 7);
@@ -615,10 +615,10 @@ test('createInitialState: shared (ownerId: null) configured zones build immediat
 });
 
 test('createInitialState: a configured zone is capitalized and only numbered when there is more than one', () => {
-  const single = createInitialState({}, () => 0.5, { zones: [{ kind: 'discard', ownerId: null, count: 1 }] });
+  const single = createInitialState({}, () => 0.5, { piles: [{ kind: 'discard', ownerId: null, count: 1 }] });
   assert.equal(zonesOf(single).find((z) => z.kind === 'discard').name, 'Discard', 'not "Discard 1"');
 
-  const many = createInitialState({}, () => 0.5, { zones: [{ kind: 'cascade', ownerId: null, count: 3 }] });
+  const many = createInitialState({}, () => 0.5, { piles: [{ kind: 'cascade', ownerId: null, count: 3 }] });
   assert.deepEqual(
     zonesOf(many).filter((z) => z.kind === 'cascade').map((z) => z.name),
     ['Cascade 1', 'Cascade 2', 'Cascade 3'],
@@ -636,14 +636,14 @@ test('createInitialState: a configured zone is capitalized and only numbered whe
 // derived from `kind`+index, matching `configuredZoneName`'s own
 // numbering rule (unnumbered when there's only one).
 test('createInitialState: a configured zone\'s id is deterministic (kind alone when there\'s only one), not a random UUID', () => {
-  const state = createInitialState({}, () => 0.5, { zones: [{ kind: 'discard', ownerId: null, count: 1 }] });
+  const state = createInitialState({}, () => 0.5, { piles: [{ kind: 'discard', ownerId: null, count: 1 }] });
   assert.equal(zonesOf(state).find((z) => z.kind === 'discard').id, 'discard');
 });
 
 test('createInitialState: a configured zone\'s id is deterministic AND stable across separate calls with the same preset', () => {
-  const zones = [{ kind: 'foundation', ownerId: null, count: 4 }, { kind: 'cascade', ownerId: null, count: 7 }];
-  const first = createInitialState({}, () => 0.5, { zones });
-  const second = createInitialState({}, () => 0.5, { zones });
+  const pileDecls = [{ kind: 'foundation', ownerId: null, count: 4 }, { kind: 'cascade', ownerId: null, count: 7 }];
+  const first = createInitialState({}, () => 0.5, { piles: pileDecls });
+  const second = createInitialState({}, () => 0.5, { piles: pileDecls });
   const idsOf = (state) => zonesOf(state).filter((z) => z.kind === 'foundation' || z.kind === 'cascade')
     .map((z) => z.id).sort();
   assert.deepEqual(idsOf(first), idsOf(second), 'the same preset must produce the same zone ids every game, so a saved panel layout still applies');
@@ -656,13 +656,13 @@ test('createInitialState: a configured zone\'s id is deterministic AND stable ac
 
 test('createInitialState: a \'perPlayer\' configured zone builds NO piles yet - count isn\'t knowable before a player exists', () => {
   const state = createInitialState({}, () => 0.5, {
-    zones: [{ kind: 'cascade', ownerId: 'perPlayer', count: 1 }],
+    piles: [{ kind: 'cascade', ownerId: 'perPlayer', count: 1 }],
   });
   assert.equal(zonesOf(state).filter((z) => z.kind === 'cascade').length, 0);
 });
 
 test('JOIN: a \'perPlayer\' configured zone also gets a deterministic id (kind + playerId), not a random UUID', () => {
-  let state = createInitialState({}, () => 0.5, { zones: [{ kind: 'cascade', ownerId: 'perPlayer', count: 1 }] });
+  let state = createInitialState({}, () => 0.5, { piles: [{ kind: 'cascade', ownerId: 'perPlayer', count: 1 }] });
   state = reduce(state, { type: 'JOIN', playerId: 'p1', name: 'Alice' });
   const ownPile = zonesOf(state).find((z) => z.kind === 'cascade' && z.ownerId === 'p1');
   assert.equal(ownPile.id, 'cascade-p1', 'same playerId, same preset -> same zone id every game, so a saved panel layout still applies');
@@ -670,7 +670,7 @@ test('JOIN: a \'perPlayer\' configured zone also gets a deterministic id (kind +
 
 test('JOIN: a \'perPlayer\' configured zone builds one pile per player, alongside their personal zone', () => {
   let state = createInitialState({}, () => 0.5, {
-    zones: [{ kind: 'rankAdjacent', ownerId: null, count: 2 }, { kind: 'cascade', ownerId: 'perPlayer', count: 1 }],
+    piles: [{ kind: 'rankAdjacent', ownerId: null, count: 2 }, { kind: 'cascade', ownerId: 'perPlayer', count: 1 }],
   });
   state = withPlayers(state, ['p1', 'p2']);
 
@@ -682,14 +682,14 @@ test('JOIN: a \'perPlayer\' configured zone builds one pile per player, alongsid
 });
 
 test('JOIN: a per-player configured zone name reads "<player>\'s <Kind>", singular, no index for count 1', () => {
-  let state = createInitialState({}, () => 0.5, { zones: [{ kind: 'cascade', ownerId: 'perPlayer', count: 1 }] });
+  let state = createInitialState({}, () => 0.5, { piles: [{ kind: 'cascade', ownerId: 'perPlayer', count: 1 }] });
   state = reduce(state, { type: 'JOIN', playerId: 'p1', name: 'Alice' });
   const ownPile = zonesOf(state).find((z) => z.kind === 'cascade' && z.ownerId === 'p1');
   assert.equal(ownPile.name, "Alice's Cascade");
 });
 
 test('JOIN: re-joining does not duplicate a \'perPlayer\' configured zone either', () => {
-  let state = createInitialState({}, () => 0.5, { zones: [{ kind: 'cascade', ownerId: 'perPlayer', count: 1 }] });
+  let state = createInitialState({}, () => 0.5, { piles: [{ kind: 'cascade', ownerId: 'perPlayer', count: 1 }] });
   state = reduce(state, { type: 'JOIN', playerId: 'p1', name: 'Alice' });
   state = reduce(state, { type: 'SET_CONNECTION', playerId: 'p1', connection: 'connecting' });
   state = reduce(state, { type: 'JOIN', playerId: 'p1', name: 'Alice' });
@@ -1330,4 +1330,125 @@ test('viewFor: a split (deck-kind) pile surfaces to a viewer as count-only, same
   const viewPile = view.zones.find((z) => z.name === 'Pile 1');
   assert.deepEqual(viewPile.cards, [], 'no per-card data at all - stronger than per-card redaction');
   assert.equal(viewPile.count, pile.cards.length, 'the size is still public, same badge as the deck itself');
+});
+
+// --- D55 (Sprint 23): Zone is a real, independent entity - `state.zones`
+// - and every table-side pile's own `zoneId` names which one it belongs
+// to. These characterize the DEFAULT assignment (reproducing every rule
+// `ui.js` used to hardcode) and the new `MOVE_PILE` reducer case that
+// makes `zoneId` real, mutable data.
+
+test('createInitialState: seeds a real Table Zone record, and the deck/table piles both point at it', () => {
+  const state = createInitialState({}, () => 0.5);
+  assert.deepEqual(state.zones, [{ id: 'table-zone', name: 'Table Zone', ownerId: null, type: 'shared' }]);
+  assert.equal(zonesOf(state).find((z) => z.id === 'deck').zoneId, 'table-zone');
+  assert.equal(tableOf(state).zoneId, 'table-zone');
+});
+
+test('CREATE_ZONE: a live user action, not a declaration - every kind (including discard) is standalone by default, never guessed from kind', () => {
+  let state = reduce(createInitialState({}, () => 0.5), { type: 'CREATE_ZONE', name: 'Discard', kind: 'discard' });
+  const discard = zonesOf(state).find((z) => z.name === 'Discard');
+  assert.equal(discard.zoneId, discard.id, 'no kind-based Table Zone inference for a live CREATE_ZONE - only a declared GameConfig.zones entry can request that');
+  assert.equal(state.zones.length, 2, 'table-zone (seeded at startup) + the new standalone zone');
+
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Solo Zone' });
+  const solo = zonesOf(state).find((z) => z.name === 'Solo Zone');
+  assert.equal(solo.zoneId, solo.id, 'a plain zone is alone in its own Zone, keyed by its own pile id');
+  assert.ok(state.zones.some((z) => z.id === solo.id && z.name === null && z.ownerId === null));
+});
+
+test('GameConfig.piles: an entry\'s own zoneId groups it into an existing Zone, declared - not inferred from kind (D55)', () => {
+  const state = createInitialState({}, () => 0.5, {
+    piles: [{ kind: 'discard', ownerId: null, count: 1, zoneId: 'table-zone' }],
+  });
+  const discard = zonesOf(state).find((z) => z.kind === 'discard');
+  assert.equal(discard.zoneId, 'table-zone');
+  assert.equal(state.zones.length, 1, 'no new zone record needed - table-zone already exists');
+});
+
+test('GameConfig.zones: a Zone is a real entity - {id, name, type} - declared alongside GameConfig.piles (D55)', () => {
+  const state = createInitialState({}, () => 0.5, {
+    zones: [{ id: 'discard-zone', name: 'Discard Area', type: 'shared' }],
+    piles: [{ kind: 'discard', ownerId: null, count: 1, zoneId: 'discard-zone' }],
+  });
+  assert.ok(state.zones.some((z) => z.id === 'discard-zone' && z.name === 'Discard Area' && z.type === 'shared'));
+  assert.equal(zonesOf(state).find((z) => z.kind === 'discard').zoneId, 'discard-zone');
+});
+
+test('GameConfig.zones: type defaults to "shared" when a declared entity omits it', () => {
+  const state = createInitialState({}, () => 0.5, { zones: [{ id: 'extra', name: 'Extra' }] });
+  assert.ok(state.zones.some((z) => z.id === 'extra' && z.type === 'shared'));
+});
+
+test('GameConfig.piles: a zoneId referencing an UNDECLARED Zone throws - real config errors are not silently accepted (D55)', () => {
+  assert.throws(
+    () => createInitialState({}, () => 0.5, {
+      piles: [{ kind: 'discard', ownerId: null, count: 1, zoneId: 'typo-zone' }],
+    }),
+    /no such Zone is declared/,
+  );
+});
+
+test('JOIN: seeds a player Zone record before the hand pile even exists; the hand pile lands in it once created', () => {
+  let state = reduce(createInitialState({}, () => 0.5), { type: 'JOIN', playerId: 'p1', name: 'P1' });
+  assert.ok(state.zones.some((z) => z.id === 'player-p1' && z.ownerId === 'p1' && z.type === 'perPlayer'));
+
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
+  assert.equal(state.piles.find((p) => p.id === 'hand:p1').zoneId, 'player-p1');
+});
+
+test("JOIN: a 'perPlayer' configured zone shares the same player Zone as that player's hand", () => {
+  let state = createInitialState({}, () => 0.5, { piles: [{ kind: 'zone', ownerId: 'perPlayer', count: 1 }] });
+  state = reduce(state, { type: 'JOIN', playerId: 'p1', name: 'P1' });
+  const stock = zonesOf(state).find((z) => z.ownerId === 'p1' && z.id !== 'hand:p1');
+  assert.equal(stock.zoneId, 'player-p1');
+});
+
+test('MOVE_PILE: reparents an eligible pile into an existing Zone, as a sibling', () => {
+  let state = reduce(createInitialState({}, () => 0.5), { type: 'CREATE_ZONE', name: 'Solo Zone' });
+  const solo = zonesOf(state).find((z) => z.name === 'Solo Zone');
+  state = reduce(state, { type: 'MOVE_PILE', pileId: solo.id, targetZoneId: 'table-zone' });
+  assert.equal(zonesOf(state).find((z) => z.id === solo.id).zoneId, 'table-zone');
+  // Sibling, not a merge - the Table pile's own cards/identity untouched.
+  assert.equal(tableOf(state).id, 'table');
+});
+
+test('MOVE_PILE: rejects deck/hand/foundation/cascade/rankAdjacent - only zone/discard piles are eligible', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
+  assert.throws(() => reduce(state, { type: 'MOVE_PILE', pileId: 'deck', targetZoneId: 'table-zone' }), /Cannot move/);
+  assert.throws(() => reduce(state, { type: 'MOVE_PILE', pileId: 'hand:p1', targetZoneId: 'table-zone' }), /Cannot move/);
+});
+
+test('MOVE_PILE: rejects an unknown target Zone', () => {
+  const state = createInitialState({}, () => 0.5);
+  assert.throws(() => reduce(state, { type: 'MOVE_PILE', pileId: 'table', targetZoneId: 'nope' }), /does not exist/);
+});
+
+test('MOVE_PILE: no target ungroups - a fresh standalone Zone of the pile\'s own', () => {
+  let state = reduce(createInitialState({}, () => 0.5), { type: 'CREATE_ZONE', name: 'Discard', kind: 'discard' });
+  const discard = zonesOf(state).find((z) => z.name === 'Discard');
+  // Join the Table Zone first (MOVE_PILE, not CREATE_ZONE - a live
+  // CREATE_ZONE never auto-groups, per D55) so there's something real
+  // to ungroup out of.
+  state = reduce(state, { type: 'MOVE_PILE', pileId: discard.id, targetZoneId: 'table-zone' });
+  assert.equal(zonesOf(state).find((z) => z.id === discard.id).zoneId, 'table-zone');
+
+  state = reduce(state, { type: 'MOVE_PILE', pileId: discard.id, targetZoneId: null });
+  const moved = zonesOf(state).find((z) => z.id === discard.id);
+  assert.equal(moved.zoneId, discard.id, 'standalone now - its own zoneId, not table-zone');
+  assert.ok(state.zones.some((z) => z.id === discard.id));
+});
+
+test('MOVE_PILE: throws for an unknown pile id', () => {
+  const state = createInitialState({}, () => 0.5);
+  assert.throws(() => reduce(state, { type: 'MOVE_PILE', pileId: 'nope', targetZoneId: 'table-zone' }), /does not exist/);
+});
+
+test('viewFor: carries zoneRecords (the real Zone registry) and each pile-view its own zoneId', () => {
+  const state = createInitialState({}, () => 0.5);
+  const view = viewFor(state, 'p1');
+  assert.deepEqual(view.zoneRecords, [{ id: 'table-zone', name: 'Table Zone', ownerId: null, type: 'shared' }]);
+  assert.equal(view.zones.find((z) => z.id === 'table').zoneId, 'table-zone');
+  assert.equal(view.zones.find((z) => z.id === 'deck').zoneId, 'table-zone');
 });

@@ -92,11 +92,11 @@ test('D46: gameConfig round-trips through save/load', () => {
   const state = createInitialState({}, () => 0.5, { allowsPlayerZones: false });
   const storage = fakeStorage();
   save(storage, state, 'ABC123');
-  assert.deepEqual(load(storage).state.gameConfig, { allowsPlayerZones: false, zones: [] });
+  assert.deepEqual(load(storage).state.gameConfig, { allowsPlayerZones: false, piles: [], zones: [] });
 });
 
 test('D46: a snapshot from before this field existed restores fine, with no gameConfig at all - not a version bump, additive only', () => {
-  const preD46 = JSON.stringify({ version: SNAPSHOT_VERSION, piles: [], players: [] });
+  const preD46 = JSON.stringify({ version: SNAPSHOT_VERSION, piles: [], players: [], zones: [] });
   const storage = fakeStorage({ [STORAGE_KEY]: preD46 });
   const result = load(storage);
   assert.equal(result.ok, true, 'must NOT be refused the way a real version bump would refuse it');
