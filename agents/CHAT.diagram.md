@@ -171,4 +171,6 @@ sequenceDiagram
     Note right of Trin: "*qa uat phase-76 PASSED.<br/>Independently re-ran npm<br/>test (358/358),<br/>lint:style clean, and<br/>grepped for every<br/>removed CSS class/id<br/>(fd-btn, mov…"
     Morpheus->>Neo: "lead handoff"
     Note right of Morpheus: "Phase 76 review PASSED.<br/>Good discipline: kept<br/>the still-load-bearing<br/>part of the compound<br/>selector instead of<br/>deleting the whole rule,<br/>and…"
+    Neo->>All: "swe decision"
+    Note right of Neo: "D60 recorded: deleted<br/>tests/e2e.smoke.mjs<br/>(1692 lines, monolithic)<br/>- asserted against DOM<br/>ids (#hand-area/#table-<br/>area/#seat-zones)<br/>retired…"
 ```

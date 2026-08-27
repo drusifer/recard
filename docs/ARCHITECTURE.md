@@ -3289,3 +3289,30 @@ treatment without needing to remember a suppression comment.
 **Verified:** `npm run lint:js` 435 → 246 findings from this change
 alone. `npm test` 358/358 unchanged throughout (no code touched, config
 only).
+
+---
+
+### D60. `tests/e2e.smoke.mjs` removed rather than repaired (US-67, tech-debt sprint)
+
+**Decision:** delete the file outright. See the Testing Strategy
+section above for the full account of what it covered and why it had
+gone stale.
+
+**What was rejected, and why:** two alternatives were presented to the
+user rather than picked unilaterally - (1) leave it in place and file a
+rewrite as its own future sprint, (2) attempt the full rewrite inside
+this sprint. Both were live options; the user chose deletion. Rejected
+reasoning for each: (1) would keep a 1692-line file sitting in the repo
+that looks like a maintained test suite but tests nothing real, an
+ongoing source of the exact false confidence that let this drift go
+unnoticed as long as it did; (2) is a full integration-suite
+re-authoring project (rewriting selectors for every scenario against
+the current `#zones`-based DOM), not a "cut dead tests" task, and too
+large/risky to take on unplanned mid-sprint.
+
+**Where the full text lives:** `docs/ARCHITECTURE.md`'s Testing
+Strategy section (above); commit `7da7321`.
+
+**Verified:** `npm test` 358/358 (never depended on this file), `npm
+run lint:design` unchanged (5 pre-existing violations, same as before),
+`npm run lint:js` unaffected.
