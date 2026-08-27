@@ -28,6 +28,59 @@ const DONE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const COPY_LABEL = 'Copy table code';
 
 /**
+ * *nit fix (2026-08-26), real bug found live: `navigator.clipboard` is
+ * only defined in a SECURE CONTEXT (`https:`, or `http://localhost`/
+ * `127.0.0.1`) - and this app's own README tells a guest to open it at
+ * the HOST'S LAN IP over plain `http://`, which is NOT one. On that
+ * connection `navigator.clipboard` is `undefined`, so `?.writeText()`
+ * silently no-ops - yet the button went straight to showing "Copied"
+ * regardless, because nothing ever checked whether the write actually
+ * happened. The button was lying, not "not copying" in some vaguer
+ * sense - confirmed by instrumenting `writeText` live: it never even
+ * exists to call on that exact connection.
+ *
+ * `copyText` is the fix, factored out so it's testable/reusable on its
+ * own: try the modern Clipboard API when it exists; when it doesn't (or
+ * it exists but the browser still rejects the call - a permission
+ * prompt denial, for instance), fall back to the classic
+ * select-a-hidden-textarea-and-`execCommand('copy')` trick, which is a
+ * SYNCHRONOUS DOM API that still works in a non-secure context (that's
+ * exactly why it's still worth keeping as a fallback despite being
+ * deprecated - the modern replacement doesn't cover this real case).
+ * Resolves `true`/`false` for whether it actually worked, never throws.
+ */
+export async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Permission denied, or some other runtime rejection - fall
+      // through to the legacy path rather than give up.
+    }
+  }
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  // Off-screen, not `display: none` - a hidden element can't be
+  // focused/selected, and `execCommand('copy')` only ever copies the
+  // current selection.
+  textarea.style.position = 'fixed';
+  textarea.style.left = '-9999px';
+  textarea.setAttribute('readonly', '');
+  document.body.appendChild(textarea);
+  textarea.select();
+  textarea.setSelectionRange(0, text.length); // iOS Safari needs this explicitly, select() alone isn't enough
+  let copied = false;
+  try {
+    copied = document.execCommand('copy');
+  } catch {
+    copied = false;
+  }
+  textarea.remove();
+  return copied;
+}
+
+/**
  * Turns any button into the icon-only "copy the table code" control.
  *
  * The code, not a join URL: the code is what someone reads out, types in,
@@ -38,7 +91,9 @@ const COPY_LABEL = 'Copy table code';
  * An icon-only button has no text for a screen reader to announce, so the
  * `aria-label` IS the button's name here, not a nicety — and it flips to
  * "Copied" with the glyph so the confirmation reaches someone who cannot
- * see the tick.
+ * see the tick. *nit (2026-08-26): only flips to that state on a
+ * CONFIRMED copy now (`copyText`'s real return value) - a failure flips
+ * to an honest "Couldn't copy" instead, never a false positive.
  *
  * Assigns `onclick` rather than adding a listener: `showGameCode` re-runs
  * on every state broadcast, and `addEventListener` would stack a new
@@ -49,11 +104,12 @@ export function wireCopyCode(btn, code) {
   btn.innerHTML = COPY_ICON;
   btn.setAttribute('aria-label', COPY_LABEL);
   btn.title = COPY_LABEL;
-  btn.onclick = () => {
-    navigator.clipboard?.writeText(code);
-    btn.innerHTML = DONE_ICON;
-    btn.setAttribute('aria-label', 'Copied');
-    btn.title = 'Copied';
+  btn.onclick = async () => {
+    const ok = await copyText(code);
+    btn.innerHTML = ok ? DONE_ICON : COPY_ICON;
+    const label = ok ? 'Copied' : "Couldn't copy - select and copy the code manually";
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
     setTimeout(() => {
       btn.innerHTML = COPY_ICON;
       btn.setAttribute('aria-label', COPY_LABEL);

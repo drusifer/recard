@@ -2571,3 +2571,49 @@ baseline) before calling it done.
 None outstanding on D56 itself. @Trin still owed UAT on the class
 rewrite (unchanged from above). If ScoreZone-as-a-real-Zone is wanted,
 it should come in as its own new request/decision, not a D56 follow-up.
+
+## D57: piles/zones/cards all Movable (2026-08-26, bloop)
+
+### What I did
+Delivered `task.md` Phase 72 (pile-title drag between zones) plus a
+new capability the user's bloop request added: cards dropped on a
+zone's own empty space spawn a new pile.
+
+- `state.js`: new `CREATE_PILE` action (join an EXISTING zone,
+  optionally atomically seeded with a moved card via `transferCard`,
+  same PLAY-vs-MOVE branching `dropCardOnZone` already makes at the UI
+  layer). 5 new tests, TDD-first.
+- `ui.js`: pile-title native HTML5 drag (`pile-drag:<id>` token,
+  distinct from a card's bare id and a pile-action token). Zone-level
+  drop handling for both pile-reparent and card-spawn-pile, `#zones`
+  background handling for ungroup. `.zone-drag-over` highlight fixed
+  to target `zoneEl` (was wrongly toggled on `.zone-body`, which
+  matches no CSS rule - would have rendered nothing).
+- `pileActions.js`: new `isReparentable(kind)` helper.
+- **Real conflict found and resolved**: `attachPanelDrag`'s pointerdown
+  handler (used for panel-reposition) and native HTML5 drag can't both
+  wire onto the same element - `preventDefault()` on pointerdown blocks
+  native dragstart from ever firing. Fixed by skipping
+  `attachPanelDrag` wiring on a reparentable pile's own title
+  specifically (disclosed trade-off: that one case loses free-drag
+  panel repositioning, gains pile reparenting instead).
+- **Real gap found+fixed, unrelated to the ask**: `MOVE_PILE`'s
+  eligibility check was hardcoded (`pile.kind !== 'zone' && !==
+  'discard'`), never actually reading D56's own `reparentable` flag -
+  which was ALSO silently wrong on 3 classes (defaulted to `true`
+  instead of `false`). Fixed both; existing test coverage confirmed
+  zero behavior change.
+
+### Verification
+354/354 unit green. `lint:design` unchanged at pre-existing baseline.
+Live Playwright verification using real `DragEvent` dispatch (native
+DnD doesn't fire from Playwright's synthetic mouse input - same
+technique this project's own `e2e.smoke.mjs` already uses): card-drop
+spawns a real new pile with the highlight firing; pile ungroup and
+reparent both round-trip correctly, screenshots confirmed visually,
+zero console errors throughout.
+
+### Next Steps
+@Trin: UAT. This changes real interaction model (new drag gestures) -
+per the `*impl` bloop chain, Smith's UX gate applies after Trin/
+Morpheus, not skippable as internal-only.

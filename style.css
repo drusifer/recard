@@ -640,6 +640,21 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   cursor: grabbing;
 }
 
+/* Smith close-out finding, D57 (bloop: piles are Movable) - same
+   affordance rule as the card cursor above, applied here for real: a
+   reparentable pile's own title bar became a native drag source with
+   no visual hint at all that it's draggable (`cursor: auto`, verified
+   live before this fix). `[draggable="true"]` already tracks the exact
+   authorization (`isReparentable`, `ui.js`) - no separate condition
+   needed, same pattern this project already established for cards. */
+.pile-title[draggable='true'] {
+  cursor: grab;
+}
+
+.pile-title[draggable='true']:active {
+  cursor: grabbing;
+}
+
 /* Phase 55 (T55.1): same affordance rule as the drag cursor above - a
    revealable card's own class already tracks its authorization exactly
    (`actionsForCard`), so this needs no separate condition either.
@@ -648,6 +663,13 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    owner's own real `.card` face (`redactMiddleCard`, D7, never redacts
    a card from its own owner - see the T55.1 comment in ui.js). */
 .revealable {
+  cursor: pointer;
+}
+
+/* *nit (2026-08-26): same affordance rule as `.revealable` above, for
+   the new tap-to-rotate trigger that replaced the card hover-popup's
+   Rotate button ("cards are Movable not Actionable"). */
+.rotatable {
   cursor: pointer;
 }
 
@@ -787,6 +809,30 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   text-transform: uppercase;
   letter-spacing: 0.03em;
   margin-bottom: 0.25rem;
+}
+
+/* *nit (2026-08-26): rename affordance - a dashed underline hints
+   "double-click me" the way a text input's own affordance normally
+   would, without needing a visible pencil icon competing with the
+   pile/zone action buttons already crowding this same header. */
+.zone-name-text.renamable {
+  cursor: text;
+  border-bottom: 1px dashed transparent;
+}
+.zone-name-text.renamable:hover {
+  border-bottom-color: var(--muted);
+}
+.zone-name-edit {
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 0 0.2rem;
+  min-width: 4rem;
+  max-width: 10rem;
 }
 
 .move-to-select {
@@ -1097,8 +1143,19 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    the stack rendered on top of the header instead of below it. Scoping
    the positioning context to `.deck-stack` itself - where it visually
    lives - fixes it at the actual cause. */
+/* *nit (2026-08-26), real bug found live: `.deck-stack-card` (the
+   actual card-back visuals, `var(--card-h)` tall) is `position:
+   absolute`, so it never contributes to `.deck-stack`'s own auto
+   height - the box only grew to fit the in-flow `.deck-count-badge`
+   span (~1.3rem). `.deck-area-row`'s `align-items: center` then
+   centered that too-short box, leaving the actual card images
+   starting well below the row's own top and hanging out past the
+   pile-panel's bottom border by several px - confirmed via measured
+   `getBoundingClientRect()`, not just eyeballed. An explicit height
+   matching the real card art is what was missing. */
 .deck-stack {
   position: relative;
+  height: var(--card-h);
 }
 
 .deck-stack-card {
@@ -1384,8 +1441,16 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   align-items: flex-start;
 }
 
+/* *nit (2026-08-26), direct user request: "Piles are not Resizable so
+   they always should be the min size for the content." `flex-grow: 0`
+   (was `1`) - a Pile never stretches to fill extra space its Zone
+   happens to have (from a manual resize, or simply sitting beside a
+   taller sibling); only the ZONE itself is Resizable
+   (`wirePanelLayout`'s corner handle, wired once per Zone box, never
+   per Pile). `min-width` stays - a readability floor, not a growth
+   allowance. */
 .zone-body > .pile-section {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 11rem;
 }
 
@@ -1609,15 +1674,15 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 
 /* UX follow-up (direct user request): "small square icons ... tool tip
-   style hover text ... keep each button the same size." Shared by
-   `.pile-action-btn` (header buttons) and `.card-action-btn` (card
-   hover row) below - one fixed square, same for every action, the
-   glyph is the only thing that changes (`ACTION_SPECS[id].icon`, the
-   full name moved to `title`/`aria-label` - see `ui.js`'s
-   `applyIconButton`). 2.75rem keeps the existing 44px touch-target
-   floor exactly, just square instead of pill-shaped now. */
-.pile-action-btn,
-.card-action-btn {
+   style hover text ... keep each button the same size." One fixed
+   square, same for every pile/zone header action, the glyph is the
+   only thing that changes (`ACTION_SPECS[id].icon`, the full name
+   moved to `title`/`aria-label` - see `ui.js`'s `applyIconButton`).
+   2.75rem keeps the existing 44px touch-target floor exactly, just
+   square instead of pill-shaped now. *nit (2026-08-26): `.card-
+   action-btn` (the card hover-popup's own buttons) is gone with the
+   popup itself - "cards are Movable not Actionable". */
+.pile-action-btn {
   /* UX follow-up (direct user request, 2026-08-24): "the button is still
      HUGE... needs to be the same size or smaller than the title text."
      A deliberate override of the base `button{}` rule's 44px touch-
@@ -1647,55 +1712,12 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   border-radius: 0.15rem;
 }
 
-/* A card's own actions (Reveal is a direct tap, not a button here - see
-   `performReveal`): a small row directly below the card on hover,
-   never a permanent fixture (a real card is too small to carry 2-4
-   buttons at all times without becoming mostly button). Positioned
-   relative to the card itself now, not the pointer, so it needs none of
-   the old radial menu's trapped-stacking-context escapes. */
-.card-action-row {
-  /* `position: fixed`, not `absolute` inside the card - `ui.js`'s
-     `attachActionRow` sets `left`/`top` from the card's own
-     `getBoundingClientRect()`. Escapes a fanned row's clipping (real
-     bug, found live: its horizontal scroll, `overflow-x: auto`, needed
-     for the fan, forces `overflow-y` to compute as `auto` too, not
-     `visible` - a genuine CSS rule, a non-`visible` value on one axis
-     pulls the other off `visible` - so a row anchored INSIDE that box
-     and extending past its edge was silently clipped invisible).
-     Body-level fixed positioning is exactly why D52's own radial menu
-     used it, for the same underlying reason - reused here for a plain
-     row, not the ring. */
-  position: fixed;
-  translate: -50% -100%;
-  margin-top: -0.25rem;
-  z-index: 20;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  width: max-content;
-  max-width: 9rem;
-  justify-content: center;
-}
-
-/* The follow-mode label (`beginTargetingWithGhost`) - "the card follows
-   my mouse" (user's own wording). Text-only, not a full card clone: the
-   ghost only needs to say WHICH action is armed, not re-render the
-   card's face - `dropTarget.js`'s "picked-up" cue is the pile lighting
-   up `.pile-target`, not this label. */
-.radial-follow-ghost {
-  position: fixed;
-  translate: -50% -140%;
-  z-index: 21;
-  pointer-events: none;
-  background: var(--accent);
-  color: var(--accent-text);
-  padding: 0.3rem 0.6rem;
-  border-radius: var(--radius-md);
-  font-size: 0.8rem;
-  font-weight: 600;
-  white-space: nowrap;
-  box-shadow: 0 4px 14px rgb(0 0 0 / 45%);
-}
+/* *nit (2026-08-26), direct user request ("cards are Movable not
+   Actionable"): the card hover-popup (`.card-action-row`, `ui.js`'s
+   `attachActionRow`) and its follow-mode label (`.radial-follow-ghost`,
+   `beginTargetingWithGhost`) are both deleted - every card action now
+   has a real trigger of its own (drag for move/pickup/play, a direct
+   tap for reveal/rotate), no popup needed at all. */
 
 /* Phase 56 (T56.1)/D52: the count inputs (Deal's cards-per-player,
    Split's pile count) are persistent now, next to the deck itself, not
@@ -1748,20 +1770,25 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 #resume-anyway-btn { min-height: 44px; }
 
-/* UX follow-up (direct user request): move is a base zone feature now -
-   every pile/zone panel (shared, personal, deck) switches to this,
-   plain `position: absolute` with NO transform, the first time it's
-   actually dragged (`ui.js`'s `attachPanelDrag`). Before that, each
-   panel keeps its own default mechanism unchanged - a personal zone's
-   `.seat-zone`/`.own-zone` centering `--raise-base` transform, or a
-   shared/deck panel's normal flex-wrap flow (`#zones`). `--raise-base:
-   none` matters even though `transform` alone would look right at
-   rest: `.pile-hover-host:hover` COMPOSES `var(--raise-base, none)`
-   with its own raise - leaving the old centering transform in that
-   custom property would silently re-apply it (a visible jump) the
-   moment a moved panel is hovered. `.zone.panel-moved` (not just
-   `.panel-moved`) outranks `.seat-zone`'s own same-specificity rule
-   regardless of source order. */
+/* UX follow-up (direct user request): move is a base zone feature -
+   every Zone panel (shared, personal, deck) switches to this, plain
+   `position: absolute` with NO transform, the first time it's actually
+   dragged (`ui.js`'s `attachPanelDrag`) or preset-seeded
+   (`applyPresetLayout`). Before that, each panel keeps its own default
+   mechanism unchanged - a personal zone's `.seat-zone`/`.own-zone`
+   centering `--raise-base` transform, or a shared/deck panel's normal
+   flex-wrap flow (`#zones`). `--raise-base: none` matters even though
+   `transform` alone would look right at rest: `.pile-hover-host:hover`
+   COMPOSES `var(--raise-base, none)` with its own raise - leaving the
+   old centering transform in that custom property would silently
+   re-apply it (a visible jump) the moment a moved panel is hovered.
+   `.zone.panel-moved` (not just `.panel-moved`) outranks `.seat-zone`'s
+   own same-specificity rule regardless of source order.
+   *nit (2026-08-26) history: this whole mechanism was briefly deleted
+   ("remove pointer-based panel behavior"), then directly restored by
+   the user - "zones can be moved anywhere on the table, it was working
+   great until you broke it." Piles use a separate native-drag
+   mechanism for their own different capability (reparent/reorder). */
 .zone.panel-moved {
   position: absolute;
   transform: none;
@@ -1802,6 +1829,23 @@ body.panel-drag-active {
      happening) - this means "you CAN do something here", a standing
      affordance, not a live state change. */
   border-color: rgba(79, 157, 255, 0.4);
+}
+
+/* *nit (2026-08-26), real bug found live: a Zone's own `flex-grow: 1`
+   (`#zones > .zone:not(.seat-zone)`, ID+2-class specificity) outranks
+   an explicit `style.width` set by a resize - the drag correctly set
+   the width, but the browser grew the panel right back past it to
+   fill the row anyway, reading as "I can't make it narrower." Once a
+   panel has a REAL width (a live resize, or a stored/preset one -
+   `ui.js`'s `wirePanelLayout`/`attachPanelResize` both add this class
+   the moment that's true), it stops growing - the explicit width is
+   what a resize is FOR. Matched (ID + 2 classes + the same `:not()`
+   argument) rather than a bare `.panel-sized`, so this genuinely
+   outranks the rule it's overriding instead of hoping source order
+   favors it - same reasoning `.zone.panel-moved`'s own comment gives
+   for its fight against `.seat-zone`. */
+#zones > .zone.panel-sized:not(.seat-zone) {
+  flex-grow: 0;
 }
 
 .panel-resize-handle {

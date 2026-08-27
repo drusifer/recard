@@ -11,6 +11,12 @@ import { RANKS } from '../decks/standardDeck.js';
 const RED_SUITS = new Set(['diamonds', 'hearts']);
 
 export class CascadePile extends Pile {
+  /** *nit fix (2026-08-26): matches `MOVE_PILE`'s own hardcoded
+   * eligibility (`state.js`), now actually read from this flag instead
+   * of duplicated there - a cascade is one of Solitaire's 7 fixed
+   * tableau columns, not something meaningful to drag elsewhere. */
+  static reparentable = false;
+
   /** No before/after halo choice - a card either fits the sequence or
    * it doesn't (`canAccept` decides that); it always lands at the end. */
   static resolveDropTarget() {

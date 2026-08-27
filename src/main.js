@@ -15,6 +15,7 @@ import {
   setCardLifted,
   updateCardDragGhost,
   removeCardDragGhost,
+  pileDragFromDrop,
 } from './ui.js';
 import { pileLevelActions } from './pileActions.js';
 import { PRESETS } from './presets.js';
@@ -54,6 +55,22 @@ const bannerEl = document.getElementById('banner');
 // child of this one flat container now, no `#table-center`/
 // `#table-area`/`#seat-zones` split.
 const zonesEl = document.getElementById('zones');
+// (bloop: piles/zones/cards are all Movable) - "drop here to ungroup"
+// (Phase 72's own task.md AC): a pile dropped on the open TABLE
+// background, not onto any specific Zone, becomes its own standalone
+// Zone (`MOVE_PILE` with no target - D55's existing ungroup design).
+// Wired once, here, directly on the persistent `#zones` container
+// (survives `renderZones`' own innerHTML rebuilds) rather than
+// re-attached every render. Every Zone's own drop handler
+// (`renderZonePanel`, `ui.js`) `stopPropagation()`s a pile-token drop
+// it actually handles, so this only ever fires for a drop that lands
+// on truly empty space between zones, never a double-dispatch.
+zonesEl.addEventListener('dragover', (e) => e.preventDefault());
+zonesEl.addEventListener('drop', (e) => {
+  e.preventDefault();
+  const pileId = pileDragFromDrop(e.dataTransfer);
+  if (pileId) performMovePile(pileId, null);
+});
 // Only ever built for the VIEWER's own score (other players' scores
 // show in the roster list, `renderRoster`'s own thing) - one browser,
 // one own-score panel, so a single fixed id is enough.
@@ -987,6 +1004,19 @@ function renderGameFromView(view) {
       if (actionId === 'hide') return performSetPileOrientation(pileId, false);
       if (actionId === 'show') return performSetPileOrientation(pileId, true);
     },
+    // *nit (2026-08-26): "allow user to rename zones and piles - any
+    // user can edit - persisted by host." Same `sessionEnded` gate
+    // every other dispatching handler in this object already uses.
+    onRenamePile: sessionEnded ? null : (pileId, name) => performRenamePile(pileId, name),
+    onRenameZone: sessionEnded ? null : (zoneId, name) => performRenameZone(zoneId, name),
+    // (bloop: piles/zones/cards are all Movable)
+    onMovePile: sessionEnded ? null : (pileId, targetZoneId) => performMovePile(pileId, targetZoneId),
+    // *nit (2026-08-26): "relocated within their zone (ordering)" -
+    // every pile can be reordered among its own zone's siblings, even
+    // a kind `onMovePile`/`MOVE_PILE` would reject for a cross-zone
+    // move (purely cosmetic, no game-rule concern either way).
+    onReorderPile: sessionEnded ? null : (pileId, beforePileId) => performReorderPile(pileId, beforePileId),
+    onDropCardOnZone: sessionEnded ? null : (cardId, zoneId) => performCreatePileWithCard(cardId, zoneId),
     isHost: role === 'host',
     // US-41/D29: dealing lives on the deck, where the cards are - the
     // whole point of the story. Read/written here since the deck now
@@ -999,11 +1029,14 @@ function renderGameFromView(view) {
     // UX follow-up (direct user request): panel position/size is a
     // local, per-browser preference (`panelLayout.js`) - read fresh on
     // every render so a drag/resize persisted by `movePanel`/
-    // `resizePanel` above shows up on the very next render, same as it
+    // `resizePanel` below shows up on the very next render, same as it
     // did when this was replicated state. Overrides the computed
     // default position when present; `movePanel`/`resizePanel` are what
     // a title-bar drag/corner-handle drag (`ui.js`'s `attachPanelDrag`/
-    // `attachPanelResize`) call on release.
+    // `attachPanelResize`) call on release. *nit (2026-08-26) history:
+    // `onMovePanel` was briefly removed, then directly restored - see
+    // `wirePanelLayout`'s own comment ("zones can be moved anywhere on
+    // the table").
     layout: loadPanelLayout(window.localStorage),
     onMovePanel: movePanel,
     onResizePanel: resizePanel,
@@ -1086,6 +1119,9 @@ function rotateCard(cardId) {
 // release; the drag itself already applied the style live (`ui.js`),
 // so this just persists it for the NEXT render (`renderGameFromView`
 // reads `loadPanelLayout` fresh every time) - nothing to send anywhere.
+// *nit (2026-08-26) history: briefly removed, then directly restored -
+// see `wirePanelLayout`'s own comment. Zone panels only now (a Pile's
+// own title uses native drag for a different capability instead).
 function movePanel(id, x, y) {
   savePanelPosition(window.localStorage, id, x, y);
 }
@@ -1210,6 +1246,76 @@ function performSetPileOrientation(pileId, faceUp) {
     try { dispatch({ type: 'SET_PILE_ORIENTATION', playerId: myId, pileId, faceUp }); }
     catch (err) { window.alert(err.message); }
   } else session.send({ type: 'action', action: { type: 'SET_PILE_ORIENTATION', pileId, faceUp } });
+}
+
+// *nit (2026-08-26): rename, any player - same dispatch shape as every
+// other pile-affecting action above. `window.alert` on failure matches
+// `performSplitPile`/`performTakePile`'s own precedent for a reducer
+// throw the UI itself can't prevent in advance (here: a concurrent
+// delete of the pile/zone between the dblclick and the commit).
+function performRenamePile(pileId, name) {
+  if (sessionEnded) return;
+  if (role === 'host') {
+    try { dispatch({ type: 'RENAME_PILE', playerId: myId, pileId, name }); }
+    catch (err) { window.alert(err.message); }
+  } else session.send({ type: 'action', action: { type: 'RENAME_PILE', pileId, name } });
+}
+
+function performRenameZone(zoneId, name) {
+  if (sessionEnded) return;
+  if (role === 'host') {
+    try { dispatch({ type: 'RENAME_ZONE', playerId: myId, zoneId, name }); }
+    catch (err) { window.alert(err.message); }
+  } else session.send({ type: 'action', action: { type: 'RENAME_ZONE', zoneId, name } });
+}
+
+// (bloop: piles/zones/cards are all Movable) - reparent a pile
+// (`targetZoneId: null` ungroups into a fresh standalone Zone, D55's
+// existing design). Same dispatch shape as every other pile-affecting
+// action above.
+function performMovePile(pileId, targetZoneId) {
+  if (sessionEnded) return;
+  if (role === 'host') {
+    try { dispatch({ type: 'MOVE_PILE', playerId: myId, pileId, targetZoneId }); }
+    catch (err) { window.alert(err.message); }
+  } else session.send({ type: 'action', action: { type: 'MOVE_PILE', pileId, targetZoneId } });
+}
+
+// *nit (2026-08-26): reorder a pile among its own zone's siblings -
+// same dispatch shape as every other pile-affecting action, purely
+// cosmetic (no authorization beyond "these two piles share a zone",
+// which the reducer itself re-checks).
+function performReorderPile(pileId, beforePileId) {
+  if (sessionEnded) return;
+  if (role === 'host') {
+    try { dispatch({ type: 'REORDER_PILE', playerId: myId, pileId, beforePileId }); }
+    catch (err) { window.alert(err.message); }
+  } else session.send({ type: 'action', action: { type: 'REORDER_PILE', pileId, beforePileId } });
+}
+
+
+// A card dropped on a Zone's own empty space spawns a brand-new pile
+// there, seeded with that card - one atomic dispatch (`CREATE_PILE`,
+// `state.js`) rather than create-then-move as two separate actions,
+// which would race a guest's own relayed send against the host's
+// broadcast of the intermediate state.
+function performCreatePileWithCard(cardId, zoneId) {
+  if (sessionEnded) return;
+  const view = currentView();
+  if (!view) return;
+  // Same hand-vs-table source distinction `dropCardOnZone` already
+  // makes - `state.js`'s own `CREATE_PILE` case re-derives it too
+  // (never trusts the client alone for the PLAY-vs-MOVE authorization
+  // shape), this just needs to know which existing pile to remove the
+  // card FROM.
+  const fromPileId = view.myHand.some((c) => c.id === cardId)
+    ? view.zones.find((z) => z.kind === 'hand' && z.ownerId === myId)?.id
+    : view.zones.find((z) => z.cards.some((c) => c.id === cardId))?.id;
+  if (!fromPileId) return;
+  if (role === 'host') {
+    try { dispatch({ type: 'CREATE_PILE', playerId: myId, zoneId, fromPileId, cardId }); }
+    catch (err) { window.alert(err.message); }
+  } else session.send({ type: 'action', action: { type: 'CREATE_PILE', zoneId, fromPileId, cardId } });
 }
 
 // D35/D51 (both drop behaviors): Draw's action-token drop is

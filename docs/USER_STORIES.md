@@ -2316,3 +2316,30 @@ same way other zones do? does it get a `viewerRelation`-driven "You"
 badge the way personal zones already do?), sized and sequenced like any
 other feature, not inherited from D56 by default. See
 `docs/ARCHITECTURE.md` D56's closing section for the full reasoning.
+
+---
+
+## Backlog: Smith close-out finding, D57 (2026-08-26) - "drop here to ungroup" has no visual affordance
+
+Live-tested D57's pile-drag (piles/zones/cards all Movable, bloop).
+Two real findings, one fixed on the spot, one filed:
+
+1. **Fixed live**: `.pile-title[draggable="true"]` had no cursor
+   affordance at all (`cursor: auto`, confirmed via
+   `getComputedStyle`) - the exact same gap this project already named
+   and fixed for cards (Sprint 4 close-out finding #1, "the only
+   visual hint a mouse user has that [something] is draggable"). Added
+   `cursor: grab`/`:active { cursor: grabbing }`, same pattern,
+   `style.css`.
+2. **Not fixed, filed**: Phase 72's own AC (`task.md`) called the
+   "drop here to ungroup" open-`#zones`-background target "explicit,
+   equally-visible" alongside the Zone-drop highlight. It functions
+   correctly (verified: dropping there does ungroup a pile) but has
+   ZERO visual cue during the drag - `#zones` is `position: absolute;
+   inset: 0`, so a naive border/tint would run along the outer
+   viewport edge rather than reading as a distinct drop region. Doing
+   this well needs real design thought (a dedicated visible drop
+   affordance, not just a class toggle on the existing full-bleed
+   container) - not something to guess at blind. Functional, not
+   fully meeting its own AC's visibility bar - real UX debt, not a
+   blocker for the feature working.

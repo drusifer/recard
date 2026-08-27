@@ -567,6 +567,57 @@ const ACTIONS = {
   },
 
   /**
+   * (bloop: piles/zones/cards are all Movable) - a card dropped on a
+   * Zone's own empty space, not onto any existing pile inside it,
+   * spawns a brand-new pile there. Deliberately its own action, not
+   * `CREATE_ZONE` with an optional `zoneId` bolted on: `CREATE_ZONE`
+   * always mints a NEW standalone Zone (`ensureZoneRecord`); this
+   * always joins an EXISTING one (validated, never created) - the same
+   * genuine Zone/Pile distinction D55 already drew, not two branches
+   * of one action pretending to be the same operation.
+   *
+   * `cardId`/`fromPileId` are optional (an empty pile can be spawned on
+   * its own) but must come together - seeding the new pile with a
+   * dropped card reuses `transferCard` (D43) so authorization/`canAccept`
+   * both run through the exact same single path `MOVE_CARD` does,
+   * atomically in one dispatch (no create-then-move race between the
+   * host and a guest's own separate action).
+   */
+  CREATE_PILE(state, action) {
+    if (!state.zones.some((z) => z.id === action.zoneId)) {
+      throw new Error(`Zone ${action.zoneId} does not exist`);
+    }
+    const kind = action.kind ?? 'zone';
+    if (kind === 'hand' || !PILE_TYPES[kind]?.tableSide) {
+      throw new Error(`Cannot create a pile of kind "${kind}"`);
+    }
+    const pile = makeTableSidePile(kind, action.name ?? null, null, null, action.zoneId);
+    const withPile = { ...state, piles: [...state.piles, pile] };
+    if (!action.cardId) return withPile;
+
+    // A card dragged FROM a hand is a PLAY (needs PLAY's own
+    // owner/faceUp transform - a hand card carries neither field) - a
+    // card dragged from anywhere else on the table is a MOVE (keeps its
+    // existing owner/faceUp as-is). Same source-kind branch
+    // `dropCardOnZone` (`main.js`) already makes at the UI layer, just
+    // made here too so a directly-dispatched action (a guest's own
+    // relayed send) gets it right without depending on the UI branch.
+    const fromPile = state.piles.find((p) => p.id === action.fromPileId);
+    if (!fromPile) throw new Error(`Pile ${action.fromPileId} does not exist`);
+    const isFromHand = fromPile.kind === 'hand';
+    return transferCard(withPile, {
+      fromPileId: action.fromPileId,
+      toPileId: pile.id,
+      cardId: action.cardId,
+      viewerId: action.playerId,
+      action: isFromHand ? 'play' : 'move',
+      transform: isFromHand
+        ? (card) => ({ ...card, ...middleCardVisibility(action.visibility ?? 'public', action.playerId) })
+        : undefined,
+    });
+  },
+
+  /**
    * US-63 (Sprint 23, D55): reparent a pile into a different Zone -
    * `zoneId` is real, mutable data (see the comment above
    * `TABLE_ZONE_RECORD` for why it has to be), so this is the
@@ -579,12 +630,16 @@ const ACTIONS = {
   MOVE_PILE(state, action) {
     const pile = state.piles.find((p) => p.id === action.pileId);
     if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
-    // Smith's ruling (Sprint 23 Gate 1): only `zone`/`discard` piles are
-    // eligible to move at all. `deck`/`hand`/`foundation`/`cascade`/
-    // `rankAdjacent` are all rejected - `deck` explicitly, beyond what
-    // `tableSide` alone would allow, because `state.js` finds THE deck
-    // by fixed id (`DECK_PILE_ID`) elsewhere, not by searching zones.
-    if (pile.kind !== 'zone' && pile.kind !== 'discard') {
+    // *nit fix (2026-08-26): was a hardcoded `pile.kind !== 'zone' &&
+    // pile.kind !== 'discard'` literal, duplicating exactly what each
+    // Pile class's own `static reparentable` (D56) already declares -
+    // that flag existed but was never actually wired to anything until
+    // now. Same eligibility as before (Smith's Gate 1 ruling: only
+    // `zone`/`discard`; `deck` is excluded even though `tableSide` alone
+    // would allow it, since `state.js` finds THE deck by fixed id
+    // elsewhere, not by searching zones) - just read from one source of
+    // truth instead of two that could drift apart.
+    if (!PILE_TYPES[pile.kind]?.reparentable) {
       throw new Error(`Cannot move a "${pile.kind}" pile between zones`);
     }
 
@@ -608,6 +663,36 @@ const ACTIONS = {
       zones,
       piles: state.piles.map((p) => (p.id === action.pileId ? { ...p, zoneId: targetZoneId } : p)),
     };
+  },
+
+  /**
+   * (direct user request) - "Panels can be moved from zone to zone
+   * [MOVE_PILE, above] and relocated within their zone (ordering)."
+   * `state.piles`' own array order IS render order within a zone
+   * (`zonesOf`/`viewFor` both iterate it in place) - reordering is
+   * genuinely just moving one entry to sit before another. Deliberately
+   * NOT gated by `reparentable` the way `MOVE_PILE` is: staying inside
+   * the SAME zone is purely cosmetic arrangement, never a game-rule
+   * concern, for any pile kind - open to any player, same reasoning
+   * `RENAME_PILE`/`RENAME_ZONE` already established for "this is a
+   * label/arrangement, not a privacy or turn-order boundary."
+   * Cross-zone is deliberately rejected here, not silently redirected
+   * to `MOVE_PILE` - two different operations, two different eligibility
+   * rules, kept as two real actions rather than one that guesses intent.
+   */
+  REORDER_PILE(state, action) {
+    const pile = state.piles.find((p) => p.id === action.pileId);
+    if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
+    const before = state.piles.find((p) => p.id === action.beforePileId);
+    if (!before) throw new Error(`Pile ${action.beforePileId} does not exist`);
+    if (pile.zoneId !== before.zoneId) {
+      throw new Error('REORDER_PILE only reorders within the same Zone - use MOVE_PILE to change zones');
+    }
+    if (pile.id === before.id) return state;
+
+    const withoutPile = state.piles.filter((p) => p.id !== pile.id);
+    const index = withoutPile.findIndex((p) => p.id === before.id);
+    return { ...state, piles: [...withoutPile.slice(0, index), pile, ...withoutPile.slice(index)] };
   },
 
   /**
@@ -901,6 +986,32 @@ const ACTIONS = {
     };
   },
 
+  /**
+   * *nit (2026-08-26): rename a pile's own label. Open to any player,
+   * same "cosmetic, not a privacy/turn-order boundary" reasoning
+   * `MOVE_CARD`'s unowned-card case already uses - a name is a label,
+   * not something worth a host-only or owner-only gate. Persisted for
+   * free: `persistence.js` already writes `state.piles` wholesale.
+   */
+  RENAME_PILE(state, action) {
+    const pile = state.piles.find((p) => p.id === action.pileId);
+    if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
+    const name = action.name?.trim();
+    if (!name) throw new Error('Pile name cannot be blank');
+    return { ...state, piles: state.piles.map((p) => (p.id === action.pileId ? { ...p, name } : p)) };
+  },
+
+  /** *nit (2026-08-26): same reasoning as RENAME_PILE, for a Zone
+   * record's own name (D55's `state.zones`). */
+  RENAME_ZONE(state, action) {
+    if (!state.zones.some((z) => z.id === action.zoneId)) {
+      throw new Error(`Zone ${action.zoneId} does not exist`);
+    }
+    const name = action.name?.trim();
+    if (!name) throw new Error('Zone name cannot be blank');
+    return { ...state, zones: state.zones.map((z) => (z.id === action.zoneId ? { ...z, name } : z)) };
+  },
+
   TOGGLE_PASS(state, action) {
     const current = state.passed[action.playerId] ?? false;
     return { ...state, passed: { ...state.passed, [action.playerId]: !current } };
@@ -1011,18 +1122,18 @@ export function viewFor(state, playerId) {
         // (`ui.js` renders every entry here as a `<zone-panel>`), so it
         // needs an ownerId'd `zones` entry too, same as the `myHand`/
         // `otherHandCounts` fields above still carry for every other
-        // consumer. NOTE (flagged, not yet done): `PILE_TYPES.hand.
-        // redactCard` is still a no-op, so this currently sends every
-        // OTHER player's real cards here too - a deliberate, temporary
-        // gap. Direct instruction was to get this rendering working
-        // first and fix the actual hiding as a following step.
+        // consumer. *nit (2026-08-26): `HandPile.redactCard` now
+        // actually redacts (needs the PILE, not just the card, to know
+        // whose hand this is - a hand card carries no per-card `owner`
+        // field of its own) - the long-disclosed gap where this sent
+        // every OTHER player's real cards here too is fixed.
         zones.push({
           id: pile.id,
           name: pile.name,
           ownerId: pile.ownerId ?? null,
           kind: pile.kind,
           zoneId: pile.zoneId,
-          cards: pile.cards.map((card) => PILE_TYPES[pile.kind].redactCard(card, playerId)),
+          cards: pile.cards.map((card) => PILE_TYPES[pile.kind].redactCard(card, playerId, pile)),
         });
         break;
       case 'mixed':

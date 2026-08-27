@@ -14,6 +14,17 @@
 import { Pile } from './Pile.js';
 
 export class MeldPile extends Pile {
+  /** *nit fix (2026-08-26): a real gap found while wiring MOVE_PILE to
+   * actually READ this flag instead of its own separate hardcoded
+   * kind check - the base `Pile` default (`true`) was never overridden
+   * here, even though `MOVE_PILE`'s own hardcoded eligibility list
+   * (`state.js`) has excluded every Meld-family kind since D55. The
+   * flag was correct in intent, documented, and simply never wired to
+   * anything - this is what actually makes it real. A meld has a fixed
+   * structural role in its game (Solitaire's 4 foundation slots, etc.)
+   * - reparenting one between zones was never a meaningful operation. */
+  static reparentable = false;
+
   /** Nothing is ever offered on a card once it's part of a meld -
    * `canRemoveCard` (inherited) reuses this, so it falls out to always
    * `false` for free, same pattern as `DiscardPile`. */

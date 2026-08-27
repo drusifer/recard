@@ -484,3 +484,31 @@ re-litigated here). Phase 72 (pile-title drag-drop) is not yet
 implemented - nothing to test there.
 
 **Verdict: APPROVED, no new bugs.** Handed to full-team retro.
+
+## D57 UX test (2026-08-26) - piles/zones/cards all Movable
+
+Live-tested the actual drag affordances, not just functional
+correctness (already verified twice by Neo/Trin):
+
+- **Real gap found+fixed on the spot**: a reparentable pile's title
+  had NO cursor affordance at all (`cursor: auto`) despite being newly
+  draggable - confirmed via `getComputedStyle`, not assumed. This is
+  the exact gap this project already named for cards (Sprint 4
+  close-out finding #1) - fixed the same way, same file, same pattern
+  (`cursor: grab`/`:active { grabbing }`), verified live afterward
+  (now reads `grab`; a non-reparentable pile's title correctly stays
+  `auto`, unaffected).
+- **Real gap filed, not fixed**: Phase 72's own AC called the "drop
+  here to ungroup" open-background target "explicit, equally-visible"
+  - it works (verified) but has zero visual cue during a drag.
+  `#zones` is a full-bleed `position: absolute; inset: 0` container, so
+  a naive highlight would run along the outer viewport edge rather
+  than read as a distinct drop target - needs real design thought, not
+  a guessed class toggle. Filed to `docs/USER_STORIES.md` backlog.
+
+D57 itself: the mechanics work correctly and the one cheap, clearly-
+scoped affordance gap is fixed; the harder visual-design gap is real
+UX debt, disclosed rather than guessed at.
+
+**Verdict: APPROVED with 1 fix applied, 1 filed.** 354/354 still green,
+lint unchanged at baseline. Handed to full-team retro.

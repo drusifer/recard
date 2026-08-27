@@ -641,3 +641,159 @@ Independent verification, not a re-read of Neo's claims:
   one-off.
 
 **Verdict: PASS.** No blockers. Handed to Morpheus for code review.
+
+## *nit: rename zones/piles (2026-08-26) - PASSED
+
+Targeted check (not full UAT/e2e - matches the abbreviated `*nit` loop):
+- `npm test`: 349/349, independently re-run.
+- Mutation-verified `RENAME_PILE`'s blank-name guard - killed it, a
+  real test failed, restored, confirmed green again.
+- `npm run lint:style`: clean.
+- Confirmed wiring symmetry: exactly 2 `onRenamePile`/`onRenameZone`
+  call sites in `main.js`, exactly 2 matching `onRename:` consumers in
+  `ui.js` - no orphaned half of the plumbing.
+- Reviewed the guest-path fix Neo already live-verified (session.send
+  round-trip) rather than re-running it myself - Neo's own script
+  output (guest edit -> host dispatch -> broadcast back, both clients
+  showing "Loot Pile") is real evidence, not just a claim.
+- No new e2e coverage added - correct call for a `*nit`; the reducer
+  tests + Neo's own live Playwright check already cover both the pure
+  logic and the real DOM/network path.
+
+No blockers, nothing bigger than the nit itself surfaced. **Verdict:
+PASS.**
+
+## *nit: drop count from pile titles (2026-08-26) - PASSED
+
+349/349 independently re-run. Confirmed the only other `count`-reading
+line left in that function (`disabledPileActionsFor`'s own arg) is
+unrelated to the title and correctly untouched - this was a real
+one-line, single-call-site change, not a partial fix hiding a second
+spot. `rawName: zone.name` (the rename feature's own field) still
+matches the new plain title exactly, so the two *nits compose cleanly
+rather than drifting apart. No blockers.
+
+## *nit: real hand-card privacy fix (2026-08-26) - PASSED
+
+The long-disclosed "handPile.redactCard is a no-op" gap (D54's own
+"single biggest open gap" note) is genuinely closed, not just marked
+so. 349/349 independently re-run, including solo-play (a real
+regression risk for any "hide from others" change - confirmed a lone
+player's own hand still renders fully, never accidentally redacted
+against themself). Grepped for any remaining `kind === 'hand'`
+special-casing in `ui.js` that could bypass the generic redaction path
+- none found, the fix is real end-to-end through the same pipeline
+every other pile already uses. Reviewed the id-omission reasoning
+(card ids encode rank/suit in this app) - correct, and a sharper
+privacy bar than the base `Pile.redactCard`'s `{id, owner, faceDown}`
+shape, appropriately so given hand cards have no legitimate reason for
+another player to ever address one by id. No blockers.
+
+## *nit: deck overflow fix (2026-08-26) - PASSED
+
+Independently re-ran the same live overflow measurement (not just
+trusted the claim): zero overflowing elements at the deck pile across
+desktop/laptop/phone viewports (1440, 1024, 390px), each freshly
+re-created and dealt, not reusing Neo's own session. 349/349 green,
+stylelint clean. One-line CSS fix, correctly scoped - no other
+`.deck-stack` consumer (pre-game preview screen shares the same class)
+regressed. No blockers.
+
+## D57 UAT (2026-08-26) - PASSED, with one real gap found+fixed
+
+Independent verification, not a re-read of Neo's claims:
+- `npm test`: 354/354 (then 356 after my own fix below), re-run myself.
+- `npm run lint`: unchanged pre-existing baseline.
+- **Mutation-tested `MeldPile.reparentable` and found a REAL gap**:
+  deleting the flag should have made `FoundationPile`/`CascadePile`/
+  `RankAdjacentPile` movable again, but the test named "rejects
+  deck/hand/foundation/cascade/rankAdjacent" passed clean anyway - it
+  never actually tested any of those three kinds, only deck/hand
+  (a pre-existing coverage gap, not introduced by D57, but D57's own
+  MOVE_PILE-reads-the-flag change made it newly load-bearing with zero
+  guard). Fixed it myself: added real foundation/cascade/rankAdjacent
+  piles via `GameConfig.piles` and asserted MOVE_PILE rejects each one
+  through the real reducer. Re-ran the same mutation - now correctly
+  caught (1 real failure), restored, confirmed green again.
+- Mutation-tested `CREATE_PILE`'s `viewerId` threading - killing it
+  broke a real test for a different (still correct) reason, confirming
+  the wiring matters.
+- Did not re-run Neo's live Playwright drag verification myself
+  (screenshots + DOM assertions already in the session transcript are
+  real evidence, not just a claim) - reviewed the technique (real
+  `DragEvent` dispatch, matches this project's own established
+  workaround for native DnD not firing from synthetic input) and it's
+  sound.
+
+**Verdict: PASS**, with the one gap found during UAT itself fixed, not
+just filed. @Morpheus for code review (this touches architecture -
+new reducer action, a real drag-handle mechanism conflict resolved).
+
+## *nit: remove pointer-based panel drag + ScoreZone ActionBar unification (2026-08-26) - PASSED
+
+353/353 independently re-run. Grepped for stray `attachPanelDrag`/
+`onMovePanel`/`savePanelPosition`/`movePanel` references - only
+comments left, all accurate, no live code paths. Checked CSS
+(`.panel-drag-handle`/`.panel-dragging`/`body.panel-drag-active`) -
+fully removed, only historical comment mentions remain in unrelated
+resize-handle rules.
+
+Independent live check (fresh session, not reused): `score-zone`'s `-`
+button works through the ActionBar (0 -> -1), and its heading is now a
+genuine `<header-actions>` element with the exact expected className -
+structurally identical to every other panel's heading, not a
+lookalike that merely looks the same. No blockers.
+
+## *nit correction: Movable-not-Actionable, universal pile drag + reorder (2026-08-26) - PASSED
+
+Independently re-ran 357/357. Grepped for every deleted symbol
+(attachActionRow/actionMenuEl/beginTargeting/beginTargetingWithGhost,
+card-action-row/card-action-btn/radial-follow-ghost) - only comments
+remain (historical, harmless), `.pile-target`/`highlightDragTargets`
+correctly still live since native card drag still uses them
+independent of the deleted popup.
+
+Mutation-verified `REORDER_PILE`'s same-zone guard (already done
+during implementation, re-confirmed): killing the zoneId check lets
+cross-zone "reordering" silently succeed - real test catches it.
+
+Reviewed Neo's own live verification (3 separate Playwright checks:
+zero popup on hover, tap-to-rotate actually rotates, universal pile
+drag + reorder + rejected cross-zone alert) as real evidence, not just
+a claim - each script's assertions are concrete DOM/state checks, not
+vibes. No blockers.
+
+## *nit: resize-flex-grow bug + zone Movable regression (2026-08-26) - PASSED
+
+360/360 independently re-run. Reviewed the CSS specificity fix
+(`#zones > .zone.panel-sized:not(.seat-zone)`) - matches the exact
+specificity of the rule it overrides plus the extra class, same
+technique this file already used for `.zone.panel-moved` vs
+`.seat-zone` - not a guess, a real specificity calculation. Mutation-
+tested `REORDER_ZONE`'s unknown-id guards (both sides) - real
+failures on removal, confirmed load-bearing. Reviewed the CAPTURE-
+phase zone-drag listener placement (`renderZonePanel`) - correctly
+intercepts before `body`'s own bubble-phase pile/card handler would
+misread a zone-drag token as a card id. No blockers.
+
+## *nit: Copy code button real clipboard bug (2026-08-26) - PASSED
+
+Independently re-verified the NORMAL (secure-context) path myself with
+real clipboard read/write permissions granted - the displayed code and
+the actual clipboard content matched exactly. Reviewed the root-cause
+claim against the project's own README (does tell guests to open via
+the host's LAN IP over plain http) - real, not speculative. Reviewed
+`copyText`'s fallback logic - correct order (modern API first, legacy
+textarea/execCommand second), never throws, honestly reports failure
+instead of a false positive. 360/360 green. No blockers.
+
+## *nit: zone free-positioning restored (2026-08-26, real regression fix) - PASSED
+
+358/358 independently re-run. Grepped for the removed REORDER_ZONE/
+zone-drag-token machinery - fully gone, no stray references. Confirmed
+`attachPanelDrag` matches the original HEAD implementation exactly
+(diffed against `git show HEAD:src/ui.js`), not a rewritten
+approximation. Reviewed the "no zone nesting" claim myself by walking
+the live DOM tree for any `.zone` containing another `.zone` - none,
+confirmed `attachPanelDrag` only ever sets CSS position, never
+reparents nodes. No blockers.

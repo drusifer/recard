@@ -187,13 +187,15 @@ try {
       // reflowed element and genuinely trigger `:hover` by accident -
       // exposing a real, pre-existing gap in this exemption, not a new
       // regression to fix in the app.
-      // UX follow-up (direct user request, 2026-08-24): `.pile-action-btn`/
-      // `.card-action-btn` (the icon buttons in pile/zone headers and a
-      // card's hover row) are deliberately sized to the title text, NOT
-      // the 44px floor - same "user explicitly overrode it" reasoning as
-      // `.card` above, not a regression this checker should flag.
+      // UX follow-up (direct user request, 2026-08-24): `.pile-action-btn`
+      // (the icon buttons in pile/zone headers) is deliberately sized to
+      // the title text, NOT the 44px floor - same "user explicitly
+      // overrode it" reasoning as `.card` above, not a regression this
+      // checker should flag. *nit (2026-08-26): `.card-action-btn` (the
+      // card hover row's own buttons) no longer exists - the popup it
+      // belonged to is deleted ("cards are Movable not Actionable").
       buttons: [...document.querySelectorAll(
-        'button:not([hidden]):not(.card):not(.action-btn):not(.pile-action-btn):not(.card-action-btn)',
+        'button:not([hidden]):not(.card):not(.action-btn):not(.pile-action-btn)',
       )]
         .filter((b) => {
           const r = b.getBoundingClientRect();

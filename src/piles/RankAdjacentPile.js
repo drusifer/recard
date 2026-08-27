@@ -10,6 +10,13 @@ import { Pile } from './Pile.js';
 import { RANKS } from '../decks/standardDeck.js';
 
 export class RankAdjacentPile extends Pile {
+  /** *nit fix (2026-08-26): matches `MOVE_PILE`'s own hardcoded
+   * eligibility (`state.js`), now actually read from this flag instead
+   * of duplicated there - Spit's single shared center pile is a fixed
+   * part of that game's layout, not something meaningful to drag
+   * elsewhere. */
+  static reparentable = false;
+
   /** No before/after halo - exactly one landing spot (on top). */
   static resolveDropTarget() {
     return {};

@@ -139,6 +139,14 @@ export const ACTION_SPECS = {
   // "flip it back" cost the way `take`/`reshuffleDeal` have.
   hide: { label: 'Hide', destructive: false, hint: 'Turn every card in this pile face-down.', icon: '🙈' },
   show: { label: 'Show', destructive: false, hint: 'Turn every card in this pile face-up.', icon: '👁' },
+  // *nit (2026-08-26), direct user request: "anything Actionable should
+  // always get an ActionBar" - `<score-zone>`'s own +/- buttons were a
+  // bespoke, hand-built header (`ScoreZoneElement._render()`), not the
+  // shared `<header-actions>`/`ACTION_SPECS` table every other
+  // pile/zone heading already goes through. These two entries are what
+  // let it join that one table instead of staying a lookalike.
+  scoreDown: { label: 'Decrease score', destructive: false, icon: '-' },
+  scoreUp: { label: 'Increase score', destructive: false, icon: '+' },
 };
 
 /**
@@ -269,3 +277,4 @@ export function componentFor(kind) {
 export function resolveDropTargetFor(kind, cardBoxes, point) {
   return PILE_TYPES[kind]?.resolveDropTarget(cardBoxes, point) ?? {};
 }
+

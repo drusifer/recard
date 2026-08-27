@@ -71,42 +71,23 @@ export class ScoreZoneElement extends HTMLElement {
     this.setAttribute('label', value);
   }
 
+  // *nit (2026-08-26), direct user request: "anything Actionable should
+  // always get an ActionBar" - the +/- controls now go through the same
+  // `<header-actions>`/`ACTION_SPECS` mechanism (`scoreDown`/`scoreUp`,
+  // `pileActions.js`) every other pile/zone heading uses, instead of a
+  // bespoke hand-built header. `panel-title` is still the heading class
+  // (`wirePanelLayout` still wires resize/starting-position off it).
   _render() {
     this.innerHTML = '';
 
-    const header = document.createElement('div');
-    // `panel-title` - same drag-handle class every other zone's heading
-    // carries (`ui.js`'s `wirePanelLayout`/`attachPanelDrag`).
-    header.className = 'zone-name pile-action-header panel-title';
-    const label = document.createElement('span');
-    label.className = 'zone-name-text';
-    label.textContent = this.label;
-    header.appendChild(label);
-
-    if (this.adjustable) {
-      const minus = document.createElement('button');
-      minus.type = 'button';
-      minus.className = 'pile-action-btn';
-      minus.textContent = '-';
-      minus.title = 'Decrease score';
-      minus.setAttribute('aria-label', 'Decrease score');
-      minus.addEventListener('click', () => {
-        this.dispatchEvent(new CustomEvent('score-adjust', { detail: { delta: -1 }, bubbles: true }));
-      });
-      header.appendChild(minus);
-
-      const plus = document.createElement('button');
-      plus.type = 'button';
-      plus.className = 'pile-action-btn';
-      plus.textContent = '+';
-      plus.title = 'Increase score';
-      plus.setAttribute('aria-label', 'Increase score');
-      plus.addEventListener('click', () => {
-        this.dispatchEvent(new CustomEvent('score-adjust', { detail: { delta: 1 }, bubbles: true }));
-      });
-      header.appendChild(plus);
-    }
-    this.appendChild(header);
+    const heading = document.createElement('header-actions');
+    this.appendChild(heading);
+    heading.render(this.label, this.adjustable ? ['scoreDown', 'scoreUp'] : [], {
+      headingClass: 'panel-title',
+      onAction: (id) => {
+        this.dispatchEvent(new CustomEvent('score-adjust', { detail: { delta: id === 'scoreUp' ? 1 : -1 }, bubbles: true }));
+      },
+    });
 
     const value = document.createElement('div');
     value.className = 'score-value';

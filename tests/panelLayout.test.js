@@ -32,6 +32,12 @@ test('loadPanelLayout: hostile storage (throws on read) never throws, just retur
   assert.deepEqual(loadPanelLayout(storage), {});
 });
 
+// *nit (2026-08-26) history: `savePanelPosition` was briefly deleted
+// ("remove pointer-based panel behavior"), then directly restored -
+// "zones can be moved anywhere on the table, it was working great
+// until you broke it." Full coverage restored below, matching its
+// original shape.
+
 test('savePanelPosition: sets a panel\'s x/y, keyed by id, readable back via loadPanelLayout', () => {
   const storage = fakeStorage();
   savePanelPosition(storage, 'deck', 12, 34);

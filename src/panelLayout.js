@@ -1,13 +1,26 @@
 /**
- * Panel positions/sizes (drag-to-move, drag-to-resize) as PURELY LOCAL,
- * per-browser preference - reversed from an earlier pass that made this
- * replicated, host-authoritative game state (`state.layout`,
- * MOVE_PANEL/RESIZE_PANEL). Direct user request: every table starts
- * from the same computed default arrangement, and each viewer's own
- * adjustments are theirs alone - never sent over the network, never
- * part of a save/restore snapshot. `storage` is injected (same
- * `{getItem, setItem}` shape `persistence.js` takes) so this is testable
- * without a browser.
+ * Panel positions/sizes as PURELY LOCAL, per-browser preference -
+ * reversed from an earlier pass that made this replicated,
+ * host-authoritative game state (`state.layout`, MOVE_PANEL/
+ * RESIZE_PANEL). Direct user request: every table starts from the same
+ * computed default arrangement, and each viewer's own adjustments are
+ * theirs alone - never sent over the network, never part of a
+ * save/restore snapshot. `storage` is injected (same `{getItem,
+ * setItem}` shape `persistence.js` takes) so this is testable without a
+ * browser.
+ *
+ * *nit (2026-08-26) history: a same-day pass briefly removed
+ * `savePanelPosition`/pointer-drag entirely ("remove pointer-based
+ * panel behavior"), then a DIRECT USER CORRECTION restored it: "zone
+ * movement is still broken, it was working great until you broke it -
+ * Zones can be moved anywhere on the table." The "remove pointer-
+ * based" ask turned out to be about the CARD hover-popup ("cards are
+ * Movable not Actionable"), not Zone positioning - Zones genuinely
+ * need free, anywhere-on-the-table placement, which only a real
+ * pointer-drag (continuous position tracking) can give; Piles instead
+ * use native HTML5 drag for their own, different capability
+ * (reparent/reorder between discrete targets) - two different
+ * entities, two different Movable mechanisms, not one shared one.
  */
 export const PANEL_LAYOUT_KEY = 'recard:panel-layout:v1';
 

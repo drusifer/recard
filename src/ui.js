@@ -303,17 +303,10 @@ function moveToControl(card, currentZoneId, allZones, onMoveCard) {
 // `pileActions.js` rather than being re-derived here - so the offer can
 // never disagree with the rule.
 
-let cancelTargeting = null;
-
-/** Drops any in-progress targeting and removes every highlight. */
+/** Drops any in-progress drag-target highlighting. */
 export function clearPileTargets() {
   for (const el of document.querySelectorAll('.pile-target')) {
     el.classList.remove('pile-target');
-  }
-  document.body.classList.remove('targeting');
-  if (cancelTargeting) {
-    cancelTargeting();
-    cancelTargeting = null;
   }
 }
 
@@ -343,88 +336,6 @@ function highlightDragTargets(actionIds, piles, ctx) {
     for (const id of targetsForAction(action, piles, ctx)) ids.add(id);
   }
   for (const id of ids) pileElement(id)?.classList.add('pile-target');
-}
-
-/**
- * Highlights every pile that accepts `action` and waits for a click.
- * Escape or a click anywhere else cancels, so the user is never stuck in
- * a mode they can't leave (Nielsen #3).
- */
-function beginTargeting(action, targetIds, onChoose) {
-  clearPileTargets();
-  const els = targetIds.map(pileElement).filter(Boolean);
-  if (els.length === 0) return;
-
-  document.body.classList.add('targeting');
-  const onPick = (e) => {
-    const el = e.currentTarget;
-    e.preventDefault();
-    e.stopPropagation();
-    clearPileTargets();
-    onChoose(el.dataset.zoneId);
-  };
-  const onEscape = (e) => { if (e.key === 'Escape') clearPileTargets(); };
-  const onElsewhere = () => clearPileTargets();
-
-  for (const el of els) {
-    el.classList.add('pile-target');
-    // CAPTURE phase, not bubble: a pile-target element (`#hand-zone`, a
-    // zone) can contain its own genuinely-clickable content - a hand
-    // card's `onClick` (Play), a revealable middle-card's `onClick`
-    // (tap-to-reveal). Choosing that PILE as a target by clicking its
-    // body, at whatever point the pointer happens to land, must not
-    // ALSO fire whatever's underneath - found live (D52 follow-up): a
-    // Pick-up-into-hand click that happened to land on a hand card
-    // silently played that card too, netting the hand size unchanged
-    // and reading as "pickup does nothing". Capturing here means this
-    // listener runs BEFORE the click ever reaches that descendant, and
-    // its own `stopPropagation()` (still called, same as before) then
-    // stops it from proceeding to the target at all - not a bubble-
-    // order race, doesn't depend on which registered first.
-    el.addEventListener('click', onPick, { capture: true });
-  }
-  document.addEventListener('keydown', onEscape);
-  // Deferred so the click that opened targeting doesn't immediately close it.
-  setTimeout(() => document.addEventListener('click', onElsewhere, { once: true }), 0);
-
-  cancelTargeting = () => {
-    for (const el of els) el.removeEventListener('click', onPick, { capture: true });
-    document.removeEventListener('keydown', onEscape);
-    document.removeEventListener('click', onElsewhere);
-  };
-}
-
-/**
- * D52 (direct user request): "on hover, draw a radial menu of actions
- * around my pointer... click an action, the card follows my mouse and
- * displays what drop targets are valid... click to confirm." Reuses
- * `beginTargeting`'s highlight-then-click machinery unchanged for the
- * "which pile did they choose" half (same `.pile-target` class, same
- * Escape/click-elsewhere cancel) - this only ADDS the visual: a small
- * label that tracks the cursor for as long as targeting stays open,
- * cleaned up through the same `cancelTargeting` hook `clearPileTargets`
- * already calls, so there is exactly one way out of either mode, not two.
- */
-function beginTargetingWithGhost(action, targetIds, label, onChoose) {
-  beginTargeting(action, targetIds, onChoose);
-  if (!cancelTargeting) return; // beginTargeting found no legal targets - nothing to track
-
-  const ghost = document.createElement('div');
-  ghost.className = 'radial-follow-ghost';
-  ghost.textContent = label;
-  document.body.appendChild(ghost);
-  const onMove = (e) => {
-    ghost.style.left = `${e.clientX}px`;
-    ghost.style.top = `${e.clientY}px`;
-  };
-  document.addEventListener('mousemove', onMove);
-
-  const cleanup = cancelTargeting;
-  cancelTargeting = () => {
-    cleanup();
-    document.removeEventListener('mousemove', onMove);
-    ghost.remove();
-  };
 }
 
 /**
@@ -467,7 +378,8 @@ function applyIconButton(btn, spec, labelOverride) {
  * @param {string[]} actionIds
  * @param {{labels?: Record<string,string>, disabled?: string[],
  *   onAction: (actionId: string) => void, draggable?: boolean,
- *   headingId?: string, headingClass?: string}} opts
+ *   headingId?: string, headingClass?: string, rawName?: string,
+ *   onRename?: (name: string) => void}} opts
  */
 export function renderActionHeader(container, titleText, actionIds, opts = {}) {
   container.innerHTML = '';
@@ -478,6 +390,67 @@ export function renderActionHeader(container, titleText, actionIds, opts = {}) {
   label.className = 'zone-name-text';
   label.textContent = titleText;
   container.appendChild(label);
+
+  // *nit (2026-08-26): "allow user to rename zones and piles - any user
+  // can edit". `titleText` often carries a derived suffix a pile's own
+  // heading appends ("Hand (7)") that isn't part of the actual stored
+  // name, so editing needs the RAW name (`opts.rawName`) as its
+  // starting value, not `titleText` itself - only wired when a caller
+  // supplies `onRename` (a Zone with no name, e.g. the common
+  // single-pile case, never gets this at all, matching how it already
+  // renders no heading there).
+  if (opts.onRename) {
+    label.title = 'Double-click to rename';
+    label.classList.add('renamable');
+    label.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'zone-name-edit';
+      input.value = opts.rawName ?? titleText;
+      label.replaceWith(input);
+      input.focus();
+      input.select();
+
+      let settled = false;
+      const commit = () => {
+        if (settled) return;
+        settled = true;
+        const name = input.value.trim();
+        // A blank/unchanged edit reverts silently rather than round-
+        // tripping a no-op (or a reducer throw the user never asked
+        // for) through the network - same "cancel is a valid outcome"
+        // spirit as the split/take confirm dialogs' Cancel button.
+        if (name && name !== (opts.rawName ?? titleText)) opts.onRename(name);
+        input.replaceWith(label);
+      };
+      input.addEventListener('blur', commit);
+      input.addEventListener('keydown', (ke) => {
+        if (ke.key === 'Enter') { ke.preventDefault(); input.blur(); }
+        else if (ke.key === 'Escape') { settled = true; input.replaceWith(label); }
+      });
+      // A drag on the containing heading (Zone move, D24) shouldn't
+      // start while the input has focus - the same class this heading
+      // uses as a drag handle would otherwise steal the mousedown.
+      input.addEventListener('mousedown', (me) => me.stopPropagation());
+    });
+  }
+
+  // (bloop: piles/zones/cards are all Movable) - a reparentable pile's
+  // own title bar IS its drag handle for moving it between zones (or
+  // reordering within one), native HTML5 DnD (same mechanism a card's
+  // own drag already uses). A Zone's OWN heading deliberately does NOT
+  // get this - it uses real pointer-drag (`attachPanelDrag`,
+  // `wirePanelLayout`) instead, for genuine free anywhere-on-the-table
+  // positioning, which a discrete native-drop-target model can't give.
+  // Two different Movable mechanisms for two different entities, not
+  // one shared one - see `wirePanelLayout`'s own comment.
+  if (opts.pileDraggable) {
+    container.draggable = true;
+    container.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/plain', pileDragToken(opts.pileId));
+    });
+  }
 
   for (const id of actionIds) {
     if (opts.disabled?.includes(id)) continue;
@@ -516,85 +489,6 @@ export function renderActionHeader(container, titleText, actionIds, opts = {}) {
 }
 
 /**
- * UX follow-up: a card's own actions as a small row directly above it
- * on hover - replaces D52's radial ring for the CARD case specifically
- * (piles/zones get `renderActionHeader` above; a card has no title bar
- * to host buttons next to, and is too small to carry them permanently).
- * A target-bearing action still opens `beginTargetingWithGhost`
- * unchanged - only the TRIGGER visual changed, not the destination-
- * choosing mechanic underneath it.
- *
- * Appended to `document.body` (`position: fixed`, computed from
- * `hostEl.getBoundingClientRect()` once on open) rather than as a plain
- * absolutely-positioned child of the card - a real bug, found live: a
- * hand card lives inside `#hand-area`, whose horizontal scroll
- * (`overflow-x: auto`, needed for the fan) forces `overflow-y` to
- * compute as `auto` too, not `visible` (a genuine CSS rule: a non-
- * `visible` value on one axis pulls the other off `visible`) - so a
- * row anchored INSIDE that box was silently clipped invisible on
- * either side, not just below. Body-level fixed positioning is exactly
- * why D52's own radial menu used it, for the same underlying reason
- * (trapped stacking/clipping contexts) - reused here for a plain row,
- * not reintroducing the ring.
- *
- * @param {HTMLElement} hostEl the card's own wrapper.
- * @param {() => string[]} getActionIds computed fresh on every hover.
- * @param {{labels?: Record<string,string>,
- *   targetsFor: (actionId: string) => string[],
- *   onAction: (actionId: string, targetPileId?: string) => void}} opts
- */
-function attachActionRow(hostEl, getActionIds, opts) {
-  hostEl.classList.add('pile-hover-host');
-  if (hostEl.tabIndex < 0 || hostEl.tabIndex == null) hostEl.tabIndex = 0;
-  let rowEl = null;
-  let closeTimer = null;
-
-  const cancelClose = () => { clearTimeout(closeTimer); closeTimer = null; };
-  const close = () => { rowEl?.remove(); rowEl = null; };
-  const scheduleClose = () => { cancelClose(); closeTimer = setTimeout(close, 0); };
-
-  const open = () => {
-    close();
-    const ids = getActionIds();
-    if (!ids.length) return;
-    rowEl = document.createElement('div');
-    rowEl.className = 'card-action-row';
-    for (const id of ids) {
-      const spec = ACTION_SPECS[id];
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'card-action-btn' + (spec.destructive ? ' btn-danger' : '');
-      applyIconButton(btn, spec, opts.labels?.[id]);
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        close();
-        if (spec.target == null || spec.singleTarget) {
-          opts.onAction(id);
-        } else {
-          beginTargetingWithGhost(id, opts.targetsFor(id), spec.label, (targetId) => opts.onAction(id, targetId));
-        }
-      });
-      rowEl.appendChild(btn);
-    }
-    rowEl.addEventListener('pointerenter', cancelClose);
-    rowEl.addEventListener('pointerleave', scheduleClose);
-    document.body.appendChild(rowEl);
-    const rect = hostEl.getBoundingClientRect();
-    rowEl.style.left = `${rect.left + rect.width / 2}px`;
-    rowEl.style.top = `${rect.top}px`;
-  };
-
-  hostEl.addEventListener('pointerenter', (e) => {
-    if (e.pointerType !== 'mouse') return;
-    cancelClose();
-    open();
-  });
-  hostEl.addEventListener('pointerleave', () => {
-    if (!cancelTargeting) scheduleClose();
-  });
-}
-
-/**
  * Reveal a still-hidden card (Sprint 12, Phase 55, T55.1): a direct tap
  * on the card itself, joining tap-to-play's existing vocabulary, rather
  * than a separate hover-revealed button. The confirm gate is unchanged
@@ -608,53 +502,6 @@ function performReveal(card, viewerId, onReveal) {
   const mine = card.owner != null && card.owner === viewerId;
   if (mine && !window.confirm('Reveal this card to everyone? This cannot be undone.')) return;
   onReveal?.(card.id);
-}
-
-/**
- * A card's own hover action row (UX follow-up, retires D52's radial for
- * this case) - `attachActionRow` wired for the card case: a
- * `target`-bearing action opens the card-follows-cursor targeting mode
- * since a card may have several legal destinations (`move` among
- * zones); an in-place action (`target: null` - today just `rotate`)
- * dispatches directly. `reveal` is deliberately excluded (Phase 55
- * moved it to a direct tap on the card - see `performReveal` and its
- * call site in `renderZoneCards`).
- *
- * @param {HTMLElement} wrapper the card's own `.middle-card` element -
- *   `attachActionRow` opens the row on hovering it.
- */
-function actionMenuEl(wrapper, zone, card, allZones, opts) {
-  const { viewerId, onPickup, onMoveCard, onRotate, onPlay } = opts;
-  // D45: both were hardcoded `kind: 'zone'` - real bugs the moment a
-  // second table-side type exists, same class as `renderZoneCards`'s.
-  const pile = { id: zone.id, kind: zone.kind, ownerId: zone.ownerId ?? null };
-  const available = actionsForCard(pile, card, viewerId).filter((a) => a !== 'reveal');
-  if (available.length === 0) return;
-
-  // UX follow-up (direct user request): a hand pile is a real,
-  // addressable entry in `allZones` now (`view.zones`) - no more
-  // synthetic `HAND_PILE_ID` stand-in needed for `pickup`'s `target:
-  // 'hand'` lookup below.
-  const piles = allZones.map((z) => ({ id: z.id, kind: z.kind, ownerId: z.ownerId ?? null }));
-
-  attachActionRow(wrapper, () => available, {
-    targetsFor: (action) => targetsForAction(action, piles, { viewerId, fromPileId: zone.id }),
-    onAction: (action, targetId) => {
-      // D48: an in-place action has no destination to pick - dispatched
-      // directly (no `targetId` argument) rather than going through
-      // targeting, since `targetsForAction` would return `[]` for a
-      // null-target action anyway (a no-op click, not a bug in either).
-      if (action === 'rotate') onRotate?.(card.id);
-      else if (action === 'pickup') onPickup?.(card.id);
-      else if (action === 'move') onMoveCard?.(card.id, targetId);
-      // UX follow-up (direct user request): 'play' is offered by
-      // `cardActions` for a hand pile's own owner (`handPile.js`) but
-      // had no dispatcher wired here before - the merged own-zone panel
-      // used to be the only way to play a card. Generic now, same
-      // click-a-lit-target flow as `move`.
-      else if (action === 'play') onPlay?.(card.id, targetId);
-    },
-  });
 }
 
 export function renderZoneCards(container, zone, allZones, opts = {}) {
@@ -677,7 +524,17 @@ export function renderZoneCards(container, zone, allZones, opts = {}) {
   // just applied generically by index instead of being hand-specific.
   zone.cards.forEach((card, i) => {
     const wrapper = document.createElement('div');
-    wrapper.className = 'middle-card';
+    // *nit (2026-08-26): `pile-hover-host` used to arrive via the now-
+    // deleted `attachActionRow` (the popup mechanism) as a side effect
+    // of wiring hover - it was never really ABOUT the popup, it drives
+    // the shared hover-raise visual (`style.css`, `.pile-hover-host:
+    // hover`) independent of it, so it's added directly here now that
+    // nothing else adds it. Same for `tabIndex` - a keyboard-focusable
+    // wrapper is what makes `:focus-within` reachable at all for a
+    // face-down card (`cardBackEl` is a plain `<div>`, not naturally
+    // focusable the way `cardEl`'s `<button>` face already is).
+    wrapper.className = 'middle-card pile-hover-host';
+    wrapper.tabIndex = 0;
     if (opts.fan) {
       // UX follow-up (direct user request): "lower the peak a bit so
       // it's a more gradual curve" - then, immediately after: "it still
@@ -788,6 +645,15 @@ export function renderZoneCards(container, zone, allZones, opts = {}) {
     // wiring onto whichever one actually renders for this viewer.
     // `pile` is the one hoisted to the top of this function (D45).
     const canReveal = Boolean(opts.onReveal) && actionsForCard(pile, card, opts.viewerId).includes('reveal');
+    // *nit (2026-08-26), direct user request: "cards are Movable not
+    // Actionable" - the hover-popup action row (`attachActionRow`) is
+    // gone entirely. `pickup`/`move`/`play` already had a real trigger
+    // beyond the popup (native drag, below) - `rotate` didn't, so it
+    // gets the same "tap the card itself" pattern `reveal` already
+    // established (Phase 55), applied to the FACE-UP case specifically
+    // (`reveal` only ever offers on a still-hidden card, so the two
+    // never compete for the same tap).
+    const canRotate = Boolean(opts.onRotate) && actionsForCard(pile, card, opts.viewerId).includes('rotate');
 
     if (card.faceDown) {
       const back = cardBackEl(card.id);
@@ -804,8 +670,11 @@ export function renderZoneCards(container, zone, allZones, opts = {}) {
     } else {
       const face = cardEl(card, canReveal
         ? { onClick: () => performReveal(card, opts.viewerId, opts.onReveal) }
-        : { disabled: true });
+        : canRotate
+          ? { onClick: () => opts.onRotate(card.id) }
+          : { disabled: true });
       if (canReveal) face.classList.add('revealable');
+      if (canRotate) face.classList.add('rotatable');
       wrapper.appendChild(face);
       if (card.owner) wrapper.appendChild(ownerTag(resolveOwnerName?.(card.owner) ?? card.owner));
       // UX follow-up (real bug, found live via a screenshot): a plain
@@ -823,8 +692,6 @@ export function renderZoneCards(container, zone, allZones, opts = {}) {
         wrapper.appendChild(hiddenTag);
       }
     }
-
-    actionMenuEl(wrapper, zone, card, allZones, opts);
 
     container.appendChild(wrapper);
   });
@@ -927,20 +794,43 @@ function performZoneDrop(zoneEl, row, zoneId, cardId, point, onDropCard, kind) {
  */
 /**
  * UX follow-up (direct user request): move + resize as one shared,
- * "normalized" wiring pass - EVERY pile/zone panel calls this exact
+ * "normalized" wiring pass - EVERY zone panel calls this exact
  * function (`renderZonePanel` below, and `renderDeck`'s own caller in
  * main.js), so the deck offers the identical resize/move interface a
  * zone does rather than a bespoke copy. `id` keys `opts.layout`
- * (`panelLayout.js`, local per-browser storage) and is whatever stable
- * string the caller already uses elsewhere (a zone's own `id`, or
- * `'deck'` for the draw pile). `headingEl` is the drag handle - `null`
- * is fine, `attachPanelDrag` no-ops.
+ * (`panelLayout.js`, local per-browser storage). `headingEl` is the
+ * drag handle for repositioning - `null` is fine, `attachPanelDrag`
+ * no-ops.
+ *
+ * *nit (2026-08-26) history: briefly deleted ("remove pointer-based
+ * panel behavior"), then DIRECTLY RESTORED by the user: "zone movement
+ * is still broken, it was working great until you broke it - Zones can
+ * be moved anywhere on the table." Piles use a DIFFERENT mechanism -
+ * native HTML5 drag, `renderPileShell`'s `pileDraggable` - for their
+ * own different capability (reparent into another Zone, or reorder
+ * among siblings, both discrete target-based operations). A Zone
+ * needs genuine free, continuous, anywhere-on-the-table placement,
+ * which only real pointer-tracking gives - the two were never
+ * actually the same capability wearing two names, despite both being
+ * "drag this panel."
  */
 export function wirePanelLayout(panelEl, id, headingEl, opts) {
   if (opts.onResizePanel) {
     panelEl.classList.add('panel-resizable');
     const stored = opts.layout?.[id];
-    if (typeof stored?.w === 'number') panelEl.style.width = `${stored.w}px`;
+    // *nit (2026-08-26), real bug found live: a Zone's own `flex-grow:
+    // 1` (`#zones > .zone`, every shared/standalone panel) OUTRANKS an
+    // explicit `style.width` - the resize handle set the width
+    // correctly, but the browser grew the panel right back past it to
+    // fill the row anyway. `panel-sized` (style.css) sets `flex-grow: 0`
+    // once a panel has a real stored width, so an explicit size actually
+    // sticks. Applied here for a STORED width (page load / preset);
+    // `attachPanelResize` applies the same class live, for a resize
+    // that just happened this session.
+    if (typeof stored?.w === 'number') {
+      panelEl.style.width = `${stored.w}px`;
+      panelEl.classList.add('panel-sized');
+    }
     if (typeof stored?.h === 'number') {
       panelEl.style.height = `${stored.h}px`;
       // A resized-short panel needs somewhere for overflow to go rather
@@ -1013,7 +903,11 @@ export function renderPileShell(container, zone, allZones, opts, buildRow) {
   const heading = document.createElement('header-actions');
   container.appendChild(heading);
   heading.render(
-    `${zone.name} (${zone.count ?? zone.cards.length})`,
+    // *nit (2026-08-26), direct user request: the card count no longer
+    // appears in a pile's own title text ("Deck (32)" -> "Deck") - the
+    // count is still visible elsewhere for kinds where it matters (the
+    // deck's own stack badge, a zone's actual card row).
+    zone.name,
     pileLevelActions(zone.kind, {
       isOwner: zone.ownerId === opts.viewerId,
       isHost: opts.isHost,
@@ -1029,11 +923,10 @@ export function renderPileShell(container, zone, allZones, opts, buildRow) {
     })
       .filter((id) => id !== 'sortRank' && id !== 'sortSuit'),
     {
-      // `pile-title`, not `panel-title` - a Pile's own heading is never
-      // a Zone's move/resize drag handle (`renderZonePanel` wires that
-      // once, on the Zone's OWN heading instead), so it needs a
-      // different class than the one `attachPanelDrag`/`wirePanelLayout`
-      // look for.
+      // `pile-title`, not `panel-title` - visually/semantically distinct
+      // from a Zone's own heading class, and the selector
+      // `.pile-title[draggable="true"]`'s cursor affordance (style.css)
+      // keys off it specifically.
       headingClass: 'pile-title',
       draggable: true,
       // UX follow-up (direct user request): "a Deck is a specific kind
@@ -1047,6 +940,19 @@ export function renderPileShell(container, zone, allZones, opts, buildRow) {
       // effect to that card's own un-confirmed single-card `pickup`.
       noConfirm: (zone.cards?.length ?? zone.count) === 1 ? ['take'] : [],
       onAction: (id) => opts.onPileAction?.(zone.id, id),
+      // *nit (2026-08-26): rename affordance, any player.
+      rawName: zone.name,
+      onRename: opts.onRenamePile ? (name) => opts.onRenamePile(zone.id, name) : undefined,
+      // *nit (2026-08-26), direct user request: "All Movables can be
+      // drag/drop" - every pile's title is a drag source now (was
+      // gated to `isReparentable` kinds only). A non-reparentable kind
+      // (deck/hand/foundation/cascade/rankAdjacent) still can't change
+      // ZONES (the drop handler below rejects that, matching
+      // `MOVE_PILE`'s own game-rule eligibility) but CAN be reordered
+      // among its own zone's siblings - that half is purely cosmetic,
+      // never a game-rule concern, for any kind.
+      pileDraggable: Boolean(opts.onMovePile) || Boolean(opts.onReorderPile),
+      pileId: zone.id,
     },
   );
 
@@ -1069,6 +975,29 @@ export function renderPileShell(container, zone, allZones, opts, buildRow) {
       // misread as a bogus card id.
       const pileAction = pileActionFromDrop(e.dataTransfer);
       if (pileAction) { opts.onPileActionDrop?.(pileAction, zone.id); return; }
+      // *nit (2026-08-26), direct user request: "relocated within their
+      // zone (ordering)" - a dragged PILE dropped directly onto ANOTHER
+      // pile now reorders it to sit right there if they already share a
+      // zone (purely cosmetic, always allowed - `onReorderPile`, below).
+      // A drop onto a pile in a DIFFERENT zone is a reparent request
+      // instead - deliberately NOT `stopPropagation()`'d for that case,
+      // so it bubbles up to the containing Zone's own drop handler
+      // (`renderZonePanel`), which is what actually calls `onMovePile`
+      // (and, via `state.js`'s own `reparentable` check, is where an
+      // ineligible kind's cross-zone attempt gets rejected).
+      const draggedPileId = pileDragFromDrop(e.dataTransfer);
+      if (draggedPileId) {
+        const draggedZoneId = allZones.find((z) => z.id === draggedPileId)?.zoneId;
+        if (draggedPileId !== zone.id && draggedZoneId === zone.zoneId) {
+          e.stopPropagation();
+          opts.onReorderPile?.(draggedPileId, zone.id);
+        }
+        return;
+      }
+      // An ordinary card drop DOES belong to this specific pile - stop
+      // it here so the Zone's own drop handler doesn't ALSO fire and
+      // spawn a redundant new pile for the same drop.
+      e.stopPropagation();
       performZoneDrop(container, row, zone.id, e.dataTransfer.getData('text/plain'),
         { x: e.clientX, y: e.clientY }, opts.onDropCard, zone.kind);
     });
@@ -1116,17 +1045,79 @@ export function renderZonePanel(zoneEl, id, title, piles, allZones, opts) {
   // hold several piles and so has no single pile id of its own.
   zoneEl.dataset.groupId = id;
 
+  // *nit (2026-08-26): restored - see `wirePanelLayout`'s own comment
+  // for the full "zones need free positioning, piles need discrete
+  // native drag" reasoning. A Zone's own separate heading (this `title`
+  // block - the only case that renders one at all; a standalone 1-pile
+  // Zone has no separate heading, its lone pile's own title covers
+  // reparent/reorder there instead) is the pointer-drag handle.
   let dragHandle;
   if (title) {
     const heading = document.createElement('header-actions');
     zoneEl.appendChild(heading);
-    heading.render(title, [], { headingClass: 'panel-title' });
+    heading.render(title, [], {
+      headingClass: 'panel-title',
+      // *nit (2026-08-26): rename affordance, any player.
+      rawName: title,
+      onRename: opts.onRenameZone ? (name) => opts.onRenameZone(id, name) : undefined,
+    });
     dragHandle = heading;
   }
 
   const body = document.createElement('div');
   body.className = 'zone-body';
   zoneEl.appendChild(body);
+
+  // (bloop: piles/zones/cards are all Movable) - a card dropped on the
+  // Zone's own EMPTY space (not onto any pile inside it) spawns a
+  // brand-new pile here, seeded with that card. Wired on `body`, not
+  // `zoneEl` itself - `zoneEl` also contains the heading/pile-panel
+  // children, and a drop landing on one of THOSE is handled by that
+  // pile's own listener (`renderPileShell`, which now stops
+  // propagation so it never also reaches this one).
+  // (bloop) also handles a dragged PILE dropped here - reparenting it
+  // into THIS zone as a sibling (Smith's Gate 1 ruling, D55: always a
+  // sibling, never a merge). `renderPileShell`'s own per-pile drop
+  // handler ignores a pile-drag-token and lets it bubble up here
+  // unhandled (rather than misreading it as a card id) - a pile
+  // reparents into the ZONE it lands in, not specifically the other
+  // pile pixel it happened to land on top of.
+  if (opts.onDropCardOnZone || opts.onMovePile) {
+    // D35 note (unchanged reasoning): real browsers don't expose
+    // `dataTransfer` values during `dragover`, only `.types` - so the
+    // pile-action/pile-drag/card distinction only happens at DROP time,
+    // same as every other drop target in this file. `dragover` always
+    // just previews "something droppable" unconditionally.
+    body.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      // `zoneEl` (`.zone`), not `body` (`.zone-body`) - matches the
+      // existing `.zone.zone-drag-over` CSS rule (Phase 72's task.md AC:
+      // "reuses `.zone-drag-over`"); toggling it on `body` alone
+      // wouldn't match either that rule or `.pile-section.zone-drag-over`,
+      // so nothing would actually render.
+      zoneEl.classList.add('zone-drag-over');
+    });
+    body.addEventListener('dragleave', (e) => {
+      if (e.target === body) zoneEl.classList.remove('zone-drag-over');
+    });
+    body.addEventListener('drop', (e) => {
+      e.preventDefault();
+      zoneEl.classList.remove('zone-drag-over');
+      // A pile-action token (Draw) dropped on open zone space has
+      // nowhere sensible to go - same exclusion the per-pile drop
+      // handler already makes for itself.
+      if (pileActionFromDrop(e.dataTransfer)) return;
+      // Stop here, whichever branch below actually applies - otherwise
+      // this would ALSO bubble to `#zones`'s own "drop on open table
+      // space ungroups" handler (`main.js`), double-dispatching a
+      // reparent-into-this-zone AND an ungroup for the same drop.
+      e.stopPropagation();
+      const pileId = pileDragFromDrop(e.dataTransfer);
+      if (pileId) { opts.onMovePile?.(pileId, id); return; }
+      const cardId = e.dataTransfer.getData('text/plain');
+      if (cardId) opts.onDropCardOnZone?.(cardId, id);
+    });
+  }
 
   // UX follow-up (direct user request): "a Deck is a specific kind of
   // Pile... it is not a Zone at all" / "pile-panel and header-actions
@@ -1143,11 +1134,6 @@ export function renderZonePanel(zoneEl, id, title, piles, allZones, opts) {
     const el = document.createElement(componentFor(zone.kind));
     body.appendChild(el);
     el.render(zone, allZones, opts);
-    // No separate Zone-level title for the common single-pile case -
-    // the lone pile's own heading (`.pile-title`) is the drag handle
-    // instead, so this Zone doesn't show two headings saying almost the
-    // same thing.
-    if (!dragHandle) dragHandle = el.querySelector('.pile-title');
   }
 
   wirePanelLayout(zoneEl, id, dragHandle, opts);
@@ -1233,6 +1219,18 @@ export function renderZones(container, zones, seatedPlayers, zoneRecords, opts =
   }
 }
 
+/** Never let a resize shrink a panel past the point its own content
+ * (a card, a heading) stops fitting - matches `.seat-zone`'s own CSS
+ * `min-width` floor for the un-resized case, just enforced here too so
+ * a resize can't undercut it. */
+const MIN_PANEL_WIDTH_PX = 160;
+/** Same idea for height - tall enough for the heading plus one row of
+ * cards, so a vertical resize can't collapse a zone to an unusable
+ * sliver (the `overflow-y: auto` `renderZonePanel` sets handles a
+ * SHORTER-than-content panel gracefully; this stops it going shorter
+ * than makes sense at all). */
+const MIN_PANEL_HEIGHT_PX = 90;
+
 /**
  * UX follow-up (direct user request): "grab bars and click title...
  * grabbing the title to move the panel to a different place on the
@@ -1246,6 +1244,13 @@ export function renderZones(container, zones, seatedPlayers, zoneRecords, opts =
  * to persist to `localStorage` (`panelLayout.js`) once the gesture is
  * done, not on every intermediate pixel; the live drag itself is purely
  * a local style update until then.
+ *
+ * *nit (2026-08-26): restored after a same-day round trip (deleted,
+ * then the user directly corrected that "zones can be moved anywhere
+ * on the table" - this is a Zone-only capability now, wired onto a
+ * Zone's own separate heading, never onto a Pile's title, which uses
+ * native drag for its own different, discrete-target capability
+ * instead - see `wirePanelLayout`'s own comment for the full reasoning.
  */
 function attachPanelDrag(headingEl, panelEl, id, onMove) {
   if (!headingEl) return;
@@ -1305,18 +1310,6 @@ function attachPanelDrag(headingEl, panelEl, id, onMove) {
   });
 }
 
-/** Never let a resize shrink a panel past the point its own content
- * (a card, a heading) stops fitting - matches `.seat-zone`'s own CSS
- * `min-width` floor for the un-resized case, just enforced here too so
- * a resize can't undercut it. */
-const MIN_PANEL_WIDTH_PX = 160;
-/** Same idea for height - tall enough for the heading plus one row of
- * cards, so a vertical resize can't collapse a zone to an unusable
- * sliver (the `overflow-y: auto` `renderZonePanel` sets handles a
- * SHORTER-than-content panel gracefully; this stops it going shorter
- * than makes sense at all). */
-const MIN_PANEL_HEIGHT_PX = 90;
-
 /**
  * UX follow-up (direct user request): a resize handle in the panel's
  * own bottom-right corner, alongside the title-bar move handle
@@ -1355,6 +1348,12 @@ function attachPanelResize(panelEl, id, onResize) {
     const startX = e.clientX;
     const startY = e.clientY;
     panelEl.classList.add('panel-resizing');
+    // *nit (2026-08-26): `flex-grow: 1` would otherwise grow the panel
+    // right back past whatever width this drag is about to set - see
+    // `wirePanelLayout`'s own comment on `.panel-sized`. Added the
+    // instant the drag STARTS (not just on the next full render from
+    // stored layout), so even a first-ever resize actually holds.
+    panelEl.classList.add('panel-sized');
     document.body.classList.add('panel-resize-active');
 
     const onPointerMove = (ev) => {
@@ -1493,6 +1492,25 @@ function pileActionToken(actionId) {
 export function pileActionFromDrop(dataTransfer) {
   const raw = dataTransfer.getData('text/plain');
   return raw.startsWith(PILE_ACTION_TOKEN_PREFIX) ? raw.slice(PILE_ACTION_TOKEN_PREFIX.length) : null;
+}
+
+// (bloop: piles/zones/cards are all Movable) - a dragged PILE (its own
+// title bar is the handle, `renderPileShell`) carries its id the same
+// tagged-string way a pile-ACTION token does, so every drop target's
+// existing "is this actually a plain card?" check can tell the three
+// payload shapes apart with one string prefix test each, no new
+// `dataTransfer` MIME type needed (browsers only reliably round-trip
+// `text/plain` through a real drag, D35's own standing note).
+const PILE_DRAG_TOKEN_PREFIX = 'pile-drag:';
+
+function pileDragToken(pileId) {
+  return `${PILE_DRAG_TOKEN_PREFIX}${pileId}`;
+}
+
+/** Same shape as `pileActionFromDrop` - only meaningful at `drop` time. */
+export function pileDragFromDrop(dataTransfer) {
+  const raw = dataTransfer.getData('text/plain');
+  return raw.startsWith(PILE_DRAG_TOKEN_PREFIX) ? raw.slice(PILE_DRAG_TOKEN_PREFIX.length) : null;
 }
 
 /**

@@ -23,10 +23,27 @@ export class HandPile extends Pile {
     return {};
   }
 
-  /** `viewFor` never calls this for an `in-hand` pile - present for
-   * interface uniformity only. */
-  static redactCard(card) {
-    return card;
+  /**
+   * *nit (2026-08-26), real fix for a long-disclosed gap: a hand card
+   * carries no per-card `owner`/`faceUp` of its own (unlike a table-side
+   * pile's cards, D7) - ownership is the PILE's `ownerId`, so redaction
+   * needs the pile in scope, not just the card. The owner sees their
+   * hand in full; anyone else gets an anonymous face-down placeholder,
+   * WITHOUT `id` - deliberately, unlike the base `Pile.redactCard`'s
+   * `{id, owner, faceDown}` shape: this app's card ids encode rank/suit
+   * (`decks/standardDeck.js`, e.g. `"A-spades-0"`), so keeping `id`
+   * here would leak identity through the one field D7's own redaction
+   * elsewhere is careful to strip. No card-level action ever needs to
+   * address another player's hand card by id (unlike a table-side
+   * pile's hidden cards, which PICKUP/REVEAL/MOVE_CARD still reference),
+   * so there's nothing lost by omitting it. `owner: null` (not
+   * `pile.ownerId`) is deliberate too - `ui.js`'s renderer would
+   * otherwise try to tag every card with its owner's name, redundant
+   * noise inside a panel that's already labeled with that name once.
+   */
+  static redactCard(card, viewerId, pile) {
+    if (pile?.ownerId === viewerId) return card;
+    return { faceDown: true, owner: null };
   }
 
   /** A hand only offers anything to its own owner. */

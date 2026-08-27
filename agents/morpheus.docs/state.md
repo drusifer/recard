@@ -872,3 +872,40 @@ whole scope per the user's own no-phase-gate directive.
 getting long. No open D56 work remains; ScoreZone-as-a-real-Zone is a
 separate future feature request if wanted, not a D56 follow-up (see
 `docs/ARCHITECTURE.md` D56's own closing section).
+
+## D57 code review (2026-08-26) - APPROVED
+
+Reviewed after Trin's UAT (PASS, one real coverage gap found+fixed
+during review itself - good sign of genuine scrutiny, not rubber-
+stamping).
+
+- Traced every `stopPropagation()`/bubble path by hand across the 3
+  drop layers (per-pile -> zone body -> `#zones` background): a card
+  drop stops at whichever layer actually claims it; a pile-drag token
+  is deliberately let bubble PAST the per-pile layer (a pile dropped
+  on top of another pile belongs to the containing ZONE, not that
+  specific sibling) and IS stopped at the zone layer once claimed, so
+  `#zones`' own ungroup handler only ever fires for a genuinely
+  unclaimed drop. Coherent, no double-dispatch path found.
+- The `attachPanelDrag`-vs-native-drag conflict resolution (skip
+  pointer-drag wiring on a reparentable pile's own title) is the right
+  call, correctly scoped (only reparentable kinds lose panel-reposition
+  via title-drag; deck/hand/foundation/cascade/rankAdjacent keep it
+  unchanged since they never get native drag) and honestly disclosed
+  as a trade-off rather than silently dropped.
+- `CREATE_PILE` reusing `transferCard` (D43) rather than hand-rolling a
+  new remove/insert pair is the right reuse - same authorization/
+  `canAccept` pipeline every other transfer goes through, not a
+  parallel path that could drift.
+- The `MOVE_PILE`-reads-`reparentable` fix is a genuine correctness
+  improvement (one source of truth instead of two that had already
+  silently diverged) - good instinct to fix it while already in this
+  code rather than filing it separately.
+
+**Verdict: APPROVED.** No architecture concerns. Real interaction
+model change (new drag gestures) - Smith's UX gate applies per the
+`*impl` bloop chain, not skippable as internal-only.
+
+### Next Steps
+@Smith: `*user test` D57 - live drag interactions specifically (pile
+reparent/ungroup, card-drop-spawns-pile), not just a spec read.

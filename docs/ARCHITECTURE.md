@@ -2757,11 +2757,16 @@ cover (visual/UX judgment calls, not just functional correctness).
   per phase.
 
 ## Open Items Carried Forward (not blocking v1)
-- **`handPile.redactCard` — no privacy enforcement.** Hand cards leak to
-  every viewer via `view.zones` since the roster-retirement/D54 session
-  moved the hand into the generic zone pipeline. The single biggest
-  open gap as of D54 — flagged repeatedly through that session, not
-  fixed yet.
+- ~~`handPile.redactCard` — no privacy enforcement.~~ **Fixed** (*nit,
+  2026-08-26): `HandPile.redactCard(card, viewerId, pile)` now checks
+  the PILE's `ownerId` (a hand card carries no per-card `owner` of its
+  own) and returns `{faceDown: true, owner: null}` — deliberately
+  WITHOUT `id`, since this app's card ids encode rank/suit
+  (`decks/standardDeck.js`) and would otherwise leak identity through
+  the one field D7's own table-side redaction is careful to strip.
+  `state.js`'s `viewFor` call site updated to pass `pile` through.
+  Live-verified 2-client: the owner sees real cards, every other
+  viewer sees only anonymous card-backs, in both directions.
 - **Per-seat anchor geometry for non-viewer seats** — D54's Table Zone
   growth (Deck joining it) produces real overlaps against seat/score
   panels at several desktop widths; needs a per-seat anchor direction
@@ -3084,3 +3089,109 @@ them, not by re-litigating the "no phase gates" call:
 
 D56 is complete as scoped: the class hierarchies exist, the
 duplication is gone, nothing is broken.
+
+### D57. Piles, Zones, and cards are all genuinely Movable; a card dropped on empty Zone space spawns a new Pile
+
+Direct user request (bloop): "piles, zones and cards must all be
+Movable. Any movable can be picked up and put down with drag and
+drop. A pile dropped onto the Table will automatically create a zone.
+and a card dropped in a zone will create a new pile." Delivers Phase
+72 (`task.md`, already-scoped pile-title drag between zones) plus one
+genuinely new capability the phase never covered.
+
+**Pile drag (Phase 72's own scope, now shipped):** a reparentable
+pile's `<header-actions>` title bar becomes a native-HTML5-DnD source
+(`draggable`, a `pile-drag:<id>` payload distinct from a card's bare
+id and from a pile-action token). Dropped on another Zone's box:
+reparents as a sibling there (Smith's Gate 1 ruling, D55 — never a
+merge). Dropped on the open `#zones` background: ungroups into a
+fresh standalone Zone (D55's existing `MOVE_PILE`-with-no-target
+design, now reachable from the UI).
+
+**A real mechanical conflict found and resolved, not glossed over:**
+a lone pile's title already doubled as its containing Zone's own
+`attachPanelDrag` handle (pointer-based panel repositioning). Native
+drag and pointer-drag can't coexist on the same element — a
+`pointerdown` handler that calls `preventDefault()` (which
+`attachPanelDrag`'s does) suppresses the browser's native drag gesture
+from ever starting. Resolved by NOT wiring `attachPanelDrag` onto a
+reparentable pile's own title (`renderZonePanel`, `ui.js`) — a
+disclosed trade-off: a lone reparentable pile's zone panel can still
+be resized (separate corner handle), just not freely repositioned by
+title-drag any more; dragging its title now means "move this pile,"
+not "move this panel." Non-reparentable kinds (deck/hand/foundation/
+cascade/rankAdjacent) are unaffected — their titles keep the original
+panel-reposition behavior, since they never gain native drag.
+
+**New: `CREATE_PILE` (`state.js`).** A card dropped on a Zone's own
+empty space (not onto any existing pile inside it) atomically spawns
+a new pile there, seeded with that card. Deliberately its own action,
+not `CREATE_ZONE` with an optional `zoneId` — `CREATE_ZONE` always
+mints a NEW standalone Zone; `CREATE_PILE` always joins an EXISTING
+one (validated, never created), the same real Zone/Pile distinction
+D55 already drew. Reuses `transferCard` (D43) for the seed-card half,
+so authorization/`canAccept` run through the exact one path every
+other transfer does — and re-derives the same hand-vs-table source
+branch `dropCardOnZone` already makes at the UI layer (a card dragged
+FROM a hand needs PLAY's owner/faceUp transform; from anywhere else on
+the table, MOVE's plain pass-through), atomically in one dispatch so a
+guest's own relayed action never races a separate move.
+
+**Real gap found and fixed while wiring this, unrelated to the ask
+itself:** `MOVE_PILE`'s eligibility check was a hardcoded
+`pile.kind !== 'zone' && pile.kind !== 'discard'` literal — D56's own
+`static reparentable` flag existed, was documented, and was simply
+never read by anything. Worse, it was silently WRONG on three classes
+(`FoundationPile`/`CascadePile`/`RankAdjacentPile` inherited the base
+`Pile` default of `true` instead of the `false` their own established
+test coverage already required). Fixed both — the flag values, and
+`MOVE_PILE` now reads `PILE_TYPES[pile.kind]?.reparentable` instead of
+duplicating its own copy of the same rule. Full test suite (which
+already asserted the correct exclusion) stayed green throughout,
+confirming the fix was behavior-preserving, not just theoretically
+correct.
+
+**Verified:** 354/354 unit green (11 new — `CREATE_PILE`'s eligibility/
+authorization/atomicity, `MOVE_PILE`'s flag-driven rejection unchanged),
+`lint:design` unchanged at its pre-existing 5-violation baseline. Live
+Playwright verification (real `DragEvent` dispatch, native DnD doesn't
+fire from Playwright's synthetic mouse input, same technique
+`e2e.smoke.mjs` already established): card-drop spawns a real new pile
+with the drop-target highlight firing correctly; pile ungroup and
+reparent both round-trip correctly with zero console errors.
+
+#### Correction (same day): Zones need free positioning, not discrete drag-and-drop
+
+A follow-on same-day *nit ("remove pointer-based panel behavior")
+deleted `attachPanelDrag` (pointer-tracking panel repositioning)
+entirely, on the theory that native drag was now "the same thing" for
+every Movable panel. **Direct user correction, unambiguous**: "zone
+movement is still broken, it was working great until you broke it -
+Zones can be moved anywhere on the table. No Zone nesting."
+
+The premise was wrong: a Pile's Movable capability (reparent into
+another Zone, or reorder among siblings) is inherently a DISCRETE,
+target-based operation - native HTML5 DnD's drop-target model fits it
+well. A Zone's Movable capability is CONTINUOUS, arbitrary-pixel
+placement anywhere on the table - something only real pointer-tracking
+(mousedown → mousemove → mouseup, updating position live) can express;
+native drag has no equivalent "drop wherever the cursor currently is"
+concept. These were never the same capability wearing two names, and
+collapsing them onto one mechanism broke the one that needed the other
+shape. `attachPanelDrag`/`savePanelPosition`/`onMovePanel` are restored,
+wired onto a Zone's own separate heading only (never a Pile's title,
+which keeps native drag for its own different capability) - the
+short-lived `REORDER_ZONE` action and `zone-drag:` token mechanism this
+session had built as a replacement are removed, superseded by the
+restored free positioning. "No Zone nesting" was never actually at
+risk - `attachPanelDrag` only ever sets `position: absolute` CSS
+coordinates within `#zones`, never reparents DOM nodes - confirmed
+live (no `.zone` is ever a descendant of another `.zone`).
+
+**Verified:** 358/358 unit green, `lint:design` unchanged. Live
+Playwright verification with REAL mouse events (not synthetic
+`DragEvent`s, since this is genuinely pointer-driven): dragging a
+Zone's heading sets an arbitrary pixel position (`panel-moved` class,
+real `left`/`top`); Pile drag/ungroup/reparent all independently
+re-verified unaffected; zero zone nesting confirmed by walking the
+actual DOM tree.

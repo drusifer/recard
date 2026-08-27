@@ -1232,20 +1232,45 @@ they build, so it gets its own pure/UI pair rather than folding into 70.
       baseline. Live-verified via ad-hoc Playwright script + screenshot:
       Solitaire's 11-zone table renders pixel-identical to before.
 
-### Phase 72 — Pile-title drag-and-drop between zones (UI)
-- [ ] Drag handle is the pile's own `<header-actions>` title bar (D54),
-      not the pile body — must not be confused with a card drag.
-- [ ] Drop-target highlight reuses `.zone-drag-over` (Smith's Gate 2
+### Phase 72 — Pile-title drag-and-drop between zones (UI) — DONE (bloop, 2026-08-26)
+- [x] Drag handle is the pile's own `<header-actions>` title bar (D54),
+      not the pile body — must not be confused with a card drag. Native
+      HTML5 DnD (`draggable`/`dragstart`), a `pile-drag:<id>` payload
+      distinct from a card's own bare id and from a pile-ACTION token
+      (`pile-action:<id>`, Draw) — every drop target tells all three
+      apart at drop time (`pileDragFromDrop`/`pileActionFromDrop`,
+      `ui.js`). Only a `reparentable` kind's title becomes draggable at
+      all (`isReparentable`, `pileActions.js` — reads each Pile class's
+      own `static reparentable`, D56).
+- [x] Drop-target highlight reuses `.zone-drag-over` (Smith's Gate 2
       note #1) while dragging over an eligible target Zone's box.
-- [ ] An explicit, equally-visible "drop here to ungroup" target (an
+- [x] An explicit, equally-visible "drop here to ungroup" target (an
       open area of `#zones`) for pulling a grouped pile back out
       (Smith's Gate 2 note #2) — creates a fresh standalone Zone per
-      Phase 71's ungrouping design.
-- [ ] Verify live via screenshot: drag a standalone `zone`/`discard`
-      pile's title into another Zone, confirm it renders as a sibling
-      there; drag it back out, confirm it's standalone again; confirm
-      the Table Zone (Deck+Table+Discard) still renders identically to
-      before, now via config instead of the deleted hardcode.
+      Phase 71's ungrouping design (`MOVE_PILE` with no target).
+- [x] Verify live via screenshot: drag a standalone pile's title into
+      another Zone, confirm it renders as a sibling there; drag it back
+      out via the `#zones` background, confirm it's standalone again;
+      confirm the Table Zone (Deck+Table) still renders identically to
+      before. Done — see `agents/CHAT.md`/state files for the session.
+- **Real gap found+fixed along the way**: `MOVE_PILE`'s own eligibility
+      check was a hardcoded `pile.kind !== 'zone' && pile.kind !==
+      'discard'` literal — D56's `reparentable` flag existed and was
+      documented but never actually wired to it, and was WRONG on 3
+      classes (`FoundationPile`/`CascadePile`/`RankAdjacentPile`
+      inherited the base `Pile` default `true` instead of `false`).
+      Fixed both: the flag values, and `MOVE_PILE` now reads
+      `PILE_TYPES[pile.kind]?.reparentable` instead of its own copy.
+- **Extension beyond the original AC, direct user request** ("piles,
+      zones and cards must all be Movable... a card dropped in a zone
+      will create a new pile"): new `CREATE_PILE` reducer action
+      (`state.js`) — a card dropped on a Zone's own empty space (not
+      onto any existing pile) atomically spawns a new pile there,
+      seeded with that card, reusing `transferCard`'s full
+      authorization/`canAccept` pipeline (same PLAY-vs-MOVE branching
+      `dropCardOnZone` already makes, so hand-sourced drops get PLAY's
+      visibility transform and table-sourced drops keep their existing
+      owner/faceUp).
 
 ### Phase 73 — reserved bug-fix + full regression
 - [ ] Full regression: unit + `npm run test:e2e` (only if Phase 72
