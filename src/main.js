@@ -64,10 +64,10 @@ const zonesElement = document.querySelector('#zones');
 // (`renderZonePanel`, `ui.js`) `stopPropagation()`s a pile-token drop
 // it actually handles, so this only ever fires for a drop that lands
 // on truly empty space between zones, never a double-dispatch.
-zonesElement.addEventListener('dragover', (e) => e.preventDefault());
-zonesElement.addEventListener('drop', (e) => {
-  e.preventDefault();
-  const pileId = pileDragFromDrop(e.dataTransfer);
+zonesElement.addEventListener('dragover', (event) => event.preventDefault());
+zonesElement.addEventListener('drop', (event) => {
+  event.preventDefault();
+  const pileId = pileDragFromDrop(event.dataTransfer);
   if (pileId) performMovePile(pileId, null);
 });
 // Only ever built for the VIEWER's own score (other players' scores
@@ -174,11 +174,11 @@ gameScreenElement.addEventListener('pointerdown', () => {
 globalThis.addEventListener('pointerup', () => {
   isPointerActive = false;
 });
-gameScreenElement.addEventListener('pointermove', (e) => {
+gameScreenElement.addEventListener('pointermove', (event) => {
   if (!isPointerActive || isSessionEnded) return;
   const rect = gameScreenElement.getBoundingClientRect();
-  const x = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-  const y = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+  const x = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+  const y = Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height));
   motionThrottler.schedule('cursor', { x, y });
 });
 
@@ -1078,7 +1078,7 @@ function renderGameFromView(view) {
     scoreElement.score = view.scores[player.id];
     scoreElement.adjustable = !isSessionEnded;
     if (!isMe) scoreElement.label = `${player.name} Score`;
-    scoreElement.addEventListener('score-adjust', (e) => adjustScore(player.id, e.detail.delta));
+    scoreElement.addEventListener('score-adjust', (event) => adjustScore(player.id, event.detail.delta));
     zonesElement.append(scoreElement);
     const panelId = isMe ? SCORE_PANEL_ID : `score-${player.id}`;
     wirePanelLayout(scoreElement, panelId, scoreElement.querySelector('.panel-title'), zoneOptions);

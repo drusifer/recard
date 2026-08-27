@@ -30,7 +30,7 @@ test('a still finger held past HOLD_MS lifts, even with no move events at all', 
   // require a wiggle to begin.
   const { state, events } = run([down(0), { type: 'tick', t: HOLD_MS }]);
   assert.equal(phaseOf(state), 'dragging');
-  assert.deepEqual(events.map((e) => e.type), ['lift']);
+  assert.deepEqual(events.map((event) => event.type), ['lift']);
   assert.deepEqual([events[0].x, events[0].y], [100, 100]);
 });
 
@@ -69,7 +69,7 @@ test('a finger that stays within the slop for the whole hold lifts', () => {
     move(HOLD_MS + 10, 102, 103),
   ]);
   assert.equal(phaseOf(state), 'dragging');
-  assert.deepEqual(events.map((e) => e.type), ['lift', 'move']);
+  assert.deepEqual(events.map((event) => event.type), ['lift', 'move']);
 });
 
 test('a first move that arrives late AND far still lifts - time is checked before distance', () => {
@@ -81,7 +81,7 @@ test('a first move that arrives late AND far still lifts - time is checked befor
   // kind. The hold has elapsed, so the finger is free to have moved.
   const { state, events } = run([down(0), move(HOLD_MS + 40, 100, 220)]);
   assert.equal(phaseOf(state), 'dragging');
-  assert.deepEqual(events.map((e) => e.type), ['lift', 'move']);
+  assert.deepEqual(events.map((event) => event.type), ['lift', 'move']);
   assert.deepEqual([events[0].x, events[0].y], [100, 100], 'the lift is reported at the origin, where the card actually is');
   assert.deepEqual([events[1].x, events[1].y], [100, 220]);
 });
@@ -94,7 +94,7 @@ test('once lifted, the slop no longer applies - a drag may go anywhere', () => {
     move(320, 20, 20),
   ]);
   assert.equal(phaseOf(state), 'dragging');
-  assert.deepEqual(events.map((e) => e.type), ['lift', 'move', 'move']);
+  assert.deepEqual(events.map((event) => event.type), ['lift', 'move', 'move']);
   assert.deepEqual([events[2].x, events[2].y], [20, 20]);
 });
 

@@ -215,26 +215,26 @@ function attachTouchDrag(sourceElement, card, context) {
     for (const event of out.events) handle[event.type](event);
   };
 
-  sourceElement.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'mouse') return;
-    feed({ type: 'down', x: e.clientX, y: e.clientY, t: performance.now() });
+  sourceElement.addEventListener('pointerdown', (event) => {
+    if (event.pointerType === 'mouse') return;
+    feed({ type: 'down', x: event.clientX, y: event.clientY, t: performance.now() });
     clearTimeout(timer);
     // A finger that never moves fires no pointermove, so the timer is
     // the only thing that can start the drag.
     timer = setTimeout(() => feed({ type: 'tick', t: performance.now() }), HOLD_MS);
-    sourceElement.setPointerCapture(e.pointerId);
+    sourceElement.setPointerCapture(event.pointerId);
   });
-  sourceElement.addEventListener('pointermove', (e) => {
-    if (e.pointerType === 'mouse') return;
-    feed({ type: 'move', x: e.clientX, y: e.clientY, t: performance.now() });
+  sourceElement.addEventListener('pointermove', (event) => {
+    if (event.pointerType === 'mouse') return;
+    feed({ type: 'move', x: event.clientX, y: event.clientY, t: performance.now() });
   });
-  sourceElement.addEventListener('pointerup', (e) => {
-    if (e.pointerType === 'mouse') return;
+  sourceElement.addEventListener('pointerup', (event) => {
+    if (event.pointerType === 'mouse') return;
     clearTimeout(timer);
-    feed({ type: 'up', x: e.clientX, y: e.clientY, t: performance.now() });
+    feed({ type: 'up', x: event.clientX, y: event.clientY, t: performance.now() });
   });
-  sourceElement.addEventListener('pointercancel', (e) => {
-    if (e.pointerType === 'mouse') return;
+  sourceElement.addEventListener('pointercancel', (event) => {
+    if (event.pointerType === 'mouse') return;
     clearTimeout(timer);
     feed({ type: 'cancel', t: performance.now() });
   });
@@ -246,8 +246,8 @@ function attachTouchDrag(sourceElement, card, context) {
   // instead works mid-gesture, and is safe here because a drag only
   // exists after 250ms of stillness, by which point the browser has not
   // begun scrolling and will still honour preventDefault.
-  sourceElement.addEventListener('touchmove', (e) => {
-    if (state?.phase === 'dragging') e.preventDefault();
+  sourceElement.addEventListener('touchmove', (event) => {
+    if (state?.phase === 'dragging') event.preventDefault();
   }, { passive: false });
 }
 
@@ -374,8 +374,8 @@ export function renderActionHeader(container, titleText, actionIds, options = {}
   if (options.onRename) {
     label.title = 'Double-click to rename';
     label.classList.add('renamable');
-    label.addEventListener('dblclick', (e) => {
-      e.stopPropagation();
+    label.addEventListener('dblclick', (event) => {
+      event.stopPropagation();
       const input = document.createElement('input');
       input.type = 'text';
       input.className = 'zone-name-edit';
@@ -419,8 +419,8 @@ export function renderActionHeader(container, titleText, actionIds, options = {}
   // one shared one - see `wirePanelLayout`'s own comment.
   if (options.pileDraggable) {
     container.draggable = true;
-    container.addEventListener('dragstart', (e) => {
-      e.dataTransfer.setData('text/plain', pileDragToken(options.pileId));
+    container.addEventListener('dragstart', (event) => {
+      event.dataTransfer.setData('text/plain', pileDragToken(options.pileId));
     });
   }
 
@@ -431,8 +431,8 @@ export function renderActionHeader(container, titleText, actionIds, options = {}
     button.type = 'button';
     button.className = 'pile-action-btn' + (spec.destructive ? ' btn-danger' : '');
     applyIconButton(button, spec, options.labels?.[id]);
-    button.addEventListener('click', (e) => {
-      e.stopPropagation();
+    button.addEventListener('click', (event) => {
+      event.stopPropagation();
       // US-61 (Sprint 23), Smith's ruling (Phase 70): each spec's own
       // `hint` already states its real consequence (reshuffleDeal's own
       // hint says it deals a fresh hand to each player; take's says it
@@ -453,7 +453,7 @@ export function renderActionHeader(container, titleText, actionIds, options = {}
     // button now instead of a radial one.
     if (options.draggable && spec.target) {
       button.draggable = true;
-      button.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', pileActionToken(id)));
+      button.addEventListener('dragstart', (event) => event.dataTransfer.setData('text/plain', pileActionToken(id)));
       attachPileActionTouchDrag(button, id, () => options.onAction(id));
     }
     container.append(button);
@@ -547,9 +547,9 @@ export function renderZoneCards(container, zone, allZones, options = {}) {
     // scroll broadcast a lift that never happened. Touch gets the cue
     // from the recognizer's `lift` instead - see `attachTouchDrag`.
     if (onCardLift) {
-      wrapper.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse') onCardLift(card.id, true); });
-      wrapper.addEventListener('pointerup', (e) => { if (e.pointerType === 'mouse') onCardLift(card.id, false); });
-      wrapper.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') onCardLift(card.id, false); });
+      wrapper.addEventListener('pointerdown', (event) => { if (event.pointerType === 'mouse') onCardLift(card.id, true); });
+      wrapper.addEventListener('pointerup', (event) => { if (event.pointerType === 'mouse') onCardLift(card.id, false); });
+      wrapper.addEventListener('pointerleave', (event) => { if (event.pointerType === 'mouse') onCardLift(card.id, false); });
     }
 
     // US-28: draggable exactly where MOVE_CARD's own authorization would
@@ -575,8 +575,8 @@ export function renderZoneCards(container, zone, allZones, options = {}) {
       // addressable entry in `allZones` now - no more synthetic
       // `HAND_PILE_ID` stand-in needed.
       const piles = allZones.map((z) => ({ id: z.id, kind: z.kind, ownerId: z.ownerId ?? null }));
-      wrapper.addEventListener('dragstart', (e) => {
-        e.dataTransfer.setData('text/plain', card.id);
+      wrapper.addEventListener('dragstart', (event) => {
+        event.dataTransfer.setData('text/plain', card.id);
         // D51: every zone (and the hand, if this card is pickup-eligible)
         // that could legally receive this SPECIFIC card lights up for the
         // whole drag - not just whichever one the pointer happens to be
@@ -596,7 +596,7 @@ export function renderZoneCards(container, zone, allZones, options = {}) {
       // `cardDragPayload` correctly treats it the same as hidden - even
       // a blind "put or take" move of a shared face-down card never
       // reveals its identity mid-drag.
-      wrapper.addEventListener('drag', (e) => onCardDrag?.(card, e.clientX, e.clientY));
+      wrapper.addEventListener('drag', (event) => onCardDrag?.(card, event.clientX, event.clientY));
       wrapper.addEventListener('dragend', () => onCardDrag?.(null, 0, 0));
       attachTouchDrag(wrapper, card, { onDropCard: options.onDropCard, onCardDrag, onCardLift });
     }
@@ -931,13 +931,13 @@ export function renderPileShell(container, zone, allZones, options, buildRow) {
   const row = buildRow(container);
 
   if (options.onDropCard) {
-    container.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      showZoneDragOver(container, row, { x: e.clientX, y: e.clientY }, zone.kind);
+    container.addEventListener('dragover', (event) => {
+      event.preventDefault();
+      showZoneDragOver(container, row, { x: event.clientX, y: event.clientY }, zone.kind);
     });
     container.addEventListener('dragleave', () => clearZoneDragOver(container, row));
-    container.addEventListener('drop', (e) => {
-      e.preventDefault();
+    container.addEventListener('drop', (event) => {
+      event.preventDefault();
       // UX follow-up (direct user request): a dragged pile-level action
       // token (Draw's own drag protocol, D35) can now land on ANY pile,
       // including a hand - this used to only be handled by the merged
@@ -945,7 +945,7 @@ export function renderPileShell(container, zone, allZones, options, buildRow) {
       // generically, before falling back to the ordinary card-drop
       // path, so Draw dropped on a hand pile draws instead of being
       // misread as a bogus card id.
-      const pileAction = pileActionFromDrop(e.dataTransfer);
+      const pileAction = pileActionFromDrop(event.dataTransfer);
       if (pileAction) { options.onPileActionDrop?.(pileAction, zone.id); return; }
       // *nit (2026-08-26), direct user request: "relocated within their
       // zone (ordering)" - a dragged PILE dropped directly onto ANOTHER
@@ -957,11 +957,11 @@ export function renderPileShell(container, zone, allZones, options, buildRow) {
       // (`renderZonePanel`), which is what actually calls `onMovePile`
       // (and, via `state.js`'s own `reparentable` check, is where an
       // ineligible kind's cross-zone attempt gets rejected).
-      const draggedPileId = pileDragFromDrop(e.dataTransfer);
+      const draggedPileId = pileDragFromDrop(event.dataTransfer);
       if (draggedPileId) {
         const draggedZoneId = allZones.find((z) => z.id === draggedPileId)?.zoneId;
         if (draggedPileId !== zone.id && draggedZoneId === zone.zoneId) {
-          e.stopPropagation();
+          event.stopPropagation();
           options.onReorderPile?.(draggedPileId, zone.id);
         }
         return;
@@ -969,9 +969,9 @@ export function renderPileShell(container, zone, allZones, options, buildRow) {
       // An ordinary card drop DOES belong to this specific pile - stop
       // it here so the Zone's own drop handler doesn't ALSO fire and
       // spawn a redundant new pile for the same drop.
-      e.stopPropagation();
-      performZoneDrop(container, row, zone.id, e.dataTransfer.getData('text/plain'),
-        { x: e.clientX, y: e.clientY }, options.onDropCard, zone.kind);
+      event.stopPropagation();
+      performZoneDrop(container, row, zone.id, event.dataTransfer.getData('text/plain'),
+        { x: event.clientX, y: event.clientY }, options.onDropCard, zone.kind);
     });
   }
 }
@@ -1060,8 +1060,8 @@ export function renderZonePanel(zoneElement, id, title, piles, allZones, options
     // pile-action/pile-drag/card distinction only happens at DROP time,
     // same as every other drop target in this file. `dragover` always
     // just previews "something droppable" unconditionally.
-    body.addEventListener('dragover', (e) => {
-      e.preventDefault();
+    body.addEventListener('dragover', (event) => {
+      event.preventDefault();
       // `zoneEl` (`.zone`), not `body` (`.zone-body`) - matches the
       // existing `.zone.zone-drag-over` CSS rule (Phase 72's task.md AC:
       // "reuses `.zone-drag-over`"); toggling it on `body` alone
@@ -1069,24 +1069,24 @@ export function renderZonePanel(zoneElement, id, title, piles, allZones, options
       // so nothing would actually render.
       zoneElement.classList.add('zone-drag-over');
     });
-    body.addEventListener('dragleave', (e) => {
-      if (e.target === body) zoneElement.classList.remove('zone-drag-over');
+    body.addEventListener('dragleave', (event) => {
+      if (event.target === body) zoneElement.classList.remove('zone-drag-over');
     });
-    body.addEventListener('drop', (e) => {
-      e.preventDefault();
+    body.addEventListener('drop', (event) => {
+      event.preventDefault();
       zoneElement.classList.remove('zone-drag-over');
       // A pile-action token (Draw) dropped on open zone space has
       // nowhere sensible to go - same exclusion the per-pile drop
       // handler already makes for itself.
-      if (pileActionFromDrop(e.dataTransfer)) return;
+      if (pileActionFromDrop(event.dataTransfer)) return;
       // Stop here, whichever branch below actually applies - otherwise
       // this would ALSO bubble to `#zones`'s own "drop on open table
       // space ungroups" handler (`main.js`), double-dispatching a
       // reparent-into-this-zone AND an ungroup for the same drop.
-      e.stopPropagation();
-      const pileId = pileDragFromDrop(e.dataTransfer);
+      event.stopPropagation();
+      const pileId = pileDragFromDrop(event.dataTransfer);
       if (pileId) { options.onMovePile?.(pileId, id); return; }
-      const cardId = e.dataTransfer.getData('text/plain');
+      const cardId = event.dataTransfer.getData('text/plain');
       if (cardId) options.onDropCardOnZone?.(cardId, id);
     });
   }
@@ -1227,11 +1227,11 @@ const MIN_PANEL_HEIGHT_PX = 90;
 function attachPanelDrag(headingElement, panelElement, id, onMove) {
   if (!headingElement) return;
   headingElement.classList.add('panel-drag-handle');
-  headingElement.addEventListener('pointerdown', (e) => {
+  headingElement.addEventListener('pointerdown', (event) => {
     // Buttons in the header (pile-action-btn, score +/-) must keep
     // working as plain clicks, not become a drag's starting point.
-    if (e.pointerType !== 'mouse' || e.target.closest('button')) return;
-    e.preventDefault();
+    if (event.pointerType !== 'mouse' || event.target.closest('button')) return;
+    event.preventDefault();
     // `offsetParent`, not a hardcoded `#table-surface`: every panel is a
     // direct child of `#zones` now, but this still generalizes correctly
     // regardless of what any panel's positioning ancestor actually is.
@@ -1240,8 +1240,8 @@ function attachPanelDrag(headingElement, panelElement, id, onMove) {
     // Offset from the pointer to the panel's own top-left, so the panel
     // doesn't jump to re-center itself on the cursor the instant the
     // drag starts - it moves exactly as far as the pointer does.
-    const grabDx = e.clientX - startRect.left;
-    const grabDy = e.clientY - startRect.top;
+    const grabDx = event.clientX - startRect.left;
+    const grabDy = event.clientY - startRect.top;
     // UX follow-up (real bug, found live): a panel that has never been
     // moved is still positioned by its OWN default mechanism (a personal
     // zone's seatPosition ring math + centering transform, a shared
@@ -1305,10 +1305,10 @@ function attachPanelResize(panelElement, id, onResize) {
   handle.title = 'Drag to resize';
   panelElement.append(handle);
 
-  handle.addEventListener('pointerdown', (e) => {
-    if (e.pointerType !== 'mouse') return;
-    e.preventDefault();
-    e.stopPropagation(); // don't also let this bubble into a move-drag
+  handle.addEventListener('pointerdown', (event) => {
+    if (event.pointerType !== 'mouse') return;
+    event.preventDefault();
+    event.stopPropagation(); // don't also let this bubble into a move-drag
     // `offsetParent`, not a hardcoded `#table-surface`: a personal zone's
     // is `#seat-zones` (which exactly overlays `#table-surface`, so the
     // numbers agree either way), but a shared zone's is `#table-area` -
@@ -1317,8 +1317,8 @@ function attachPanelResize(panelElement, id, onResize) {
     // element.
     const bound = (panelElement.offsetParent || document.querySelector('#table-surface')).getBoundingClientRect();
     const startRect = panelElement.getBoundingClientRect();
-    const startX = e.clientX;
-    const startY = e.clientY;
+    const startX = event.clientX;
+    const startY = event.clientY;
     panelElement.classList.add('panel-resizing');
     // *nit (2026-08-26): `flex-grow: 1` would otherwise grow the panel
     // right back past whatever width this drag is about to set - see
@@ -1524,31 +1524,31 @@ function attachPileActionTouchDrag(sourceElement, actionId, onDrop) {
   const feed = (sample) => {
     const out = touchDragStep(state, sample);
     state = out.state;
-    for (const e of out.events) handle[e.type](e);
+    for (const dragEvent of out.events) handle[dragEvent.type](dragEvent);
   };
 
-  sourceElement.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'mouse') return;
-    feed({ type: 'down', x: e.clientX, y: e.clientY, t: performance.now() });
+  sourceElement.addEventListener('pointerdown', (event) => {
+    if (event.pointerType === 'mouse') return;
+    feed({ type: 'down', x: event.clientX, y: event.clientY, t: performance.now() });
     clearTimeout(timer);
     timer = setTimeout(() => feed({ type: 'tick', t: performance.now() }), HOLD_MS);
-    sourceElement.setPointerCapture(e.pointerId);
+    sourceElement.setPointerCapture(event.pointerId);
   });
-  sourceElement.addEventListener('pointermove', (e) => {
-    if (e.pointerType === 'mouse') return;
-    feed({ type: 'move', x: e.clientX, y: e.clientY, t: performance.now() });
+  sourceElement.addEventListener('pointermove', (event) => {
+    if (event.pointerType === 'mouse') return;
+    feed({ type: 'move', x: event.clientX, y: event.clientY, t: performance.now() });
   });
-  sourceElement.addEventListener('pointerup', (e) => {
-    if (e.pointerType === 'mouse') return;
+  sourceElement.addEventListener('pointerup', (event) => {
+    if (event.pointerType === 'mouse') return;
     clearTimeout(timer);
-    feed({ type: 'up', x: e.clientX, y: e.clientY, t: performance.now() });
+    feed({ type: 'up', x: event.clientX, y: event.clientY, t: performance.now() });
   });
   sourceElement.addEventListener('pointercancel', () => {
     clearTimeout(timer);
     feed({ type: 'cancel', t: performance.now() });
   });
-  sourceElement.addEventListener('touchmove', (e) => {
-    if (state?.phase === 'dragging') e.preventDefault();
+  sourceElement.addEventListener('touchmove', (event) => {
+    if (state?.phase === 'dragging') event.preventDefault();
   }, { passive: false });
 }
 

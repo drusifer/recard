@@ -1671,7 +1671,7 @@ try {
   await rGuest.close();
 
   assert(
-    errors.every((e) => e.includes('favicon') || e.includes('404')),
+    errors.every((event) => event.includes('favicon') || event.includes('404')),
     `unexpected console/page errors: ${JSON.stringify(errors)}`,
   );
 
