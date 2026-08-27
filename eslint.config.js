@@ -108,6 +108,13 @@ export default [
       // lexicographic sort is already correct for strings, so an
       // explicit comparator would be pure noise, not a real fix.
       'unicorn/require-array-sort-compare': 'off',
+      // All 23 instances are the same Playwright idiom -
+      // `(await locator.textContent()).trim()` / `(await x.evaluate(...))
+      // === y` - inside already-dense one-line assertions. Splitting each
+      // into a temp variable + separate statement adds verbosity with no
+      // behavior or readability benefit here; same rationale as this
+      // block's other test-only relaxations above.
+      'unicorn/no-await-expression-member': 'off',
     },
   },
   {
