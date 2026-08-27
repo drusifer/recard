@@ -32,6 +32,18 @@ export class Session {
   */
   role;
   /**
+  @type {import('peerjs').Peer}
+  */
+  peer;
+  /**
+  @type {DataConnection} the host's own connection back, join role only
+  */
+  hostConn;
+  /**
+  @type {Promise<string>} resolves with this peer's own id once ready
+  */
+  readyPromise;
+  /**
   @type {Map<string, {id: string, name: string, connection: DataConnection}>}
   */
   peers = new Map();
@@ -39,33 +51,6 @@ export class Session {
   // is final. They are separate events because a client about to retry
   // must never first be told the session is over (Smith Gate 1 #2).
   handlers = { data: [], roster: [], 'host-lost': [], 'session-ended': [] };
-
-  constructor(role) {
-    this.role = role;
-  }
-
-  /**
-   * Tears down the underlying peer. Needed by the US-44 retry loop: an
-   * attempt that times out leaves a half-open peer holding a broker
-   * connection, and one per attempt would accumulate for the whole
-   * budget.
-   */
-  close() {
-    try { this.peer?.destroy(); } catch { /* already gone */ }
-    this.handlers = { data: [], roster: [], 'host-lost': [], 'session-ended': [] };
-  }
-
-  on(event, handler) {
-    // Fail loudly on a typo'd or unregistered event: silently dropping a
-    // subscription means a disconnect handler that simply never runs.
-    if (!this.handlers[event]) throw new Error(`Session: unknown event "${event}"`);
-    this.handlers[event].push(handler);
-    return this;
-  }
-
-  emit(event, payload) {
-    for (const handler of this.handlers[event] ?? []) handler(payload);
-  }
 
   /**
    * Host: create a table and wait for others to join. Uses a short,
@@ -96,7 +81,7 @@ export class Session {
     });
 
     peer.on('connection', (conn) => {
-      session._wireIncomingConnection(conn);
+      session.#wireIncomingConnection(conn);
     });
 
     return session;
@@ -135,7 +120,35 @@ export class Session {
     return session;
   }
 
-  _wireIncomingConnection(conn) {
+  constructor(role) {
+    this.role = role;
+  }
+
+  /**
+   * Tears down the underlying peer. Needed by the US-44 retry loop: an
+   * attempt that times out leaves a half-open peer holding a broker
+   * connection, and one per attempt would accumulate for the whole
+   * budget.
+   */
+  close() {
+    try { this.peer?.destroy(); } catch { /* already gone */ }
+    this.handlers = { data: [], roster: [], 'host-lost': [], 'session-ended': [] };
+  }
+
+  on(event, handler) {
+    // Fail loudly on a typo'd or unregistered event: silently dropping a
+    // subscription means a disconnect handler that simply never runs.
+    if (!Object.hasOwn(this.handlers, event)) throw new Error(`Session: unknown event "${event}"`);
+    this.handlers[event].push(handler);
+    return this;
+  }
+
+  emit(event, payload) {
+    const handlers = this.handlers[event] ?? [];
+    for (const handler of handlers) handler(payload);
+  }
+
+  #wireIncomingConnection(conn) {
     const name = conn.metadata?.name ?? conn.peer;
     const record = { id: conn.peer, name, playerKey: conn.metadata?.playerKey ?? null, status: 'connecting', conn };
     this.peers.set(conn.peer, record);
@@ -159,7 +172,7 @@ export class Session {
   #emitRoster() {
     this.emit(
       'roster',
-      [...this.peers.values()].map(({ id, name, playerKey, status }) => ({ id, name, playerKey, connection: status })),
+      this.peers.values().map(({ id, name, playerKey, status }) => ({ id, name, playerKey, connection: status })).toArray(),
     );
   }
 
