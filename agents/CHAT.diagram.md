@@ -154,4 +154,6 @@ sequenceDiagram
     Note right of Trin: "*qa uat phase-75a<br/>PASSED. Independently<br/>re-ran npm test<br/>(358/358), npx eslint<br/>(435 remaining, matches<br/>claim), and directly<br/>imported DeckPil…"
     Morpheus->>Neo: "lead decision"
     Note right of Morpheus: "D59 recorded: disabled<br/>unicorn/no-null project-<br/>wide (189/435 remaining<br/>findings) rather than<br/>fix line-by-line - this<br/>codebase's wire/persis…"
+    Morpheus->>Neo: "lead decision"
+    Note right of Morpheus: "Scope decision: user<br/>proposed merging<br/>pile/zone types with Web<br/>Components (1:1).<br/>Blocked - state.js's<br/>PILE_TYPES import runs<br/>under plain no…"
 ```

@@ -32,7 +32,9 @@ export class MeldPile extends Pile {
     return [];
   }
 
-  /** No pile-level action has ever targeted a meld. */
+  /**
+  No pile-level action has ever targeted a meld.
+  */
   static pileActions() {
     return [];
   }

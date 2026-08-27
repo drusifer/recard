@@ -17,7 +17,9 @@ export class RankAdjacentPile extends Pile {
    * elsewhere. */
   static reparentable = false;
 
-  /** No before/after halo - exactly one landing spot (on top). */
+  /**
+  No before/after halo - exactly one landing spot (on top).
+  */
   static resolveDropTarget() {
     return {};
   }
@@ -29,9 +31,9 @@ export class RankAdjacentPile extends Pile {
     if (pile.cards.length === 0) return true;
     // `insertCard` prepends (STACK convention) - index 0 is the top.
     const top = pile.cards[0];
-    const cardIdx = RANKS.indexOf(card.rank);
-    const topIdx = RANKS.indexOf(top.rank);
-    const diff = Math.abs(cardIdx - topIdx);
+    const cardIndex = RANKS.indexOf(card.rank);
+    const topIndex = RANKS.indexOf(top.rank);
+    const diff = Math.abs(cardIndex - topIndex);
     return diff === 1 || diff === RANKS.length - 1; // the wrap: A (0) <-> K (12)
   }
 

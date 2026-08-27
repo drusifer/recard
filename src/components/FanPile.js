@@ -22,12 +22,12 @@ import { renderPileShell, renderZoneCards } from '../ui.js';
  * base` rotate/translateY, identical to `renderHand`'s old formula).
  */
 export class FanPileElement extends HTMLElement {
-  render(zone, allZones, opts) {
-    renderPileShell(this, zone, allZones, opts, (container) => {
+  render(zone, allZones, options) {
+    renderPileShell(this, zone, allZones, options, (container) => {
       const row = document.createElement('div');
       row.className = 'card-row fan-row';
-      container.appendChild(row);
-      renderZoneCards(row, zone, allZones, { ...opts, fan: true });
+      container.append(row);
+      renderZoneCards(row, zone, allZones, { ...options, fan: true });
       return row;
     });
   }

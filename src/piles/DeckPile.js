@@ -34,7 +34,9 @@ export class DeckPile extends Pile {
     return [];
   }
 
-  /** Draw is open to everyone; every other deck action is host-only. */
+  /**
+  Draw is open to everyone; every other deck action is host-only.
+  */
   static pileActions({ isHost } = {}) {
     return isHost ? ['draw', 'deal', 'reshuffleDeal', 'shuffle', 'split'] : ['draw'];
   }

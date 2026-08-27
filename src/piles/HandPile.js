@@ -46,7 +46,9 @@ export class HandPile extends Pile {
     return { faceDown: true, owner: null };
   }
 
-  /** A hand only offers anything to its own owner. */
+  /**
+  A hand only offers anything to its own owner.
+  */
   static cardActions(pile, card, viewerId) {
     return pile.ownerId === viewerId ? ['play'] : [];
   }

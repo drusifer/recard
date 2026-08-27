@@ -92,6 +92,12 @@ export default [
       'sonarjs/no-duplicate-string': 'off',
       'sonarjs/cognitive-complexity': 'off',
       'unicorn/consistent-function-scoping': 'off',
+      // Every instance here sorts a freshly-built array of plain
+      // strings (object keys, card/zone ids) purely to make a
+      // deepEqual/JSON.stringify assertion order-independent - default
+      // lexicographic sort is already correct for strings, so an
+      // explicit comparator would be pure noise, not a real fix.
+      'unicorn/require-array-sort-compare': 'off',
     },
   },
 ];

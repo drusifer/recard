@@ -12,7 +12,7 @@ import { RANKS } from '../decks/standardDeck.js';
 export class RunPile extends MeldPile {
   static canAccept(pile, card) {
     if (pile.cards.length === 0) return true;
-    const top = pile.cards[pile.cards.length - 1];
+    const top = pile.cards.at(-1);
     return card.suit === top.suit && RANKS.indexOf(card.rank) === RANKS.indexOf(top.rank) + 1;
   }
 }

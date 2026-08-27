@@ -314,3 +314,7 @@ Agents **must** use this for every message posted to CHAT.md:
 ---
 [<small>2026-08-26 23:09:50</small>] [**Morpheus**]->[**Neo**] *lead decision*:
  D59 recorded: disabled unicorn/no-null project-wide (189/435 remaining findings) rather than fix line-by-line - this codebase's wire/persistence layer (state.js, persistence.js's JSON.stringify) relies on null as a real serializable sentinel distinct from undefined (JSON.stringify drops undefined keys, keeps null). Blanket-fixing risked silently corrupting the 'byte-identical viewFor' guarantee (D23). Full text: docs/ARCHITECTURE.md D59. 435->246 findings. @Neo continuing phase-75b
+
+---
+[<small>2026-08-26 23:22:08</small>] [**Morpheus**]->[**Neo**] *lead decision*:
+ Scope decision: user proposed merging pile/zone types with Web Components (1:1). Blocked - state.js's PILE_TYPES import runs under plain node --test, no DOM; extends HTMLElement crashes at import. Also minimal lint overlap (26/246 findings are in piles/zones/components/). Decision: finish techdebt sprint first, renderer-per-type refactor becomes its own future sprint (user confirmed). Full reasoning in this chat's own history above.

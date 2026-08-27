@@ -78,10 +78,10 @@ export class ScoreZoneElement extends HTMLElement {
   // bespoke hand-built header. `panel-title` is still the heading class
   // (`wirePanelLayout` still wires resize/starting-position off it).
   _render() {
-    this.innerHTML = '';
+    this.replaceChildren();
 
     const heading = document.createElement('header-actions');
-    this.appendChild(heading);
+    this.append(heading);
     heading.render(this.label, this.adjustable ? ['scoreDown', 'scoreUp'] : [], {
       headingClass: 'panel-title',
       onAction: (id) => {
@@ -92,7 +92,7 @@ export class ScoreZoneElement extends HTMLElement {
     const value = document.createElement('div');
     value.className = 'score-value';
     value.textContent = String(this.score);
-    this.appendChild(value);
+    this.append(value);
   }
 }
 

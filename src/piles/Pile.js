@@ -98,14 +98,14 @@ export class Pile {
    * anyone.
    */
   static cardActions(pile, card, viewerId) {
-    const hidden = card.faceDown === true || card.faceUp === false;
-    const owned = card.owner != null;
-    const mine = card.owner === viewerId;
+    const isHidden = card.faceDown === true || card.faceUp === false;
+    const isOwned = card.owner != null;
+    const isMine = card.owner === viewerId;
 
     return ['reveal', 'pickup', 'move', 'rotate'].filter((action) => {
-      if (action === 'reveal') return hidden && (!owned || mine);
-      if (action === 'pickup') return !hidden;
-      if (action === 'move' || action === 'rotate') return !hidden || !owned || mine;
+      if (action === 'reveal') return isHidden && (!isOwned || isMine);
+      if (action === 'pickup') return !isHidden;
+      if (action === 'move' || action === 'rotate') return !isHidden || !isOwned || isMine;
       return false;
     });
   }

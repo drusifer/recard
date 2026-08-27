@@ -28,9 +28,9 @@ export class CascadePile extends Pile {
    * lower than the current top card. */
   static canAccept(pile, card) {
     if (pile.cards.length === 0) return true;
-    const top = pile.cards[pile.cards.length - 1];
-    const oppositeColor = RED_SUITS.has(card.suit) !== RED_SUITS.has(top.suit);
-    return oppositeColor && RANKS.indexOf(card.rank) === RANKS.indexOf(top.rank) - 1;
+    const top = pile.cards.at(-1);
+    const isOppositeColor = RED_SUITS.has(card.suit) !== RED_SUITS.has(top.suit);
+    return isOppositeColor && RANKS.indexOf(card.rank) === RANKS.indexOf(top.rank) - 1;
   }
 
   /** US-57 explicitly scopes multi-card sequence moves out - no

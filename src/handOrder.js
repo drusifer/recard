@@ -45,8 +45,8 @@ export function reconcileOrder(previousOrder, currentCards) {
  *   ties broken by suit
  */
 export function sortByRank(cards) {
-  return [...cards]
-    .sort((a, b) => rankIndex(a.rank) - rankIndex(b.rank) || suitIndex(a.suit) - suitIndex(b.suit))
+  return cards
+    .toSorted((a, b) => rankIndex(a.rank) - rankIndex(b.rank) || suitIndex(a.suit) - suitIndex(b.suit))
     .map((c) => c.id);
 }
 
@@ -56,7 +56,7 @@ export function sortByRank(cards) {
  *   hearts/spades, JOKER last), rank-ascending within each suit
  */
 export function sortBySuit(cards) {
-  return [...cards]
-    .sort((a, b) => suitIndex(a.suit) - suitIndex(b.suit) || rankIndex(a.rank) - rankIndex(b.rank))
+  return cards
+    .toSorted((a, b) => suitIndex(a.suit) - suitIndex(b.suit) || rankIndex(a.rank) - rankIndex(b.rank))
     .map((c) => c.id);
 }
