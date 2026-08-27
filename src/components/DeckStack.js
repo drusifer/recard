@@ -24,7 +24,10 @@ export class DeckStackElement extends HTMLElement {
     renderPileShell(this, zone, allZones, options, (container) => {
       const row = document.createElement('div');
       container.append(row);
-      renderDeckStack(row, zone.count ?? zone.cards.length, options);
+      // D67: `zone.cards` now carries the pile's own top card (redacted,
+      // real id) for hidden-visibility kinds like `deck` - `renderDeckStack`
+      // uses it as a genuine drag source, same mechanism as any other pile.
+      renderDeckStack(row, zone.count ?? zone.cards.length, { ...options, pileId: zone.id, topCard: zone.cards[0] });
       return row;
     });
   }

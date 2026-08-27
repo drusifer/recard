@@ -76,11 +76,22 @@ test('component: deck/hand pick their own dedicated element, everything else fal
   assert.equal(RankAdjacentPile.component, 'pile-panel');
 });
 
-test('reparentable: deck and hand opt out (D55/US-63), everything else stays eligible', () => {
-  assert.equal(DeckPile.reparentable, false);
+test('reparentable: hand opts out (D55/US-63/D64), everything else - including deck now - stays eligible', () => {
+  assert.equal(DeckPile.reparentable, true, 'D64: reversed Sprint 23\'s deck exclusion, direct user request');
   assert.equal(HandPile.reparentable, false);
   assert.equal(Pile.reparentable, true);
   assert.equal(DiscardPile.reparentable, true, 'inherited, not overridden');
+});
+
+// *nit (direct user request, "don't enable X unless empty"): remove/
+// changePileType (D62/D63) are empty-only at the reducer - disabled
+// client-side too now, so a click never reaches the reducer's block
+// message on a non-empty pile (Nielsen #5).
+test('disabledActions: remove/changePileType are disabled on a non-empty pile, enabled on an empty one', () => {
+  assert.deepEqual(Pile.disabledActions(0), []);
+  assert.deepEqual(Pile.disabledActions(3), ['remove', 'changePileType']);
+  assert.deepEqual(DiscardPile.disabledActions(0), [], 'inherited, not overridden');
+  assert.deepEqual(DiscardPile.disabledActions(1), ['remove', 'changePileType'], 'inherited, not overridden');
 });
 
 // --- cardActions: characterized against pileActions.js's actionsForCard ---
@@ -242,7 +253,7 @@ test('discard cardActions: always empty - drop-only, nothing is ever offered on 
 });
 
 test('discard pileActions: split/take/hide/show, inherited from Pile unmodified - same shared/owner-open rule', () => {
-  assert.deepEqual(DiscardPile.pileActions({ isShared: true }), ['split', 'take']);
+  assert.deepEqual(DiscardPile.pileActions({ isShared: true }), ['split', 'take', 'changePileType', 'remove']);
   assert.deepEqual(DiscardPile.pileActions({}), []);
 });
 

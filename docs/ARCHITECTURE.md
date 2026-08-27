@@ -3316,3 +3316,351 @@ Strategy section (above); commit `7da7321`.
 **Verified:** `npm test` 358/358 (never depended on this file), `npm
 run lint:design` unchanged (5 pre-existing violations, same as before),
 `npm run lint:js` unaffected.
+
+---
+
+### D61. Saved layout overrides only cover stable-id panels; a new, separate localStorage store keyed by user-chosen name + recorded base preset
+
+**Context (US-69/70, Save Layout/SaveAs):** `panelLayout.js`'s existing
+`PANEL_LAYOUT_KEY` blob is flat, id-keyed, and mixes every panel this
+browser has ever positioned across every game. Per-player panel ids
+(`player-<ownerId>`, `hand:<ownerId>`) are connection-id-derived and
+cannot be known ahead of a new game (this is already documented as the
+reason `applyPresetLayout` only ever applies a preset's *shared*
+panels). Worse, discovered this sprint: any zone or pile the player
+creates at runtime (`CREATE_ZONE`/`CREATE_PILE`, `state.js` L115-120)
+gets a `crypto.randomUUID()` id — random per session, not reproducible
+in a future game. A saved layout that recorded positions by these ids
+would be silently meaningless on replay: the new game's freshly-created
+zones get different random ids, so nothing would match.
+
+**Decision:** "Save Layout" captures positions for only the
+**stable-id** panels already reachable in a fresh game of that preset —
+`table-zone`, `score`, `deck`, and whatever the active preset's own
+`GameConfig.piles`/`GameConfig.zones` declares (these use the preset's
+own fixed ids, e.g. `foundation-1`, per D52/D53). Player-created
+zones/piles (random UUID ids) are excluded from the saved set outright
+— repositioning them is still a live-session action, it just isn't
+capturable into a reusable saved layout, for the structural reason
+above, not an oversight.
+
+New store, `recard:layout-overrides:v1` (new file, `src/layoutOverrides.js`,
+same `storage`-injected pattern as `panelLayout.js`):
+```
+{ [name]: { presetName, layout: {<stableId>: {x,y,w,h}}, savedAt } }
+```
+- **Save** (US-69): writes/overwrites the entry keyed by the *active
+  preset's* `name` — this makes "Save" mean "override this preset's
+  default," matching the user's own framing.
+- **SaveAs** (US-70): prompts for a name (prefilled with the active
+  preset's name per the story's AC), writes under that name instead;
+  `presetName` is still recorded as the active preset so the host UI's
+  layout picker can filter to compatible saves only.
+- Table-create flow (`main.js`, near the existing `applyPresetLayout`
+  call at L634): a new "Layout" selector next to the preset dropdown,
+  populated with "Default" (the preset's built-in `layout`) plus every
+  override whose recorded `presetName` matches the selected preset.
+  Choosing one calls `applyPresetLayout(localStorage, chosenLayout)`
+  exactly as today — no change to how a layout gets applied, only to
+  which layout object gets passed in.
+- **Reset Layout** (Gate 1 Q7 amendment): deletes the named override
+  entry. Affects future table-creates only, same as Save/SaveAs — does
+  not retroactively move panels in the current live session.
+
+**Rejected:** keying overrides by preset `name` alone with no separate
+store (i.e. writing straight into `PANEL_LAYOUT_KEY` under a
+preset-prefixed id) — rejected because `panelLayout.js`'s existing
+semantics are "this browser's current live arrangement," a different
+concept from "a named, reusable saved layout"; conflating them would
+mean every live drag/resize during a session silently mutates a named
+save, which contradicts Save/SaveAs being an explicit user action
+(Smith Gate 1's Nielsen #1 amendment — the whole point is the user
+knows when a save happened).
+
+**Where the full text lives:** this entry; AC in `docs/USER_STORIES.md`
+US-69/70; Gate 1 amendments in the same file's "Smith Gate 1 review"
+subsection.
+
+---
+
+### D62. `REMOVE_ZONE`/`REMOVE_PILE` — new reducer actions, modeled on `RENAME_ZONE`/`RENAME_PILE`, empty-only
+
+**Context (US-71/72):** no removal reducer action exists today.
+`RENAME_ZONE`/`RENAME_PILE` (`state.js` L1030-1047) are the nearest
+precedent: unauthenticated (any player), find-by-id-or-throw, then
+`.map()` to replace/filter.
+
+**Decision:**
+- `REMOVE_PILE { pileId }`: throws if the pile doesn't exist; throws if
+  `kind` is `deck` or `hand` (same exemption `MOVE_PILE` already
+  enforces, `state.js` L654-656 — `deck` is found by fixed id not
+  kind-search, `hand` has the per-player exactly-one invariant); throws
+  a specific, user-facing message if `cards.length > 0` (Gate 1's
+  Nielsen #9 amendment — no cascade-delete, no silent card loss, no
+  auto-migration to Table). Otherwise filters the pile out of
+  `state.piles`.
+- `REMOVE_ZONE { zoneId }`: throws if the zone doesn't exist; throws if
+  `zoneId` is `TABLE_ZONE_ID` or is declared by the active preset's
+  `GameConfig.zones` (same exemption shape `CREATE_ZONE` already
+  enforces via `allowsPlayerZones`); throws a specific message if any
+  pile still has that `zoneId` (empty-only, same reasoning as
+  `REMOVE_PILE` — no cascade). Otherwise filters the zone record out of
+  `state.zones`.
+- Both wired through `ACTION_SPECS` (`pileActions.js`) as
+  `destructive: true`, `target: null` in-place actions, offered via
+  each Pile/Zone's own action surface — the existing radial pile-action
+  menu for piles (D51/D52 pattern); zone removal surfaces on the zone's
+  own header control, next to its existing rename affordance.
+
+**Rejected:** cascade-delete (removing a non-empty zone/pile silently
+drops its cards) — rejected per Gate 1's explicit "no silent card
+loss" amendment; the user must empty a pile/zone first, same discipline
+the existing `RESET` action already draws between zone piles (emptied)
+and hand piles (dropped, deliberately, only because a hand's cards
+belong to a leaving/resetting game state, not to an in-progress
+customization).
+
+**Where the full text lives:** this entry; AC in `docs/USER_STORIES.md`
+US-71/72.
+
+---
+
+### D63. `changePileType` — new pile action, `zone`⇄`discard` only, empty-only
+
+**Context (US-73):** `ACTION_SPECS` (`pileActions.js` L48-150) is the
+existing table for pile-level actions (`split`, `take`, `hide`, `show`,
+etc); no existing code re-validates a pile's current cards against a
+different type's `canAccept` rules.
+
+**Decision:** new `CHANGE_PILE_TYPE { pileId, kind }` reducer action,
+scoped to `kind` values `zone` and `discard` only in both directions —
+the two `PILE_TYPES` (`src/piles/pileTypes.js`) already treated as
+interchangeable/general-purpose by `MOVE_PILE`/`SPLIT_PILE`. `deck`,
+`hand` are structurally exempt (same reasoning as D62); `foundation`,
+`cascade`, `rankAdjacent` are excluded because they carry real
+game-rule `canAccept` logic (rank sequencing, adjacency) that a runtime
+swap could leave silently violated — no per-card re-validation exists
+anywhere in the codebase to check that, and building one is out of
+scope this sprint (`docs/USER_STORIES.md`, "Out of scope"). Throws a
+specific message (Gate 1 Nielsen #9) if `cards.length > 0` — empty-only,
+same discipline as D62's remove actions, for the same reason (no
+validated way to know the existing cards are still legal under the new
+type). `ACTION_SPECS` entry added the same way `hide`/`show` were;
+offered only by `Pile.js`'s base `pileActions()` for `zone`/`discard`
+kind piles specifically (not the base default for every subclass —
+`CascadePile`/`RankAdjacentPile`/`HandPile`/`DeckPile` do not override
+to add it).
+
+**Rejected:** per-card re-validation against the target type's
+`canAccept` (would allow non-empty swaps when every card happens to
+still be legal) — rejected as unscoped extra complexity for this
+sprint; flagged in `docs/USER_STORIES.md` as a possible future
+enhancement if empty-only proves too restrictive in practice.
+
+**Where the full text lives:** this entry; AC in `docs/USER_STORIES.md`
+US-73.
+
+---
+
+### D64. The deck can now be reparented (drag-and-drop between Zones) - reverses part of Sprint 23's Gate 1 ruling
+
+**Context:** direct user request, "*nit need drag and drop on all
+piles including Deck and Discard." Discard was already fully eligible
+(`DiscardPile` inherits `reparentable` unchanged from `Pile`) - only
+`deck` needed a real change. Sprint 23's Gate 1 (D55, `MOVE_PILE`'s own
+doc comment) had explicitly excluded it: "excluded even though
+`tableSide` alone would allow it, since `state.js` finds THE deck by
+fixed id elsewhere, not by searching zones."
+
+**Decision:** `DeckPile.reparentable` flipped `false` -> `true`.
+Re-checked the original reasoning against the actual code before
+reversing it (not assumed stale): `deckOf`/`DEAL`/`DRAW`/`SPLIT_DECK`/
+`SHUFFLE_DECK`/`RESET` all locate the deck by its fixed `DECK_PILE_ID`,
+none of them read or depend on its `zoneId` - the 2026-08-25 exclusion
+was overcautious, not load-bearing. Only `MOVE_PILE` reads the
+`reparentable` flag; `SPLIT_PILE`/`TAKE_PILE`/`SET_PILE_ORIENTATION`
+use their own hardcoded `zone`/`discard` kind checks and are entirely
+unaffected by this change - the deck does not gain generic split/take/
+hide-show, only the ability to move between Zones. The deck's title
+bar was already an unconditional drag SOURCE (`pileDraggable`, ui.js) -
+before this fix, dragging it produced a silent drop-then-`MOVE_PILE`-
+throws-then-alert, not a missing affordance.
+
+**Rejected:** leaving the exclusion in place and instead disabling the
+deck's title-bar drag entirely (removing the false affordance instead
+of making it real) - rejected because the user's own request was for
+the capability, not for hiding the broken attempt; and the load-
+bearing check above showed there was no real blocker to honoring it.
+
+**Live-verified** (Playwright against the real dev server, not
+assumed): dragged the deck's title onto `#zones`' empty background -
+it ungrouped into its own new standalone Zone (`MOVE_PILE`'s existing
+no-target-provided fallback), then a `Draw` click immediately after
+completed with no exception - confirming the id-based lookups the
+reasoning above relied on hold in practice, not just in a code read.
+
+**Where the full text lives:** this entry;
+`src/piles/DeckPile.js`/`src/state.js`'s `MOVE_PILE` comments;
+`tests/piles.test.js`/`tests/state.test.js`.
+
+---
+
+### D65. Fixed a real bug found live via D64's follow-up: Draw's drag-to-pick-up was silently clobbered by the pile-title's own drag
+
+**Context:** direct user report immediately after D64 shipped - "I can
+drop cards to the deck but can't pick up." Investigated live
+(Playwright against the real dev server) rather than guessing: dropping
+a card ONTO the deck worked (count went 26 -> 27); dragging the Draw
+button (its own drag-to-hand protocol, D34/D35) onto the hand did NOT
+add a card.
+
+**Root cause, found by instrumenting the actual DOM events:** the Draw
+button (`draggable="true"`) sits INSIDE the pile's `<header-actions>`
+title bar, which `pileDraggable` (the "every pile title is a drag
+source" *nit, 2026-08-26) ALSO made `draggable="true"`. `dragstart`
+bubbles - the button's own listener set `dataTransfer`'s `text/plain`
+to `pile-action:draw` correctly, but without `stopPropagation()` the
+event then bubbled up into the title bar's own `dragstart` listener,
+which unconditionally overwrote the SAME `text/plain` slot with
+`pile-drag:deck` (the pile-move token). The drop side read the
+clobbered value and silently misread a Draw-drag as a reparent
+attempt - `onPileActionDrop` never fired, and `onMovePile` fired
+instead but had no target pile-token match either, so it did nothing
+visible except the missing card.
+
+**Fix:** the button's own `dragstart` handler now calls
+`event.stopPropagation()` before setting its own drag data - same
+pattern the sibling click handler on this exact button already used
+for the identical bubbling risk (`ui.js`, `renderActionHeader`).
+
+**Why this wasn't caught earlier:** Draw is the ONLY pile-level action
+with a `target` (draggable), so this collision was unreachable until a
+pile that both offers Draw AND has a draggable title bar existed -
+which has been true since 2026-08-26 (title bars became universally
+draggable) but apparently untested for this specific combination since
+then; D64 didn't cause it, it just prompted the user to re-try the
+gesture that surfaced it.
+
+**Live-verified**: instrumented the real DOM's `dragstart`/`drop`
+events before and after the fix - before: drop's `dataTransfer` read
+`pile-drag:deck`, hand count unchanged (26 -> 26); after: drop's
+`dataTransfer` read `pile-action:draw`, hand count incremented
+correctly (26 -> 27).
+
+**Where the full text lives:** this entry; `src/ui.js`'s
+`renderActionHeader` (the button's `dragstart` listener).
+
+---
+
+### D66. Draw is now also draggable from the deck's own card-stack visual, not only its icon button
+
+**Context:** direct user follow-up to D65 - "I don't want to drag from
+the draw button I want to drag from the card like all piles do please
+remove custom behavior like this wrt drag and drop - maximum allow."
+Every other pile lets you drag a real card element; the deck could
+only be dragged-from via its small Draw icon button, a genuinely
+inconsistent affordance (Nielsen #4).
+
+**Why the deck can't literally do what other piles do:** checked
+`viewFor` (`state.js`) before implementing, not assumed - a `'hidden'`-
+visibility pile (deck) always sends `cards: []` to every client,
+including the host's own rendering; only `count` ever leaves the
+reducer. There is no real per-card id on any client to attach a drag
+handle to - dragging "the actual top card" the way `MOVE_CARD`/`PLAY`
+drag a `zone`/`discard`/hand card by id is architecturally impossible
+without breaking the "nobody, including the host, ever sees deck
+order" privacy guarantee several other decisions already depend on.
+
+**Decision:** the deck's own stack visual (`.deck-stack`, the card-back
++ badge element `renderDeckStack` already renders) is now ALSO a drag
+source for the exact same `pile-action:draw` token protocol the button
+already uses (D34/D35, fixed D65) - not a new mechanism, the same one
+widened to a second, more discoverable handle. Gated on
+`options.onPileAction`/`options.pileId` being present, so the pre-game
+preview screen (`#host-deck-area`, no options) stays inert exactly as
+before. Cursor affordance (`cursor: grab`/`:active grabbing`) added,
+matching the project's own established convention for every other
+drag source (cards, pile titles).
+
+**Rejected:** removing the button's own drag capability (the user said
+"remove custom behavior," which could be read as replace-not-add) -
+kept it instead, since it still works correctly post-D65 and offering
+two consistent handles to the same result isn't itself an
+inconsistency; only "one specific tiny icon is the ONLY way" was the
+actual complaint. Flagged here rather than guessed silently.
+
+**Live-verified**: dragged `.deck-stack` itself (not the button) onto
+the hand - card count incremented (26 -> 27); re-verified the Draw
+button's own drag still also works afterward (27 -> 28).
+
+**Where the full text lives:** this entry; `src/ui.js`'s
+`renderDeckStack`; `src/components/DeckStack.js`; `style.css`'s
+`.deck-stack[draggable='true']` rule.
+
+---
+
+### D67. D66's action-token drag is retired outright; the deck's top card is now a REAL, draggable card - `viewFor`'s hidden-pile privacy rule is deliberately narrowed
+
+**Context:** rapid direct correction to D66, same session - "still not
+right... use the same mechanism as all the other piles this is a
+generic pile behavior for all piles... don't worry about rule
+enforcement or anything like that - maximum droppability", followed by
+the concrete symptom that named the actual defect: "whenever I drag
+from the deck the card ends up in my hand no matter where dropped...
+drop isn't triggering an action it's moving cards around - get it?"
+
+**Root problem with D66 (and D34/D35 before it):** the `draw` pile-
+action was always a fixed-destination ACTION (deck -> caller's own
+hand), just wearing a drag costume - dropping it ANYWHERE dispatched
+the same `DRAW`, ignoring the actual drop target entirely. That is not
+what dragging means in this app for any other pile; every other card
+drag genuinely goes wherever it's released (`MOVE_CARD`/`PICKUP`/
+`PLAY`).
+
+**Decision, two parts:**
+1. **`viewFor` (`state.js`)** now exposes a `'hidden'`-visibility
+   pile's own TOP card - real `id`, redacted to `{id, faceDown: true}`
+   (never rank/suit) - instead of always `cards: []`. This directly
+   reverses this file's own prior rule ("no deck card ever reaches any
+   viewer, not even its id," D23) - a deliberate, disclosed reversal
+   per direct instruction ("nix the constraint re: privacy guarantee,
+   that is not a requirement"), not a silent regression. Every card
+   BELOW the top one is still never exposed - `count` still carries the
+   real size; this narrows the guarantee, it doesn't remove it.
+2. With a real id available, the deck's single top-card visual
+   (`renderDeckStack`) is wired with the EXACT SAME per-card drag
+   mechanism `renderZoneCards` already uses for every other pile
+   (`dataTransfer` carries the real card id; `attachTouchDrag` for
+   touch) - dropping it anywhere flows through the ordinary
+   `dropCardOnZone` -> `MOVE_CARD`/`PICKUP`/`PLAY` path, unchanged,
+   because it's now an unremarkable real card to that machinery. No
+   new reducer action was needed - this is the whole point of "the
+   same mechanism as all other piles."
+3. **D66's action-token drag mechanism is deleted, not deprecated**:
+   the button's own `dragstart`/`spec.target` wiring,
+   `attachPileActionTouchDrag`, `pileActionToken`/`pileActionFromDrop`/
+   `PILE_ACTION_TOKEN_PREFIX`, and the now-unreachable drop-side checks
+   for it - all removed outright (no backward-compat shim kept). Draw
+   remains available as a plain click (unconditionally hand-bound,
+   which is fine for an explicit, unambiguous button click - the
+   complaint was specifically about DRAG implying "goes where I drop
+   it" and then not doing that).
+
+**Why no new authorization was added ("don't worry about rule
+enforcement"):** `transferCard`'s existing `canRemoveCard`/`canAccept`
+checks still run exactly as they do for any other card move -
+`DeckPile.canRemoveCard` was already unconditionally `true`. Nothing
+new was built; "maximum droppability" was already the status quo for
+every other reparentable/`zone`/`discard` destination.
+
+**Live-verified** (Playwright, real dev server): exactly 1 visual card
+in the deck row; dragging it onto the Table zone lands it on the
+table (deck count 26 -> 25) and does NOT touch the hand; dragging it
+onto the hand specifically lands it there instead (26 -> 27); dropping
+a hand card back onto the deck still increments the deck count
+correctly (top-of-pile insert, order preserved, D66's own AC,
+unaffected by any of this).
+
+**Where the full text lives:** this entry; `src/state.js`'s `viewFor`
+(hidden-pile case); `src/ui.js`'s `renderDeckStack`;
+`tests/state.test.js`'s D67-labeled tests.

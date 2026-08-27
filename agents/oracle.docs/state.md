@@ -282,3 +282,26 @@ about Sprint 23's Phase 68-71 UI (split/take/hide/show buttons,
 Zone-entity rendering) which hasn't had a Smith end-to-end pass since
 Phase 70's live spot-check. Phase 72 (pile-title drag-drop) remains
 unimplemented - not in scope for this test pass.
+
+## Groom — Save Layout/Remove Zone+Pile/changePileType sprint (2026-08-27)
+
+Sprint fully implemented (task.md 79-84, US-69..73, D61-D63) - groomed:
+- `docs/USER_STORIES.md`: added "Sprint status: COMPLETE" summary
+  under the US-69..73 section, same convention as every prior sprint's
+  status line.
+- `docs/ARCHITECTURE.md` already current (D61-D63 recorded live by
+  Morpheus during Stage 1, not deferred to groom).
+- `task.md` already current (Neo checked off every AC live per phase,
+  including the two live-caught fixes).
+- CHAT.md archived via `bobp chat-report --moniker
+  save-layout-remove-changetype` -> `agents/chat_archive/
+  CHAT_save-layout-remove-changetype.md`/`.diagram.md`, reset for the
+  next sprint.
+
+### Next Steps
+@Smith: `*user test` - full end-to-end pass on this sprint's actual
+delivered surface (Save/SaveAs/Reset Layout, Remove Zone, Remove Pile,
+changePileType), from the user's perspective, HCI heuristics applied.
+Neo already live-verified functionally via Playwright during
+implementation (Phase 84) - Smith's pass should probe usability/
+learnability specifically, not just re-confirm it runs.

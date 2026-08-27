@@ -1338,3 +1338,110 @@ they build, so it gets its own pure/UI pair rather than folding into 70.
 - [x] Full regression: `npm test` 358/358, `npm run lint` (style +
       design + js) all consistent with the established baseline
       (`test:e2e` no longer exists - D60). Sprint-close groom next.
+
+---
+
+## Sprint: Save Layout, Remove Zone/Pile, changePileType (US-69..73, D61-D63)
+
+Data-layer phases (79-81, pure reducer/module logic, no DOM) before UI
+phases (82-84), same split pattern as prior sprints. Phase 85 reserved
+bug-fix, carried forward per standing convention.
+
+### Phase 79 — REMOVE_ZONE / REMOVE_PILE reducer actions (US-71/72, D62) ✅ DONE
+- [x] `REMOVE_PILE`/`REMOVE_ZONE` implemented per spec, plus a live
+      catch: the default Table pile (`id: 'table'`, `kind: 'zone'`)
+      wasn't exempt from `REMOVE_PILE` even though its Zone record is
+      exempt from `REMOVE_ZONE` - added a matching exemption.
+- [x] TDD, 15 new tests (happy path + every throw condition, incl. the
+      Table-pile exemption).
+
+### Phase 80 — CHANGE_PILE_TYPE reducer action (US-73, D63) ✅ DONE
+- [x] `CHANGE_PILE_TYPE` + `ACTION_SPECS` entries (`remove`,
+      `changePileType`), wired into `Pile.pileActions()` base method
+      (covers `zone`/`discard`, both inherit it unchanged).
+- [x] TDD, 7 new tests. lint:js caught 3 real findings in the new code
+      (boolean naming, condition order) - fixed immediately.
+
+### Phase 81 — `src/layoutOverrides.js` module (US-69/70 foundation, D61) ✅ DONE
+- [x] Module built as specified: `saveLayoutOverride`/
+      `loadLayoutOverrides`/`deleteLayoutOverride`/`overridesForPreset`/
+      `stableLayoutSubset`, storage-injected like `panelLayout.js`.
+- [x] TDD, 14 new tests incl. `stableLayoutSubset` excluding a
+      random-UUID id and a per-player id. lint:js caught 4 findings,
+      fixed.
+
+### Phase 82 — Remove Zone/Pile UI wiring (US-71/72 UI) ✅ DONE
+- [x] `remove` reaches the pile's own ActionBar automatically (offered
+      by `Pile.pileActions()`, Phase 80) - `performRemovePile`
+      (main.js) dispatches `REMOVE_PILE`. Zone removal is a new heading
+      action (`renderZonePanel`, ui.js), `performRemoveZone` dispatches
+      `REMOVE_ZONE`. Both exempt `table-zone`/the default Table pile at
+      the UI layer too (found live while smoke-testing: an
+      always-offered-then-always-rejected button on the one pile every
+      game has - fixed by filtering `remove` out for `zone.id ===
+      'table'`, matching the Table-Zone exemption already in
+      `renderZonePanel`).
+- [x] `window.alert(error.message)` surfaces the reducer's block
+      message verbatim - same precedent `performSplitPile`/
+      `performTakePile` already established (Gate 1 Nielsen #9).
+
+### Phase 83 — changePileType UI wiring (US-73 UI) ✅ DONE
+- [x] Landed together with Phase 82 (same `onPileAction` dispatch
+      table) - `performChangePileType` toggles `zone`<->`discard`
+      based on the pile's current kind.
+
+### Phase 84 — Save/SaveAs/Reset Layout UI (US-69/70 UI, Gate 1 + Gate 2 conditions) ✅ DONE
+- [x] Save/SaveAs/Reset Layout buttons + persistent disclosure caption
+      (`#layout-controls`, index.html/style.css), host-only (hidden for
+      guests - `updateLayoutControlsVisibility`, since a saved override
+      is keyed to `selectedPreset`, host-local knowledge).
+- [x] Save/SaveAs both confirm via `alert` naming the saved layout
+      (Gate 1). SaveAs prompts for a name (prefilled via the browser
+      prompt's default arg = preset name), confirms before overwriting
+      an existing name.
+- [x] "Layout" selector added next to the preset dropdown
+      (`#host-layout-row`, hidden until a preset is chosen), populated
+      from `overridesForPreset` on preset change; the chosen override's
+      `layout` (or the preset's own built-in one) feeds
+      `applyPresetLayout` at table-create, unchanged call shape.
+- [x] design-lint caught a real regression while wiring this: the new
+      control bar forced 1px of scroll at the 1024x768 viewport -
+      trimmed margins/font-size, confirmed clean (3 pre-existing
+      baseline violations, no new ones).
+- [x] Live-verified (Playwright against the real dev server, not
+      assumed): Save Layout on War shows the exact confirmation
+      dialog; SaveAs on Gin Rummy prompts, saves under a custom name;
+      Reset confirms then reports; zero page exceptions throughout.
+      Confirmed visually that the Table pile's ActionBar shows
+      split/take/changePileType but NOT remove (the live-caught fix
+      above, verified working).
+
+### Phase 85 — reserved bug-fix + full regression ✅ DONE
+- [x] Filled by a run of direct post-launch *nits, not a formal Trin/
+      Smith close-out pass - all still went through TDD + live
+      Playwright verification before being called done:
+      - **D64**: deck reparentable (drag between Zones) - Sprint 23's
+        exclusion re-checked against the actual code and reversed.
+      - **D65**: real bug fix - Draw's drag-to-hand was silently
+        clobbered by the pile-title's own drag (`dragstart` bubbling,
+        no `stopPropagation`).
+      - **D66 -> D67**: two iterations to get pickup/drop semantics
+        right. D66 widened Draw's action-token drag to the card visual;
+        direct correction ("drop isn't triggering an action, it's
+        moving cards") led to D67, which retired the action-token
+        mechanism outright and exposed a hidden pile's real top-card id
+        (deliberate, disclosed narrowing of D23's privacy rule) so the
+        deck's card uses the EXACT SAME generic per-card drag/drop
+        every other pile already had. No new reducer action needed.
+      - Remove/changePileType buttons now disabled (hidden, same
+        mechanism as Deal at 0 cards) unless the pile/zone is actually
+        empty (Nielsen #5, error prevention over error messages).
+      - Deal-count input widened + restyled as a pill (matches
+        deck-count-badge); a real overlap bug this surfaced (badge's
+        shifted position was never reserved for) fixed at the cause.
+      - `lastDealCount` now initializes from the preset's own
+        `cardsPerPlayer` instead of a hardcoded 1.
+- [x] Full regression: `npm test` 396/396, `npm run lint` (style/
+      design/js) baseline unchanged throughout every change (7
+      pre-existing `cognitive-complexity` findings, 3 pre-existing
+      `lint:design` overlaps).

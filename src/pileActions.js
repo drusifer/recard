@@ -139,6 +139,18 @@ export const ACTION_SPECS = {
   // "flip it back" cost the way `take`/`reshuffleDeal` have.
   hide: { label: 'Hide', destructive: false, hint: 'Turn every card in this pile face-down.', icon: '🙈' },
   show: { label: 'Show', destructive: false, hint: 'Turn every card in this pile face-up.', icon: '👁' },
+  // US-73 (D63): zone<->discard only, offered by Pile.pileActions() -
+  // same base method DiscardPile inherits unchanged, so both kinds get
+  // it "for free" without either subclass needing a separate opt-in.
+  changePileType: {
+    label: 'Change type',
+    destructive: false,
+    hint: 'Change this pile between a plain zone and a discard pile. Must be empty.',
+    icon: '⇋',
+  },
+  // US-71/72 (D62): empty-only, no cascade-delete - same base-method
+  // reasoning as changePileType above.
+  remove: { label: 'Remove', destructive: true, hint: 'Remove this pile. Must be empty first.', icon: '✕' },
   // *nit (2026-08-26), direct user request: "anything Actionable should
   // always get an ActionBar" - `<score-zone>`'s own +/- buttons were a
   // bespoke, hand-built header (`ScoreZoneElement._render()`), not the

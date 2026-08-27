@@ -208,6 +208,11 @@ test('viewFor: owner sees full hand, other players see only a count', () => {
   assert.deepEqual(myHandView.cards, ownerView.myHand, 'the owner\'s own hand-in-zones view is unredacted, same cards as myHand');
 });
 
+// Title kept accurate post-D67: deckCount and the deck's own `zones`
+// entry still expose only a count + its top card (see the dedicated
+// D67 tests below) - full contents/order still never leave this
+// function. This test only ever checked the count + an unrelated
+// table-zone card, so its own assertions are untouched.
 test('viewFor: deck is exposed only as a count, table is fully public', () => {
   let state = createInitialState({}, () => 0.5);
   state = withPlayers(state, ['p1']);
@@ -934,15 +939,36 @@ test('solo play: a single player can deal, play, draw, and reset a full round al
 // a pile from the view entirely. Neither was possible when deck/hands/
 // zones were three separately-shaped slices.
 
-test('viewFor: no deck card ever reaches any viewer, not even its id (D23 routing)', () => {
+// D67 (direct user request, reverses this test's own original D23
+// rule): "nix the constraint re: privacy guarantee, that is not a
+// requirement" - a hidden pile's TOP card id is now deliberately
+// exposed (redacted to face-down/unowned), so it can be a real drag
+// source through the exact same generic per-card mechanism every other
+// pile's cards use. Every card BELOW the top one still never leaves
+// this function - that half of the original guarantee still holds and
+// is asserted below.
+test('viewFor: a hidden pile\'s top card id is exposed (redacted, face-down) - D67', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1', 'p2']);
+  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 3 });
+
+  const view = viewFor(state, 'p1');
+  const deckView = view.zones.find((z) => z.id === 'deck');
+  const realTopCard = deckOf(state)[0];
+  assert.deepEqual(deckView.cards, [{ id: realTopCard.id, faceDown: true }]);
+  assert.equal(deckView.count, deckOf(state).length, 'the badge count still reflects the FULL deck, not just the exposed 1');
+});
+
+test('viewFor: every deck card except the top one still never reaches any viewer (D67)', () => {
   let state = withPlayers(createInitialState({}, () => 0.5), ['p1', 'p2']);
   state = reduce(state, { type: 'DEAL', cardsPerPlayer: 3 });
 
   const serialized = JSON.stringify(viewFor(state, 'p1'));
-  for (const card of deckOf(state)) {
+  const [topCard, ...restOfDeck] = deckOf(state);
+  assert.ok(serialized.includes(topCard.id), 'the top card IS meant to be exposed now (D67)');
+  for (const card of restOfDeck) {
     assert.ok(
       !serialized.includes(card.id),
-      `deck card ${card.id} leaked into a player view - the deck must only ever be a count`,
+      `deck card ${card.id} (not the top one) leaked into a player view`,
     );
   }
 });
@@ -1356,14 +1382,14 @@ test('SPLIT_DECK piles carry plain cards - no per-card owner/faceUp/layout, unli
     'a deck-kind pile needs none of the fields a zone pile uses to fake hiddenness');
 });
 
-test('viewFor: a split (deck-kind) pile surfaces to a viewer as count-only, same as the original deck (D7/D24)', () => {
+test('viewFor: a split (deck-kind) pile surfaces to a viewer with its top card + a count, same as the original deck (D7/D24/D67)', () => {
   let state = withPlayers(createInitialState({}, () => 0.5), ['p1', 'p2']);
   state = reduce(state, { type: 'SPLIT_DECK', pileCount: 2 });
   const pile = zonesOf(state).find((z) => z.name === 'Pile 1');
 
   const view = viewFor(state, 'p2');
   const viewPile = view.zones.find((z) => z.name === 'Pile 1');
-  assert.deepEqual(viewPile.cards, [], 'no per-card data at all - stronger than per-card redaction');
+  assert.deepEqual(viewPile.cards, [{ id: pile.cards[0].id, faceDown: true }], 'same D67 top-card exposure as the main deck - this is a "hidden"-visibility pile too');
   assert.equal(viewPile.count, pile.cards.length, 'the size is still public, same badge as the deck itself');
 });
 
@@ -1448,10 +1474,24 @@ test('MOVE_PILE: reparents an eligible pile into an existing Zone, as a sibling'
   assert.equal(tableOf(state).id, 'table');
 });
 
-test('MOVE_PILE: rejects deck/hand/foundation/cascade/rankAdjacent - only zone/discard piles are eligible', () => {
+// *nit (direct user request): "drag and drop on all piles including
+// Deck and Discard" - reverses Sprint 23's Gate 1 exclusion of the
+// deck (D55/D64). Discard was already eligible (`DiscardPile`
+// inherits `reparentable` unchanged) - this test only covers the
+// deck's own new eligibility.
+test('MOVE_PILE: the deck can now be reparented into a different Zone', () => {
+  let state = reduce(createInitialState({}, () => 0.5), { type: 'CREATE_ZONE', name: 'Deck Corner' });
+  const zone = zonesOf(state).find((z) => z.name === 'Deck Corner');
+  state = reduce(state, { type: 'MOVE_PILE', pileId: 'deck', targetZoneId: zone.zoneId });
+  assert.equal(state.piles.find((p) => p.id === 'deck').zoneId, zone.zoneId);
+  // Moving it doesn't change how it's found for real gameplay - DEAL/
+  // DRAW/etc. all locate it by fixed id, never by zoneId.
+  assert.equal(deckOf(state).length, 52);
+});
+
+test('MOVE_PILE: rejects hand/foundation/cascade/rankAdjacent - only zone/discard/deck piles are eligible', () => {
   let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
   state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
-  assert.throws(() => reduce(state, { type: 'MOVE_PILE', pileId: 'deck', targetZoneId: 'table-zone' }), /Cannot move/);
   assert.throws(() => reduce(state, { type: 'MOVE_PILE', pileId: 'hand:p1', targetZoneId: 'table-zone' }), /Cannot move/);
 
   // *nit fix (Trin, 2026-08-26): the test name promised
@@ -1719,10 +1759,10 @@ test('TAKE_PILE: rejects deck/hand kinds - only zone/discard are eligible', () =
 });
 
 test('zonePile/discardPile pileActions: split/take open to any player on a shared pile, owner-only on a personal one', () => {
-  assert.deepEqual(PILE_TYPES.zone.pileActions({ isShared: true }), ['split', 'take']);
-  assert.deepEqual(PILE_TYPES.zone.pileActions({ isOwner: true }), ['split', 'take']);
+  assert.deepEqual(PILE_TYPES.zone.pileActions({ isShared: true }), ['split', 'take', 'changePileType', 'remove']);
+  assert.deepEqual(PILE_TYPES.zone.pileActions({ isOwner: true }), ['split', 'take', 'changePileType', 'remove']);
   assert.deepEqual(PILE_TYPES.zone.pileActions({ isOwner: false, isShared: false }), []);
-  assert.deepEqual(PILE_TYPES.discard.pileActions({ isShared: true }), ['split', 'take']);
+  assert.deepEqual(PILE_TYPES.discard.pileActions({ isShared: true }), ['split', 'take', 'changePileType', 'remove']);
   assert.deepEqual(PILE_TYPES.discard.pileActions({}), []);
 });
 
@@ -1874,4 +1914,173 @@ test('RENAME_ZONE: rejects a blank name', () => {
     () => reduce(state, { type: 'RENAME_ZONE', zoneId: pile.zoneId, playerId: 'p1', name: '' }),
     /blank/,
   );
+});
+
+// --- REMOVE_PILE / REMOVE_ZONE (US-71/72, D62): empty-only, no
+// cascade-delete, no silent card loss. deck/hand exempt from removal
+// like MOVE_PILE; the Table Zone and any preset-declared zone are
+// exempt from zone removal like CREATE_ZONE's own gating.
+
+test('REMOVE_PILE: removes an empty zone-kind pile', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Melds' });
+  const pile = state.piles.find((p) => p.name === 'Melds');
+  state = reduce(state, { type: 'REMOVE_PILE', pileId: pile.id, playerId: 'p1' });
+  assert.equal(state.piles.some((p) => p.id === pile.id), false);
+});
+
+test('REMOVE_PILE: rejects an unknown pile id', () => {
+  const state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  assert.throws(
+    () => reduce(state, { type: 'REMOVE_PILE', pileId: 'nope', playerId: 'p1' }),
+    /does not exist/,
+  );
+});
+
+test('REMOVE_PILE: rejects the deck pile', () => {
+  const state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  assert.throws(
+    () => reduce(state, { type: 'REMOVE_PILE', pileId: 'deck', playerId: 'p1' }),
+    /Cannot remove/,
+  );
+});
+
+test('REMOVE_PILE: rejects a hand pile', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'DEAL', playerId: 'p1', cardsPerPlayer: 0 });
+  const hand = state.piles.find((p) => p.id === 'hand:p1');
+  assert.throws(
+    () => reduce(state, { type: 'REMOVE_PILE', pileId: hand.id, playerId: 'p1' }),
+    /Cannot remove/,
+  );
+});
+
+test('REMOVE_PILE: rejects the default Table pile even when empty', () => {
+  const state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  const table = tableOf(state);
+  assert.throws(
+    () => reduce(state, { type: 'REMOVE_PILE', pileId: table.id, playerId: 'p1' }),
+    /Cannot remove/,
+  );
+});
+
+test('REMOVE_PILE: rejects a non-empty pile with a specific message, no cards lost', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Melds' });
+  const pile = state.piles.find((p) => p.name === 'Melds');
+  const card = { id: 'c1', rank: 'A', suit: 'S', faceUp: true };
+  state = { ...state, piles: state.piles.map((p) => (p.id === pile.id ? { ...p, cards: [card] } : p)) };
+  assert.throws(
+    () => reduce(state, { type: 'REMOVE_PILE', pileId: pile.id, playerId: 'p1' }),
+    /must be empty/,
+  );
+  assert.equal(state.piles.find((p) => p.id === pile.id).cards.length, 1, 'card must survive the rejected attempt');
+});
+
+test('REMOVE_ZONE: removes an empty player-created zone', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Melds' });
+  const pile = state.piles.find((p) => p.name === 'Melds');
+  const zoneId = pile.zoneId;
+  state = reduce(state, { type: 'REMOVE_PILE', pileId: pile.id, playerId: 'p1' });
+  state = reduce(state, { type: 'REMOVE_ZONE', zoneId, playerId: 'p1' });
+  assert.equal(state.zones.some((z) => z.id === zoneId), false);
+});
+
+test('REMOVE_ZONE: rejects an unknown zone id', () => {
+  const state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  assert.throws(
+    () => reduce(state, { type: 'REMOVE_ZONE', zoneId: 'nope', playerId: 'p1' }),
+    /does not exist/,
+  );
+});
+
+test('REMOVE_ZONE: rejects the Table Zone', () => {
+  const state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  assert.throws(
+    () => reduce(state, { type: 'REMOVE_ZONE', zoneId: 'table-zone', playerId: 'p1' }),
+    /Cannot remove/,
+  );
+});
+
+test('REMOVE_ZONE: rejects a zone still containing a pile, no cascade-delete', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Melds' });
+  const pile = state.piles.find((p) => p.name === 'Melds');
+  assert.throws(
+    () => reduce(state, { type: 'REMOVE_ZONE', zoneId: pile.zoneId, playerId: 'p1' }),
+    /must be empty/,
+  );
+  assert.equal(state.piles.some((p) => p.id === pile.id), true, 'the pile must survive the rejected attempt');
+});
+
+test('REMOVE_ZONE: rejects a preset-declared zone even when empty', () => {
+  const state = withPlayers(
+    createInitialState({}, () => 0.5, { zones: [{ id: 'foundations-zone', name: 'Foundations' }] }),
+    ['p1'],
+  );
+  assert.throws(
+    () => reduce(state, { type: 'REMOVE_ZONE', zoneId: 'foundations-zone', playerId: 'p1' }),
+    /Cannot remove/,
+  );
+});
+
+// --- CHANGE_PILE_TYPE (US-73, D63): zone<->discard only, empty-only -
+// no per-card canAccept re-validation exists to safely allow non-empty
+// swaps.
+
+test('CHANGE_PILE_TYPE: flips an empty zone-kind pile to discard', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Melds' });
+  const pile = state.piles.find((p) => p.name === 'Melds');
+  state = reduce(state, { type: 'CHANGE_PILE_TYPE', pileId: pile.id, kind: 'discard', playerId: 'p1' });
+  assert.equal(state.piles.find((p) => p.id === pile.id).kind, 'discard');
+});
+
+test('CHANGE_PILE_TYPE: flips discard back to zone', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Melds' });
+  const pile = state.piles.find((p) => p.name === 'Melds');
+  state = reduce(state, { type: 'CHANGE_PILE_TYPE', pileId: pile.id, kind: 'discard', playerId: 'p1' });
+  state = reduce(state, { type: 'CHANGE_PILE_TYPE', pileId: pile.id, kind: 'zone', playerId: 'p1' });
+  assert.equal(state.piles.find((p) => p.id === pile.id).kind, 'zone');
+});
+
+test('CHANGE_PILE_TYPE: rejects an unknown pile id', () => {
+  const state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  assert.throws(
+    () => reduce(state, { type: 'CHANGE_PILE_TYPE', pileId: 'nope', kind: 'discard', playerId: 'p1' }),
+    /does not exist/,
+  );
+});
+
+test('CHANGE_PILE_TYPE: rejects a target kind outside zone/discard', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Melds' });
+  const pile = state.piles.find((p) => p.name === 'Melds');
+  assert.throws(
+    () => reduce(state, { type: 'CHANGE_PILE_TYPE', pileId: pile.id, kind: 'foundation', playerId: 'p1' }),
+    /Cannot change/,
+  );
+});
+
+test('CHANGE_PILE_TYPE: rejects changing the deck', () => {
+  const state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  assert.throws(
+    () => reduce(state, { type: 'CHANGE_PILE_TYPE', pileId: 'deck', kind: 'discard', playerId: 'p1' }),
+    /Cannot change/,
+  );
+});
+
+test('CHANGE_PILE_TYPE: rejects a non-empty pile, no mutation happens', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Melds' });
+  const pile = state.piles.find((p) => p.name === 'Melds');
+  const card = { id: 'c1', rank: 'A', suit: 'S', faceUp: true };
+  state = { ...state, piles: state.piles.map((p) => (p.id === pile.id ? { ...p, cards: [card] } : p)) };
+  assert.throws(
+    () => reduce(state, { type: 'CHANGE_PILE_TYPE', pileId: pile.id, kind: 'discard', playerId: 'p1' }),
+    /must be empty/,
+  );
+  assert.equal(state.piles.find((p) => p.id === pile.id).kind, 'zone', 'kind must be unchanged after rejection');
 });

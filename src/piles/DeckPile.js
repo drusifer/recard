@@ -8,7 +8,20 @@ import { Pile } from './Pile.js';
 export class DeckPile extends Pile {
   static visibility = 'hidden';
   static component = 'deck-stack';
-  static reparentable = false;
+  /**
+   * *nit (direct user request): "drag and drop on all piles including
+   * Deck and Discard" - reverses Sprint 23's Gate 1 exclusion (D55),
+   * which read too cautiously: `deckOf`/`DEAL`/`DRAW`/`SPLIT_DECK`/
+   * `SHUFFLE_DECK`/`RESET` all find the deck by its fixed
+   * `DECK_PILE_ID`, never by searching zones or reading its `zoneId` -
+   * confirmed by grep before flipping this, not assumed. Only
+   * `MOVE_PILE` reads this flag (`SPLIT_PILE`/`TAKE_PILE` use their
+   * own hardcoded `zone`/`discard` kind checks, unaffected either way)
+   * - the deck's title bar was already a drag SOURCE (`pileDraggable`
+   * is unconditional), so this was a silent drop-then-error, not a
+   * missing affordance.
+   */
+  static reparentable = true;
 
   /** No halo geometry is reachable for the deck (D29's own strip
    * renders it, never `dropTarget.js`). */

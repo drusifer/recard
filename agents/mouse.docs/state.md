@@ -261,3 +261,52 @@ None pending after the push. Same open backlog as before this session
 (e2e rebuild, cognitive-complexity pass, builder screen, 2 minor
 visual overlaps) plus the pre-existing Table-Zone/Bob overlap debt -
 unclaimed, no active sprint.
+
+---
+## Sprint phase plan — Save Layout/Remove Zone+Pile/changePileType (2026-08-27)
+
+7 phases (`task.md` 79-85), following the data-layer-before-UI split
+that's worked well every sprint since Sprint 2: 79 (REMOVE_ZONE/PILE
+reducer, D62), 80 (CHANGE_PILE_TYPE reducer, D63), 81
+(`layoutOverrides.js` module, D61), 82 (Remove Zone/Pile UI), 83
+(changePileType UI), 84 (Save/SaveAs/Reset Layout UI, carrying both
+Gate 1 and Gate 2 UX conditions explicitly into its task checklist so
+they aren't lost between review and implementation), 85 (reserved
+bug-fix, carried forward per the pattern held for 3 sprints running).
+81 sequenced after 79/80 rather than in parallel with them since it's
+independent logic but keeps all three data-layer phases grouped before
+any UI phase starts, matching Sprint 22/23's ordering convention.
+Handed to Morpheus for `*lead review sprint plan` before Neo starts
+Phase 79.
+
+### Waiting On
+@Morpheus: sprint plan review.
+
+### Planned Work
+- [ ] Track Phase 79-85 status in `task.md` as the team cycles through.
+
+---
+## Session close-out — 2026-08-27, later same day
+
+All 7 phases (79-85) shipped and launched (Cypher `*pm launch`, same
+day). Phase 85 ended up covering a run of direct post-launch *nits
+rather than a formal Smith close-out pass - user kept finding real
+issues by actually using the shipped feature (deck drag-and-drop was
+the big one: took 4 rounds - D64 reparenting, D65 a real dragstart-
+bubbling bug, D66 then D67 to get pick-up/drop semantics genuinely
+generic instead of a fixed-destination action wearing a drag costume).
+Every round still went through TDD + live Playwright verification
+before being called done, not just diff review.
+
+**Repo state at close:** branch `touch-targets-and-pile-actions-sprint`,
+working tree has this session's full diff (Save Layout/SaveAs/Remove
+Zone+Pile/changePileType sprint + D64-D67 *nits) staged for commit -
+user asked to close out and commit. 396/396 unit tests, lint baseline
+unchanged throughout (7 pre-existing `cognitive-complexity`, 3
+pre-existing `lint:design` overlaps).
+
+### Next Steps
+None pending after commit. Standing backlog unchanged (e2e rebuild,
+cognitive-complexity pass, builder screen, 2 minor visual overlaps)
+plus this session's new items (SaveAs's `window.prompt()`, Morpheus's
+"check id survival before designing a save-for-reuse feature" note).

@@ -2445,3 +2445,184 @@ open backlog - a full re-authoring project, not a quick patch. Until
 then, `npm run lint:design` (layout/overlap/touch-target checks across
 real viewports) and manual two-tab testing are the only automated/
 semi-automated coverage beyond unit tests.
+
+---
+
+## Sprint: Custom Table Layouts + Zone/Pile Removal + changePileType (2026-08-27)
+
+Owner: Cypher. User-facing feature sprint per direct user request. Full
+Smith Gate 1 HCI review required (not a tech-debt fast-track).
+
+Researched against current code first (`src/panelLayout.js`,
+`src/presets.js`, `src/state.js`, `src/pileActions.js`,
+`src/piles/pileTypes.js`): layout persistence exists today
+(`panelLayout.js`, localStorage, deliberately local-only/not networked
+per its own doc comment) but is a single global blob, not scoped per
+preset — Save/SaveAs needs real namespacing. No `REMOVE_ZONE`/
+`REMOVE_PILE` reducer action exists at all today; `RENAME_ZONE`/
+`RENAME_PILE` are the nearest precedent. `changePileType` has no
+existing precedent for validating a pile's current cards against a new
+type's rules.
+
+### US-69: Save current layout as this preset's default
+**As** a player who has repositioned zones/piles, **I want** to click
+"Save Layout", **so that** starting a new game with the same preset
+uses my layout instead of the built-in default.
+**AC:**
+- A "Save Layout" action persists the current positions of all
+  visible zones/piles to localStorage, keyed to the active preset by
+  name (matches how `presets.js`/`panelLayout.js`'s existing
+  `applyPresetLayout` already key layout data — no new identifier
+  scheme invented).
+- Starting a new game with that preset applies the saved override
+  in place of the preset's built-in `layout`, the same way
+  `applyPresetLayout` applies the built-in one today.
+- Saved override persists only in this browser (matches
+  `panelLayout.js`'s existing local-only, not-networked, not-part-of-
+  snapshot design intent — no scope change to that boundary).
+- A way to clear an override and revert to the preset's built-in
+  default exists (exact UI flagged below for Smith).
+
+### US-70: SaveAs — save layout under a custom name
+**As** a player, **I want** to save my layout under a name I choose
+(defaulting to the current preset's name), **so that** I can keep
+multiple custom layouts without overwriting each other.
+**AC:**
+- SaveAs prompts for a name, prefilled with the active preset's name.
+- Saved custom layouts are selectable at table-create time alongside
+  the preset's built-in default.
+- If the chosen name collides with an existing saved layout, the user
+  is asked to confirm overwrite before it's replaced.
+
+### US-71: Remove a Zone
+**As** a player customizing the table, **I want** to remove a zone I
+no longer want, **so that** I can undo an unwanted zone without
+restarting the game.
+**AC:**
+- A remove action is available on player-created zones.
+- The Table Zone and any zone the active preset's `gameConfig.zones`
+  declares as required are exempt from removal (mirrors `CREATE_ZONE`'s
+  existing `allowsPlayerZones`/`kind !== 'hand'` gating pattern).
+- Removing a zone that still contains piles is blocked until the zone
+  is empty (see flagged Q3 — proposed default, no silent card loss).
+
+### US-72: Remove a Pile
+**As** a player customizing the table, **I want** to remove a pile I
+created, **so that** I can undo it without restarting the game.
+**AC:**
+- A remove action is available on `zone`/`discard`-kind piles — the
+  same two kinds already treated as reparentable/general-purpose by
+  `MOVE_PILE`/`SPLIT_PILE`.
+- `deck` and `hand` piles are exempt from removal (same reasoning
+  `MOVE_PILE` already uses to exclude them: `deck` is found by fixed
+  ID not kind-search; `hand` has a per-player exactly-one invariant).
+- Removing a pile that still has cards in it is blocked until the
+  pile is empty (see flagged Q4 — proposed default, no silent card
+  loss; matches Q3's zone-removal rule for consistency).
+
+### US-73: New pile action — changePileType
+**As** a player, **I want** to change an existing pile's type, **so
+that** I can reconfigure a pile without deleting and recreating it.
+**AC:**
+- New pile-level action `changePileType`, wired through `ACTION_SPECS`
+  the same way `split`/`take`/`hide`/`show` are today (D51 pattern).
+- Scoped to `zone` ⇄ `discard` only for this story — the two kinds
+  already interchangeable under `MOVE_PILE`/`SPLIT_PILE`'s existing
+  rules. `deck`, `hand`, `foundation`, `cascade`, `rankAdjacent` are
+  explicitly out of scope (same exemption reasoning as US-71/72; the
+  latter three also carry real game-rule `canAccept` logic that a
+  runtime type swap could silently violate).
+- The pile must be empty before its type can change (see flagged Q5 —
+  proposed default; avoids producing a pile whose existing cards
+  violate the target type's rules, since no per-card re-validation
+  exists anywhere in the codebase today).
+
+### Flagged open questions for Smith's Gate 1
+1. **Layout override storage key**: propose keying on `preset.name`
+   (matches existing `applyPresetLayout` behavior). Accepts a
+   pre-existing risk (`presets.js` already has no stable `id`, only a
+   display-string `name`) rather than inventing new identity scheme.
+2. **Scope boundary — does removal persist into a saved layout, or is
+   it live-session-only?** `panelLayout.js`'s `layout` (positions) and
+   `gameConfig.piles`/`gameConfig.zones` (which zones/piles exist at
+   game start) are separate systems today. Proposed: US-71/72 (remove)
+   are live-session actions on the running table only; making a saved
+   layout also change which zones/piles a preset starts with is a
+   separate, larger feature — **out of scope this sprint**.
+3. **Zone removal with piles still inside**: propose block-until-empty
+   (no cascade-delete, no auto-migration) — simplest, no silent card
+   loss.
+4. **Pile removal with cards still inside**: propose block-until-empty,
+   same reasoning as Q3.
+5. **changePileType with cards in the pile**: propose block-until-empty
+   rather than per-card re-validation against the target type's
+   `canAccept` — simpler, no risk of leaving a pile in a rule-
+   inconsistent state. Per-card re-validation flagged as a possible
+   future enhancement if empty-only proves too restrictive in practice.
+6. **UI surface for Remove and changePileType**: propose the existing
+   radial pile-action menu (D51/D52), same surface as `split`/`take`/
+   `hide`/`show`, rather than a new UI pattern.
+7. **"Clear override, revert to built-in default" UI for US-69**: not
+   yet specified — needs a concrete affordance (e.g. a "Reset Layout"
+   button) before Neo can implement it.
+
+**Out of scope this sprint**: a full layout-management gallery/browser
+beyond a name-prefilled SaveAs prompt; persisting zone/pile
+removal into `gameConfig.piles`/`zones` overrides (Q2); `changePileType`
+targets beyond `zone`⇄`discard`; per-card re-validation for
+`changePileType`.
+
+### Smith Gate 1 review (2026-08-27) — APPROVED WITH AMENDMENTS
+
+All 7 flagged questions resolved as Cypher proposed (empty-only guards
+for remove-zone/remove-pile/changePileType; removal is live-session-
+only, not persisted into layout overrides; `preset.name` as the
+override key; radial menu as the UI surface). Two amendments added,
+both required before Neo starts implementation:
+
+- **US-69/70 (Save/SaveAs) need visible confirmation** (Nielsen #1,
+  Visibility of System Status): silently writing to localStorage with
+  no on-screen feedback leaves the user unsure whether Save actually
+  did anything. AC added: a brief confirmation (toast/inline message)
+  naming the saved layout on success.
+- **US-71/72/73's empty-only block needs a real error message, not a
+  disabled/no-op control** (Nielsen #9, Help Users Recognize/Diagnose/
+  Recover): a greyed-out button with no explanation forces the user to
+  guess why. AC added: attempting to remove/retype a non-empty
+  pile/zone shows a specific message (e.g. "Pile must be empty before
+  it can be removed") rather than silently failing or being
+  unreachable.
+- **US-69's "reset to default" affordance (flagged Q7) resolved**:
+  propose a "Reset Layout" control placed next to Save/SaveAs
+  (Nielsen #3, User Control and Freedom — an explicit way back to the
+  built-in default, symmetric with Save the same way undo pairs with
+  an action).
+
+No rejection — scope and AC are testable and match how a user already
+thinks about "Save"/"Save As" from ordinary desktop-app conventions
+(Nielsen #2). @Morpheus *lead arch sprint.
+
+### Sprint status: US-69..73 COMPLETE (2026-08-27)
+All 6 phases (task.md 79-84) implemented, TDD throughout, 393/393 unit
+tests, lint baseline unchanged (7 pre-existing `cognitive-complexity`
+findings; `lint:design` unchanged at 3 pre-existing violations). Live-
+verified end to end via Playwright against the real dev server (Save/
+SaveAs/Reset dialogs, Layout picker, zero page exceptions) — not
+approved from a diff read alone. Two real UX gaps found and fixed live
+before shipping, neither anticipated at design time: the default Table
+pile's ActionBar was offering an always-fails Remove button (fixed by
+excluding it, matching the existing Table-Zone exemption); the new
+Save/SaveAs/Reset control bar forced 1px of scroll at the 1024x768
+viewport (fixed via tighter margins/font-size). Phase 85 (reserved
+bug-fix) held open for Smith's close-out.
+
+### Phase 85 close-out (2026-08-27, same day)
+Filled by a run of direct post-launch *nits (D64-D67, task.md Phase 85)
+rather than a formal Trin/Smith pass - deck drag-and-drop (reparenting,
+then real pick-up/drop semantics matching every other pile, two
+iterations to get right), empty-only button disabling for
+remove/changePileType, and two small deal-count UI fixes. All still
+went through TDD + live Playwright verification. 396/396, lint baseline
+unchanged throughout. See `docs/ARCHITECTURE.md` D64-D67 for full
+reasoning, including D67's deliberate, disclosed narrowing of D23's
+deck-privacy guarantee (direct user instruction).

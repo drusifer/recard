@@ -116,6 +116,7 @@ body {
   #screen-game h2 { margin: 0 0 0.2rem; font-size: 0.9rem; }
   #screen-game .btn-row { margin-top: 0.2rem; gap: 0.3rem; }
   .game-code-bar { margin-bottom: 0.1rem; }
+  .layout-controls { margin-bottom: 0.1rem; }
   fan-pile { padding-top: 0.1rem; }
 }
 
@@ -132,6 +133,7 @@ body {
   #screen-game .btn-row { margin-top: 0.25rem; gap: 0.25rem; }
   fan-pile { padding-top: 0.2rem; }
   .game-code-bar { margin-bottom: 0; font-size: 0.75rem; }
+  .layout-controls { margin-bottom: 0; }
 }
 
 /* The table panel is the one that should GROW to fill whatever room is
@@ -632,6 +634,21 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 
 .pile-title[draggable='true']:active {
+  cursor: grabbing;
+}
+
+/* D67, direct user request ("drag from the card like all piles do... use
+   the same mechanism as all other piles") - same affordance rule as the
+   two above, for the deck's own single top-card visual, a genuine
+   per-card drag source now via the generic mechanism (not a pile-level
+   action). Targets `.card`, same selector shape `.middle-card` uses
+   above - `.deck-stack` itself is no longer draggable, only its one
+   card child is. */
+.deck-stack-card[draggable='true'] {
+  cursor: grab;
+}
+
+.deck-stack-card[draggable='true']:active {
   cursor: grabbing;
 }
 
@@ -1168,6 +1185,16 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .deck-stack {
   position: relative;
   height: var(--card-h);
+  /* *nit fix, found live while widening `.pile-anchor-count`: the badge
+     is `position: relative; left: 2.9rem` (a corner-badge stamped on
+     the card, not a normal-flow sibling) - since the card itself is
+     `position: absolute` (contributes 0 to auto-width), `.deck-stack`'s
+     own flex-item width was sized from the badge's UNSHIFTED box alone,
+     letting its shifted, visible position spill past this box's own
+     right edge into whatever sits next in the row. Reserving real width
+     here is what was missing - not something the input's own width
+     caused, just what finally made it visible. */
+  min-width: 5.2rem;
 }
 
 .deck-stack-card {
@@ -1559,6 +1586,26 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   color: var(--muted);
 }
 
+/* US-69/70/D61: same compact info-bar shape as .game-code-bar right
+   above it, not a new visual pattern. The caption is a small persistent
+   note (Smith Gate 2), not styled as an error/warning - it's normal,
+   expected-every-time information. */
+.layout-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  margin-bottom: 0.3rem;
+}
+
+.layout-controls-caption {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
 .game-code-bar code {
   font-size: 1.05rem;
   font-weight: 700;
@@ -1725,13 +1772,23 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* Phase 56 (T56.1)/D52: the count inputs (Deal's cards-per-player,
    Split's pile count) are persistent now, next to the deck itself, not
-   nested in a menu - see `ui.js`'s `pileCountInput`. Sizing carried over
-   from the legacy popover-era input unchanged. */
+   nested in a menu - see `ui.js`'s `pileCountInput`. *nit (direct user
+   request, "give the number more room and I like the badge idea"):
+   widened past the legacy popover-era sizing, and restyled to match
+   `.deck-count-badge`'s own pill treatment right next to it (same
+   `background`/`border`/`border-radius`/`font-weight`) instead of a
+   plain bordered box - the two numbers sitting side by side now read
+   as one visual family instead of two different input styles. */
 .pile-anchor-count {
-  width: 3.25rem;
+  width: 4.5rem;
   min-height: 44px;
   text-align: center;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.15rem 0.4rem;
 }
 
 /* An empty deck still occupies its slot, so the controls beside it don't

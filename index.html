@@ -39,6 +39,17 @@
         </select>
       </label>
       <p id="host-preset-preview" class="deck-config" hidden></p>
+      <!-- US-70 (D61): only meaningful once a preset is picked - a
+           saved layout override is always recorded against a preset
+           name, "Custom" has none. Hidden rather than disabled/empty
+           when there's nothing to choose beyond the built-in default,
+           same "don't show a control with nothing real to offer"
+           convention `host-preset-preview` above already uses. -->
+      <label id="host-layout-row" hidden>Layout
+        <select id="host-layout">
+          <option value="">Default</option>
+        </select>
+      </label>
       <!-- D47: DeckDefinition's first host-facing field. Jokers stays
            visible regardless of type - pinochle's own build() silently
            ignores it rather than this control needing to know which
@@ -115,6 +126,21 @@
       <!-- Icon and accessible name are set by `wireCopyCode` so the game
            bar and the host share screen cannot drift apart. -->
       <button id="copy-code-btn" type="button" aria-label="Copy table code"></button>
+    </div>
+    <!-- US-69/70 (D61): host-only (hidden for guests by
+         `renderGameFromView` - a saved override is keyed to the
+         preset THIS table was created with, which only the host's
+         own `selectedPreset` knows). Captions are persistent, not a
+         per-click dialog (Smith Gate 2 condition) - true every time,
+         so shown every time rather than interrupting. -->
+    <div id="layout-controls" class="layout-controls" hidden>
+      <button id="save-layout-btn" type="button">Save Layout</button>
+      <button id="save-layout-as-btn" type="button">Save As…</button>
+      <button id="reset-layout-btn" type="button">Reset Layout</button>
+      <p class="layout-controls-caption">
+        Saves positions of built-in panels only — custom zones aren't included.
+        Applies to new games with this preset, not this table.
+      </p>
     </div>
     <section class="panel panel-felt table-section">
       <h2 class="sr-only">Table</h2>

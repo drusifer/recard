@@ -538,3 +538,96 @@ No usability gaps found. Nothing filed to backlog this time.
 
 **Verdict: APPROVED, no new bugs.** *impl loop complete (Neo -> Trin ->
 Morpheus -> Smith).
+
+## Gate 1 — Save Layout/SaveAs/Remove Zone+Pile/changePileType (2026-08-27)
+
+Reviewed Cypher's US-69..73 (USER_STORIES.md) against the 7 flagged
+open questions. All 7 resolved as Cypher proposed (empty-only guards
+on remove/changePileType, removal is live-session-only not persisted
+into layout overrides, `preset.name` as override key, radial menu as
+UI surface). Added 2 amendments before approving:
+- Save/SaveAs need a visible success confirmation (Nielsen #1) - a
+  silent localStorage write leaves the user guessing whether it
+  worked.
+- The empty-only block on remove/changePileType needs a real,
+  specific error message (Nielsen #9), not a silently-disabled
+  control.
+- Resolved flagged Q7 ("reset to default" UI) as a "Reset Layout"
+  control placed next to Save/SaveAs (Nielsen #3, User Control and
+  Freedom).
+
+Full amendment text written directly into USER_STORIES.md's new
+"Smith Gate 1 review" subsection (not just this state file) since
+Neo/Morpheus need it as part of the story, not a separate doc.
+
+**Verdict: APPROVED WITH AMENDMENTS.** No rejection - scope/AC are
+testable, match ordinary desktop Save/Save-As mental models.
+
+## Gate 2 — Save Layout/SaveAs/Remove Zone+Pile/changePileType arch (2026-08-27)
+
+Reviewed D61-D63 (`docs/ARCHITECTURE.md`). Gate 1's two amendments
+(visible save confirmation, specific block-error messages) both
+carried through explicitly into the design - confirmed, not dropped.
+
+**One new UX gap found, not present in the story-level review**:
+D61's "saved layout covers only stable-id panels, player-created
+zones/piles excluded" is a real, silent scope limitation a user won't
+guess (Nielsen #1/#2 - a user who dragged a custom zone into place,
+hit Save, and later starts a new game will reasonably expect that
+zone's position to come back too, since nothing at Save-time told them
+otherwise). Same issue for "Reset Layout only affects future games,
+not the live table" - not obvious from a button labeled "Reset."
+
+**Condition for approval**: the Save/Reset Layout UI must disclose
+both scope limits near the controls (a persistent caption, not a
+per-click modal - avoids Nielsen #8 noise for something true every
+time) - e.g. "Saves positions of built-in panels only; custom zones
+aren't included" and "Applies to new games, not this table." This is
+a UI-text requirement for Neo's implementing phase, not a new AC
+document - Mouse should size it as part of the same task as the
+Save/SaveAs/Reset controls themselves, not a separate follow-up.
+
+**Verdict: APPROVED WITH 1 CONDITION** (disclosure captions above).
+Everything else in D61-D63 - empty-only removal, zone/discard-only
+changePileType, deck/hand/preset-zone exemptions - reads as
+predictable, matches precedent (`RENAME_*`/`MOVE_PILE`), no further
+concerns.
+
+## End-to-end user test — Save Layout/Remove Zone+Pile/changePileType (2026-08-27)
+
+Full pass on the actual delivered feature (task.md 79-84), independent
+of Neo's own functional Playwright verification - probed learnability/
+consistency, not just "does it run."
+
+Confirmed working as designed:
+- Disclosure captions render exactly as specified (Gate 2), persistent
+  not per-click.
+- Save/SaveAs/Reset all confirm via dialog naming the layout (Gate 1).
+- Every icon-only action button (`remove` ✕, `changePileType` ⇋) gets
+  a `title`/`aria-label` automatically from `ACTION_SPECS`'s own
+  `applyIconButton` (ui.js) - Nielsen #6, recognition not recall,
+  nothing new needed here, the existing mechanism already covers it.
+- The live-caught Table-pile Remove-button fix: confirmed the Table
+  pile's own row shows split/take/changePileType but not remove -
+  exactly the "don't offer a button that always fails" standard this
+  gate exists to enforce.
+
+**One real, non-blocking finding**: SaveAs uses a native
+`window.prompt()` for the name - the only text-ENTRY dialog in this
+app; every other "ask for text" surface (rename) is inline
+dblclick-to-edit on an existing label, which SaveAs has no equivalent
+of (it's triggered from a button, not an existing label to edit in
+place). `prompt()` is the same native-browser-dialog family this app
+already commits to for `alert`/`confirm` (Nielsen #4 - not a NEW kind
+of inconsistency, an extension of an existing one). Disclosed, not
+blocking - filed to backlog as optional future polish (a real inline
+name field) rather than reworked under sprint pressure.
+
+**Verdict: APPROVED.** @all *sprint retro.
+
+## Current Task
+**Status:** Sprint-close testing complete. Moving to retro.
+
+## Next Steps
+Post Smith's own retro item (the `window.prompt()` finding, filed to
+backlog) during `*sprint retro`.

@@ -23,6 +23,7 @@ import { seatedOrder } from './seating.js';
 import { save as saveGame, load as loadGame, clear as clearGame, describeAge, expectedReturners } from './persistence.js';
 import { CLIENT_KEY_STORAGE, resolvePlayer, peerFor, rememberSession, recallSession, forgetSession } from './identity.js';
 import { loadPanelLayout, savePanelPosition, savePanelSize, applyPresetLayout } from './panelLayout.js';
+import { saveLayoutOverride, deleteLayoutOverride, overridesForPreset, stableLayoutSubset } from './layoutOverrides.js';
 // UX follow-up (direct user request): Score is a native Web Component
 // (customElements, light DOM) - importing it (and every pile/zone
 // component below) for its registration side effect
@@ -130,10 +131,34 @@ for (const preset of PRESETS) {
   opt.textContent = preset.name;
   presetSelect.append(opt);
 }
+const layoutSelect = document.querySelector('#host-layout');
+const layoutRow = document.querySelector('#host-layout-row');
+
+// US-70 (D61): repopulate the Layout picker with every saved override
+// recorded against THIS preset's name - `overridesForPreset` already
+// does the filtering, so a save made under "War" never appears while
+// "Solitaire" is selected.
+function refreshLayoutOptions(presetName) {
+  layoutSelect.replaceChildren();
+  const defaultOption = document.createElement('option');
+  defaultOption.value = '';
+  defaultOption.textContent = 'Default';
+  layoutSelect.append(defaultOption);
+  for (const override of overridesForPreset(localStorage, presetName)) {
+    const opt = document.createElement('option');
+    opt.value = override.name;
+    opt.textContent = override.name;
+    layoutSelect.append(opt);
+  }
+  layoutSelect.value = '';
+}
+
 presetSelect.addEventListener('change', () => {
   const preset = PRESETS.find((p) => p.name === presetSelect.value);
   const previewElement = document.querySelector('#host-preset-preview');
   selectedPreset = preset ?? null;
+  layoutRow.hidden = !preset;
+  if (preset) refreshLayoutOptions(preset.name);
   if (!preset) {
     previewElement.hidden = true;
     return;
@@ -625,13 +650,31 @@ document.querySelector('#create-table').addEventListener('click', async () => {
   document.querySelector('#host-deck-config').textContent = `Deck: ${describeDeckConfig(deckConfig)}`;
   if (selectedPreset) {
     document.querySelector('#cards-per-player').value = String(selectedPreset.cardsPerPlayer);
+    // *nit (direct user request, "make sure that number is initialized
+    // from the preset"): the deck's OWN persistent deal-count input
+    // (`lastDealCount`, its later Deal/Reshuffle&Deal clicks) was
+    // always hardcoded to 1 regardless of preset - same value the
+    // initial-deal `#cards-per-player` field above gets, so re-dealing
+    // later defaults to the preset's own hand size instead of silently
+    // resetting to 1.
+    lastDealCount = selectedPreset.cardsPerPlayer;
     // UX follow-up (direct user request): "update the preset to use
     // this layout... and preset the layouts for the other games too" -
     // a preset's own `layout` (its shared, deterministically-id'd
     // panels only - never a per-player one) seeds this browser's local
     // panel arrangement (`panelLayout.js`) the moment its table is
     // actually created, not merely previewed in the dropdown.
-    applyPresetLayout(localStorage, selectedPreset.layout);
+    //
+    // US-70 (D61): the "Layout" picker's choice, when it names a saved
+    // override, takes over from the preset's own built-in `layout`
+    // here - same `applyPresetLayout` call, just a different source
+    // object. Falls back to the built-in default when "Default" (empty
+    // value) is selected, or nothing was ever saved for this preset.
+    const chosenOverrideName = layoutSelect.value;
+    const chosenOverride = chosenOverrideName
+      ? overridesForPreset(localStorage, selectedPreset.name).find((o) => o.name === chosenOverrideName)
+      : null;
+    applyPresetLayout(localStorage, chosenOverride?.layout ?? selectedPreset.layout);
   }
   renderRosterOnly();
 
@@ -970,7 +1013,45 @@ function renderRosterOnly() {
   document.querySelector('#table-surface').style.setProperty('--seat-count', players.length);
 }
 
+// US-69/70 (D61): host-only - a saved override is keyed to the preset
+// THIS table was created with, which only the host's own
+// `selectedPreset` knows (presets/GameConfig.piles/zones are already
+// host-only concepts in this codebase, not part of replicated state).
+function updateLayoutControlsVisibility() {
+  document.querySelector('#layout-controls').hidden = role !== 'host' || !selectedPreset;
+}
+
+function performSaveLayout() {
+  if (role !== 'host' || !selectedPreset) return;
+  const layout = stableLayoutSubset(loadPanelLayout(localStorage), gameState.gameConfig);
+  saveLayoutOverride(localStorage, selectedPreset.name, selectedPreset.name, layout);
+  globalThis.alert(`Layout saved as "${selectedPreset.name}".`);
+}
+
+function performSaveLayoutAs() {
+  if (role !== 'host' || !selectedPreset) return;
+  const name = globalThis.prompt('Save layout as:', selectedPreset.name)?.trim();
+  if (!name) return;
+  const existing = overridesForPreset(localStorage, selectedPreset.name).some((o) => o.name === name);
+  if (existing && !globalThis.confirm(`"${name}" already exists. Overwrite it?`)) return;
+  const layout = stableLayoutSubset(loadPanelLayout(localStorage), gameState.gameConfig);
+  saveLayoutOverride(localStorage, name, selectedPreset.name, layout);
+  globalThis.alert(`Layout saved as "${name}".`);
+}
+
+function performResetLayout() {
+  if (role !== 'host' || !selectedPreset) return;
+  if (!globalThis.confirm(`Reset "${selectedPreset.name}" to its built-in default layout? This only affects new games, not this table.`)) return;
+  deleteLayoutOverride(localStorage, selectedPreset.name);
+  globalThis.alert(`"${selectedPreset.name}" reset to its built-in default.`);
+}
+
+document.querySelector('#save-layout-btn').addEventListener('click', performSaveLayout);
+document.querySelector('#save-layout-as-btn').addEventListener('click', performSaveLayoutAs);
+document.querySelector('#reset-layout-btn').addEventListener('click', performResetLayout);
+
 function renderGameFromView(view) {
+  updateLayoutControlsVisibility();
   const nameById = new Map(view.players.map((p) => [p.id, p.id === myId ? 'You' : p.name]));
 
   // UX follow-up (direct user request): "get rid of seat panel and
@@ -999,10 +1080,6 @@ function renderGameFromView(view) {
     onMoveCard: (cardId, toZoneId) => moveCard(cardId, toZoneId),
     onCardLift: (cardId, active) => motionThrottler.schedule('card-lift', { cardId, active }),
     onDropCard: (cardId, toZoneId, placement) => dropCardOnZone(cardId, toZoneId, placement),
-    // D35: a dragged pile-action token (Draw is the only draggable one
-    // today) dropped on any zone panel - generalizes what used to be the
-    // merged own-zone panel's own bespoke hand-drop check.
-    onPileActionDrop: isSessionEnded ? null : (actionId) => { if (actionId === 'draw') performDraw(); },
     // UX follow-up (direct user request): "like zones, Piles are
     // Actionable and should have a title bar with action buttons for
     // that pile type" - every pile's heading is a real action header now
@@ -1027,12 +1104,19 @@ function renderGameFromView(view) {
       if (actionId === 'take') return performTakePile(pileId);
       if (actionId === 'hide') return performSetPileOrientation(pileId, false);
       if (actionId === 'show') return performSetPileOrientation(pileId, true);
+      if (actionId === 'remove') return performRemovePile(pileId);
+      // US-73: zone<->discard is the only eligible pair (D63) - toggle
+      // to whichever of the two this pile currently ISN'T.
+      if (actionId === 'changePileType') {
+        return performChangePileType(pileId, pile?.kind === 'discard' ? 'zone' : 'discard');
+      }
     },
     // *nit (2026-08-26): "allow user to rename zones and piles - any
     // user can edit - persisted by host." Same `sessionEnded` gate
     // every other dispatching handler in this object already uses.
     onRenamePile: isSessionEnded ? null : (pileId, name) => performRenamePile(pileId, name),
     onRenameZone: isSessionEnded ? null : (zoneId, name) => performRenameZone(zoneId, name),
+    onRemoveZone: isSessionEnded ? null : (zoneId) => performRemoveZone(zoneId),
     // (bloop: piles/zones/cards are all Movable)
     onMovePile: isSessionEnded ? null : (pileId, targetZoneId) => performMovePile(pileId, targetZoneId),
     // *nit (2026-08-26): "relocated within their zone (ordering)" -
@@ -1273,6 +1357,34 @@ function performRenameZone(zoneId, name) {
   } else session.send({ type: 'action', action: { type: 'RENAME_ZONE', zoneId, name } });
 }
 
+// US-71/72/73 (D62/D63): same host-local/guest-relay + try/catch +
+// `window.alert` precedent as every pile/zone action above - the
+// reducer's empty-only/exemption throws are the real gate, this is
+// just how they reach the user (Gate 1 Nielsen #9).
+function performRemovePile(pileId) {
+  if (isSessionEnded) return;
+  if (role === 'host') {
+    try { dispatch({ type: 'REMOVE_PILE', playerId: myId, pileId }); }
+    catch (error) { globalThis.alert(error.message); }
+  } else session.send({ type: 'action', action: { type: 'REMOVE_PILE', pileId } });
+}
+
+function performRemoveZone(zoneId) {
+  if (isSessionEnded) return;
+  if (role === 'host') {
+    try { dispatch({ type: 'REMOVE_ZONE', playerId: myId, zoneId }); }
+    catch (error) { globalThis.alert(error.message); }
+  } else session.send({ type: 'action', action: { type: 'REMOVE_ZONE', zoneId } });
+}
+
+function performChangePileType(pileId, kind) {
+  if (isSessionEnded) return;
+  if (role === 'host') {
+    try { dispatch({ type: 'CHANGE_PILE_TYPE', playerId: myId, pileId, kind }); }
+    catch (error) { globalThis.alert(error.message); }
+  } else session.send({ type: 'action', action: { type: 'CHANGE_PILE_TYPE', pileId, kind } });
+}
+
 // (bloop: piles/zones/cards are all Movable) - reparent a pile
 // (`targetZoneId: null` ungroups into a fresh standalone Zone, D55's
 // existing design). Same dispatch shape as every other pile-affecting
@@ -1322,11 +1434,11 @@ function performCreatePileWithCard(cardId, zoneId) {
   } else session.send({ type: 'action', action: { type: 'CREATE_PILE', zoneId, fromPileId, cardId } });
 }
 
-// D35/D51 (both drop behaviors): Draw's action-token drop is
-// `zoneOpts.onPileActionDrop` above; a dragged table card landing on the
-// hand pile is `dropCardOnZone`'s own kind==='hand' check - both
-// generic, handled by whichever zone-panel the drop actually lands on,
-// not a bespoke listener on a dedicated hand element any more.
+// D51/D67: a dragged table card (or, since D67, the deck's own exposed
+// top card - same mechanism, no special case) landing on the hand pile
+// is `dropCardOnZone`'s own kind==='hand' check - generic, handled by
+// whichever zone-panel the drop actually lands on, not a bespoke
+// listener on a dedicated hand element any more.
 
 // NOTE (flagged, not yet done): hand sort (US-23, D14) had no UI trigger
 // left once the merged own-zone panel (and its always-visible Sort/Pass

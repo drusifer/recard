@@ -117,14 +117,25 @@ export class Pile {
    */
   static pileActions({ isOwner, isShared, cards } = {}) {
     if (!isOwner && !isShared) return [];
-    return ['split', 'take', ...orientationActions(cards)];
+    // US-71/72/73 (D62/D63): `remove`/`changePileType` are offered here
+    // for every base-Pile-derived kind (`zone`, `discard` - DiscardPile
+    // doesn't override this method) unconditionally; the reducer is
+    // still the real authorization/empty-only gate (D43's standing
+    // discipline - this decides what to OFFER, not what's ALLOWED).
+    return ['split', 'take', 'changePileType', 'remove', ...orientationActions(cards)];
   }
 
-  /** Which of this pile's own offered actions are disabled by its
-   * current state (e.g. `DeckPile`'s `deal` at zero cards). None for
-   * the base case. */
-  static disabledActions() {
-    return [];
+  /**
+   * Which of this pile's own offered actions are disabled by its
+   * current state (e.g. `DeckPile`'s `deal` at zero cards). `remove`/
+   * `changePileType` (D62/D63) are empty-only at the reducer - *nit,
+   * direct user request ("don't enable X unless empty"): disable them
+   * here too instead of letting a click reach the reducer's block
+   * message every time on a non-empty pile (Nielsen #5, prevent the
+   * error rather than catch it after the fact).
+   */
+  static disabledActions(count) {
+    return count > 0 ? ['remove', 'changePileType'] : [];
   }
 
   /** D43: the write-side authorization check is the READ-side offer

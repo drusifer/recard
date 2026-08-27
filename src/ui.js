@@ -129,12 +129,12 @@ function moveDragGhost(ghost, x, y) {
 /**
  * Wires the 5 pointer/touch events every touch-drag attachment needs
  * onto `feed` (the caller's own `touchDragStep` state-machine driver) -
- * shared by `attachTouchDrag` (cards) and `attachPileActionTouchDrag`
- * (pile actions), which differed only in their own `handle` callbacks,
- * never in this wiring - it had drifted into two copies, one of which
- * had silently dropped the `pointerType === 'mouse'` guard on
- * `pointercancel`. Returns a timer ref so the caller's own `teardown()`
- * can clear the same hold-timer this wiring starts.
+ * used by every `attachTouchDrag` call (D67: including the deck's own
+ * single top-card visual now, same as any other pile's cards - the
+ * pile-ACTION-specific touch-drag variant this comment used to also
+ * describe was retired the same commit, no longer a second caller to
+ * keep in sync with). Returns a timer ref so the caller's own
+ * `teardown()` can clear the same hold-timer this wiring starts.
  */
 function wireTouchDragEvents(sourceElement, feed, isDragging) {
   const timerReference = { id: null };
@@ -458,14 +458,18 @@ export function renderActionHeader(container, titleText, actionIds, options = {}
         !globalThis.confirm(`${spec.hint}\n\nContinue?`)) return;
       options.onAction(id);
     });
-    // D35: `draw`'s own action-token drag protocol, unrelated to the
-    // menu it used to live in - preserved as-is, just hosted on a plain
-    // button now instead of a radial one.
-    if (options.draggable && spec.target) {
-      button.draggable = true;
-      button.addEventListener('dragstart', (event) => event.dataTransfer.setData('text/plain', pileActionToken(id)));
-      attachPileActionTouchDrag(button, id, () => options.onAction(id));
-    }
+    // D67: the `spec.target`-driven action-token drag protocol (D34/
+    // D35, fixed D65) is retired - direct user correction: "drop isn't
+    // triggering an action it's moving cards around." An action that
+    // always resolved to the SAME fixed destination (Draw -> your own
+    // hand) regardless of where you actually released the drag was
+    // never real drop semantics, just a click wearing a drag costume.
+    // Draw stays available as a plain click (`onAction` above); the
+    // deck's own real drag-to-anywhere entry point is now
+    // `renderDeckStack`'s single card visual, using the exact same
+    // generic card-move mechanism (`onDropCard`) every other pile's
+    // cards already use - see its own comment for why a synthetic
+    // token stands in for a real card id there.
     container.append(button);
   }
 }
@@ -903,7 +907,15 @@ export function renderPileShell(container, zone, allZones, options, buildRow) {
       // `orientationActions`) - needs the actual cards, not just counts.
       cards: zone.cards,
     })
-      .filter((id) => id !== 'sortRank' && id !== 'sortSuit'),
+      // Found live while smoke-testing Phase 84 (US-71/D62): `remove`
+      // is a KIND-level offer (`Pile.pileActions`), but the default
+      // Table pile (`id: 'table'`) is exempt from REMOVE_PILE by ID,
+      // not kind - offering the button there would be a guaranteed
+      // confirm-then-fail (Gate 1/Gate 2's whole point was avoiding
+      // exactly this). Same known-id exemption `renderZonePanel`
+      // already hardcodes for the Table Zone, just for its pile
+      // counterpart.
+      .filter((id) => id !== 'sortRank' && id !== 'sortSuit' && !(id === 'remove' && zone.id === 'table')),
     {
       // `pile-title`, not `panel-title` - visually/semantically distinct
       // from a Zone's own heading class, and the selector
@@ -928,11 +940,12 @@ export function renderPileShell(container, zone, allZones, options, buildRow) {
       // *nit (2026-08-26), direct user request: "All Movables can be
       // drag/drop" - every pile's title is a drag source now (was
       // gated to `isReparentable` kinds only). A non-reparentable kind
-      // (deck/hand/foundation/cascade/rankAdjacent) still can't change
-      // ZONES (the drop handler below rejects that, matching
-      // `MOVE_PILE`'s own game-rule eligibility) but CAN be reordered
-      // among its own zone's siblings - that half is purely cosmetic,
-      // never a game-rule concern, for any kind.
+      // (hand/foundation/cascade/rankAdjacent - deck reversed by a
+      // later *nit, see DeckPile.js) still can't change ZONES (the
+      // drop handler below rejects that, matching `MOVE_PILE`'s own
+      // game-rule eligibility) but CAN be reordered among its own
+      // zone's siblings - that half is purely cosmetic, never a
+      // game-rule concern, for any kind.
       pileDraggable: Boolean(options.onMovePile) || Boolean(options.onReorderPile),
       pileId: zone.id,
     },
@@ -948,15 +961,6 @@ export function renderPileShell(container, zone, allZones, options, buildRow) {
     container.addEventListener('dragleave', () => clearZoneDragOver(container, row));
     container.addEventListener('drop', (event) => {
       event.preventDefault();
-      // UX follow-up (direct user request): a dragged pile-level action
-      // token (Draw's own drag protocol, D35) can now land on ANY pile,
-      // including a hand - this used to only be handled by the merged
-      // own-zone panel's own bespoke hand-drop listener. Checked here,
-      // generically, before falling back to the ordinary card-drop
-      // path, so Draw dropped on a hand pile draws instead of being
-      // misread as a bogus card id.
-      const pileAction = pileActionFromDrop(event.dataTransfer);
-      if (pileAction) { options.onPileActionDrop?.(pileAction, zone.id); return; }
       // *nit (2026-08-26), direct user request: "relocated within their
       // zone (ordering)" - a dragged PILE dropped directly onto ANOTHER
       // pile now reorders it to sit right there if they already share a
@@ -1037,11 +1041,26 @@ export function renderZonePanel(zoneElement, id, title, piles, allZones, options
   if (title) {
     const heading = document.createElement('header-actions');
     zoneElement.append(heading);
-    heading.render(title, [], {
+    // US-71 (D62): `remove` offered on every Zone with its own heading
+    // EXCEPT the Table Zone - the one exemption checkable here without
+    // new plumbing (a fixed, known id); everything else the reducer
+    // itself is the real gate for (preset-declared, non-empty), same
+    // "offer generically, reducer authorizes" discipline every other
+    // action in this table already follows (D43).
+    const zoneActionIds = id === 'table-zone' ? [] : ['remove'];
+    heading.render(title, zoneActionIds, {
       headingClass: 'panel-title',
       // *nit (2026-08-26): rename affordance, any player.
       rawName: title,
       onRename: options.onRenameZone ? (name) => options.onRenameZone(id, name) : undefined,
+      onAction: (actionId) => { if (actionId === 'remove') options.onRemoveZone?.(id); },
+      // *nit (direct user request, "don't enable X unless empty"): same
+      // Nielsen #5 reasoning as the pile-level `remove`/`changePileType`
+      // disabling (`Pile.disabledActions`) - REMOVE_ZONE is empty-only
+      // at the reducer (D62) too; a Zone is "empty" when it has no
+      // piles left in it, `piles` (this function's own param) already
+      // says exactly that.
+      disabled: piles.length > 0 ? ['remove'] : [],
     });
     dragHandle = heading;
   }
@@ -1085,10 +1104,6 @@ export function renderZonePanel(zoneElement, id, title, piles, allZones, options
     body.addEventListener('drop', (event) => {
       event.preventDefault();
       zoneElement.classList.remove('zone-drag-over');
-      // A pile-action token (Draw) dropped on open zone space has
-      // nowhere sensible to go - same exclusion the per-pile drop
-      // handler already makes for itself.
-      if (pileActionFromDrop(event.dataTransfer)) return;
       // Stop here, whichever branch below actually applies - otherwise
       // this would ALSO bubble to `#zones`'s own "drop on open table
       // space ungroups" handler (`main.js`), double-dispatching a
@@ -1424,17 +1439,45 @@ export function renderDeckStack(container, count, options = {}) {
   const stack = document.createElement('div');
   stack.className = 'deck-stack';
   if (count > 0) {
-    for (let index = 0; index < Math.min(count, 3); index++) {
-      const back = cardBackElement();
-      back.classList.add('deck-stack-card');
-      back.style.top = `${-index * 2}px`;
-      back.style.left = `${index * 2}px`;
-      stack.append(back);
-    }
+    // D66/D67, direct user correction: "I should only see 1 card" -
+    // was up to 3 purely decorative stacked backs; now exactly one
+    // real card element, same as any other pile ever renders for a
+    // single card. `options.topCard` (D67: `viewFor` now exposes a
+    // hidden pile's own top card, redacted to `{id, faceDown: true}`)
+    // carries the real id this needs to be a genuine drag source -
+    // absent on the pre-game preview screen (`#host-deck-area`, no
+    // game running yet), which stays a plain inert visual exactly as
+    // before.
+    const back = cardBackElement(options.topCard?.id);
+    back.classList.add('deck-stack-card');
+    stack.append(back);
     const badge = document.createElement('span');
     badge.className = 'deck-count-badge';
     badge.textContent = count;
     stack.append(badge);
+    // D67, direct user correction ("drop isn't triggering an action
+    // it's moving cards around... use the same mechanism as all the
+    // other piles, this is a generic pile behavior for all piles"):
+    // wired exactly like `renderZoneCards`'s own per-card drag - a
+    // real card id in `dataTransfer`, the same `onDropCard`/
+    // `onCardDrag`/`attachTouchDrag` plumbing every other pile's cards
+    // already use. No new mechanism, no pile-specific special case -
+    // dropping this wherever it lands dispatches the ordinary MOVE_CARD/
+    // PICKUP/PLAY path (`dropCardOnZone`, main.js) unchanged, because
+    // it now carries a real, findable card id.
+    if (options.topCard && options.onDropCard) {
+      back.draggable = true;
+      back.addEventListener('dragstart', (event) => {
+        event.dataTransfer.setData('text/plain', options.topCard.id);
+      });
+      back.addEventListener('drag', (event) => options.onCardDrag?.(options.topCard, event.clientX, event.clientY));
+      back.addEventListener('dragend', () => options.onCardDrag?.(null, 0, 0));
+      attachTouchDrag(back, options.topCard, {
+        onDropCard: options.onDropCard,
+        onCardDrag: options.onCardDrag,
+        onCardLift: options.onCardLift,
+      });
+    }
   } else {
     const empty = document.createElement('div');
     empty.className = 'deck-empty';
@@ -1473,28 +1516,6 @@ function pileCountInput({ value, onChange, min, max, ariaLabel, inputId }) {
   return input;
 }
 
-const PILE_ACTION_TOKEN_PREFIX = 'pile-action:';
-
-/**
-The dataTransfer payload a draggable pile-action button carries.
-*/
-function pileActionToken(actionId) {
-  return `${PILE_ACTION_TOKEN_PREFIX}${actionId}`;
-}
-
-/**
- * Reads a drop's raw `text/plain` payload and returns the pile-action id
- * it carries, or `null` if this drop isn't one (an ordinary card, most
- * likely). Only meaningful at `drop` time - real browsers don't expose
- * `dataTransfer` values during `dragover`, only `.types` (D35 note: this
- * is why the drop target below always calls `preventDefault()` on
- * dragover unconditionally rather than trying to distinguish there).
- */
-export function pileActionFromDrop(dataTransfer) {
-  const raw = dataTransfer.getData('text/plain');
-  return raw.startsWith(PILE_ACTION_TOKEN_PREFIX) ? raw.slice(PILE_ACTION_TOKEN_PREFIX.length) : null;
-}
-
 // (bloop: piles/zones/cards are all Movable) - a dragged PILE (its own
 // title bar is the handle, `renderPileShell`) carries its id the same
 // tagged-string way a pile-ACTION token does, so every drop target's
@@ -1514,46 +1535,6 @@ Same shape as `pileActionFromDrop` - only meaningful at `drop` time.
 export function pileDragFromDrop(dataTransfer) {
   const raw = dataTransfer.getData('text/plain');
   return raw.startsWith(PILE_DRAG_TOKEN_PREFIX) ? raw.slice(PILE_DRAG_TOKEN_PREFIX.length) : null;
-}
-
-/**
- * Touch drag for one pile-action button (Draw, Phase 54/D35) - the same
- * press-and-hold recognizer `attachTouchDrag` uses for cards, wired
- * smaller: there's no card identity to broadcast mid-drag (US-29 doesn't
- * apply - nothing has been drawn yet), just a ghost and a drop check.
- */
-function attachPileActionTouchDrag(sourceElement, actionId, onDrop) {
-  let state = null;
-  let ghost = null;
-
-  const teardown = () => {
-    clearTimeout(timerReference.id);
-    ghost?.remove();
-    ghost = null;
-  };
-
-  const handle = {
-    lift: (event) => {
-      ghost = sourceElement.cloneNode(true);
-      ghost.classList.add('touch-drag-ghost');
-      document.body.append(ghost);
-      moveDragGhost(ghost, event.x, event.y);
-    },
-    move: (event) => { if (ghost) moveDragGhost(ghost, event.x, event.y); },
-    drop: (event) => {
-      teardown();
-      if (document.elementFromPoint(event.x, event.y)?.closest('[data-kind="hand"]')) onDrop();
-    },
-    cancel: teardown,
-  };
-
-  const feed = (sample) => {
-    const out = touchDragStep(state, sample);
-    state = out.state;
-    for (const dragEvent of out.events) handle[dragEvent.type](dragEvent);
-  };
-
-  const timerReference = wireTouchDragEvents(sourceElement, feed, () => state?.phase === 'dragging');
 }
 
 /**

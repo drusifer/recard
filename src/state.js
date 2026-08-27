@@ -651,11 +651,21 @@ const ACTIONS = {
     // pile.kind !== 'discard'` literal, duplicating exactly what each
     // Pile class's own `static reparentable` (D56) already declares -
     // that flag existed but was never actually wired to anything until
-    // now. Same eligibility as before (Smith's Gate 1 ruling: only
-    // `zone`/`discard`; `deck` is excluded even though `tableSide` alone
-    // would allow it, since `state.js` finds THE deck by fixed id
-    // elsewhere, not by searching zones) - just read from one source of
-    // truth instead of two that could drift apart.
+    // now - just read from one source of truth instead of two that
+    // could drift apart.
+    //
+    // *nit (later, direct user request, D64): `deck` was originally
+    // excluded here too (Sprint 23 Gate 1: "excluded even though
+    // `tableSide` alone would allow it, since `state.js` finds THE
+    // deck by fixed id elsewhere, not by searching zones"). Re-checked
+    // that reasoning against the actual code before reversing it:
+    // `deckOf`/`DEAL`/`DRAW`/`SPLIT_DECK`/`SHUFFLE_DECK`/`RESET` all
+    // find the deck by `DECK_PILE_ID`, none of them read or assume its
+    // `zoneId` - the original exclusion was overcautious, not load-
+    // bearing. `DeckPile.reparentable` is `true` now (see its own
+    // comment); `hand`/`foundation`/`cascade`/`rankAdjacent` remain
+    // excluded for their own, still-valid reasons (per-player
+    // invariant; real game-rule `canAccept` logic).
     if (!PILE_TYPES[pile.kind]?.reparentable) {
       throw new Error(`Cannot move a "${pile.kind}" pile between zones`);
     }
@@ -1046,6 +1056,78 @@ const ACTIONS = {
     return { ...state, zones: state.zones.map((z) => (z.id === action.zoneId ? { ...z, name } : z)) };
   },
 
+  /**
+   * US-71/72 (D62): remove an empty pile/zone the player created.
+   * Empty-only - no cascade-delete, no silent card loss (Smith Gate 1
+   * Nielsen #9: the thrown message is user-facing, not just a reducer
+   * guard). `deck`/`hand` exempt from removal, same reasoning
+   * `MOVE_PILE` already uses (`deck` found by fixed id, not
+   * kind-search; `hand` has the per-player exactly-one invariant).
+   */
+  REMOVE_PILE(state, action) {
+    const pile = state.piles.find((p) => p.id === action.pileId);
+    if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
+    if (pile.kind === 'deck' || pile.kind === 'hand') {
+      throw new Error(`Cannot remove a "${pile.kind}" pile`);
+    }
+    // Found live while wiring the UI (Phase 80): the built-in default
+    // Table pile has `kind: 'zone'`, same as any player-created one -
+    // the kind check above alone would have let it be removed. Its own
+    // Zone record (TABLE_ZONE_ID) is already exempt from REMOVE_ZONE;
+    // this closes the matching gap for its pile counterpart.
+    if (pile.id === DEFAULT_ZONE_ID) {
+      throw new Error('Cannot remove the default Table pile');
+    }
+    if (pile.cards.length > 0) {
+      throw new Error('Pile must be empty before it can be removed');
+    }
+    return { ...state, piles: state.piles.filter((p) => p.id !== action.pileId) };
+  },
+
+  /**
+   * US-71 (D62): remove an empty Zone record. Table Zone and any
+   * preset-declared zone (`gameConfig.zones`) are exempt, same
+   * exemption shape `CREATE_ZONE` already enforces via
+   * `allowsPlayerZones`. Empty-only - no cascade-delete of piles still
+   * inside it.
+   */
+  REMOVE_ZONE(state, action) {
+    const zone = state.zones.find((z) => z.id === action.zoneId);
+    if (!zone) throw new Error(`Zone ${action.zoneId} does not exist`);
+    const isPresetDeclared = (state.gameConfig?.zones ?? []).some((z) => z.id === action.zoneId);
+    if (isPresetDeclared || action.zoneId === TABLE_ZONE_ID) {
+      throw new Error(`Cannot remove zone "${action.zoneId}"`);
+    }
+    if (state.piles.some((p) => p.zoneId === action.zoneId)) {
+      throw new Error('Zone must be empty before it can be removed');
+    }
+    return { ...state, zones: state.zones.filter((z) => z.id !== action.zoneId) };
+  },
+
+  /**
+   * US-73 (D63): change a pile's `kind` in place, `zone`<->`discard`
+   * only (both directions) - the two kinds `MOVE_PILE`/`SPLIT_PILE`
+   * already treat as interchangeable/general-purpose. `deck`/`hand`
+   * exempt for the same reason D62's remove actions exempt them.
+   * `foundation`/`cascade`/`rankAdjacent` excluded: they carry real
+   * game-rule `canAccept` logic a runtime swap could silently violate,
+   * and no per-card re-validation exists to check that. Empty-only,
+   * same discipline as D62.
+   */
+  CHANGE_PILE_TYPE(state, action) {
+    const pile = state.piles.find((p) => p.id === action.pileId);
+    if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
+    const isEligible = pile.kind === 'zone' || pile.kind === 'discard';
+    const isTargetEligible = action.kind === 'zone' || action.kind === 'discard';
+    if (!isEligible || !isTargetEligible) {
+      throw new Error(`Cannot change a "${pile.kind}" pile to kind "${action.kind}"`);
+    }
+    if (pile.cards.length > 0) {
+      throw new Error('Pile must be empty before its type can be changed');
+    }
+    return { ...state, piles: state.piles.map((p) => (p.id === action.pileId ? { ...p, kind: action.kind } : p)) };
+  },
+
   TOGGLE_PASS(state, action) {
     const current = state.passed[action.playerId] ?? false;
     return { ...state, passed: { ...state.passed, [action.playerId]: !current } };
@@ -1146,7 +1228,26 @@ export function viewFor(state, playerId) {
         // does, instead of being a special top-level `deckCount` field
         // with its own bespoke render path in `main.js`.
         if (pile.id === DECK_PILE_ID) deckCount = pile.cards.length;
-        zones.push({ id: pile.id, name: pile.name, ownerId: pile.ownerId ?? null, kind: pile.kind, zoneId: pile.zoneId, cards: [], count: pile.cards.length });
+        // D67, direct user request ("nix the constraint re: privacy
+        // guarantee, that is not a requirement"): reverses the "no
+        // deck card ever reaches any viewer, not even its id" rule
+        // this same switch case documented above (D23/D7's original
+        // design intent). The pile's own TOP card - real id, redacted
+        // to a face-down/unowned shape, same shape any other pile's
+        // hidden card already renders as - is now included, so it can
+        // be a genuine drag source through the exact same generic
+        // per-card mechanism (`renderZoneCards`/`onDropCard`/
+        // `MOVE_CARD`/`PICKUP`) every other pile's cards already use -
+        // no synthetic token, no new reducer action, "the same
+        // mechanism as all other piles" as directly requested. Only
+        // the top card (`slice(0, 1)`) - "I should only see 1 card" -
+        // the rest of the deck's order/contents still never leaves
+        // this function.
+        {
+          const topCard = pile.cards[0];
+          const cards = topCard ? [{ id: topCard.id, faceDown: true }] : [];
+          zones.push({ id: pile.id, name: pile.name, ownerId: pile.ownerId ?? null, kind: pile.kind, zoneId: pile.zoneId, cards, count: pile.cards.length });
+        }
         break;
       }
       case 'in-hand': {

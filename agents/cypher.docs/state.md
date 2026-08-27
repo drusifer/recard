@@ -453,6 +453,51 @@ Current state: branch `touch-targets-and-pile-actions-sprint`, commit
 `44303e3`, clean, 260/260 unit tests green.
 
 ---
+## Sprint: Custom Layouts + Zone/Pile Removal + changePileType (2026-08-27)
+
+Drafted US-69..73 in USER_STORIES.md per direct user request: Save
+Layout (persist current positions as a preset-scoped localStorage
+override), SaveAs (custom name, default = preset name), Remove Zone,
+Remove Pile, and a new `changePileType` pile action. Researched first
+(via Explore agent) against panelLayout.js/presets.js/state.js/
+pileActions.js/pileTypes.js before drafting - confirmed no
+REMOVE_ZONE/REMOVE_PILE reducer action exists at all today (RENAME_*
+is the nearest precedent), and layout persistence today is one global
+non-preset-scoped localStorage blob. Flagged 7 open questions for
+Smith's Gate 1 rather than guessing, most consequentially: whether
+"remove zone/pile" is meant to persist into a saved layout override or
+stay a live-session-only action (proposed: live-session-only, out of
+scope to also override gameConfig.piles/zones this sprint) - the
+feature request conflates layout-position persistence with
+zone/pile-existence, which are separate systems in the current code.
+Also proposed empty-only guards for remove-zone/remove-pile/
+changePileType (no cascade-delete, no silent card loss, no per-card
+re-validation against a new pile type's canAccept).
+
+### Waiting On
+@Smith: Gate 1 on US-69..73, specifically the 7 flagged open questions.
+
+## Launch — Save Layout/Remove Zone+Pile/changePileType (2026-08-27)
+
+Full cycle complete: Gate 1 (7 questions resolved) -> Morpheus arch
+(D61-D63) -> Gate 2 (1 condition) -> 6 phases (task.md 79-84) -> Oracle
+groom -> Smith end-to-end test (APPROVED) -> full-team retro. 393/393
+tests, lint baseline unchanged. Two real live-caught UX bugs fixed
+before shipping (Table-pile always-fails Remove button; 1px scroll
+regression). Backlog additions: SaveAs's `window.prompt()` (Smith,
+non-blocking), Morpheus's "check id-survival before designing a save-
+for-reuse feature" process note.
+
+### Current Task
+**Status:** Sprint complete, launched.
+
+### Next Steps
+None pending. Same standing backlog as before (e2e suite rebuild,
+7 cognitive-complexity findings, builder screen, 2 minor visual
+overlaps) plus this sprint's 2 new items above.
+
+---
+
 ## Sprint 23 ("pile-level actions, generalized") — 2026-08-25
 
 Drafted US-60..63 in USER_STORIES.md per direct user request: Split

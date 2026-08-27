@@ -991,3 +991,61 @@ applies, not skippable as internal-only.
 running app - typed entry, all four adjust buttons, cross-player
 adjustment (anyone may adjust anyone), multi-seat layout at a packed
 width.
+
+## Architecture: Save Layout/SaveAs/Remove Zone+Pile/changePileType (2026-08-27)
+
+Recorded D61-D63 in `docs/ARCHITECTURE.md` for US-69..73:
+- **D61**: saved layouts only cover stable-id panels (table-zone,
+  score, deck, preset-declared piles/zones) - discovered mid-design
+  that player-created zones/piles get `crypto.randomUUID()` ids
+  (`state.js` L115-120), so their positions can't meaningfully round-
+  trip into a future game. New store `recard:layout-overrides:v1`
+  (new file `src/layoutOverrides.js`), keyed by user-chosen name,
+  recording `presetName` so the host UI's layout picker can filter to
+  compatible saves. Save writes under the active preset's name;
+  SaveAs prompts for a name (prefilled = preset name).
+- **D62**: `REMOVE_ZONE`/`REMOVE_PILE` reducer actions, modeled on
+  `RENAME_ZONE`/`RENAME_PILE`, empty-only (no cascade-delete), with
+  the same deck/hand and preset-declared-zone exemptions `MOVE_PILE`/
+  `CREATE_ZONE` already use.
+- **D63**: `CHANGE_PILE_TYPE` reducer action, `zone`<->`discard` only,
+  empty-only (no per-card canAccept re-validation exists to safely
+  allow non-empty swaps).
+
+Both Gate 1 amendments (visible save confirmation, specific block
+error messages) carried into the design - confirmation is a UI-layer
+concern for Neo's phase; block messages are the reducer's thrown
+`Error` message text, not just a truthy/falsy return.
+
+### Current Task
+**Status:** Architecture recorded, handed to Smith for Gate 2.
+**Next:** Smith Gate 2 -> Mouse phase breakdown -> Morpheus reviews
+phase plan -> Phase Bloop.
+
+### Next Steps
+@Smith: `*user feedback` / Gate 2 on D61-D63 - specifically confirm
+the empty-only removal/changePileType restriction and the "Reset
+Layout only affects future games, not the live table" behavior don't
+read as surprising to a real user.
+
+## Sprint plan review — Save Layout/Remove Zone+Pile/changePileType (2026-08-27)
+
+Reviewed Mouse's 7-phase breakdown (task.md 79-85) against D61-D63.
+Phase sizing correct (1-3 tasks each), data-layer-before-UI sequencing
+matches architecture dependency (81's layoutOverrides.js has no
+dependency on 79/80, but grouping all three data-layer phases before
+any UI phase is still right - keeps DOM-free, fast-to-test work
+first). Phase 84 explicitly carries both Gate 1 (save confirmation)
+and Gate 2 (disclosure captions) conditions into its own checklist,
+not left implicit - correct, avoids the exact "amendment got lost
+between review and implementation" failure mode Smith's Gate 2 was
+watching for.
+
+**Verdict: APPROVED, no changes requested.**
+
+### Current Task
+**Status:** Plan approved. Phase 79 ready for Neo.
+
+### Next Steps
+@Neo: `*swe impl phase-79` (REMOVE_ZONE/REMOVE_PILE reducer actions,
+TDD). @Trin picks up UAT after.
