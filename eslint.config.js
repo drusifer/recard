@@ -36,6 +36,16 @@ export default [
       // load-bearing (D23, Phase 29). Dominant finding (189/435) -
       // flagged and resolved as one call, not fixed line-by-line.
       'unicorn/no-null': 'off',
+      // Several destructures exist ONLY to omit a field via the rest
+      // sibling (`const { owner, faceUp, layout, ...plainCard } = card`)
+      // - the named binding itself is never read, that's the point.
+      // Real dead-code findings get fixed (US-66), not this pattern.
+      'no-unused-vars': ['error', { ignoreRestSiblings: true }],
+      // sonarjs's own no-unused-vars duplicates the core rule above but
+      // has no ignoreRestSiblings option, so it still flags the
+      // destructure-to-omit pattern the core rule now correctly allows.
+      // The core rule alone covers this; no need for two.
+      'sonarjs/no-unused-vars': 'off',
     },
   },
   {

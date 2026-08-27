@@ -59,14 +59,6 @@ async function cardAction(page, cardId, action) {
   await radialButton(page, action).first().click();
 }
 
-/**
-Hovers `hostSelector` (opens its radial menu) and clicks the named action.
-*/
-async function pileAction(page, hostSelector, action) {
-  await page.hover(hostSelector);
-  await radialButton(page, action).first().click();
-}
-
 // Phase 55 (T55.1): reveal moved off the hover row onto a direct tap on
 // the card itself, joining tap-to-play's vocabulary - no hover needed.
 // `.revealable` (not `.revealable.card-back`): a shared face-down card

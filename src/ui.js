@@ -260,36 +260,6 @@ function attachTouchDrag(sourceElement, card, context) {
 // deliberate, temporary gap, not an oversight.
 
 /**
- * A "move to another zone" control - only rendered when there's actually
- * somewhere else to move a card to, and only for cards the viewer has
- * some authority/visibility over (never for another player's still-
- * hidden private card, which mirrors the reveal/pickup controls above
- * already not being offered for that case).
- */
-function moveToControl(card, currentZoneId, allZones, onMoveCard) {
-  const otherZones = allZones.filter((z) => z.id !== currentZoneId);
-  if (!onMoveCard || otherZones.length === 0) return null;
-
-  const select = document.createElement('select');
-  select.className = 'move-to-select';
-  const placeholder = document.createElement('option');
-  placeholder.value = '';
-  placeholder.textContent = 'Move to…';
-  select.append(placeholder);
-  for (const zone of otherZones) {
-    const opt = document.createElement('option');
-    opt.value = zone.id;
-    opt.textContent = zone.name;
-    select.append(opt);
-  }
-  select.addEventListener('change', () => {
-    if (select.value) onMoveCard(card.id, select.value);
-    select.value = '';
-  });
-  return select;
-}
-
-/**
  * Renders one zone's cards. Each entry is either a full card (visible to
  * this viewer) or a redacted `{id, owner, faceDown: true}` placeholder
  * (state.js's viewFor — see ARCHITECTURE.md D7). `resolveOwnerName` maps
