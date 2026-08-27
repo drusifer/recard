@@ -2419,3 +2419,29 @@ multiple copies of the same logic to drift out of sync.
 format, or introduces new features. This sprint is purely internal
 quality — if a lint finding can only be "fixed" by changing behavior,
 it's flagged for Morpheus/Cypher, not silently done.
+
+### Sprint status: US-64..68 COMPLETE (2026-08-27)
+1021 → 7 lint findings (7 remaining are flagged `cognitive-complexity`,
+deliberately not fixed under pressure). Real dead code cut (1 JS export,
+8 orphaned CSS rules). Real duplication found and consolidated (touch-
+drag event wiring). Two live bugs found and fixed along the way (a
+retired-DOM-id drop-target bug in the pile-action touch-drag path; a
+near-miss `passed`/`Object.hasOwn` regression caught before shipping).
+One major unplanned finding, escalated rather than decided unilaterally:
+`tests/e2e.smoke.mjs` had drifted into asserting against DOM containers
+retired by D51/D52 and was removed (D60) rather than repaired - no
+automated E2E suite exists until one is rebuilt (new backlog item, see
+below). Smith close-out and full retro next.
+
+---
+
+## Backlog: rebuild an automated E2E/integration test suite (added 2026-08-27, D60)
+
+The previous `tests/e2e.smoke.mjs` was removed rather than repaired -
+see D60 (`docs/ARCHITECTURE.md`) for the full reasoning. A real
+replacement, written against the CURRENT `#zones`-based DOM (not
+`#hand-area`/`#table-area`/`#seat-zones`, which no longer exist), is
+open backlog - a full re-authoring project, not a quick patch. Until
+then, `npm run lint:design` (layout/overlap/touch-target checks across
+real viewports) and manual two-tab testing are the only automated/
+semi-automated coverage beyond unit tests.

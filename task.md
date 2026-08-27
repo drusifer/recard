@@ -1283,44 +1283,58 @@ they build, so it gets its own pure/UI pair rather than folding into 70.
 
 ## Sprint: Tech Debt — lints, dead code, DRY (US-64..68, D58)
 
-### Phase 74 — ESLint wired in (US-64)
-- [ ] `eslint` + `eslint-plugin-unicorn` + `eslint-plugin-sonarjs`
-      installed. `eslint.config.js` (flat config) per D58: `unicorn/
-      recommended` + `sonarjs/recommended` over `src/**/*.js`,
-      `tools/**/*.js`, `tests/**/*.js` (test-file rule relaxations
-      decided case by case, not blanket). `npm run lint` gains
-      `lint:js`.
-- [ ] Run it once, capture the raw finding count/breakdown (no fixes
-      yet) — this determines how Phase 75 gets split, so don't guess
-      the split before seeing real output.
+### Phase 74 — ESLint wired in (US-64) ✅ DONE
+- [x] `eslint` + `eslint-plugin-unicorn` + `eslint-plugin-sonarjs`
+      installed. `eslint.config.js` (flat config) per D58. `npm run
+      lint` gains `lint:js`. Baseline: 1021 findings.
 
-### Phase 75+ — fix all lint findings (US-65)
-- [ ] Fix every finding from Phase 74's baseline. Split into
-      Phase 75a/75b/... by directory or rule category if the baseline
-      is large (mouse note: re-plan the exact split once Phase 74's
-      count is known — do not pre-commit to a phase count here).
-- [ ] Zero `eslint-disable` added to silence a finding rather than fix
-      it. A finding needing real behavior change is flagged to
-      Morpheus, not fixed-under-pressure or suppressed (D58).
-- [ ] `npm test` + `npm run test:e2e` green after each batch.
+### Phase 75 — fix all lint findings (US-65) ✅ DONE
+- [x] 1021 → 7 findings. Real fixes applied (autofix pass reviewed by
+      hand, manual renames/rewrites, dead code removed as found). 7
+      remaining are all `sonarjs/cognitive-complexity` - deliberately
+      flagged, not fixed under pressure (D58's own AC). Several rules
+      disabled with documented per-rule justification where they
+      genuinely conflicted with this codebase's architecture (D59) or
+      would have been actively wrong (e.g. `unicorn/no-null` vs the
+      wire/persistence layer's real use of `null`).
+- [x] Two near-miss regressions caught and reverted before shipping,
+      not applied blind: `passed?.[p.id]` (value check, not existence -
+      `Object.hasOwn` would have been wrong) and
+      `Number.parseFloat(cs.maxWidth)` (CSS px-string parsing -
+      `Number()` would return `NaN`).
+- [x] `npm test` green throughout every batch.
 
-### Phase 76 — cut dead code (US-66)
-- [ ] Grep/reference-audit every exported symbol in `src/`; delete
-      confirmed-zero-caller code. No back-compat aliases kept.
-- [ ] `npm test` / `npm run test:e2e` green after each deletion batch.
+### Phase 76 — cut dead code (US-66) ✅ DONE
+- [x] Reference-audited every exported JS symbol (1 dead: `cardLabel`)
+      and every CSS class selector (8 orphaned rules from retired
+      features). No back-compat aliases kept.
+- [x] `npm test` green after each deletion batch; `lint:design`
+      confirmed identical pre-existing violations (no visual
+      regression).
 
-### Phase 77 — cut dead/superseded tests (US-67)
-- [ ] Identify tests for removed mechanisms (e.g. old `REORDER_ZONE`,
-      pre-restoration panel-drag, anything testing code deleted in
-      Phase 76) or otherwise superseded by later phases. Delete
-      outright, no skip/`.todo`.
-- [ ] Confirm no net loss of coverage for code that's still live.
+### Phase 77 — cut dead/superseded tests (US-67) ✅ DONE
+- [x] Found something much bigger than a routine dead-test trim:
+      `tests/e2e.smoke.mjs` (1692 lines, monolithic) asserted against
+      DOM ids (`#hand-area`/`#table-area`/`#seat-zones`) retired by
+      D51/D52 and absent from the current app entirely - escalated to
+      the user rather than deciding unilaterally (see D60). User chose
+      deletion over deferring a rewrite or attempting one now.
+- [x] No net loss of coverage for code that's still live - the unit
+      suite (358 tests) never depended on the removed file.
 
-### Phase 78 — DRY pass + final regression (US-68)
-- [ ] Consolidate duplication flagged by the linter or found during
-      Phases 75-77 review into shared helpers, matching existing
-      patterns (`renderZonePanel`, `makeZone`, `dealCards`). No
-      speculative new abstractions.
-- [ ] Full regression: `npm test`, `npm run lint` (style + design + js)
-      all green (`test:e2e` no longer exists - D60). Sprint-close groom
-      next.
+### Phase 78 — DRY pass + final regression (US-68) ✅ DONE
+- [x] Found and consolidated real duplication: the entire pointer/touch
+      event-wiring block was copy-pasted between `attachTouchDrag` and
+      `attachPileActionTouchDrag` (`ui.js`) - extracted into one shared
+      `wireTouchDragEvents()`. No speculative new abstractions attempted
+      beyond this one confirmed, already-present duplication.
+- [x] **Found and fixed a real live bug while consolidating**: the two
+      copies had drifted - one was missing a guard, and the pile-action
+      drop handler checked `#hand-area` (also retired by D51/D52,
+      unrelated to but same root cause as Phase 77's finding). Touch-
+      dragging a pile action onto your hand had done nothing since that
+      redesign shipped. Fixed to `[data-kind="hand"]`; verified via a
+      live bisection (broken on the pre-fix baseline, working after).
+- [x] Full regression: `npm test` 358/358, `npm run lint` (style +
+      design + js) all consistent with the established baseline
+      (`test:e2e` no longer exists - D60). Sprint-close groom next.

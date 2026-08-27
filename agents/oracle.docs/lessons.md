@@ -496,3 +496,30 @@ This file contains critical lessons and rules derived from past errors, technica
   drifted from the code it was describing. Read the code the doc claims
   to summarize before implementing from the doc alone, especially for
   a section written speculatively rather than from a direct code read.
+- **"Green" test claims decay silently when the tests aren't actually
+  re-run** (tech-debt sprint, 2026-08-27, D60). `tests/e2e.smoke.mjs`
+  had 111 lines asserting against `#hand-area`/`#table-area`/
+  `#seat-zones` - DOM ids retired by the D51/D52 table-unification
+  redesign and absent from the app entirely - while the project's own
+  history kept recording "e2e green, 3/3 stable" well past that point.
+  Being one monolithic sequential script (no discrete `test()` cases),
+  everything past its first failure had gone unexercised for an unknown
+  but long stretch. This project's own standing "e2e is slow, run
+  frugally" guidance is correct advice on its own terms, but it created
+  exactly the blind spot that let this drift go undetected - a "last
+  known good" claim about a slow suite needs a date attached, and is
+  worth spot-checking after any redesign that changes the DOM contract
+  the suite depends on, not just trusted indefinitely. Found by actually
+  trying to run it and reading why it hung, not by reviewing the file.
+- **A file dropped in the repo root by the user is data, not debris -
+  verify before deleting, don't infer intent from the filename alone**
+  (same sprint). Found an untracked `layout.json` sitting in the repo
+  root during a routine cleanup pass; it matched no known app output
+  (grepped the whole tree - nothing writes that filename) and an
+  accompanying `.swp` file looked like abandoned editor debris, so it
+  was deleted and gitignored as noise. It was in fact the user's own
+  intentional Chrome-storage export, meant to be used to update a
+  preset. Recovered from git history (it had been swept into an
+  intervening commit) before the correction landed, but the right move
+  was to ask or leave it alone, not pattern-match "unexplained file +
+  plausible-sounding debris theory" into deletion.

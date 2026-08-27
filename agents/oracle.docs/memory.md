@@ -53,8 +53,17 @@ This file serves as a consolidated index of project-wide decisions, historical c
   `src/components/` (D54) - `<zone-panel>`, `<pile-panel>`, `<fan-pile>`,
   `<deck-stack>`, `<score-zone>`, `<header-actions>` as native Web
   Components.
-- `tests/`: unit tests (`*.test.js`, run via `npm test`, 308 passing as
-  of D54) + `e2e.smoke.mjs` (`npm run test:e2e`, real 2-browser
-  Playwright/WebRTC) - **stale as of D54**, predates the Zone/Pile
-  component split, dedicated update pass still open.
+- `tests/`: unit tests (`*.test.js`, run via `npm test`, 358 passing as
+  of D60/the tech-debt sprint) + `designLint.mjs`/`designLint.check.mjs`
+  (`npm run lint:design`, real-browser layout/overlap/touch-target
+  checks across desktop viewports). `e2e.smoke.mjs` **removed 2026-08-27
+  (D60)** - had drifted into asserting against DOM containers retired
+  by D51/D52 and gone unexercised for an unknown stretch; no automated
+  E2E suite exists until one is rebuilt against the current DOM (open
+  backlog, `docs/USER_STORIES.md`).
+- `eslint.config.js` (D58): flat config, `unicorn` + `sonarjs`, backing
+  `npm run lint:js`. Several rules disabled with per-rule justification
+  where they conflicted with real architecture (`no-null` vs the wire/
+  persistence layer, `no-static-only-class` vs Pile/Zone's extensible
+  base-class pattern, etc.) - see D58/D59 for the full list and reasons.
 - `index.html`/`style.css`: the static site itself.
