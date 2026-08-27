@@ -811,6 +811,24 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   margin-bottom: 0.25rem;
 }
 
+/* UX follow-up (real bug, found live): a Zone's title bar - `.panel-
+   title`, the ONE shared heading class every Movable Zone type uses
+   (`renderZonePanel`, `<score-zone>`) - must be draggable across its
+   FULL visual width, the same for every zone regardless of its own
+   layout mode. Without this, `.zone`'s default `display: block` happens
+   to stretch a block child to full width for free, but `.seat-zone`'s
+   `display: flex; align-items: flex-start` (needed so the zone itself
+   sizes to its widest child, the hand row) shrinks EVERY flex child,
+   heading included, to its own content width instead - only the
+   player's name text was actually draggable, not the visible bar beside
+   it. `width: 100%` covers the block case, `align-self: stretch`
+   overrides `align-items: flex-start` for the flex case - one rule on
+   the one shared class, not a per-zone-type fix. */
+.panel-title {
+  width: 100%;
+  align-self: stretch;
+}
+
 /* *nit (2026-08-26): rename affordance - a dashed underline hints
    "double-click me" the way a text input's own affordance normally
    would, without needing a visible pencil icon competing with the

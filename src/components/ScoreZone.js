@@ -35,11 +35,11 @@ export class ScoreZoneElement extends HTMLElement {
     // separately, same as every other zone - this only owns the class
     // every zone panel needs at rest.
     this.classList.add('zone');
-    this._render();
+    this.#render();
   }
 
   attributeChangedCallback() {
-    if (this.isConnected) this._render();
+    if (this.isConnected) this.#render();
   }
 
   get score() {
@@ -77,7 +77,7 @@ export class ScoreZoneElement extends HTMLElement {
   // `pileActions.js`) every other pile/zone heading uses, instead of a
   // bespoke hand-built header. `panel-title` is still the heading class
   // (`wirePanelLayout` still wires resize/starting-position off it).
-  _render() {
+  #render() {
     this.replaceChildren();
 
     const heading = document.createElement('header-actions');
