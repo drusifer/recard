@@ -36,7 +36,7 @@ function watchConsole(page, label) {
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(`[${label}] ${message.text()}`);
   });
-  page.on('pageerror', (error) => errors.push(`[${label}] pageerror: ${error.message}`));
+  page.on('pageerror', (error) => { errors.push(`[${label}] pageerror: ${error.message}`); });
 }
 
 function assert(condition, message) {
@@ -811,8 +811,9 @@ try {
       source.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer }));
       zone.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer, ...point }));
       const target = zone.querySelector(`.middle-card[data-card-id="${CSS.escape(targetId)}"]`);
-      const hint = target.classList.contains('drop-onto') ? 'onto'
-        : (target.classList.contains('drop-before') ? 'before' : null);
+      let hint = null;
+      if (target.classList.contains('drop-onto')) hint = 'onto';
+      else if (target.classList.contains('drop-before')) hint = 'before';
       zone.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer, ...point }));
       return hint;
     }, { dragId, targetId, where });
@@ -1052,15 +1053,17 @@ try {
   // without asserting away a budget conflict neither this sprint (pile-
   // anchor UI, not ring/pot geometry) nor a `--table-min-h` tweak can
   // actually resolve.
-  const potOverlapAt = (width) => host.setViewportSize({ width, height: 1000 }).then(() =>
-    host.evaluate(() => {
+  const potOverlapAt = async (width) => {
+    await host.setViewportSize({ width, height: 1000 });
+    return host.evaluate(() => {
       const pot = document.querySelector('#table-area').getBoundingClientRect();
-      const intersects = (r) =>
+      const isIntersecting = (r) =>
         r.left < pot.right && r.right > pot.left && r.top < pot.bottom && r.bottom > pot.top;
       return [...document.querySelectorAll('#seat-zones .seat-zone')]
-        .filter((element) => intersects(element.getBoundingClientRect()))
+        .filter((element) => isIntersecting(element.getBoundingClientRect()))
         .map((element) => element.textContent.trim().slice(0, 24));
-    }));
+    });
+  };
 
   for (const width of [1024, 1440, 1920]) {
     const overlapping = await potOverlapAt(width);
@@ -1085,7 +1088,7 @@ try {
       .map((z) => ({
         name: z.querySelector('.zone-name').textContent,
         cards: z.querySelectorAll('.middle-card').length,
-        anyFaceUp: [...z.querySelectorAll('.middle-card .card')].some((c) => !c.classList.contains('card-back')),
+        anyFaceUp: [...z.querySelectorAll(':scope .middle-card .card')].some((c) => !c.classList.contains('card-back')),
       })));
   assert(pileState.length === 3, `Split must create exactly 3 piles, got ${pileState.length}`);
   assert(pileState.every((p) => p.cards > 0), `every pile gets cards, got ${JSON.stringify(pileState)}`);
@@ -1101,11 +1104,13 @@ try {
   // Measure the room *available*, not the rendered width - the pot is
   // shrink-to-fit, and stacking deliberately makes the same cards
   // narrower, so rendered width would move for reasons unrelated to D24.
-  const potRoomAt = (width) => host.setViewportSize({ width, height: 1000 }).then(() =>
-    host.evaluate(() => {
+  const potRoomAt = async (width) => {
+    await host.setViewportSize({ width, height: 1000 });
+    return host.evaluate(() => {
       const cs = getComputedStyle(document.querySelector('#table-area'));
       return { w: Number.parseFloat(cs.maxWidth), zone: Number.parseFloat(getComputedStyle(document.querySelector('#seat-zones .seat-zone')).maxWidth) };
-    }));
+    });
+  };
   const roomNarrow = await potRoomAt(900);
   const roomWide = await potRoomAt(1440);
   assert(roomWide.w >= roomNarrow.w * 1.75 && roomWide.zone > roomNarrow.zone,

@@ -29,7 +29,7 @@
  * @param {{left:number,right:number,top:number,bottom:number}} a
  * @param {{left:number,right:number,top:number,bottom:number}} b
  */
-export function rectsOverlap(a, b) {
+export function isOverlapping(a, b) {
   return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
 }
 
@@ -39,7 +39,7 @@ export function rectsOverlap(a, b) {
  * @param {{left:number,right:number,top:number,bottom:number}} rect
  * @param {{width:number,height:number}} viewport
  */
-export function fitsViewport(rect, viewport) {
+export function isWithinViewport(rect, viewport) {
   return rect.top >= 0 && rect.left >= 0 && rect.bottom <= viewport.height && rect.right <= viewport.width;
 }
 
@@ -51,7 +51,7 @@ export function fitsViewport(rect, viewport) {
  * @param {{width:number,height:number}} rect
  * @param {number} [min]
  */
-export function meetsMinTouchTarget(rect, min = 44) {
+export function hasMinTouchTarget(rect, min = 44) {
   return rect.width >= min && rect.height >= min;
 }
 
@@ -79,7 +79,7 @@ export function findOverlaps(entries) {
   const collisions = [];
   for (let index = 0; index < entries.length; index++) {
     for (let index_ = index + 1; index_ < entries.length; index_++) {
-      if (rectsOverlap(entries[index].rect, entries[index_].rect)) {
+      if (isOverlapping(entries[index].rect, entries[index_].rect)) {
         collisions.push({ a: entries[index].label, b: entries[index_].label });
       }
     }

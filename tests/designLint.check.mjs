@@ -23,7 +23,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { rectsOverlap, fitsViewport, meetsMinTouchTarget, pageOverflow } from './designLint.mjs';
+import { isOverlapping, isWithinViewport, hasMinTouchTarget, pageOverflow } from './designLint.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const PORT = 8211;
@@ -73,7 +73,7 @@ const VIEWPORTS = [
 ];
 
 const violations = [];
-const report = (viewport, message) => violations.push(`[${viewport}] ${message}`);
+const report = (viewport, message) => { violations.push(`[${viewport}] ${message}`); };
 
 const browser = await launchChromium();
 try {
@@ -216,7 +216,7 @@ try {
     // Check 2: every hand stays visible without scrolling - the user's
     // literal ask ("see the table and my cards at the same time").
     for (const rect of g.handRects) {
-      if (!fitsViewport(rect, { width: vp.width, height: vp.height })) {
+      if (!isWithinViewport(rect, { width: vp.width, height: vp.height })) {
         report(vp.name, 'a hand is not fully visible without scrolling');
         break;
       }
@@ -226,7 +226,7 @@ try {
     // invariant, generalized to every zone pair instead of just seat-vs-pot.
     for (let index = 0; index < g.zones.length; index++) {
       for (let index_ = index + 1; index_ < g.zones.length; index_++) {
-        if (rectsOverlap(g.zones[index].rect, g.zones[index_].rect)) {
+        if (isOverlapping(g.zones[index].rect, g.zones[index_].rect)) {
           report(vp.name, `zone "${g.zones[index].label}" overlaps zone "${g.zones[index_].label}"`);
         }
       }
@@ -234,7 +234,7 @@ try {
 
     // Check 4: every visible button clears the 44px touch-target floor.
     for (const button of g.buttons) {
-      if (!meetsMinTouchTarget(button.rect)) {
+      if (!hasMinTouchTarget(button.rect)) {
         report(vp.name, `button "${button.label}" is ${Math.round(button.rect.width)}x${Math.round(button.rect.height)}px, under the 44px floor`);
       }
     }

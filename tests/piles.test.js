@@ -26,9 +26,9 @@ test('the registry exposes exactly the seven pile kinds', () => {
 });
 
 test('every concrete pile class extends Pile', () => {
-  for (const kind of Object.keys(PILE_TYPES)) {
-    if (PILE_TYPES[kind] === Pile) continue;
-    assert.ok(PILE_TYPES[kind].prototype instanceof Pile || PILE_TYPES[kind] === Pile,
+  for (const [kind, pileClass] of Object.entries(PILE_TYPES)) {
+    if (pileClass === Pile) continue;
+    assert.ok(pileClass.prototype instanceof Pile || pileClass === Pile,
       `${kind} should be a real subclass of Pile`);
   }
 });

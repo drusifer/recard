@@ -115,9 +115,10 @@ function mulberry32(seed) {
   let a = seed;
   return function rng() {
     a = Math.trunc(a);
+    // eslint-disable-next-line unicorn/prefer-math-trunc -- this `| 0` is the mulberry32 algorithm's 32-bit signed overflow wraparound, not decimal truncation; Math.trunc doesn't wrap and would change the sequence.
     a = (a + 0x6D_2B_79_F5) | 0;
     let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
     return ((t ^ (t >>> 14)) >>> 0) / 4_294_967_296;
   };
 }

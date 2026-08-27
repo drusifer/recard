@@ -4,10 +4,9 @@ import { createInitialState, reduce, viewFor, deckOf, handOf, handsOf, zonesOf, 
 import { PILE_TYPES } from '../src/piles/pileTypes.js';
 
 function withPlayers(state, ids) {
-  return ids.reduce(
-    (s, id) => reduce(s, { type: 'JOIN', playerId: id, name: id }),
-    state,
-  );
+  let s = state;
+  for (const id of ids) s = reduce(s, { type: 'JOIN', playerId: id, name: id });
+  return s;
 }
 
 // UX follow-up: deckPile.tableSide is true now, so zonesOf() (every

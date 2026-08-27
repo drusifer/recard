@@ -64,7 +64,7 @@ test('the nearer card wins when two are in range (no ambiguous double-claim)', (
   // Exactly between A's right (40) and B's left (50) -> tie broken
   // deterministically rather than depending on iteration order.
   const first = resolveDropTarget(ROW, { x: 44, y: 30 });
-  const second = resolveDropTarget([...ROW].reverse(), { x: 44, y: 30 });
+  const second = resolveDropTarget(ROW.toReversed(), { x: 44, y: 30 });
   assert.deepEqual(first, second, 'the result must not depend on the order cards are supplied in');
 });
 

@@ -138,6 +138,13 @@ export default [
       // behavior or readability benefit here; same rationale as this
       // block's other test-only relaxations above.
       'unicorn/no-await-expression-member': 'off',
+      // `getComputedStyle(...).maxWidth` etc. return CSS strings with a
+      // unit suffix ("993.46px") - Number.parseFloat correctly extracts
+      // the numeric prefix and ignores the rest; Number() would return
+      // NaN on the trailing "px" instead. Real semantic difference, not
+      // interchangeable here (same class of near-miss as the passed/
+      // Object.hasOwn case in src/ui.js - caught before applying it).
+      'unicorn/prefer-number-coercion': 'off',
     },
   },
   {
@@ -148,6 +155,18 @@ export default [
       // Component, not an incidental side effect. No alternative
       // pattern exists that isn't strictly worse.
       'unicorn/no-top-level-side-effects': 'off',
+    },
+  },
+  {
+    files: ['tests/designLint.check.mjs'],
+    rules: {
+      // This IS the CLI entry point the rule's own message asks for -
+      // `npm run lint:design` invokes it directly expecting a clean
+      // nonzero exit on failure. Throwing instead would print a raw
+      // stack trace rather than the tool's own formatted violation
+      // list, worse UX for exactly the audience (someone running the
+      // lint) this script exists for.
+      'unicorn/no-process-exit': 'off',
     },
   },
   {
