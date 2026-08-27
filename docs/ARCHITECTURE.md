@@ -3195,3 +3195,45 @@ Zone's heading sets an arbitrary pixel position (`panel-moved` class,
 real `left`/`top`); Pile drag/ungroup/reparent all independently
 re-verified unaffected; zero zone nesting confirmed by walking the
 actual DOM tree.
+
+---
+
+### D58. ESLint adopted (flat config, `eslint.config.js`) with `unicorn` + `sonarjs` for the tech-debt sprint (US-64..68)
+
+**Decision:** add `eslint` + `eslint-plugin-unicorn` + `eslint-plugin-sonarjs`
+as devDependencies. `eslint.config.js` (flat config, ESM, Node 24 target)
+applies `eslint:recommended` + `unicorn/recommended` + `sonarjs/recommended`
+to `src/**/*.js`, `tools/**/*.js`, and `tests/**/*.js` (test files get the
+same rules minus a couple of stylistic unicorn rules that fight test-file
+idioms — decided case by case while wiring the config, not blanket-disabled
+up front). `npm run lint` gains a `lint:js` step alongside the existing
+`lint:style`/`lint:design`.
+
+**Why these two plugins over alternatives:**
+- `eslint:recommended` alone only catches syntax-level mistakes (undefined
+  vars, unreachable code) — it has nothing to say about duplication or
+  code smell, which is the actual ask.
+- `unicorn` catches a broad set of modern-JS best-practice issues (dead
+  branches, redundant patterns, prefer-modern-API) with a mature
+  `recommended` preset — chosen over hand-picking individual rules because
+  the ask was "powerful lints," not a minimal set.
+- `sonarjs` specifically targets duplication and cognitive complexity
+  (`no-identical-functions`, `no-duplicate-string`, `cognitive-complexity`)
+  — the most direct mechanical proxy available for "keep it DRY" and "bad
+  code smell" from the sprint's own framing.
+- Rejected `eslint-plugin-import`'s cross-module unused-export detection:
+  it requires a resolver config prone to false positives on this project's
+  mixed `src/`-relative + dynamic-import layout, and US-66 (dead code)
+  is already scoped as a manual grep-audit deliverable, not a lint rule —
+  no reason to fight a flaky plugin for something already covered.
+
+**Non-negotiable per US-65's AC:** zero `eslint-disable` comments added
+just to make the initial run pass. A finding either gets fixed, or — if
+fixing it would change observable behavior — gets flagged back to
+Morpheus rather than fixed-under-pressure or suppressed. Real, load-
+bearing disables (e.g. a rule that's simply wrong for one specific line)
+require a comment explaining why, same standard as any other lint
+suppression.
+
+**Verified:** none yet — architecture-only decision, no code written.
+Phase Bloop starts fresh against this config.

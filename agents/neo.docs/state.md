@@ -2617,3 +2617,60 @@ zero console errors throughout.
 @Trin: UAT. This changes real interaction model (new drag gestures) -
 per the `*impl` bloop chain, Smith's UX gate applies after Trin/
 Morpheus, not skippable as internal-only.
+
+## Session close-out (2026-08-26, prep for context clear)
+
+Everything in this session is DONE, committed, and pushed - no
+in-progress work to resume.
+
+### What shipped, in order
+1. D56: Pile/Zone real class hierarchies (replaces flat per-kind
+   modules), reviewed + approved.
+2. D57: piles/zones/cards all Movable via drag-and-drop (pile
+   reparent/reorder, card-drop-spawns-pile).
+3. A chain of direct user corrections on WHAT "Movable" means per
+   entity type, each one real and each one applied:
+   - "cards are Movable not Actionable" -> deleted the card hover-
+     popup entirely, rotate now a direct tap (matches reveal's pattern).
+   - "Piles are not Resizable" -> fixed a real CSS bug (piles were
+     flex-growing past their content size).
+   - "All Movables can be drag/drop... relocated within their zone" ->
+     universal pile drag + new REORDER_PILE.
+   - "zone Movable broke... Zones can be moved anywhere on the table"
+     -> RESTORED `attachPanelDrag`/pointer-based free positioning for
+     Zone headings specifically (a same-day over-correction had
+     deleted it entirely) - Zones need continuous free placement,
+     Piles need discrete native-drag reparent/reorder; never the same
+     mechanism, despite both being "Movable."
+4. Independent real bugs found+fixed along the way (not the asks
+   themselves): MOVE_PILE never read D56's own `reparentable` flag;
+   Copy-code button claimed success even when clipboard was
+   unavailable (real root cause: this app's own README has guests open
+   it via LAN IP over plain http, not a secure context); a resize
+   `flex-grow` specificity bug that made panels un-shrinkable.
+
+### Current state
+- `main` is at `da3679f` (pushed). Working tree clean, nothing
+  uncommitted.
+- 358/358 unit tests green, `lint:style` clean, `lint:design` at its
+  known pre-existing 5-violation baseline (Table Zone vs Bob/Score
+  overlap at packed desktop widths - open item, not touched this
+  session).
+- `tests/e2e.smoke.mjs` was NOT run this session (frugal-e2e standing
+  preference) - still the known-stale suite from the D54-era DOM
+  flattening, needs its own dedicated update pass whenever picked up.
+
+### Next Steps (nothing urgent, no active task)
+Open items, none blocking, in `docs/USER_STORIES.md` backlog:
+- ScoreZone-as-a-real-Zone (D56/D57 both deliberately left this
+  unwired - folding score into replicated state is a real feature, not
+  a refactor).
+- "Drop here to ungroup" (pile drag onto open table space) has no
+  visual affordance during the drag - functional, just not
+  "equally-visible" per its own AC.
+- Per-seat anchor geometry / Table Zone vs seat overlap (the disclosed
+  lint:design baseline).
+
+On resume cold: read this file's own history above for the full
+reasoning trail on any of the above; `docs/ARCHITECTURE.md` D56/D57
+have the durable design record.

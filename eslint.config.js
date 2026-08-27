@@ -1,0 +1,78 @@
+import js from '@eslint/js';
+import unicorn from 'eslint-plugin-unicorn';
+import sonarjs from 'eslint-plugin-sonarjs';
+
+export default [
+  {
+    ignores: ['node_modules/**', 'build/**'],
+  },
+  js.configs.recommended,
+  unicorn.configs['flat/recommended'],
+  sonarjs.configs.recommended,
+  {
+    rules: {
+      // Project convention: one class per file, filename matches the
+      // class name in PascalCase (Pile.js, HandPile.js, Zone.js...) -
+      // a standard, deliberate pattern, not smell. Fighting it for
+      // kebab-case would rename ~15 files and every import site for
+      // zero substantive benefit.
+      'unicorn/filename-case': 'off',
+    },
+  },
+  {
+    languageOptions: {
+      ecmaVersion: 2024,
+      sourceType: 'module',
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        navigator: 'readonly',
+        console: 'readonly',
+        fetch: 'readonly',
+        localStorage: 'readonly',
+        customElements: 'readonly',
+        HTMLElement: 'readonly',
+        CustomEvent: 'readonly',
+        DragEvent: 'readonly',
+        Event: 'readonly',
+        MouseEvent: 'readonly',
+        PointerEvent: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        requestAnimationFrame: 'readonly',
+        structuredClone: 'readonly',
+        crypto: 'readonly',
+        performance: 'readonly',
+        CSS: 'readonly',
+        URLSearchParams: 'readonly',
+      },
+    },
+  },
+  {
+    files: ['tools/**/*.mjs', 'tests/**/*.mjs', 'tests/**/*.js'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+        Buffer: 'readonly',
+        __dirname: 'readonly',
+        __filename: 'readonly',
+        // Playwright's page.evaluate() callbacks run in a real browser,
+        // even though this file itself executes under Node.
+        DataTransfer: 'readonly',
+        getComputedStyle: 'readonly',
+      },
+    },
+  },
+  {
+    files: ['tests/**/*.js', 'tests/**/*.mjs'],
+    rules: {
+      // Test files legitimately use long, explicit assertion chains
+      // and duplicated setup across cases - readability over DRY there.
+      'sonarjs/no-duplicate-string': 'off',
+      'sonarjs/cognitive-complexity': 'off',
+      'unicorn/consistent-function-scoping': 'off',
+    },
+  },
+];

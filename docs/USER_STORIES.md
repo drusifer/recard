@@ -2343,3 +2343,79 @@ Two real findings, one fixed on the spot, one filed:
    container) - not something to guess at blind. Functional, not
    fully meeting its own AC's visibility bar - real UX debt, not a
    blocker for the feature working.
+
+---
+
+## Sprint: Tech Debt — lints, dead code, DRY (2026-08-26)
+
+Owner: Cypher. Engineering-driven sprint, not user-facing — Smith Gate 1
+scoped to "does this change any observable behavior" rather than HCI
+heuristics. No JS linter exists today (only `stylelint` for CSS + the
+custom `tests/designLint.check.mjs`); this is the real gap driving US-64.
+
+### US-64: Adopt a real JS linter
+**As** the dev team, **I want** a strict, modern ESLint config wired into
+`npm run lint`, **so that** code-smell/dead-code/duplication issues are
+caught mechanically instead of only by eyeball review.
+**AC:**
+- ESLint (flat config, `eslint.config.js`) added as a devDependency, npm
+  script `lint:js` (or folded into existing `npm run lint`).
+- Config uses `eslint:recommended` plus a meaningfully stricter layer
+  (e.g. `unicorn` and/or `sonarjs`-style rules) capable of flagging dead
+  code, unused exports, and duplicate logic — not just syntax errors.
+- Config targets `src/**/*.js` (and `tools/`, `tests/` if it makes sense)
+  under Node 24 ESM.
+- Zero config exceptions/`eslint-disable` added purely to make the
+  initial run pass — real findings get fixed (US-65), not suppressed.
+
+### US-65: Fix all lint findings
+**As** the dev team, **I want** `npm run lint` fully clean, **so that**
+the new linter is a real gate, not aspirational.
+**AC:**
+- Every finding from US-64's config is resolved (fixed, not disabled)
+  across `src/`.
+- Zero behavior change: `npm test` (unit) and `npm run test:e2e` stay
+  green throughout, byte-identical `viewFor`/wire-format behavior.
+- Any finding that would require a genuine behavior change to fix is
+  flagged for Morpheus rather than silently changed or silently
+  suppressed.
+
+### US-66: Cut dead code
+**As** the dev team, **I want** unused exports/functions/files removed,
+**so that** the codebase only contains code that's actually reachable.
+**AC:**
+- Grep/reference-audit every exported symbol in `src/`; delete anything
+  with zero callers (confirmed, not guessed).
+- No backward-compat aliases or re-exports kept "just in case" — full
+  deletion, per standing project convention (no backward-compat shims).
+- `npm test` / `npm run test:e2e` green after each deletion batch.
+
+### US-67: Cut dead/superseded tests
+**As** the dev team, **I want** the test suite to only contain tests that
+exercise real, current behavior, **so that** test maintenance cost
+matches actual coverage value.
+**AC:**
+- Identify tests superseded by later phases (e.g. asserting removed
+  mechanisms — REORDER_ZONE, old panel-drag, etc. per recent CHAT.md
+  history) or testing code deleted in US-66.
+- Delete them outright — no skip/`.todo` left behind.
+- Full suite still green; no net loss of coverage for code that's still
+  live (confirmed by checking what each deleted test actually covered
+  before deleting).
+
+### US-68: DRY pass on flagged duplication
+**As** the dev team, **I want** duplication the linter/manual review
+surfaces to be consolidated, **so that** the codebase doesn't carry
+multiple copies of the same logic to drift out of sync.
+**AC:**
+- Address duplication flagged by US-64's config (or found during US-65/66
+  review) by extracting a shared helper/module — matching the project's
+  existing pattern (e.g. `renderZonePanel`, `makeZone`, `dealCards`).
+- No new abstraction introduced for hypothetical future reuse — only
+  consolidate duplication that's real and already present.
+- `npm test` / `npm run test:e2e` green, zero behavior change.
+
+**Out of scope:** any refactor that changes user-visible behavior, wire
+format, or introduces new features. This sprint is purely internal
+quality — if a lint finding can only be "fixed" by changing behavior,
+it's flagged for Morpheus/Cypher, not silently done.

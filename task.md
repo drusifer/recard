@@ -1278,3 +1278,48 @@ they build, so it gets its own pure/UI pair rather than folding into 70.
       `tests/e2e.smoke.mjs` selectors — otherwise note explicitly why
       not re-run, matching this project's own "frugal e2e" standing
       preference) + `lint:design`.
+
+---
+
+## Sprint: Tech Debt — lints, dead code, DRY (US-64..68, D58)
+
+### Phase 74 — ESLint wired in (US-64)
+- [ ] `eslint` + `eslint-plugin-unicorn` + `eslint-plugin-sonarjs`
+      installed. `eslint.config.js` (flat config) per D58: `unicorn/
+      recommended` + `sonarjs/recommended` over `src/**/*.js`,
+      `tools/**/*.js`, `tests/**/*.js` (test-file rule relaxations
+      decided case by case, not blanket). `npm run lint` gains
+      `lint:js`.
+- [ ] Run it once, capture the raw finding count/breakdown (no fixes
+      yet) — this determines how Phase 75 gets split, so don't guess
+      the split before seeing real output.
+
+### Phase 75+ — fix all lint findings (US-65)
+- [ ] Fix every finding from Phase 74's baseline. Split into
+      Phase 75a/75b/... by directory or rule category if the baseline
+      is large (mouse note: re-plan the exact split once Phase 74's
+      count is known — do not pre-commit to a phase count here).
+- [ ] Zero `eslint-disable` added to silence a finding rather than fix
+      it. A finding needing real behavior change is flagged to
+      Morpheus, not fixed-under-pressure or suppressed (D58).
+- [ ] `npm test` + `npm run test:e2e` green after each batch.
+
+### Phase 76 — cut dead code (US-66)
+- [ ] Grep/reference-audit every exported symbol in `src/`; delete
+      confirmed-zero-caller code. No back-compat aliases kept.
+- [ ] `npm test` / `npm run test:e2e` green after each deletion batch.
+
+### Phase 77 — cut dead/superseded tests (US-67)
+- [ ] Identify tests for removed mechanisms (e.g. old `REORDER_ZONE`,
+      pre-restoration panel-drag, anything testing code deleted in
+      Phase 76) or otherwise superseded by later phases. Delete
+      outright, no skip/`.todo`.
+- [ ] Confirm no net loss of coverage for code that's still live.
+
+### Phase 78 — DRY pass + final regression (US-68)
+- [ ] Consolidate duplication flagged by the linter or found during
+      Phases 75-77 review into shared helpers, matching existing
+      patterns (`renderZonePanel`, `makeZone`, `dealCards`). No
+      speculative new abstractions.
+- [ ] Full regression: `npm test`, `npm run test:e2e`, `npm run lint`
+      (style + design + js) all green. Sprint-close groom next.

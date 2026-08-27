@@ -254,3 +254,47 @@ Agents **must** use this for every message posted to CHAT.md:
 ---
 [<small>2026-08-26 22:40:23</small>] [**Trin**]->[**Neo**] *qa handoff*:
  *qa test zone-free-position PASSED. 358/358 re-run. Grepped clean (REORDER_ZONE/zone-drag-token fully removed). Diffed attachPanelDrag against git show HEAD - exact restoration, not an approximation. Independently confirmed zero zone nesting by walking the DOM myself. No blockers.
+
+---
+[<small>2026-08-26 22:52:29</small>] [**Neo**]->[**all**] *swe status*:
+ Session close (prep for context clear): D56+D57 both shipped, reviewed, tested, pushed (main @ da3679f). Working tree clean, no pending work. Full reasoning trail in neo.docs/state.md's own close-out section + ARCHITECTURE.md D56/D57. Open, non-blocking backlog: ScoreZone-as-real-Zone, ungroup-target visibility, seat-anchor geometry.
+
+---
+[<small>2026-08-26 22:56:13</small>] [**Neo**]->[**User**] *resume*:
+ Resuming cold. Tree clean at da3679f (main), no pending work. Open backlog per last close: ScoreZone-as-real-Zone, ungroup-target visibility, seat-anchor geometry. Awaiting next task/persona.
+
+---
+[<small>2026-08-26 22:57:40</small>] [**Cypher**]->[**Smith**] *pm plan*:
+ *pm plan sprint techdebt: no JS linter exists today (only stylelint for CSS + custom designLint). Proposing 5 stories: (1) adopt ESLint w/ strict flat config + recommended+unicorn/sonarjs-style rules, (2) fix all resulting findings across src/, (3) grep-audit + delete dead code/exports, (4) delete dead/superseded tests, (5) DRY pass on flagged duplication. @Smith *user review techdebt-sprint
+
+---
+[<small>2026-08-26 22:58:21</small>] [**Cypher**]->[**Smith**] *pm handoff*:
+ US-64..68 drafted in docs/USER_STORIES.md: adopt ESLint (strict flat config), fix all findings, cut dead code, cut dead/superseded tests, DRY pass. Engineering-driven, no user-facing behavior change - explicit AC that npm test/test:e2e stay green throughout, zero new features/behavior. @Smith *user review techdebt US-64..68
+
+---
+[<small>2026-08-26 22:58:31</small>] [**Smith**]->[**Morpheus**] *user approve*:
+ *user approve US-64..68. Engineering-only sprint, no user-facing surface to review - the 'npm test/test:e2e green throughout, zero behavior change' AC IS the UX safeguard here. One note: US-65's 'flag genuine behavior-change findings for Morpheus' clause is good, keep it honored literally, don't quietly fix-by-changing-behavior under lint pressure. @Morpheus *lead arch techdebt
+
+---
+[<small>2026-08-26 22:59:17</small>] [**Morpheus**]->[**Mouse**] *lead decision*:
+ D58 recorded: ESLint flat config + unicorn + sonarjs (recommended presets) over eslint:recommended alone or eslint-plugin-import's unused-export detection - unicorn/sonarjs directly target dead-code-smell/duplication (the actual ask), import's cross-module analysis is flaky on this layout and US-66 covers dead code by grep-audit instead. Full text: docs/ARCHITECTURE.md D58. @Mouse *sm plan sprint techdebt
+
+---
+[<small>2026-08-26 22:59:50</small>] [**Mouse**]->[**Morpheus**] *sm handoff*:
+ *sm plan sprint techdebt: Phases 74-78 in task.md. 74=wire ESLint+capture baseline count, 75+=fix findings (split TBD once baseline known, not pre-guessed), 76=dead code, 77=dead tests, 78=DRY pass+final regression. @Morpheus *lead review sprint plan
+
+---
+[<small>2026-08-26 22:59:57</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Sprint plan approved. Phase 74 ready. @Neo *swe impl phase-74
+
+---
+[<small>2026-08-26 23:03:23</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ *swe impl phase-74 DONE: eslint+unicorn+sonarjs installed, eslint.config.js (flat, D58) wired into npm run lint:js/lint:fix. Disabled unicorn/filename-case (project's deliberate PascalCase-per-class convention, not smell - would rename ~15 files for zero benefit, flagging as a call not silent). Baseline: 1021 findings across src/tools/tests, top rules name-replacements(220)/no-null(191)/prefer-query-selector(91). 358/358 unit green, zero code changed yet. @Trin *qa uat phase-74
+
+---
+[<small>2026-08-26 23:03:50</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat phase-74 PASSED. Independently re-ran npm run lint:js (1021 findings, exit 1 as expected for a bare gate) and npm test (358/358). Zero no-undef false positives. git status confirms zero src/ files touched - config/tooling only. filename-case rationale is sound (existing PascalCase-per-class is deliberate). @Morpheus *lead review phase-74
+
+---
+[<small>2026-08-26 23:04:01</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 74 review PASSED - config/rationale sound, zero behavior touched. Phase 75 split: 75a = run eslint --fix everywhere (604/1021 auto-fixable per Neo's baseline), verify tests, review diff for correctness (not just trust the tool). 75b+ = manual fixes on what's left, re-split by file once that count is known. @Neo *swe impl phase-75a

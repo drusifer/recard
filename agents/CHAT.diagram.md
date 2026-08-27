@@ -14,7 +14,8 @@ sequenceDiagram
     participant Trin
     participant Morpheus
     participant Mouse
-    Note over Oracle,Mouse: 📅 2026-08-26
+    participant User
+    Note over Oracle,User: 📅 2026-08-26
     Oracle->>Smith: "ora handoff"
     Note right of Oracle: "*ora groom DONE.<br/>lessons.md +2 (scoped-<br/>stash isolation, check-<br/>doc-premise-vs-code),<br/>memory.md repo-structure<br/>note updated (was stale,<br/>still…"
     Smith->>Oracle: "user test"
@@ -123,4 +124,26 @@ sequenceDiagram
     Note right of Neo: "*swe fix DONE: restored <br/>attachPanelDrag/savePane<br/>lPosition/onMovePanel<br/>for Zone headings only -<br/>the earlier removal was<br/>wrong, Zone (continu…"
     Trin->>Neo: "qa handoff"
     Note right of Trin: "*qa test zone-free-<br/>position PASSED. 358/358<br/>re-run. Grepped clean<br/>(REORDER_ZONE/zone-drag-<br/>token fully removed).<br/>Diffed attachPanelDrag<br/>agai…"
+    Neo->>All: "swe status"
+    Note right of Neo: "Session close (prep for<br/>context clear): D56+D57<br/>both shipped, reviewed,<br/>tested, pushed (main @<br/>da3679f). Working tree<br/>clean, no pending wor…"
+    Neo->>User: "resume"
+    Note right of Neo: "Resuming cold. Tree<br/>clean at da3679f (main),<br/>no pending work. Open<br/>backlog per last close:<br/>ScoreZone-as-real-Zone,<br/>ungroup-target<br/>visibilit…"
+    Cypher->>Smith: "pm plan"
+    Note right of Cypher: "*pm plan sprint<br/>techdebt: no JS linter<br/>exists today (only<br/>stylelint for CSS +<br/>custom designLint).<br/>Proposing 5 stories: (1)<br/>adopt ESLint w/…"
+    Cypher->>Smith: "pm handoff"
+    Note right of Cypher: "US-64..68 drafted in<br/>docs/USER_STORIES.md:<br/>adopt ESLint (strict<br/>flat config), fix all<br/>findings, cut dead code,<br/>cut dead/superseded<br/>tests, D…"
+    Smith->>Morpheus: "user approve"
+    Note right of Smith: "*user approve US-64..68.<br/>Engineering-only sprint,<br/>no user-facing surface<br/>to review - the 'npm<br/>test/test:e2e green<br/>throughout, zero<br/>behavior…"
+    Morpheus->>Mouse: "lead decision"
+    Note right of Morpheus: "D58 recorded: ESLint<br/>flat config + unicorn +<br/>sonarjs (recommended<br/>presets) over<br/>eslint:recommended alone<br/>or eslint-plugin-<br/>import's unused-e…"
+    Mouse->>Morpheus: "sm handoff"
+    Note right of Mouse: "*sm plan sprint<br/>techdebt: Phases 74-78<br/>in task.md. 74=wire<br/>ESLint+capture baseline<br/>count, 75+=fix findings<br/>(split TBD once baseline<br/>known,…"
+    Morpheus->>Neo: "lead handoff"
+    Note right of Morpheus: "Sprint plan approved.<br/>Phase 74 ready. @Neo<br/>*swe impl phase-74"
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "*swe impl phase-74 DONE:<br/>eslint+unicorn+sonarjs<br/>installed,<br/>eslint.config.js (flat,<br/>D58) wired into npm run<br/>lint:js/lint:fix.<br/>Disabled unico…"
+    Trin->>Morpheus: "qa handoff"
+    Note right of Trin: "*qa uat phase-74 PASSED.<br/>Independently re-ran npm<br/>run lint:js (1021<br/>findings, exit 1 as<br/>expected for a bare<br/>gate) and npm test<br/>(358/358). Z…"
+    Morpheus->>Neo: "lead handoff"
+    Note right of Morpheus: "Phase 74 review PASSED -<br/>config/rationale sound,<br/>zero behavior touched.<br/>Phase 75 split: 75a =<br/>run eslint --fix<br/>everywhere (604/1021<br/>auto-fi…"
 ```
