@@ -40,25 +40,30 @@ one to host a table, one to join with the code/link the host shows.
 
 ```
 npm test            # unit tests (deck, state, protocol) - node:test, no framework
-npm run test:e2e     # real 2-browser Playwright smoke test over live PeerJS/WebRTC
-npm run lint         # stylelint + design-lint (below) - the merge gate
+npm run lint         # stylelint + design-lint + eslint - the merge gate
 npm run lint:style    # stylelint only, fast
 npm run lint:design   # design-lint only - renders the real app and checks
                        # for forced page scroll, overlapping zones, and
-                       # touch targets under 44px, across 6 real viewports
+                       # touch targets under 44px, across 3 real desktop
+                       # viewports
+npm run lint:js       # eslint (unicorn + sonarjs)
 ```
 
-**`lint:design` currently reports 6 known violations** (down from 70 at
-its first run, 2026-08-20) — all phone-width (390/375px) zone-overlap
-cases, disclosed and tracked rather than silently accepted; see
-`docs/ARCHITECTURE.md` D54 and `docs/USER_STORIES.md` Backlog. Wired in
-as blocking rather than left silent so the count can't quietly grow
+**`lint:design` currently reports 5 known violations** — desktop-width
+zone-overlap cases, disclosed and tracked rather than silently accepted;
+see `docs/ARCHITECTURE.md` D24 and `docs/USER_STORIES.md` Backlog. Wired
+in as blocking rather than left silent so the count can't quietly grow
 while it's unfixed.
 
-`npm run test:e2e` needs a Chromium build Playwright can launch — either
-run `npx playwright install chromium` once, or have a system Chromium/
-Chrome installed (the test falls back to `/usr/bin/chromium`,
+`npm run lint:design` needs a Chromium build Playwright can launch —
+either run `npx playwright install chromium` once, or have a system
+Chromium/Chrome installed (it falls back to `/usr/bin/chromium`,
 `/usr/bin/chromium-browser`, or `/usr/bin/google-chrome`).
+
+There is no automated end-to-end/integration test suite today (see
+"Known limitations" below) — `npm run lint:design` and manual two-tab
+testing are the two remaining automated/semi-automated checks beyond
+unit tests.
 
 ## Known limitations
 
@@ -95,14 +100,12 @@ Chrome installed (the test falls back to `/usr/bin/chromium`,
 - **Multi-touch gestures (pinch, rotate) and long-press menus do
   nothing.** Touch support covers dragging cards; it isn't a full mobile
   gesture vocabulary.
-- **Hand cards are not actually private from other players yet.** Since
-  a player's seat became a real Pile in the shared zone pipeline,
-  `handPile.redactCard` was never implemented — hand contents currently
-  reach every viewer, not just their owner. The single biggest known
-  gap as of `docs/ARCHITECTURE.md` D54; not yet fixed.
-- **`tests/e2e.smoke.mjs` is out of date** relative to the current DOM
-  (Zone/Pile split into Web Components, D54) — a dedicated update pass
-  is still open.
+- **No automated end-to-end/integration test suite exists.** The
+  previous one (`tests/e2e.smoke.mjs`) had drifted into asserting
+  against DOM containers retired by the table-unification redesign
+  (D51/D52) and was removed 2026-08-27 rather than kept as false
+  assurance — see `docs/ARCHITECTURE.md`'s Testing Strategy. Rebuilding
+  one against the current `#zones`-based DOM is open backlog.
 
 ## How it works, briefly
 

@@ -1273,11 +1273,11 @@ they build, so it gets its own pure/UI pair rather than folding into 70.
       owner/faceUp).
 
 ### Phase 73 — reserved bug-fix + full regression
-- [ ] Full regression: unit + `npm run test:e2e` (only if Phase 72
-      genuinely changed rendered zone structure enough to risk
-      `tests/e2e.smoke.mjs` selectors — otherwise note explicitly why
-      not re-run, matching this project's own "frugal e2e" standing
-      preference) + `lint:design`.
+- [ ] Full regression: unit + `lint:design`. (`npm run test:e2e` no
+      longer exists — `tests/e2e.smoke.mjs` was removed in the
+      tech-debt sprint, 2026-08-27, having drifted into asserting
+      against DOM containers retired well before Phase 72; see
+      `docs/ARCHITECTURE.md`'s Testing Strategy.)
 
 ---
 

@@ -2739,14 +2739,27 @@ mistaken for complete. Worth its own small groom-only pass.
 Pure logic (`deck.js`, `state.js`, `protocol.js`) is unit-tested with
 Node's built-in `node:test` (`npm test`) — no framework dependency needed.
 
-Full P2P flow **is** automatable (revised 2026-08-15 — originally assumed
-not to be): `tests/e2e.smoke.mjs` drives two real Playwright browser
-contexts against the actual PeerJS broker/WebRTC (`npm run test:e2e`),
-covering host/join, deal, play/draw propagation, and the host-disconnect
-banner. Playwright is a devDependency only — no runtime/build-step impact
-on the shipped static site (D1 still holds). Smith/Trin can still do
-additional manual two-tab testing for anything the smoke test doesn't
-cover (visual/UX judgment calls, not just functional correctness).
+Full P2P flow **was** automatable (revised 2026-08-15 — originally
+assumed not to be): `tests/e2e.smoke.mjs` drove two real Playwright
+browser contexts against the actual PeerJS broker/WebRTC, covering
+host/join, deal, play/draw propagation, and the host-disconnect banner.
+**Removed 2026-08-27 (tech-debt sprint, US-67)**: the file had drifted
+into a single ~1700-line monolithic script (no discrete `test()` cases)
+asserting against `#hand-area`/`#table-area`/`#seat-zones` — DOM
+containers retired by the D51/D52 table-unification redesign and never
+present in the current markup at all. Being sequential, everything past
+its first failure had gone unexercised for an unknown but long stretch
+despite repeated "e2e green" claims in the project history — a real
+process gap (this drift went undetected), not just a stale file. No
+automated integration/E2E coverage exists today; rebuilding one against
+the current `#zones`-based DOM is open backlog, not attempted as part of
+this cleanup (a full re-authoring project, not a dead-test deletion).
+`npm run lint:design` (`tests/designLint.check.mjs`) still gives a fast,
+narrower automated check (layout/overlap/touch-target invariants across
+real viewports) using the same real-browser approach. Playwright remains
+a devDependency for that script. Smith/Trin should lean more on manual
+two-tab testing for functional correctness until a real E2E suite exists
+again.
 
 ## UI Conventions
 - **Interactive elements are ≥44×44px** (iOS HIG / Material minimum),

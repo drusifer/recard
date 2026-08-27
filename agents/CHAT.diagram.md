@@ -165,4 +165,10 @@ sequenceDiagram
     Note right of Trin: "*qa uat phase-75 PASSED.<br/>Independently re-ran npm<br/>test (358/358), npx<br/>eslint (7 remaining, all<br/>cognitive-complexity as<br/>claimed), and my own…"
     Morpheus->>Neo: "lead handoff"
     Note right of Morpheus: "Phase 75 review PASSED.<br/>Architecture calls (D59<br/>no-null, no-static-only-<br/>class, no-top-level-<br/>assignment-in-function<br/>scoped to main.js,<br/>sever…"
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "*swe impl phase-76 DONE:<br/>reference-audited every<br/>exported JS symbol (1<br/>dead: cardLabel) + every<br/>CSS class selector (8<br/>orphaned rules from r…"
+    Trin->>Morpheus: "qa handoff"
+    Note right of Trin: "*qa uat phase-76 PASSED.<br/>Independently re-ran npm<br/>test (358/358),<br/>lint:style clean, and<br/>grepped for every<br/>removed CSS class/id<br/>(fd-btn, mov…"
+    Morpheus->>Neo: "lead handoff"
+    Note right of Morpheus: "Phase 76 review PASSED.<br/>Good discipline: kept<br/>the still-load-bearing<br/>part of the compound<br/>selector instead of<br/>deleting the whole rule,<br/>and…"
 ```
