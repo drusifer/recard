@@ -797,3 +797,43 @@ approximation. Reviewed the "no zone nesting" claim myself by walking
 the live DOM tree for any `.zone` containing another `.zone` - none,
 confirmed `attachPanelDrag` only ever sets CSS position, never
 reparents nodes. No blockers.
+
+## *fix: zone-drop-gutter (permissive PlayerZone/OpponentZone pile creation) (2026-08-27) - PASSED
+
+Reviewed Neo's diff (`ui.js` `renderZonePanel`, `style.css`
+`.zone-drop-gutter`) directly rather than trusting the handoff summary.
+Grepped every existing DOM query that could plausibly catch the new
+`<div class="zone-drop-gutter">` as something it isn't
+(`.pile-section[data-zone-id]`, `[data-card-id="..."]`,
+`.middle-card`) - all are specific-selector lookups, none index
+`.zone-body`'s children positionally, so the gutter is inert to every
+other code path. Confirmed `onDropCardOnZone` (`main.js`) is wired
+identically for every zone regardless of `ownerId`/viewer relation -
+no special-casing needed for "opponent" to work, by construction.
+Re-ran `npm test` (358/358) and `npm run lint` myself rather than
+trusting Neo's numbers - identical baseline (7 cognitive-complexity, 5
+design-overlap, both pre-existing and unrelated). No DOM/e2e harness
+exists to assert the actual drag/drop end-to-end (D60 backlog) - did
+NOT fabricate coverage for that gap; instead reviewed Neo's live
+Playwright geometry fixture methodology (real `boundingBox()`
+measurements against the real `style.css`, not a synthetic assertion)
+and judged it sound. No blockers. Handed to Morpheus for review.
+
+## *impl: consolidated ScoreZone (2026-08-27) - PASSED
+
+Independently re-ran everything rather than trusting Neo's numbers:
+362/362 unit tests, `npm run lint:js`/`lint:style`/`lint:design` -
+identical to what was reported (7 pre-existing complexity findings, 3
+pre-existing Table-Zone/Bob overlaps only, down from the 5-violation
+baseline this same session started with). Reviewed the reducer diff
+(`ADJUST_SCORE` widened, new `SET_SCORE`) against `state.test.js`'s
+new cases - guard logic matches what's tested, no untested branch.
+Checked `SET_SCORE`'s guest→host relay path specifically (`main.js`'s
+`session.on('data', ...)` dispatches any `msg.action.type` generically
+through `dispatch()`/`reduce()`'s table) - no special-case wiring
+needed, confirmed by reading, not assumed. Ran my own live check (not
+just re-running Neo's): had the GUEST adjust the HOST's own score via
+the -10 button, confirmed it synced correctly in both directions -
+"anyone may adjust anyone's score" is real, not just a comment.
+Re-verified the blank-input-reverts-not-zeroes fix live myself. No
+blockers. Handed to Morpheus for review.

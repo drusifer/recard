@@ -1060,14 +1060,55 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    `<score-zone>` Web Component now (`src/components/ScoreZone.js`,
    `main.js`), not a nested pseudo-zone inside the own-panel, so it
    picks up `.zone`'s own border/padding/background for free instead of
-   duplicating them here. Name/connection folded into the own-panel's
-   existing heading text (`ui.js`'s `buildOwnPanel`) - no separate info
-   column left either. */
-.score-value {
-  font-size: 1.4rem;
-  font-weight: 700;
+   duplicating them here.
+   *nit (2026-08-27), direct user request ("save space"): ONE panel now
+   lists every seated player - `.score-value`'s single centered number
+   is gone with the one-panel-per-player design; `.score-rows`/
+   `.score-zone-row` (below) is what replaced it. */
+.score-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.score-zone-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.score-row-name {
+  flex: 1 1 auto;
+  font-size: 0.85rem;
   color: var(--text);
+  /* A long name shouldn't push the +/-10 buttons off the panel's own
+     content-sized width - same "readable, not clipped" floor
+     `.zone-body > .pile-section`'s `min-width` gives a pile. */
+  min-width: 4rem;
+}
+
+/* Sized like `.pile-action-btn` (same small/square/non-44px-floor
+   control), but auto-width instead of a fixed 1.3rem square - "-10"/
+   "+10" don't fit a one-glyph icon box. Exempted from
+   `tests/designLint.check.mjs`'s 44px touch-target check for the same
+   reason `.pile-action-btn` already is (direct user request: small
+   controls sized to their content, not the touch-target floor). */
+.score-adjust-btn {
+  min-width: 0;
+  min-height: 0;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.7rem;
+  line-height: 1;
+  background: var(--surface-2);
+  border-color: var(--accent);
+  border-radius: 0.15rem;
+}
+
+.score-input {
+  width: 3.2rem;
   text-align: center;
+  font-size: 0.85rem;
+  padding: 0.1rem 0.2rem;
 }
 
 /* Visual deck stack (US-20) instead of a bare "N cards left" line.
@@ -1388,6 +1429,22 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   margin-bottom: 0;
 }
 
+/* *nit (2026-08-27), direct user request ("save space"): the
+   consolidated Score panel (`ScoreZoneElement`, every seated player's
+   row) is tall enough (one row per player) that letting it flow beside
+   the Table Zone - `#zones`'s default row behavior, above - extended
+   that row far enough right to reach into the opponent seat-zone's own
+   ring position at packed desktop widths (measured live via `npm run
+   lint:design`: a new "Bob overlaps Scores" violation that a plain
+   flow position didn't avoid). Forcing its own line, before any
+   `panel-moved` drag ever happens, keeps it clear of the ring without
+   reviving per-seat position math - real user drag (`wirePanelLayout`)
+   still overrides this the moment someone moves it, same as any other
+   panel. */
+#zones > score-zone.zone:not(.panel-moved) {
+  flex-basis: 100%;
+}
+
 /* UX follow-up (direct user request): "zone is one thing, pile is
    another - don't overload zone-panel to do everything." A Zone
    (`.zone`, `<zone-panel>`) draws its OWN box and holds one or more
@@ -1413,6 +1470,26 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .zone-body > .pile-section {
   flex: 0 1 auto;
   min-width: 11rem;
+}
+
+/* Bug fix (direct user request): reserved empty drop target so a card
+   can always be dropped beside a Zone's existing piles to spawn a new
+   one (a meld, etc.) - `ui.js`'s `renderZonePanel` appends exactly one
+   of these as `.zone-body`'s last child, always. Without it, a Zone
+   whose box shrinks to fit its content exactly (`.seat-zone`) has zero
+   pixels of empty `.zone-body` space once its one pile fills the row -
+   confirmed live, its bounding box was pixel-identical to its lone
+   pile's. Sized to one card slot (not a bigger, more visually
+   demanding target) - unobtrusive at rest, and the existing
+   `.zone.zone-drag-over` highlight (triggered on the SAME `body`
+   listener this space extends) already gives drag feedback without
+   this needing its own. */
+.zone-drop-gutter {
+  flex: 0 0 auto;
+  min-width: var(--card-w);
+  min-height: var(--card-h);
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-md);
 }
 
 /* UX follow-up (direct user request): "make zones and piles visually
@@ -1588,15 +1665,14 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    had (no new wrapper element, no JS change).
    Scoped to `.pile-title` specifically (`ui.js`'s `headingClass:
    'pile-title'`, the ONLY header actually built from `pileActions.js`)
-   rather than the shared `.pile-action-header` every header (including
-   `<score-zone>`'s own -/+ adjuster, `ScoreZone.js`) reuses for its
-   base button/label styling - a real regression, found live via
-   `npm run lint:design`: forcing every reused header onto 2 lines grew
-   the Score panel enough (~20px) to overlap its neighboring seat zone
-   at several packed desktop widths (1280x800, 1024x768, 1280x720),
-   which the pre-existing baseline (14 violations) didn't have. Score's
-   title+2-button row already fit on one line and was never what "Pile
-   Title" meant here. */
+   rather than the shared `.pile-action-header` every header reuses for
+   its base button/label styling.
+   *nit (2026-08-27): `<score-zone>` (`ScoreZone.js`) no longer renders
+   through this path at all - its 2-button title-bar adjuster (and the
+   `.score-header` variant of this same rule that briefly existed for
+   it) is gone with the one-panel-per-player design; its heading is now
+   plain text, no actions, and every player's own +/-1/+/-10 controls
+   live in that player's row instead (`.score-adjust-btn`, below). */
 .pile-title .zone-name-text {
   flex: 1 0 100%;
 }

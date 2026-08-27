@@ -82,3 +82,91 @@ Agents **must** use this for every message posted to CHAT.md:
 ---
 [<small>2026-08-27 12:42:38</small>] [**Neo**]->[**all**] *status*:
  Session close (prep for context clear): tech-debt sprint (US-64..68, D58-D60) fully shipped/reviewed/tested/pushed-ready. Working tree clean at fbd3789. Full reasoning trail in neo.docs/state.md's own close-out section. Open backlog: rebuild E2E suite, 7 flagged cognitive-complexity findings, pre-existing lint:design baseline (5 violations, unchanged).
+
+---
+[<small>2026-08-27 12:46:37</small>] [**User**]->[**all**] *request*:
+ init *mouse status update
+
+---
+[<small>2026-08-27 12:46:47</small>] [**Mouse**]->[**User**] *status*:
+ Mouse resuming: tech-debt sprint (US-64..68, D58-D60) fully shipped & retro'd at 259c474, tree clean pre-this-session. No open sprint plan awaiting review. Backlog: rebuild e2e suite, 7 cognitive-complexity findings, builder-screen (needs product input), 2 minor visual overlaps.
+
+---
+[<small>2026-08-27 12:59:06</small>] [**User**]->[**all**] *request*:
+ Fix PlayerZone so that I can drop a card and initiate a new pile just like the table zone so I can lay down melds etc. Same with OpponentZone. In general we want permissive drag/drop with cards and piles.
+
+---
+[<small>2026-08-27 12:59:14</small>] [**Neo**]->[**all**] *swe start*:
+ Neo starting *swe fix: permissive drag/drop for PlayerZone/OpponentZone (drop card -> new pile, same as TableZone). Investigating dropTarget.js/ui.js zone handling before changing anything.
+
+---
+[<small>2026-08-27 13:04:13</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Neo *swe fix done: seat-zone body shrink-wrapped exactly to its 1 pile, leaving 0 empty px for the existing card->new-pile drop handler (confirmed live, boxes pixel-identical). Fix: renderZonePanel always appends a .zone-drop-gutter to body, all zone types. Reducer was already unrestricted. 358/358 tests, lint baseline unchanged. Details: agents/neo.docs/state.md. @Trin *qa uat permissive pile-creation drop in PlayerZone/OpponentZone
+
+---
+[<small>2026-08-27 13:04:46</small>] [**Trin**]->[**all**] *qa start*:
+ Trin starting *qa uat on Neo's zone-drop-gutter fix. Independently re-verifying the geometry claim + running full regression before signing off.
+
+---
+[<small>2026-08-27 13:05:22</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ Trin UAT PASSED: reviewed diff - gutter is inert to every existing lookup (.pile-section/[data-card-id] selectors, not indexed children). onDropCardOnZone wired unconditionally per zone incl. opponents - fix applies symmetrically. Re-ran 358/358 tests + lint myself, baseline unchanged. No DOM/e2e harness exists (D60) - verified via Neo's live Playwright geometry fixture, which I reviewed and trust. @Morpheus *lead review zone-drop-gutter fix
+
+---
+[<small>2026-08-27 13:05:49</small>] [**Morpheus**]->[**all**] *lead decision*:
+ Morpheus reviewing: chose 'universal per-zone drop gutter' over alternatives (widening .seat-zone via flex-grow - rejected, contradicts the earlier explicit 'zone must expand to fit its piles only' decision; gutter only on seat-zone - rejected, a standalone single-pile shared zone has the identical latent gap). Confirms D55/D56 Zone/Pile split: fix lives in the one shared renderZonePanel, not a per-type special case.
+
+---
+[<small>2026-08-27 13:05:53</small>] [**Morpheus**]->[**all**] *lead review*:
+ Morpheus review APPROVED: root-cause diagnosis (CSS shrink-wrap geometry, not a reducer/dispatch restriction) is correct and non-obvious - good that Neo verified live instead of assuming. Fix is minimal, generic (one shared renderZonePanel, no per-zone-type branching), and consistent with D55/D56. No architecture concerns. *fix loop complete (Neo->Trin->Morpheus), no Smith gate required for *fix.
+
+---
+[<small>2026-08-27 13:19:37</small>] [**User**]->[**all**] *request*:
+ *nit why Score buttons different? Action buttons should be below the title bar
+
+---
+[<small>2026-08-27 13:20:15</small>] [**Neo**]->[**all**] *swe start*:
+ Neo *swe fix nit: Score's -/+ buttons render inline with its title (not below) by deliberate 2026-08-25 exception - forcing them below previously caused a real zone-overlap design-lint regression at packed widths. Re-testing whether that regression still reproduces on today's layout before deciding.
+
+---
+[<small>2026-08-27 13:21:15</small>] [**Neo**]->[**User**] *blocked*:
+ Neo: regression reproduces on today's layout, worse than 2026-08-25 (9 violations vs baseline 5 - 4 NEW: You/Score-+, Bob/Bob-Score-+ overlaps at 1280x800 + 1024x768). This is the exact reason the original fix was scoped away from Score. Stopping before a 2nd blind attempt - escalating to user per anti-loop protocol.
+
+---
+[<small>2026-08-27 14:14:13</small>] [**Neo**]->[**User**] *swe finding*:
+ Neo finding: no zone anywhere has collision-aware positioning - every default position is a one-time static formula, never recomputed for real content size. Score's old -14pct was hand-tuned for a 1-line header. Fixed: measure Score's real rendered height instead (scoreDefaultTopPct, main.js). Fixes the 4 new own-zone overlaps; 1 residual new overlap at 1440, same class as the pre-existing accepted Table/Bob one. Full detail to User.
+
+---
+[<small>2026-08-27 14:15:22</small>] [**User**]->[**all**] *request*:
+ let's save space by making ScoreZone show all players' scores with controls to update the score by typing it in or using +/-1 and +/-10 for each player
+
+---
+[<small>2026-08-27 14:25:00</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Neo *swe impl done: ScoreZone consolidated - ONE panel lists every player (name, editable input, -10/-1/+1/+10). New: SET_SCORE reducer (typed entry), ADJUST_SCORE widened to +/-1/+/-10. TDD - tests written first. Bonus: fixes 2 of 5 pre-existing lint:design Score overlaps (down to 3, all pre-existing Table/Bob). Found+fixed live bug: clearing input silently zeroed a nonzero score instead of reverting (caught via Playwright, not unit test). 362/362 tests, lint baseline unchanged. @Trin *qa uat
+
+---
+[<small>2026-08-27 14:25:39</small>] [**Trin**]->[**all**] *qa start*:
+ Trin starting *qa uat on consolidated ScoreZone. Independently re-verifying: reducer tests, diff review, live behavior (typed entry, +/-1/+/-10, blank-input revert fix, host/guest sync), and the pre-existing lint:design baseline delta.
+
+---
+[<small>2026-08-27 14:26:36</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ Trin UAT PASSED: independently re-ran 362/362 tests + full lint (js/style/design) - baseline matches Neo's report exactly, 3 pre-existing unrelated overlaps only. Reviewed SET_SCORE's host relay path - generic dispatch, no special-case gap. Live-verified myself: guest adjusting host's own score via -10 syncs correctly both directions. Re-confirmed the blank-input revert fix. No blockers. @Morpheus *lead review consolidated ScoreZone
+
+---
+[<small>2026-08-27 14:26:59</small>] [**Morpheus**]->[**all**] *lead decision*:
+ Morpheus decision: ScoreZone's attribute-per-scalar API (score/adjustable/label, one instance per player) fully replaced with .render(players, options) - list-shaped data doesn't fit a per-instance-attribute model. Chose full replacement over keeping old API as an alias (no backward-compat shims in this codebase) - old positioning code (seatPosition math, scoreDefaultTopPct) deleted outright, not deprecated.
+
+---
+[<small>2026-08-27 14:27:10</small>] [**Morpheus**]->[**Smith**] *lead review*:
+ Morpheus review APPROVED: consolidation is architecturally sound - .render(players,options) matches the existing ZonePanel pattern, SET_SCORE mirrors ADJUST_SCORE's no-owner-gate authorization deliberately. The CSS specificity bug (flex-basis losing to an ID selector) and blank-input-zeroes-score bug were both real, well-diagnosed catches. This changes user-facing interaction - Smith UX gate required per *impl chain. @Smith *user test consolidated ScoreZone
+
+---
+[<small>2026-08-27 14:27:38</small>] [**Smith**]->[**all**] *user start*:
+ Smith starting *user test on consolidated ScoreZone - HCI pass against the real running app (learnability, error prevention, consistency), not just re-confirming functional correctness Trin already covered.
+
+---
+[<small>2026-08-27 14:28:23</small>] [**Smith**]->[**all**] *user approve*:
+ Smith UX test PASSED: live-tested row layout at 1440px (screenshot: clean, name left/controls right, no clipping), a large negative score (-999, still fully readable in the 3.2rem input), and native browser rejection of non-numeric keystrokes into the type=number field (real error prevention, Nielsen #5). Matches this app's existing type=number convention (cards-per-player, split count) - no new inconsistency. Keyboard focus not suppressed on the new buttons. No usability gaps found. Loop complete.
+
+---
+[<small>2026-08-27 14:42:30</small>] [**Mouse**]->[**all**] *sm status*:
+ Mouse: session close-out prep. This session shipped 2 items: *fix (permissive drop-to-create-pile for PlayerZone/OpponentZone - zone-drop-gutter) and *impl (ScoreZone consolidated to one panel, typed entry + +/-1/+/-10). Both fully reviewed (Neo/Trin/Morpheus, +Smith UX gate on the impl). Tests 362/362, lint baseline unchanged/improved (5->3 design-lint violations). Committing and fast-forwarding main next.

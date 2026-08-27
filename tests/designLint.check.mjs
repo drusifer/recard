@@ -194,8 +194,11 @@ try {
       // checker should flag. *nit (2026-08-26): `.card-action-btn` (the
       // card hover row's own buttons) no longer exists - the popup it
       // belonged to is deleted ("cards are Movable not Actionable").
+      // *nit (2026-08-27): `.score-adjust-btn` (each player's own
+      // +/-1/+/-10 row, `ScoreZone.js`) is the same small-content-sized
+      // control, same exemption reasoning.
       buttons: [...document.querySelectorAll(
-        'button:not([hidden]):not(.card):not(.action-btn):not(.pile-action-btn)',
+        'button:not([hidden]):not(.card):not(.action-btn):not(.pile-action-btn):not(.score-adjust-btn)',
       )]
         .filter((b) => {
           const r = b.getBoundingClientRect();

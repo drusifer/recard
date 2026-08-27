@@ -184,3 +184,80 @@ must land clean first), 63 foundation+cascade piles (Solitaire), 64
 rankAdjacent pile (Spit), 65 GameConfig.zones+2 presets, 66 e2e, 67
 reserved bug-fix. Morpheus-approved, no changes requested. Handed to
 Neo for Phase 62. Track phase-by-phase status in task.md as usual.
+
+---
+## Status check-in — 2026-08-27 (`*mouse status update`)
+
+### Context
+- Tech-debt sprint (US-64..68, D58-D60, task.md Phases 74-78) fully
+  shipped, reviewed, retro'd, and launched by Cypher. Session-close
+  notes posted by Neo for context-clear prep. Working tree was clean at
+  `fbd3789`/`259c474` before this session started; branch
+  `touch-targets-and-pile-actions-sprint` is 26 commits ahead of its
+  origin (unpushed, not yet requested).
+- This file (state.md) had been stale since Sprint 6/the 2026-08-22
+  shutdown note - CHAT.md and task.md are the actual source of truth,
+  confirmed by cross-checking task.md's Phase 74-78 log and `git log`
+  against the CHAT.md tail. No discrepancies found.
+
+### Current Task
+**Status:** No sprint plan currently awaiting review or in flight.
+Idle between sprints.
+
+### Open backlog (from tech-debt retro, unclaimed)
+- Rebuild the e2e suite (D60 removed the stale monolithic one) -
+  Trin's retro flagged it should be discrete `test()` cases this time,
+  not one script, so a failure anywhere doesn't hide everything after
+  it.
+- 7 flagged `sonarjs/cognitive-complexity` findings (deliberately not
+  fixed under Phase 75 time pressure per D58's AC) - candidate for its
+  own small future pass per Morpheus's retro.
+- Builder screen (framework epic's one unstarted piece) - blocked on
+  real product/UX input, not phase planning.
+- 2 disclosed minor visual overlaps in `docs/USER_STORIES.md`
+  (personal-zone-label/hand-row at 1440x900, radial-menu-
+  button/zone-heading text collision).
+
+### Next Steps
+No planning action pending. Waiting on the user for direction: start a
+new sprint (candidates: e2e rebuild, cognitive-complexity pass, or
+something new), or something else entirely.
+
+---
+## Session close-out — 2026-08-27, later same day
+
+Two direct-user-request items landed this session, both via full Bloop
+chains, both fully reviewed:
+
+1. **`*fix`: permissive pile-creation drop for PlayerZone/OpponentZone.**
+   Root cause was CSS geometry (`.seat-zone` shrink-wraps to its one
+   pile, zero spare drop space), not a reducer restriction. Fix:
+   `.zone-drop-gutter`, a reserved one-card-slot drop target,
+   generically added to every zone type (`renderZonePanel`). Neo -> Trin
+   -> Morpheus, all approved.
+2. **`*impl`: ScoreZone consolidated.** One panel now lists every
+   player (typed entry + -10/-1/+1/+10), replacing one panel per
+   player. New `SET_SCORE` reducer action, `ADJUST_SCORE` widened to
+   +/-10. Two real bugs found+fixed via live testing (a CSS
+   specificity bug, a blank-input-zeroes-score bug). Side effect: cut
+   the pre-existing `lint:design` baseline from 5 violations to 3
+   (removed 2 Score-related overlaps as a natural consequence of
+   consolidating). Neo -> Trin -> Morpheus -> Smith (UX gate), all
+   approved.
+
+362/362 unit tests, lint:js baseline unchanged (7 pre-existing
+cognitive-complexity findings), lint:design improved (5->3, all
+remaining ones pre-existing/unrelated Table-Zone/Bob overlaps).
+
+**Repo state at close:** branch `touch-targets-and-pile-actions-sprint`
+was 26 commits ahead of its own origin before this session; origin/main
+is a strict ancestor of this branch (clean fast-forward available, no
+divergent history to reconcile). User asked to commit this session's
+work and push main - proceeding to commit, then fast-forward local
+`main` to this branch's tip and push `origin main`.
+
+### Next Steps
+None pending after the push. Same open backlog as before this session
+(e2e rebuild, cognitive-complexity pass, builder screen, 2 minor
+visual overlaps) plus the pre-existing Table-Zone/Bob overlap debt -
+unclaimed, no active sprint.

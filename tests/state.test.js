@@ -766,9 +766,44 @@ test('ADJUST_SCORE: +1 and -1 move the target player\'s score', () => {
   assert.equal(state.scores.p2, -1);
 });
 
-test('ADJUST_SCORE: rejects any delta other than +1/-1', () => {
+test('ADJUST_SCORE: +10 and -10 also move the target player\'s score', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1', 'p2']);
+  state = reduce(state, { type: 'ADJUST_SCORE', targetPlayerId: 'p1', delta: 10 });
+  state = reduce(state, { type: 'ADJUST_SCORE', targetPlayerId: 'p2', delta: -10 });
+
+  assert.equal(state.scores.p1, 10);
+  assert.equal(state.scores.p2, -10);
+});
+
+test('ADJUST_SCORE: rejects any delta other than +/-1 or +/-10', () => {
   let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
   assert.throws(() => reduce(state, { type: 'ADJUST_SCORE', targetPlayerId: 'p1', delta: 5 }));
+  assert.throws(() => reduce(state, { type: 'ADJUST_SCORE', targetPlayerId: 'p1', delta: 100 }));
+});
+
+test('SET_SCORE: sets the target player\'s score to an exact typed-in value', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1', 'p2']);
+  state = reduce(state, { type: 'ADJUST_SCORE', targetPlayerId: 'p2', delta: 1 });
+
+  state = reduce(state, { type: 'SET_SCORE', targetPlayerId: 'p1', value: 42 });
+
+  assert.equal(state.scores.p1, 42);
+  assert.equal(state.scores.p2, 1); // untouched
+});
+
+test('SET_SCORE: accepts negative and zero values', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'SET_SCORE', targetPlayerId: 'p1', value: -7 });
+  assert.equal(state.scores.p1, -7);
+  state = reduce(state, { type: 'SET_SCORE', targetPlayerId: 'p1', value: 0 });
+  assert.equal(state.scores.p1, 0);
+});
+
+test('SET_SCORE: rejects a non-finite or non-integer value', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  assert.throws(() => reduce(state, { type: 'SET_SCORE', targetPlayerId: 'p1', value: NaN }));
+  assert.throws(() => reduce(state, { type: 'SET_SCORE', targetPlayerId: 'p1', value: Infinity }));
+  assert.throws(() => reduce(state, { type: 'SET_SCORE', targetPlayerId: 'p1', value: 3.5 }));
 });
 
 test('RESET_SCORES: zeros every player\'s score', () => {

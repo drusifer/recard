@@ -992,14 +992,32 @@ const ACTIONS = {
   },
 
   ADJUST_SCORE(state, action) {
-    if (action.delta !== 1 && action.delta !== -1) {
-      throw new Error(`Score delta must be +1 or -1, got ${action.delta}`);
+    // *nit (2026-08-27), direct user request: "+/-1 and +/-10 for each
+    // player" - the same fixed, enumerable set of allowed deltas
+    // `dealFromDeck`/every other reducer guard already uses, just wider
+    // than the original +/-1-only set.
+    if (![1, -1, 10, -10].includes(action.delta)) {
+      throw new Error(`Score delta must be +/-1 or +/-10, got ${action.delta}`);
     }
     const current = state.scores[action.targetPlayerId] ?? 0;
     return {
       ...state,
       scores: { ...state.scores, [action.targetPlayerId]: current + action.delta },
     };
+  },
+
+  /**
+   * *nit (2026-08-27), direct user request: "update the score by typing
+   * it in" - a direct absolute set, alongside `ADJUST_SCORE`'s relative
+   * deltas, same two-shape pattern `MOVE_PILE`'s absolute `zoneId` vs.
+   * `REORDER_PILE`'s relative `beforePileId` already uses elsewhere in
+   * this reducer.
+   */
+  SET_SCORE(state, action) {
+    if (!Number.isSafeInteger(action.value)) {
+      throw new TypeError(`Score value must be an integer, got ${action.value}`);
+    }
+    return { ...state, scores: { ...state.scores, [action.targetPlayerId]: action.value } };
   },
 
   /**

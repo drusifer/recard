@@ -909,3 +909,85 @@ model change (new drag gestures) - Smith's UX gate applies per the
 ### Next Steps
 @Smith: `*user test` D57 - live drag interactions specifically (pile
 reparent/ungroup, card-drop-spawns-pile), not just a spec read.
+
+---
+## *fix: zone-drop-gutter review (2026-08-27) - APPROVED
+
+Direct user request: PlayerZone/OpponentZone should permit dropping a
+card to spawn a new pile, same as the Table Zone (for melds). Neo/Trin
+chain (`*fix`, not `*impl` - no Smith UX gate required for this loop).
+
+**Root cause was genuinely non-obvious**: `CREATE_PILE`
+(`state.js`)/`onDropCardOnZone` (`main.js`) were already fully
+generic and unrestricted by zone type - the actual bug was pure CSS
+geometry. `.seat-zone` is `width: max-content` ("zone expands to fit
+its piles" - my own earlier-sprint call, still correct in principle),
+so with one pile (the hand) filling it, `.zone-body` had ZERO spare
+pixels for the existing empty-space-drop listener to ever catch.
+`.zone:not(.seat-zone)` (Table Zone) only worked by accident of
+`flex: 1 1 auto` giving it real leftover row space. Neo confirmed this
+LIVE (Playwright `boundingBox()` on a real CSS fixture - identical
+boxes before the fix, real reachable space after) rather than shipping
+a guess.
+
+**Decision (posted to chat)**: a small reserved `.zone-drop-gutter`
+(one card-slot, dashed, `renderZonePanel`'s last body child, every
+zone type) over two rejected alternatives - widening `.seat-zone`
+itself (would undo the earlier "expand to fit piles only" decision)
+and scoping the gutter to `.seat-zone` alone (a standalone single-pile
+shared zone has the identical latent gap, just rarer to hit in
+practice).
+
+**Verdict: APPROVED.** Minimal, generic (one shared code path, no
+per-zone-type branch), consistent with D55/D56's Zone/Pile split.
+Trin independently re-ran 358/358 + lint (baseline unchanged) and
+reviewed the diff for regressions (gutter is inert to every existing
+`.pile-section`/`[data-card-id]` lookup). No blockers.
+
+### Next Steps
+None pending from this fix - loop complete. D57 Smith UX-gate item
+above is unrelated/still open from Sprint 23.
+
+---
+## *impl: consolidated ScoreZone review (2026-08-27) - APPROVED
+
+Direct user request ("save space"): one ScoreZone panel listing every
+seated player (name, typed-entry input, -10/-1/+1/+10), replacing the
+one-panel-per-player design from earlier this same session.
+
+**Decision (posted to chat)**: `ScoreZoneElement`'s old attribute API
+(`score`/`adjustable`/`label`, one instance per player) is fully
+replaced with `.render(players, options)`, not kept as a compat shim -
+a list of players doesn't fit a per-instance-attribute model, and this
+codebase doesn't keep old interfaces around "just in case." Matches
+`<zone-panel>`'s existing `.render(...)` shape - one method-call
+convention across panel types, not two.
+
+**Real catches, not just claims**: Neo found and fixed a CSS
+specificity bug live (a naive `score-zone:not(.panel-moved) {
+flex-basis: 100% }` silently did nothing - `#zones > .zone:not(.seat-
+zone)`'s `flex: 1 1 auto` has an ID selector and won the tie; fixed by
+matching specificity with `#zones > score-zone.zone:not(.panel-
+moved)`) and a real data-loss bug (clearing the score input committed
+`0` instead of reverting - `Number('') === 0` is a valid safe integer,
+so the guard never caught it). Both found via live Playwright
+verification, not assumed from reading the diff - good discipline,
+consistent with this session's own zone-drop-gutter fix earlier.
+
+**Side effect, disclosed not claimed as the goal**: consolidating to
+one panel removed 2 of the 5 pre-existing `lint:design` violations
+("Table Zone overlaps Score-+") as a natural consequence of there
+being fewer, differently-shaped panels - not something this task set
+out to fix, correctly not over-claimed as "fixed the overlap backlog
+item" (the remaining 3 Table-Zone/Bob overlaps are untouched, separate,
+pre-existing debt).
+
+**Verdict: APPROVED.** No architecture concerns. Real interaction
+model change (typed input, new button layout) - Smith's UX gate
+applies, not skippable as internal-only.
+
+### Next Steps
+@Smith: `*user test` the consolidated ScoreZone against the real
+running app - typed entry, all four adjust buttons, cross-player
+adjustment (anyone may adjust anyone), multi-seat layout at a packed
+width.

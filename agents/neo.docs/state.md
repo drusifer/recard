@@ -2764,3 +2764,179 @@ user brings a new request.
 3. Pre-existing `lint:design` baseline: 5 violations (Table Zone
    overlapping "Bob"/"Score-+" at desktop widths) — unrelated to this
    sprint, unchanged throughout.
+
+---
+## `*fix` — permissive pile-creation drop in PlayerZone/OpponentZone (2026-08-27)
+
+### Task
+Direct user request: dropping a card onto a PerPlayerZone (own or
+opponent's) should spawn a new pile there, same as the Table Zone
+(SharedZone) already does — so a player can lay down a meld beside
+their hand. "In general we want permissive drag/drop with cards and
+piles."
+
+### Investigation (before touching anything)
+- `CREATE_PILE` (`state.js`) is fully generic already — no restriction
+  by zone type/owner, just `kind !== 'hand'` and a valid `tableSideId`.
+  The UI wiring (`onDropCardOnZone`, `main.js:1021`) is also wired
+  unconditionally for every zone. So the reducer/dispatch layer was
+  never the problem.
+- `renderZonePanel` (`ui.js`) wires a `drop` listener on `.zone-body`
+  that spawns a new pile when a card lands on the zone's own EMPTY
+  space (not on an existing pile). This listener is real and correct
+  for every zone type.
+- The actual bug: **geometry**. `.seat-zone` (PerPlayerZone) is
+  deliberately `width: max-content` — "the zone must expand to fit its
+  piles" (an earlier direct UX request, still correct) — so with only
+  one pile (the hand), `.zone-body`'s box has ZERO spare pixels beyond
+  the pile itself. `.zone:not(.seat-zone)` (the Table Zone / any
+  standalone shared zone) gets `flex: 1 1 auto` in `#zones`'s row and
+  so grows into real leftover space — that's the ONLY reason dropping
+  onto its open space ever worked; it was never a zone-type check.
+- **Confirmed live**, not just reasoned: built a minimal CSS-only
+  fixture (`geom.html`) reusing the real `style.css`, loaded it via
+  Playwright against the running dev server, measured
+  `.zone-body`'s and `.pile-section`'s `boundingBox()` for a
+  `.seat-zone` with one 4-card hand pile — **identical**, pixel for
+  pixel (`x/y/width/height` all equal). Zero reachable drop target.
+
+### Fix
+- `ui.js` `renderZonePanel`: after rendering each zone's piles into
+  `body`, always append one `<div class="zone-drop-gutter">` as body's
+  last flex child (guarded by the same `options.onDropCardOnZone ||
+  options.onMovePile` condition the body's own drop listeners already
+  use — i.e. skipped once a session has ended). Applies to every zone
+  type, not just `.seat-zone` — a standalone single-pile shared zone
+  had the identical latent gap, just less commonly hit.
+- `style.css`: `.zone-drop-gutter` — `flex: 0 0 auto`, sized to one
+  card slot (`var(--card-w)`/`var(--card-h)`), subtle dashed border.
+  Existing `.zone.zone-drag-over` highlight (already toggled by the
+  same `body` dragover listener) gives drag feedback for free — no new
+  highlight rule needed.
+- Re-ran the same fixture with the gutter present: `.zone-body`'s box
+  is now genuinely larger than `.pile-section`'s (43×59px of real
+  reachable space beyond the hand pile) — confirmed fixed, not just
+  theorized.
+- `npm test`: 358/358 green (no DOM/geometry tests exist for `ui.js` —
+  this is a pure-CSS-layout fix, so verification was live/visual via
+  the Playwright fixture, not a new unit test; see Trin's UAT).
+- `npm run lint`: unchanged from the known baseline (7
+  cognitive-complexity findings, 5 pre-existing design-overlap
+  findings) — nothing in this change touched a flagged function or
+  introduced a new zone-overlap.
+- Scratch fixture (`geom.html`, `geom_test_tmp.html`) was temporary,
+  not committed — deleted after use.
+
+### Handed to Trin
+`*qa uat` — verify live in the actual app (deal a hand, drag a card
+from own hand onto empty PlayerZone space → new pile; same for an
+OpponentZone if reachable from the viewer's own drag surface; confirm
+Table Zone drop-to-create still works unchanged).
+
+---
+## *impl: consolidated ScoreZone (2026-08-27)
+
+### Task
+Direct user request ("save space"): ScoreZone should show every
+player's score in ONE panel instead of one whole panel per player,
+with per-player controls to type an exact score or nudge it by
++/-1/+/-10.
+
+### Background (same session, earlier today)
+The one-panel-per-player design (today's earlier state) had just been
+through a whole positioning saga: Score's -/+ moved below its title
+for consistency with Pile headers, which broke its fixed `-14%`
+default-position constant (own-seat-zone overlap), which I fixed by
+measuring the panel's real rendered height instead of guessing. This
+request replaces that entire per-player-panel design, so all of that
+positioning code is now DELETED, not layered under - see below.
+
+### Implementation (TDD: tests written first)
+- `tests/state.test.js`: new cases for `ADJUST_SCORE` accepting
+  +/-10 (previously +/-1 only) and a brand-new `SET_SCORE` action
+  (absolute set, `Number.isSafeInteger` validated - rejects NaN,
+  Infinity, non-integers).
+- `state.js`: `ADJUST_SCORE`'s guard widened from `=== 1 || === -1`
+  to `[1,-1,10,-10].includes()`. New `SET_SCORE(state, action)` case.
+- `src/components/ScoreZone.js`: fully rewritten. Was an
+  attribute-per-scalar API (`score`/`adjustable`/`label`, one
+  instance per player) - now a `.render(players, options)` method
+  (same shape `<zone-panel>` already uses) taking the FULL roster and
+  rendering one row per player: name, a `type=number` input (typed
+  entry → `onSet`), and four `.score-adjust-btn`s (-10/-1/+1/+10 →
+  `onAdjust`). No back-compat attribute shim kept - old API fully
+  removed.
+- `main.js`: `adjustScore`/new `setScore` dispatchers (host-
+  authoritative, guest-relays, same shape as every other action here).
+  New `renderScoreZone()` builds exactly ONE `<score-zone>` for the
+  whole roster and calls `wirePanelLayout` on it once (same
+  `SCORE_PANEL_ID` as before the per-player design). DELETED: the
+  whole `seatPosition`-based default-position dance (both the original
+  `-14` constant AND my own same-session `scoreDefaultTopPct` height-
+  aware fix) - a single panel with no "belongs to one seat" relationship
+  just joins `#zones`'s normal flow, like the Table Zone always has.
+  `seatPosition` import removed from `main.js` (no longer used there).
+- `style.css`: new `.score-rows`/`.score-zone-row`/`.score-row-name`/
+  `.score-input`/`.score-adjust-btn` (named to avoid colliding with
+  the PRE-EXISTING, unrelated `.score-row`/`.score-btn` classes the
+  pre-game host-roster's own +/-1 score UI already uses -
+  `renderRoster`, `ui.js`, untouched, different screen). Removed the
+  dead `.score-value`/`.score-header` rules (title-bar actions are
+  gone - each row carries its own four buttons now).
+- `tests/designLint.check.mjs`: `.score-adjust-btn` added to the
+  44px-touch-target exemption list, same reasoning as
+  `.pile-action-btn` (small content-sized control, not the primary
+  touch target).
+
+### A real live bug found by testing the actual UI, not just the reducer
+Clearing the number input and blurring committed the score to `0`
+(`Number('') === 0`, a valid safe integer, `!== player.score`) instead
+of reverting - would have silently zeroed anyone's real score on an
+accidental clear+tab. Caught via a live Playwright check (typed 55,
+cleared, blurred → committed 0), not the unit suite, since this is DOM
+input behavior `state.test.js` can't see. Fixed: blank input is now a
+distinct third case, reverts before the numeric parse ever runs - same
+"cancel is a valid outcome" convention every other inline edit in this
+codebase already follows (pile/zone rename, split/take confirm).
+
+### A real positioning tug-of-war, resolved by testing live (not guessing)
+Consolidating to one panel didn't fix overlap for free: my first
+attempt (let it flow normally beside the Table Zone, like a shared
+zone) grew the row wide enough to newly overlap the opponent's
+absolutely-positioned seat-zone ("Bob") - confirmed via a live
+`getBoundingClientRect()` check (not assumed). Fixed with
+`#zones > score-zone.zone:not(.panel-moved) { flex-basis: 100% }`,
+forcing the panel onto its own line below the Table Zone before any
+user drag - real drag (`wirePanelLayout`) still overrides this the
+moment someone moves it. First cut of this rule (`score-zone:not(...)`
+with no `#zones >`/`.zone` scoping) silently did nothing - lost the
+specificity fight against `#zones > .zone:not(.seat-zone)`'s existing
+`flex: 1 1 auto` (which resets flex-basis to auto) because that
+selector carries an ID. Re-verified live after fixing the selector,
+not just trusted the CSS looked right.
+
+### Net result on the pre-existing `lint:design` baseline
+5 violations → 3. The 2 "Table Zone overlaps Score-+" ones (pre-
+existing, present even before today's session) are gone entirely -
+consolidating into one panel removed them as a side effect. The
+remaining 3 ("Table Zone overlaps Bob") are unrelated, unchanged,
+already-known backlog debt (same category noted in every recent
+close-out) - not something this task touched or was asked to fix.
+
+### Verification
+362/362 unit tests (from 358 - 4 new `state.test.js` cases). `npm run
+lint:js`: same pre-existing 7 cognitive-complexity findings (one of
+them, `main.js`'s `renderGameFromView`, actually DROPPED from 99 to 65
+as a side effect of deleting the per-player positioning loop - still
+over the limit, still the same pre-existing category, just less bad).
+`npm run lint:style`: clean. Live-verified via Playwright (not just
+reducer tests): +10/-1 buttons, typing an exact value, the blank-input
+revert fix, and host↔guest sync all confirmed working on the real
+running app.
+
+### Handed to Trin
+`*qa uat` - independent verification requested, same as always.
+
+### Immediate Next Action
+None - implementation done, in Trin's hands. If Trin/Morpheus pass,
+this is ready to commit (nothing committed yet this session).

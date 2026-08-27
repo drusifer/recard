@@ -512,3 +512,29 @@ UX debt, disclosed rather than guessed at.
 
 **Verdict: APPROVED with 1 fix applied, 1 filed.** 354/354 still green,
 lint unchanged at baseline. Handed to full-team retro.
+
+## Consolidated ScoreZone UX test (2026-08-27) - APPROVED
+
+Direct user request ("save space"): one panel listing every player's
+score, with typed entry + -10/-1/+1/+10 buttons, replacing one panel
+per player.
+
+Live-tested against the real running app (not a spec read):
+- Screenshot at 1440px: row layout reads clearly - name left, controls
+  right, consistent spacing, no visual clutter.
+- Typed a large negative value (-999) - stayed fully readable in the
+  3.2rem input, no clipping/truncation.
+- Confirmed `type="number"` natively rejects non-numeric keystrokes
+  (Playwright's own `.fill("abc")` on it threw, proving the browser
+  refuses it) - real error prevention (Nielsen #5), not a manual
+  validation gap.
+- Checked this matches the app's EXISTING `type="number"` convention
+  (`cards-per-player`, deal/split count) rather than introducing a
+  new, inconsistent input pattern.
+- Confirmed keyboard focus isn't suppressed on the new buttons (no
+  `outline: none` anywhere touching them).
+
+No usability gaps found. Nothing filed to backlog this time.
+
+**Verdict: APPROVED, no new bugs.** *impl loop complete (Neo -> Trin ->
+Morpheus -> Smith).

@@ -19,7 +19,7 @@ import {
 } from './ui.js';
 import { PRESETS } from './presets.js';
 import { RULES_REFERENCE } from './rulesReference.js';
-import { seatedOrder, seatPosition } from './seating.js';
+import { seatedOrder } from './seating.js';
 import { save as saveGame, load as loadGame, clear as clearGame, describeAge, expectedReturners } from './persistence.js';
 import { CLIENT_KEY_STORAGE, resolvePlayer, peerFor, rememberSession, recallSession, forgetSession } from './identity.js';
 import { loadPanelLayout, savePanelPosition, savePanelSize, applyPresetLayout } from './panelLayout.js';
@@ -70,9 +70,10 @@ zonesElement.addEventListener('drop', (event) => {
   const pileId = pileDragFromDrop(event.dataTransfer);
   if (pileId) performMovePile(pileId, null);
 });
-// Only ever built for the VIEWER's own score (other players' scores
-// show in the roster list, `renderRoster`'s own thing) - one browser,
-// one own-score panel, so a single fixed id is enough.
+// *nit (2026-08-27), direct user request ("save space"): one
+// consolidated Score panel for every seated player, not one whole panel
+// per player - a single fixed id is enough again, same as before the
+// short-lived per-player-panel design it replaces.
 const SCORE_PANEL_ID = 'score';
 // Every id `deckPile.pileActions` can ever offer - `zoneOpts.onPileAction`
 // (below) uses this to route a click to `dealFromDeck` instead of the
@@ -649,6 +650,38 @@ function adjustScore(targetPlayerId, delta) {
   else session.send({ type: 'action', action: { type: 'ADJUST_SCORE', targetPlayerId, delta } });
 }
 
+// *nit (2026-08-27), direct user request: "update the score by typing it
+// in" - same host-authoritative/guest-relays shape as every other
+// dispatch here (`adjustScore` above, `performCreatePileWithCard`, ...).
+function setScore(targetPlayerId, value) {
+  if (isSessionEnded) return;
+  if (role === 'host') {
+    try { dispatch({ type: 'SET_SCORE', targetPlayerId, value }); }
+    catch (error) { globalThis.alert(error.message); }
+  } else session.send({ type: 'action', action: { type: 'SET_SCORE', targetPlayerId, value } });
+}
+
+/**
+ * *nit (2026-08-27), direct user request: "save space" - one
+ * `<score-zone>` for every seated player with a score entry, instead of
+ * one whole panel per player. `seated` (`seatedOrder`) both orders the
+ * rows and supplies the viewer-relative "You" label, same as everywhere
+ * else a seat list is used. `options.onAdjust`/`onSet` being absent
+ * (session ended, or the frozen post-session re-render) renders the same
+ * inert panel `renderZonePanel`'s own action-less case already does -
+ * no separate "disabled" branch to keep in sync.
+ */
+function renderScoreZone(container, seated, scores, options) {
+  const players = seated
+    .filter((p) => scores?.[p.id] !== undefined)
+    .map((p) => ({ id: p.id, name: p.id === myId ? 'You' : p.name, score: scores[p.id] }));
+  if (players.length === 0) return;
+  const scoreElement = document.createElement('score-zone');
+  container.append(scoreElement);
+  scoreElement.render(players, options);
+  wirePanelLayout(scoreElement, SCORE_PANEL_ID, scoreElement.querySelector('.panel-title'), options);
+}
+
 function rosterWithCounts(view) {
   return view.players.map((p) => ({
     ...p,
@@ -886,22 +919,11 @@ function endSessionForGood(message, { retryable = false } = {}) {
     // control in this frozen re-render. No separate `<deck-zone>`
     // element to build here any more.
     renderZones(zonesElement, latestView.zones, seatedOrder(latestView.players, myId), latestView.zoneRecords, frozenOptions);
-    // Same inert Score panels the live render builds (one per seated
-    // player with a score, "need a score zone for our opponent" too),
-    // just no move/resize/adjust wiring - the session is over.
+    // Same inert Score panel the live render builds (every seated
+    // player with a score, one consolidated panel), just no
+    // adjust/set wiring - the session is over.
     const frozenSeated = seatedOrder(latestView.players, myId);
-    for (const [seatIndex, player] of frozenSeated.entries()) {
-      if (latestView.scores?.[player.id] === undefined) continue;
-      const scoreElement = document.createElement('score-zone');
-      scoreElement.score = latestView.scores[player.id];
-      if (player.id !== myId) scoreElement.label = `${player.name} Score`;
-      scoreElement.classList.add('panel-moved');
-      const seatDefault = seatPosition(seatIndex, frozenSeated.length, 26);
-      scoreElement.style.position = 'absolute';
-      scoreElement.style.left = `${seatDefault.leftPct}%`;
-      scoreElement.style.top = `${Math.max(seatDefault.topPct - 14, 4)}%`;
-      zonesElement.append(scoreElement);
-    }
+    renderScoreZone(zonesElement, frozenSeated, latestView.scores, {});
   }
   renderRosterOnly();
 }
@@ -1057,40 +1079,20 @@ function renderGameFromView(view) {
   // dealCount`/`onDealCountChange` above for the one piece of deck-
   // specific state this file still owns: the Deal count input's value).
   renderZones(zonesElement, view.zones, seatedOrder(view.players, myId), view.zoneRecords, zoneOptions);
-  // UX follow-up (direct user request): Score is a real sibling
-  // `<score-zone>` Web Component now (`src/components/ScoreZone.js`),
-  // not content nested inside the own-zone panel - built the same
-  // "fresh element, wired through wirePanelLayout" way the deck is.
-  // UX follow-up (direct user request): "need a score zone for our
-  // opponent" - every seated player with a score entry gets their own
-  // `<score-zone>` now (not just the viewer's own), same component,
-  // labeled with their name and positioned near THEIR OWN seat instead
-  // of always seat 0. Anyone may adjust anyone's score (`onAdjustScore`
-  // was never owner-gated even back when this lived in the roster).
-  const seated = seatedOrder(view.players, myId);
-  for (const [seatIndex, player] of seated.entries()) {
-    if (view.scores?.[player.id] === undefined) continue;
-    const isMe = player.id === myId;
-    const scoreElement = document.createElement('score-zone');
-    scoreElement.score = view.scores[player.id];
-    scoreElement.adjustable = !isSessionEnded;
-    if (!isMe) scoreElement.label = `${player.name} Score`;
-    scoreElement.addEventListener('score-adjust', (event) => adjustScore(player.id, event.detail.delta));
-    zonesElement.append(scoreElement);
-    const panelId = isMe ? SCORE_PANEL_ID : `score-${player.id}`;
-    wirePanelLayout(scoreElement, panelId, scoreElement.querySelector('.panel-title'), zoneOptions);
-    if (!scoreElement.classList.contains('panel-moved')) {
-      // No stored position yet - default near THIS player's own seat
-      // ring point (same one their personal zone uses), offset up so it
-      // doesn't land exactly on top of it before either panel has ever
-      // been moved.
-      const seatDefault = seatPosition(seatIndex, seated.length, 26);
-      scoreElement.classList.add('panel-moved');
-      scoreElement.style.position = 'absolute';
-      scoreElement.style.left = `${seatDefault.leftPct}%`;
-      scoreElement.style.top = `${Math.max(seatDefault.topPct - 14, 4)}%`;
-    }
-  }
+  // *nit (2026-08-27), direct user request: "save space" - ONE
+  // consolidated `<score-zone>` listing every seated player, instead of
+  // one whole panel per player. No per-seat default position needed any
+  // more either: a single panel with no fixed "belongs near this one
+  // seat" relationship just joins the Table Zone in `#zones`'s own
+  // normal flex-wrap flow (`wirePanelLayout` only applies an absolute
+  // position from a REAL stored one - dragging it is still possible,
+  // same as any other panel), the same default every shared/standalone
+  // zone already gets - no more seat-ring math to fight for clearance.
+  renderScoreZone(zonesElement, seatedOrder(view.players, myId), view.scores, {
+    onAdjust: isSessionEnded ? null : adjustScore,
+    onSet: isSessionEnded ? null : setScore,
+    ...zoneOptions,
+  });
   renderRosterOnly();
 }
 

@@ -1118,6 +1118,24 @@ export function renderZonePanel(zoneElement, id, title, piles, allZones, options
     element.render(zone, allZones, options);
   }
 
+  // Bug fix (direct user request): a card dropped on a Zone's own empty
+  // space spawns a new pile there (the `body` listener above) - but a
+  // Zone whose box shrinks exactly to its piles' content (`.seat-zone`,
+  // `width: max-content`) has NO empty space to land on once its one
+  // pile (the hand) fills the whole body; a Table Zone only "just
+  // works" because `.zone:not(.seat-zone)` flex-grows into its row's
+  // leftover width for free. Confirmed live: a `.seat-zone`'s
+  // `.zone-body` bounding box was pixel-identical to its lone
+  // `.pile-section`'s. One reserved, always-present flex child (sized
+  // to one card slot) restores real droppable space generically, for
+  // every zone type - not just `.seat-zone` - so laying down a meld
+  // beside a hand works the same way dropping onto the Table Zone does.
+  if (options.onDropCardOnZone || options.onMovePile) {
+    const gutter = document.createElement('div');
+    gutter.className = 'zone-drop-gutter';
+    body.append(gutter);
+  }
+
   wirePanelLayout(zoneElement, id, dragHandle, options);
 }
 
