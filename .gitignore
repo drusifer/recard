@@ -223,3 +223,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Untracked local debris observed recreating itself on this machine,
+# unrelated to any app code (grepped - nothing writes it)
+layout.json
