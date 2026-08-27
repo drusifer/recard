@@ -81,5 +81,5 @@ test('cardDragPayload: a hand card (no faceUp/owner fields at all) omits the id'
 test('cardDragPayload: never leaks rank/suit even for a face-up card - only the id crosses the wire', () => {
   const card = { id: 'card-5', rank: 'K', suit: 'hearts', faceUp: true, owner: null };
   const payload = cardDragPayload(card, 0.2, 0.8);
-  assert.deepEqual(Object.keys(payload).sort(), ['cardId', 'x', 'y']);
+  assert.deepEqual(Object.keys(payload).toSorted(), ['cardId', 'x', 'y']);
 });

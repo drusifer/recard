@@ -1009,7 +1009,7 @@ try {
     [...document.querySelectorAll('#hand-area .card')].map((c) => c.dataset.cardId));
   assert(handOrder1[0] === handOrder0[2],
     `a touch drag must reorder the hand (wanted ${handOrder0[2]} first, got ${handOrder1[0]})`);
-  assert(JSON.stringify([...handOrder0].sort()) === JSON.stringify([...handOrder1].sort()),
+  assert(JSON.stringify([...handOrder0].toSorted()) === JSON.stringify([...handOrder1].toSorted()),
     'a touch reorder must not duplicate or lose a card');
   console.log('US-40/US-23: dragging a card with a finger reorders the hand, through the same performHandReorder the mouse uses');
 
@@ -1215,7 +1215,7 @@ try {
   // the host issued, and gets their *own* seat and cards back rather
   // than joining as a stranger with an empty hand.
   const joinHandBefore = await join.evaluate(() =>
-    [...document.querySelectorAll('#hand-area .card')].map((c) => c.dataset.cardId).sort());
+    [...document.querySelectorAll('#hand-area .card')].map((c) => c.dataset.cardId).toSorted());
   assert(joinHandBefore.length > 0, 'the guest is holding cards before the refresh');
   const storedKey = await join.evaluate(() => localStorage.getItem('recard:player-key'));
   assert(storedKey, 'the host must have issued the guest an identity to remember');
@@ -1229,7 +1229,7 @@ try {
     { timeout: 20_000 },
   );
   const joinHandAfter = await join.evaluate(() =>
-    [...document.querySelectorAll('#hand-area .card')].map((c) => c.dataset.cardId).sort());
+    [...document.querySelectorAll('#hand-area .card')].map((c) => c.dataset.cardId).toSorted());
   assert(JSON.stringify(joinHandAfter) === JSON.stringify(joinHandBefore),
     `a reconnecting guest must get their OWN hand back, not a new seat.\n  before: ${JSON.stringify(joinHandBefore)}\n  after:  ${JSON.stringify(joinHandAfter)}`);
   const rosterCount = await host.evaluate(() => document.querySelectorAll('#game-roster li').length);
@@ -1450,7 +1450,7 @@ try {
   await solitaireHost.click('#deal-btn'); // enters the game screen where zones actually render (cardsPerPlayer is 0, preset-prefilled)
   await solitaireHost.waitForSelector('#screen-game:not([hidden])', { timeout: 15_000 });
   const solitaireZoneKinds = await solitaireHost.evaluate(() =>
-    [...document.querySelectorAll('.zone')].map((z) => z.dataset.kind).sort());
+    [...document.querySelectorAll('.zone')].map((z) => z.dataset.kind).toSorted());
   const foundationCount = solitaireZoneKinds.filter((k) => k === 'foundation').length;
   const cascadeCount = solitaireZoneKinds.filter((k) => k === 'cascade').length;
   assert(foundationCount === 4, `Solitaire must build 4 foundation zones, got ${foundationCount}`);
@@ -1622,7 +1622,7 @@ try {
   await rHost.click('#deal-btn');
   await rGuest.waitForFunction(() => document.querySelectorAll('#hand-area .card').length === 5, undefined, { timeout: 15_000 });
   const guestHandBefore = await rGuest.evaluate(() =>
-    [...document.querySelectorAll('#hand-area .card')].map((c) => c.dataset.cardId).sort());
+    [...document.querySelectorAll('#hand-area .card')].map((c) => c.dataset.cardId).toSorted());
 
   // US-43/D31: the snapshot now carries hands. This is the assertion that
   // would have caught "restore succeeded, everyone's hands are empty".
@@ -1665,7 +1665,7 @@ try {
   );
   await rGuest.waitForFunction(() => document.querySelectorAll('#hand-area .card').length === 5, undefined, { timeout: 30_000 });
   const guestHandAfter = await rGuest.evaluate(() =>
-    [...document.querySelectorAll('#hand-area .card')].map((c) => c.dataset.cardId).sort());
+    [...document.querySelectorAll('#hand-area .card')].map((c) => c.dataset.cardId).toSorted());
   assert(JSON.stringify(guestHandAfter) === JSON.stringify(guestHandBefore),
     `the guest must get their OWN cards back after a host restart.\n  before: ${JSON.stringify(guestHandBefore)}\n  after:  ${JSON.stringify(guestHandAfter)}`);
   const rSeats = await rHost.evaluate(() =>

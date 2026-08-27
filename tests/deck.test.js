@@ -16,7 +16,7 @@ test('buildDeck: standard 52, no jokers, single deck', () => {
 // axis from Pile type by building a second real deck type. ---
 
 test('DECK_TYPES registry exposes standard and pinochle', () => {
-  assert.deepEqual(Object.keys(DECK_TYPES).sort(), ['pinochle', 'standard']);
+  assert.deepEqual(Object.keys(DECK_TYPES).toSorted(), ['pinochle', 'standard']);
   assert.equal(DECK_TYPES.standard, standardDeck);
   assert.equal(DECK_TYPES.pinochle, pinochleDeck);
 });
@@ -79,8 +79,8 @@ test('shuffle: returns same cards in a (likely) different order, does not mutate
   assert.deepEqual(deck, original, 'shuffle must not mutate its input');
   assert.equal(shuffled.length, deck.length);
   assert.deepEqual(
-    [...shuffled].sort((a, b) => a.id.localeCompare(b.id)),
-    [...deck].sort((a, b) => a.id.localeCompare(b.id)),
+    [...shuffled].toSorted((a, b) => a.id.localeCompare(b.id)),
+    [...deck].toSorted((a, b) => a.id.localeCompare(b.id)),
   );
   assert.notDeepEqual(shuffled, deck, 'a real shuffle should reorder a 52-card deck');
 });

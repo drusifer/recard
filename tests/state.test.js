@@ -650,7 +650,7 @@ test('createInitialState: a configured zone\'s id is deterministic AND stable ac
   const first = createInitialState({}, () => 0.5, { piles: pileDeclarations });
   const second = createInitialState({}, () => 0.5, { piles: pileDeclarations });
   const idsOf = (state) => zonesOf(state).filter((z) => z.kind === 'foundation' || z.kind === 'cascade')
-    .map((z) => z.id).sort();
+    .map((z) => z.id).toSorted();
   assert.deepEqual(idsOf(first), idsOf(second), 'the same preset must produce the same zone ids every game, so a saved panel layout still applies');
   assert.deepEqual(
     idsOf(first),
@@ -958,7 +958,7 @@ test('pileVisibility: every pile kind in use has a defined visibility rule (D23)
   state = reduce(state, { type: 'DEAL', cardsPerPlayer: 1 });
 
   const kinds = new Set(state.piles.map((p) => p.kind));
-  assert.deepEqual([...kinds].sort(), ['deck', 'hand', 'zone'], 'all three pile types are exercised');
+  assert.deepEqual([...kinds].toSorted(), ['deck', 'hand', 'zone'], 'all three pile types are exercised');
   for (const pile of state.piles) {
     assert.ok(
       ['hidden', 'in-hand', 'mixed'].includes(pileVisibility(pile)),
@@ -1239,7 +1239,7 @@ test('SHUFFLE_DECK reorders the deck without touching anything else', () => {
   let n = 0;
   const next = reduce(state, { type: 'SHUFFLE_DECK', rng: () => ((n = (n * 9301 + 49_297) % 233_280), n / 233_280) });
 
-  assert.deepEqual([...deckOf(next)].map((c) => c.id).sort(), [...deckBefore].sort(),
+  assert.deepEqual([...deckOf(next)].map((c) => c.id).toSorted(), [...deckBefore].toSorted(),
     'same cards, no additions or losses');
   assert.notDeepEqual(deckOf(next).map((c) => c.id), deckBefore, 'order actually changed');
   assert.deepEqual(handOf(next, 'p1').map((c) => c.id), handBefore, 'hands untouched');

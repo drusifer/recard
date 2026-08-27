@@ -17,7 +17,7 @@ import { RankAdjacentPile } from '../src/piles/RankAdjacentPile.js';
 // file (state.js/pileActions.js) needed zero changes.
 
 test('the registry exposes exactly the seven pile kinds', () => {
-  assert.deepEqual(Object.keys(PILE_TYPES).sort(),
+  assert.deepEqual(Object.keys(PILE_TYPES).toSorted(),
     ['cascade', 'deck', 'discard', 'foundation', 'hand', 'rankAdjacent', 'zone']);
   assert.equal(PILE_TYPES.deck, DeckPile);
   assert.equal(PILE_TYPES.hand, HandPile);

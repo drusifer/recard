@@ -100,4 +100,19 @@ export default [
       'unicorn/require-array-sort-compare': 'off',
     },
   },
+  {
+    files: ['src/main.js'],
+    rules: {
+      // main.js is the app's entry-point controller module - there is
+      // no framework/store/bundler here (deliberately, per D-history:
+      // "no bundler/build step"). Its module-scoped `let` variables
+      // (gameState, session, role, myId...) ARE the app's runtime
+      // state, reassigned from event handlers by design - the exact
+      // shape this rule assumes is always wrong. "Fixing" this properly
+      // means wrapping all of it in a class/closure, a real
+      // architecture change out of scope for a zero-behavior-change
+      // lint sprint - flagged, not attempted mechanically.
+      'unicorn/no-top-level-assignment-in-function': 'off',
+    },
+  },
 ];
