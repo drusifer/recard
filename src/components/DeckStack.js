@@ -20,11 +20,11 @@ import { renderPileShell, renderDeckStack } from '../ui.js';
  * visual and Deal count input, via the already-proven `renderDeckStack`.
  */
 export class DeckStackElement extends HTMLElement {
-  render(zone, allZones, opts) {
-    renderPileShell(this, zone, allZones, opts, (container) => {
+  render(zone, allZones, options) {
+    renderPileShell(this, zone, allZones, options, (container) => {
       const row = document.createElement('div');
-      container.appendChild(row);
-      renderDeckStack(row, zone.count ?? zone.cards.length, opts);
+      container.append(row);
+      renderDeckStack(row, zone.count ?? zone.cards.length, options);
       return row;
     });
   }

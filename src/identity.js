@@ -44,13 +44,15 @@ export function resolvePlayer(presentedKey, knownPlayers, peerToKey) {
   // it: two tabs sharing one key would otherwise both claim the hand,
   // and the roster would flip between them. The newcomer gets a fresh
   // identity instead of silently hijacking a live player.
-  const alreadyLive = [...peerToKey.values()].includes(presentedKey);
-  if (alreadyLive) return { playerKey: newPlayerKey(), returning: false };
+  const isAlreadyLive = [...peerToKey.values()].includes(presentedKey);
+  if (isAlreadyLive) return { playerKey: newPlayerKey(), returning: false };
 
   return { playerKey: presentedKey, returning: true };
 }
 
-/** The peer id currently bound to a player, or null if they're away. */
+/**
+The peer id currently bound to a player, or null if they're away.
+*/
 export function peerFor(playerKey, peerToKey) {
   for (const [peerId, key] of peerToKey) if (key === playerKey) return peerId;
   return null;
@@ -63,7 +65,9 @@ export function peerFor(playerKey, peerToKey) {
 
 export const CLIENT_SESSION_STORAGE = 'recard:last-session';
 
-/** @param {{code: string, name: string}} session */
+/**
+@param {{code: string, name: string}} session
+*/
 export function rememberSession(storage, session) {
   try {
     storage.setItem(CLIENT_SESSION_STORAGE, JSON.stringify({ ...session, at: Date.now() }));
@@ -72,7 +76,9 @@ export function rememberSession(storage, session) {
   }
 }
 
-/** @returns {{code: string, name: string}|null} */
+/**
+@returns {{code: string, name: string}|null}
+*/
 export function recallSession(storage) {
   try {
     const raw = storage.getItem(CLIENT_SESSION_STORAGE);

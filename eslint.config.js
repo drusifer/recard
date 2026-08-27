@@ -17,6 +17,14 @@ export default [
       // kebab-case would rename ~15 files and every import site for
       // zero substantive benefit.
       'unicorn/filename-case': 'off',
+      // Pile/Zone base classes (D56) are deliberately static-members-only
+      // AS AN EXTENSIBLE INTERFACE - subclasses `extends Pile`/`extends
+      // Zone` and override individual static members. The --fix for
+      // this rule rewrites `class X {}` to `const X = {}`, which is
+      // syntactically fine standalone but breaks every `extends X` -
+      // confirmed live (all piles/zones subclassing it crashed at
+      // import). Real architectural pattern, not smell.
+      'unicorn/no-static-only-class': 'off',
     },
   },
   {

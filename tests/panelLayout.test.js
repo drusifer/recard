@@ -2,7 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadPanelLayout, savePanelPosition, savePanelSize, applyPresetLayout, PANEL_LAYOUT_KEY } from '../src/panelLayout.js';
 
-/** Same fake as tests/persistence.test.js - no browser. */
+/**
+Same fake as tests/persistence.test.js - no browser.
+*/
 function fakeStorage(initial = {}) {
   const map = new Map(Object.entries(initial));
   return {
@@ -111,7 +113,7 @@ test('applyPresetLayout: leaves every OTHER id already in storage untouched', ()
 test('applyPresetLayout: a preset with no layout at all (undefined) is a no-op, not a crash', () => {
   const storage = fakeStorage();
   savePanelPosition(storage, 'score', 10, 20);
-  assert.doesNotThrow(() => applyPresetLayout(storage, undefined));
+  assert.doesNotThrow(() => applyPresetLayout(storage));
   assert.deepEqual(loadPanelLayout(storage), { score: { x: 10, y: 20 } });
 });
 

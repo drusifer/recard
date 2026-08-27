@@ -52,7 +52,7 @@ test('seatPosition: 2 seats puts the second directly opposite (top-center)', () 
 
 test('seatPosition: every seat in a set is at a distinct position', () => {
   const count = 5;
-  const positions = Array.from({ length: count }, (_, i) => seatPosition(i, count));
+  const positions = Array.from({ length: count }, (_, index) => seatPosition(index, count));
   const unique = new Set(positions.map((p) => `${p.leftPct.toFixed(4)},${p.topPct.toFixed(4)}`));
   assert.equal(unique.size, count);
 });
@@ -74,8 +74,8 @@ test('seatPosition: custom radius scales distance from center without changing a
 });
 
 test('seatPosition: stays within a 50% radius so seats never clip the surface edge', () => {
-  for (let i = 0; i < 8; i++) {
-    const { leftPct, topPct } = seatPosition(i, 8);
+  for (let index = 0; index < 8; index++) {
+    const { leftPct, topPct } = seatPosition(index, 8);
     assert.ok(leftPct >= 0 && leftPct <= 100);
     assert.ok(topPct >= 0 && topPct <= 100);
   }

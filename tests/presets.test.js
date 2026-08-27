@@ -85,9 +85,9 @@ test('Spit preset: 2 shared rank-adjacent piles + a cascade per player', () => {
 });
 
 test('every preset without a declared piles field is unaffected (undefined, not [])', () => {
-  const declaresPiles = ['Solitaire', 'Spit', 'Gin Rummy'];
+  const declaresPiles = new Set(['Solitaire', 'Spit', 'Gin Rummy']);
   for (const preset of PRESETS) {
-    if (declaresPiles.includes(preset.name)) continue;
+    if (declaresPiles.has(preset.name)) continue;
     assert.equal(preset.piles, undefined, `${preset.name} should not declare piles`);
   }
 });

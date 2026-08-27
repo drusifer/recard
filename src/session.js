@@ -20,16 +20,20 @@ const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 function generateShortCode(length = 6) {
   let code = '';
-  for (let i = 0; i < length; i++) {
+  for (let index = 0; index < length; index++) {
     code += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
   }
   return code;
 }
 
 export class Session {
-  /** @type {'host'|'join'} */
+  /**
+  @type {'host'|'join'}
+  */
   role;
-  /** @type {Map<string, {id: string, name: string, connection: DataConnection}>} */
+  /**
+  @type {Map<string, {id: string, name: string, connection: DataConnection}>}
+  */
   peers = new Map();
   // D32: 'host-lost' is the RETRYABLE loss of the host; 'session-ended'
   // is final. They are separate events because a client about to retry
@@ -88,7 +92,7 @@ export class Session {
         session.selfId = id;
         resolve(id);
       });
-      peer.on('error', (err) => reject(err));
+      peer.on('error', (error) => reject(error));
     });
 
     peer.on('connection', (conn) => {
@@ -98,7 +102,9 @@ export class Session {
     return session;
   }
 
-  /** Join an existing table by the host's PeerJS id. */
+  /**
+  Join an existing table by the host's PeerJS id.
+  */
   static join(hostId, { name, playerKey }) {
     const session = new Session('join');
     const Peer = PeerCtor();
@@ -114,7 +120,7 @@ export class Session {
         const conn = peer.connect(hostId, { metadata: { name, playerKey } });
         session.hostConn = conn;
         conn.on('open', () => resolve(id));
-        conn.on('data', (msg) => session.emit('data', msg));
+        conn.on('data', (message) => session.emit('data', message));
         // D32: losing the host is RETRYABLE and must not be announced as
         // the end of the session - a client about to retry that is first
         // told "session ended" has been scared and then corrected, which
@@ -133,31 +139,33 @@ export class Session {
     const name = conn.metadata?.name ?? conn.peer;
     const record = { id: conn.peer, name, playerKey: conn.metadata?.playerKey ?? null, status: 'connecting', conn };
     this.peers.set(conn.peer, record);
-    this._emitRoster();
+    this.#emitRoster();
 
     conn.on('open', () => {
       record.status = 'connected';
-      this._emitRoster();
+      this.#emitRoster();
     });
-    conn.on('data', (msg) => this.emit('data', { fromId: conn.peer, msg }));
+    conn.on('data', (message) => this.emit('data', { fromId: conn.peer, msg: message }));
     conn.on('close', () => {
       record.status = 'disconnected';
-      this._emitRoster();
+      this.#emitRoster();
     });
     conn.on('error', () => {
       record.status = 'disconnected';
-      this._emitRoster();
+      this.#emitRoster();
     });
   }
 
-  _emitRoster() {
+  #emitRoster() {
     this.emit(
       'roster',
       [...this.peers.values()].map(({ id, name, playerKey, status }) => ({ id, name, playerKey, connection: status })),
     );
   }
 
-  /** Host only: send a message to every connected peer. */
+  /**
+  Host only: send a message to every connected peer.
+  */
   broadcast(message) {
     for (const record of this.peers.values()) {
       if (record.status !== 'connected') continue;
@@ -165,12 +173,16 @@ export class Session {
     }
   }
 
-  /** Host only: send a message to one specific peer (used for per-player views). */
+  /**
+  Host only: send a message to one specific peer (used for per-player views).
+  */
   sendTo(peerId, message) {
     this.peers.get(peerId)?.conn?.send(message);
   }
 
-  /** Join side only: send a message to the host. */
+  /**
+  Join side only: send a message to the host.
+  */
   send(message) {
     this.hostConn.send(message);
   }

@@ -14,18 +14,18 @@ export function cardLabel(card) {
   return `${card.rank}${SUIT_SYMBOL[card.suit]}`;
 }
 
-function cardEl(card, { onClick, disabled } = {}) {
-  const el = document.createElement('button');
-  el.type = 'button';
-  el.className = 'card' + (RED_SUITS.has(card.suit) ? ' card-red' : '');
-  el.dataset.cardId = card.id;
+function cardElement(card, { onClick, disabled } = {}) {
+  const element = document.createElement('button');
+  element.type = 'button';
+  element.className = 'card' + (RED_SUITS.has(card.suit) ? ' card-red' : '');
+  element.dataset.cardId = card.id;
 
   if (card.rank === 'JOKER') {
     const pip = document.createElement('span');
     pip.className = 'card-pip';
     pip.textContent = 'JOKER';
     pip.style.fontSize = '0.65rem';
-    el.appendChild(pip);
+    element.append(pip);
   } else {
     const symbol = SUIT_SYMBOL[card.suit];
     const corner = document.createElement('span');
@@ -34,20 +34,20 @@ function cardEl(card, { onClick, disabled } = {}) {
     const pip = document.createElement('span');
     pip.className = 'card-pip';
     pip.textContent = symbol;
-    el.append(corner, pip);
+    element.append(corner, pip);
   }
 
-  if (onClick && !disabled) el.addEventListener('click', () => onClick(card));
-  else el.disabled = true;
-  return el;
+  if (onClick && !disabled) element.addEventListener('click', () => onClick(card));
+  else element.disabled = true;
+  return element;
 }
 
-function cardBackEl(cardId) {
-  const el = document.createElement('div');
-  el.className = 'card card-back';
-  el.textContent = '🂠';
-  if (cardId) el.dataset.cardId = cardId;
-  return el;
+function cardBackElement(cardId) {
+  const element = document.createElement('div');
+  element.className = 'card card-back';
+  element.textContent = '🂠';
+  if (cardId) element.dataset.cardId = cardId;
+  return element;
 }
 
 function ownerTag(name) {
@@ -73,14 +73,14 @@ const GHOST_LIFT_PX = 28;
  * `pointer-events: none` precisely so it never hit-tests as itself.
  */
 function touchTargetAt(x, y) {
-  const el = document.elementFromPoint(x, y);
-  if (!el) return null;
+  const element = document.elementFromPoint(x, y);
+  if (!element) return null;
   // UX follow-up (direct user request): the hand's own local reorder
   // (`performHandReorder`, the old `.hand-card`-specific 'hand' target
   // kind) is gone along with `renderHand`/`#hand-area` - the hand pile
   // is a plain `.pile-section[data-zone-id]` now, same as any other
   // pile, so the generic branch below already finds it.
-  const zone = el.closest('.pile-section[data-zone-id]');
+  const zone = element.closest('.pile-section[data-zone-id]');
   if (zone) return { kind: 'zone', el: zone, row: zone.querySelector('.card-row') };
   return null;
 }
@@ -89,15 +89,15 @@ function touchTargetAt(x, y) {
  *  a redacted card is only redacted in the DOM, so cloning is safe by
  *  construction where rebuilding would not be. The face is cloned rather
  *  than the wrapper because the wrapper also holds the action row. */
-function makeDragGhost(sourceEl) {
-  const face = sourceEl.querySelector('.card') ?? sourceEl;
+function makeDragGhost(sourceElement) {
+  const face = sourceElement.querySelector('.card') ?? sourceElement;
   const rect = face.getBoundingClientRect();
   const ghost = face.cloneNode(true);
   ghost.classList.add('touch-drag-ghost');
-  ghost.removeAttribute('data-card-id'); // never hit-testable, never queryable as the real card
+  delete ghost.dataset.cardId; // never hit-testable, never queryable as the real card
   ghost.style.width = `${rect.width}px`;
   ghost.style.height = `${rect.height}px`;
-  document.body.appendChild(ghost);
+  document.body.append(ghost);
   return ghost;
 }
 
@@ -130,7 +130,7 @@ function moveDragGhost(ghost, x, y) {
  * them, and it gives us the drag image, Escape-to-cancel and cursor
  * feedback for free.
  */
-function attachTouchDrag(sourceEl, card, ctx) {
+function attachTouchDrag(sourceElement, card, context) {
   let state = null;
   let timer = null;
   let ghost = null;
@@ -145,12 +145,12 @@ function attachTouchDrag(sourceEl, card, ctx) {
     clearTimeout(timer);
     ghost?.remove();
     ghost = null;
-    sourceEl.classList.remove('card-dragging');
+    sourceElement.classList.remove('card-dragging');
     clearHint();
   };
 
   const handle = {
-    lift: (ev) => {
+    lift: (event) => {
       // Morpheus, Phase 43 review: every state broadcast rebuilds the
       // cards, and a broadcast mid-hold is routine - any other player
       // drawing causes one. That detaches `sourceEl` while the 250ms
@@ -159,43 +159,43 @@ function attachTouchDrag(sourceEl, card, ctx) {
       // ghost cloned from a zero-sized rect, appended to `body`, with no
       // surviving handler to remove it. Checking the DOM directly costs
       // nothing and doesn't depend on a browser being well-behaved.
-      if (!sourceEl.isConnected) {
+      if (!sourceElement.isConnected) {
         state = null;
         return;
       }
-      ghost = makeDragGhost(sourceEl);
-      moveDragGhost(ghost, ev.x, ev.y);
-      sourceEl.classList.add('card-dragging');
+      ghost = makeDragGhost(sourceElement);
+      moveDragGhost(ghost, event.x, event.y);
+      sourceElement.classList.add('card-dragging');
       // Smith Gate 2 #1: the D13 cue fires HERE, not on raw pointerdown.
       // Bound to pointerdown it announced a lift the instant a finger
       // landed — so the rest of the table saw you pick a card up before
       // you did, and a finger merely brushing a card on its way to
       // scrolling broadcast a lift that never happened.
-      ctx.onCardLift?.(card.id, true);
-      ctx.onHandMotion?.(true);
+      context.onCardLift?.(card.id, true);
+      context.onHandMotion?.(true);
     },
-    move: (ev) => {
+    move: (event) => {
       if (!ghost) return; // the lift was refused above; there is nothing in flight
-      moveDragGhost(ghost, ev.x, ev.y);
-      ctx.onCardDrag?.(card, ev.x, ev.y);
-      const target = touchTargetAt(ev.x, ev.y);
+      moveDragGhost(ghost, event.x, event.y);
+      context.onCardDrag?.(card, event.x, event.y);
+      const target = touchTargetAt(event.x, event.y);
       if (hinted && (target?.kind !== 'zone' || target.el !== hinted.el)) clearHint();
       if (target?.kind === 'zone') {
-        showZoneDragOver(target.el, target.row, { x: ev.x, y: ev.y }, target.el.dataset.kind);
+        showZoneDragOver(target.el, target.row, { x: event.x, y: event.y }, target.el.dataset.kind);
         hinted = target;
       }
     },
-    drop: (ev) => {
+    drop: (event) => {
       if (!ghost) return;
-      const target = touchTargetAt(ev.x, ev.y);
+      const target = touchTargetAt(event.x, event.y);
       teardown();
-      ctx.onCardLift?.(card.id, false);
-      ctx.onHandMotion?.(false);
-      ctx.onCardDrag?.(null, 0, 0);
+      context.onCardLift?.(card.id, false);
+      context.onHandMotion?.(false);
+      context.onCardDrag?.(null, 0, 0);
       if (!target) return; // dropped in dead space: a no-op, same as mouse
-      if (ctx.onDropCard) {
+      if (context.onDropCard) {
         performZoneDrop(target.el, target.row, target.el.dataset.zoneId, card.id,
-          { x: ev.x, y: ev.y }, ctx.onDropCard, target.el.dataset.kind);
+          { x: event.x, y: event.y }, context.onDropCard, target.el.dataset.kind);
       }
     },
     cancel: () => {
@@ -203,37 +203,37 @@ function attachTouchDrag(sourceEl, card, ctx) {
       teardown();
       // Smith Gate 1 #5: end the gesture properly. The 2s motion TTL is
       // a backstop for dropped packets, not a way to finish a drag.
-      ctx.onCardLift?.(card.id, false);
-      ctx.onHandMotion?.(false);
-      ctx.onCardDrag?.(null, 0, 0);
+      context.onCardLift?.(card.id, false);
+      context.onHandMotion?.(false);
+      context.onCardDrag?.(null, 0, 0);
     },
   };
 
   const feed = (sample) => {
     const out = touchDragStep(state, sample);
     state = out.state;
-    for (const ev of out.events) handle[ev.type](ev);
+    for (const event of out.events) handle[event.type](event);
   };
 
-  sourceEl.addEventListener('pointerdown', (e) => {
+  sourceElement.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'mouse') return;
     feed({ type: 'down', x: e.clientX, y: e.clientY, t: performance.now() });
     clearTimeout(timer);
     // A finger that never moves fires no pointermove, so the timer is
     // the only thing that can start the drag.
     timer = setTimeout(() => feed({ type: 'tick', t: performance.now() }), HOLD_MS);
-    sourceEl.setPointerCapture(e.pointerId);
+    sourceElement.setPointerCapture(e.pointerId);
   });
-  sourceEl.addEventListener('pointermove', (e) => {
+  sourceElement.addEventListener('pointermove', (e) => {
     if (e.pointerType === 'mouse') return;
     feed({ type: 'move', x: e.clientX, y: e.clientY, t: performance.now() });
   });
-  sourceEl.addEventListener('pointerup', (e) => {
+  sourceElement.addEventListener('pointerup', (e) => {
     if (e.pointerType === 'mouse') return;
     clearTimeout(timer);
     feed({ type: 'up', x: e.clientX, y: e.clientY, t: performance.now() });
   });
-  sourceEl.addEventListener('pointercancel', (e) => {
+  sourceElement.addEventListener('pointercancel', (e) => {
     if (e.pointerType === 'mouse') return;
     clearTimeout(timer);
     feed({ type: 'cancel', t: performance.now() });
@@ -246,7 +246,7 @@ function attachTouchDrag(sourceEl, card, ctx) {
   // instead works mid-gesture, and is safe here because a drag only
   // exists after 250ms of stillness, by which point the browser has not
   // begun scrolling and will still honour preventDefault.
-  sourceEl.addEventListener('touchmove', (e) => {
+  sourceElement.addEventListener('touchmove', (e) => {
     if (state?.phase === 'dragging') e.preventDefault();
   }, { passive: false });
 }
@@ -275,12 +275,12 @@ function moveToControl(card, currentZoneId, allZones, onMoveCard) {
   const placeholder = document.createElement('option');
   placeholder.value = '';
   placeholder.textContent = 'Move to…';
-  select.appendChild(placeholder);
+  select.append(placeholder);
   for (const zone of otherZones) {
     const opt = document.createElement('option');
     opt.value = zone.id;
     opt.textContent = zone.name;
-    select.appendChild(opt);
+    select.append(opt);
   }
   select.addEventListener('change', () => {
     if (select.value) onMoveCard(card.id, select.value);
@@ -303,10 +303,12 @@ function moveToControl(card, currentZoneId, allZones, onMoveCard) {
 // `pileActions.js` rather than being re-derived here - so the offer can
 // never disagree with the rule.
 
-/** Drops any in-progress drag-target highlighting. */
+/**
+Drops any in-progress drag-target highlighting.
+*/
 export function clearPileTargets() {
-  for (const el of document.querySelectorAll('.pile-target')) {
-    el.classList.remove('pile-target');
+  for (const element of document.querySelectorAll('.pile-target')) {
+    element.classList.remove('pile-target');
   }
 }
 
@@ -330,10 +332,10 @@ function pileElement(pileId) {
  * eligible, a legal `pickup` too - both light up together, since a
  * native drag doesn't commit to which action until the drop.
  */
-function highlightDragTargets(actionIds, piles, ctx) {
+function highlightDragTargets(actionIds, piles, context) {
   const ids = new Set();
   for (const action of actionIds) {
-    for (const id of targetsForAction(action, piles, ctx)) ids.add(id);
+    for (const id of targetsForAction(action, piles, context)) ids.add(id);
   }
   for (const id of ids) pileElement(id)?.classList.add('pile-target');
 }
@@ -348,11 +350,11 @@ function highlightDragTargets(actionIds, piles, ctx) {
  * `renderActionHeader` (piles/zones) and `attachActionRow` (cards) so
  * the icon-button contract can't drift between the two.
  */
-function applyIconButton(btn, spec, labelOverride) {
+function applyIconButton(button, spec, labelOverride) {
   const label = labelOverride ?? spec.label;
-  btn.textContent = spec.icon;
-  btn.title = label;
-  btn.setAttribute('aria-label', label);
+  button.textContent = spec.icon;
+  button.title = label;
+  button.setAttribute('aria-label', label);
 }
 
 /**
@@ -382,14 +384,14 @@ function applyIconButton(btn, spec, labelOverride) {
  *   onRename?: (name: string) => void}} opts
  */
 export function renderActionHeader(container, titleText, actionIds, opts = {}) {
-  container.innerHTML = '';
+  container.replaceChildren();
   container.className = `zone-name pile-action-header${opts.headingClass ? ` ${opts.headingClass}` : ''}`;
   if (opts.headingId) container.id = opts.headingId;
 
   const label = document.createElement('span');
   label.className = 'zone-name-text';
   label.textContent = titleText;
-  container.appendChild(label);
+  container.append(label);
 
   // *nit (2026-08-26): "allow user to rename zones and piles - any user
   // can edit". `titleText` often carries a derived suffix a pile's own
@@ -412,10 +414,10 @@ export function renderActionHeader(container, titleText, actionIds, opts = {}) {
       input.focus();
       input.select();
 
-      let settled = false;
+      let isSettled = false;
       const commit = () => {
-        if (settled) return;
-        settled = true;
+        if (isSettled) return;
+        isSettled = true;
         const name = input.value.trim();
         // A blank/unchanged edit reverts silently rather than round-
         // tripping a no-op (or a reducer throw the user never asked
@@ -427,7 +429,7 @@ export function renderActionHeader(container, titleText, actionIds, opts = {}) {
       input.addEventListener('blur', commit);
       input.addEventListener('keydown', (ke) => {
         if (ke.key === 'Enter') { ke.preventDefault(); input.blur(); }
-        else if (ke.key === 'Escape') { settled = true; input.replaceWith(label); }
+        else if (ke.key === 'Escape') { isSettled = true; input.replaceWith(label); }
       });
       // A drag on the containing heading (Zone move, D24) shouldn't
       // start while the input has focus - the same class this heading
@@ -455,11 +457,11 @@ export function renderActionHeader(container, titleText, actionIds, opts = {}) {
   for (const id of actionIds) {
     if (opts.disabled?.includes(id)) continue;
     const spec = ACTION_SPECS[id];
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'pile-action-btn' + (spec.destructive ? ' btn-danger' : '');
-    applyIconButton(btn, spec, opts.labels?.[id]);
-    btn.addEventListener('click', (e) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'pile-action-btn' + (spec.destructive ? ' btn-danger' : '');
+    applyIconButton(button, spec, opts.labels?.[id]);
+    button.addEventListener('click', (e) => {
       e.stopPropagation();
       // US-61 (Sprint 23), Smith's ruling (Phase 70): each spec's own
       // `hint` already states its real consequence (reshuffleDeal's own
@@ -473,18 +475,18 @@ export function renderActionHeader(container, titleText, actionIds, opts = {}) {
       // dialog entirely - identical in effect to that card's own
       // un-confirmed single-card `pickup`.
       if (spec.destructive && !opts.noConfirm?.includes(id) &&
-        !window.confirm(`${spec.hint}\n\nContinue?`)) return;
+        !globalThis.confirm(`${spec.hint}\n\nContinue?`)) return;
       opts.onAction(id);
     });
     // D35: `draw`'s own action-token drag protocol, unrelated to the
     // menu it used to live in - preserved as-is, just hosted on a plain
     // button now instead of a radial one.
     if (opts.draggable && spec.target) {
-      btn.draggable = true;
-      btn.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', pileActionToken(id)));
-      attachPileActionTouchDrag(btn, id, () => opts.onAction(id));
+      button.draggable = true;
+      button.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', pileActionToken(id)));
+      attachPileActionTouchDrag(button, id, () => opts.onAction(id));
     }
-    container.appendChild(btn);
+    container.append(button);
   }
 }
 
@@ -499,14 +501,14 @@ export function renderActionHeader(container, titleText, actionIds, opts = {}) {
  */
 function performReveal(card, viewerId, onReveal) {
   clearPileTargets();
-  const mine = card.owner != null && card.owner === viewerId;
-  if (mine && !window.confirm('Reveal this card to everyone? This cannot be undone.')) return;
+  const isMine = card.owner != undefined && card.owner === viewerId;
+  if (isMine && !globalThis.confirm('Reveal this card to everyone? This cannot be undone.')) return;
   onReveal?.(card.id);
 }
 
-export function renderZoneCards(container, zone, allZones, opts = {}) {
-  const { resolveOwnerName, onMoveCard, onCardLift, onCardDrag } = opts;
-  container.innerHTML = '';
+export function renderZoneCards(container, zone, allZones, options = {}) {
+  const { resolveOwnerName, onMoveCard, onCardLift, onCardDrag } = options;
+  container.replaceChildren();
   // D45: was hardcoded `kind: 'zone'` below - harmless while zone was
   // the only 'mixed'-visibility pile type, a real bug the moment a
   // second one (discard) exists: every card-level authorization check
@@ -522,7 +524,7 @@ export function renderZoneCards(container, zone, allZones, opts = {}) {
   // The fan math (rotate + arc, pivoting from the bottom like cards
   // actually held in a hand) is exactly `renderHand`'s old formula,
   // just applied generically by index instead of being hand-specific.
-  zone.cards.forEach((card, i) => {
+  zone.cards.forEach((card, index) => {
     const wrapper = document.createElement('div');
     // *nit (2026-08-26): `pile-hover-host` used to arrive via the now-
     // deleted `attachActionRow` (the popup mechanism) as a side effect
@@ -535,7 +537,7 @@ export function renderZoneCards(container, zone, allZones, opts = {}) {
     // focusable the way `cardEl`'s `<button>` face already is).
     wrapper.className = 'middle-card pile-hover-host';
     wrapper.tabIndex = 0;
-    if (opts.fan) {
+    if (options.fan) {
       // UX follow-up (direct user request): "lower the peak a bit so
       // it's a more gradual curve" - then, immediately after: "it still
       // looks triangular rather than a steady curve." The rotation
@@ -552,7 +554,7 @@ export function renderZoneCards(container, zone, allZones, opts = {}) {
       // not just eyeballed - see that rule's own comment if this changes
       // again.
       const center = (zone.cards.length - 1) / 2;
-      const offset = i - center;
+      const offset = index - center;
       wrapper.style.setProperty('--raise-base', `rotate(${offset * 5}deg) translateY(${offset * offset * 0.08}rem)`);
     }
     // US-32/33: `data-card-id` makes the wrapper hit-testable for
@@ -596,7 +598,7 @@ export function renderZoneCards(container, zone, allZones, opts = {}) {
     // server-side. Reading the real offer table instead is what D34/D42
     // already promised: "the hover affordances... can't drift apart"
     // from the reducer's own authorization.
-    const cardActions = actionsForCard(pile, card, opts.viewerId);
+    const cardActions = actionsForCard(pile, card, options.viewerId);
     if (onMoveCard && cardActions.length > 0) {
       wrapper.draggable = true;
       // UX follow-up (direct user request): a hand pile is a real,
@@ -615,7 +617,7 @@ export function renderZoneCards(container, zone, allZones, opts = {}) {
         highlightDragTargets(
           cardActions.filter((a) => a === 'move' || a === 'pickup' || a === 'play'),
           piles,
-          { viewerId: opts.viewerId, fromPileId: zone.id },
+          { viewerId: options.viewerId, fromPileId: zone.id },
         );
       });
       wrapper.addEventListener('dragend', clearPileTargets);
@@ -626,7 +628,7 @@ export function renderZoneCards(container, zone, allZones, opts = {}) {
       // reveals its identity mid-drag.
       wrapper.addEventListener('drag', (e) => onCardDrag?.(card, e.clientX, e.clientY));
       wrapper.addEventListener('dragend', () => onCardDrag?.(null, 0, 0));
-      attachTouchDrag(wrapper, card, { onDropCard: opts.onDropCard, onCardDrag, onCardLift });
+      attachTouchDrag(wrapper, card, { onDropCard: options.onDropCard, onCardDrag, onCardLift });
     }
 
     // D25: one hover-revealed action row, built from `pileActions.js`,
@@ -644,7 +646,7 @@ export function renderZoneCards(container, zone, allZones, opts = {}) {
     // gets the redacted `{faceDown: true}` back. A tap-to-reveal needs
     // wiring onto whichever one actually renders for this viewer.
     // `pile` is the one hoisted to the top of this function (D45).
-    const canReveal = Boolean(opts.onReveal) && actionsForCard(pile, card, opts.viewerId).includes('reveal');
+    const canReveal = Boolean(options.onReveal) && actionsForCard(pile, card, options.viewerId).includes('reveal');
     // *nit (2026-08-26), direct user request: "cards are Movable not
     // Actionable" - the hover-popup action row (`attachActionRow`) is
     // gone entirely. `pickup`/`move`/`play` already had a real trigger
@@ -653,30 +655,30 @@ export function renderZoneCards(container, zone, allZones, opts = {}) {
     // established (Phase 55), applied to the FACE-UP case specifically
     // (`reveal` only ever offers on a still-hidden card, so the two
     // never compete for the same tap).
-    const canRotate = Boolean(opts.onRotate) && actionsForCard(pile, card, opts.viewerId).includes('rotate');
+    const canRotate = Boolean(options.onRotate) && actionsForCard(pile, card, options.viewerId).includes('rotate');
 
     if (card.faceDown) {
-      const back = cardBackEl(card.id);
+      const back = cardBackElement(card.id);
       if (canReveal) {
         back.classList.add('revealable');
-        back.addEventListener('click', () => performReveal(card, opts.viewerId, opts.onReveal));
+        back.addEventListener('click', () => performReveal(card, options.viewerId, options.onReveal));
       }
-      wrapper.appendChild(back);
-      if (card.owner !== null && card.owner !== opts.viewerId) {
+      wrapper.append(back);
+      if (card.owner !== null && card.owner !== options.viewerId) {
         // Someone else's still-hidden card: no visibility, no authority,
         // so no actions - just the anonymous back and whose it is.
-        wrapper.appendChild(ownerTag(resolveOwnerName?.(card.owner) ?? card.owner));
+        wrapper.append(ownerTag(resolveOwnerName?.(card.owner) ?? card.owner));
       }
     } else {
-      const face = cardEl(card, canReveal
-        ? { onClick: () => performReveal(card, opts.viewerId, opts.onReveal) }
-        : canRotate
-          ? { onClick: () => opts.onRotate(card.id) }
-          : { disabled: true });
+      const face = cardElement(card, canReveal
+        ? { onClick: () => performReveal(card, options.viewerId, options.onReveal) }
+        : (canRotate
+          ? { onClick: () => options.onRotate(card.id) }
+          : { disabled: true }));
       if (canReveal) face.classList.add('revealable');
       if (canRotate) face.classList.add('rotatable');
-      wrapper.appendChild(face);
-      if (card.owner) wrapper.appendChild(ownerTag(resolveOwnerName?.(card.owner) ?? card.owner));
+      wrapper.append(face);
+      if (card.owner) wrapper.append(ownerTag(resolveOwnerName?.(card.owner) ?? card.owner));
       // UX follow-up (real bug, found live via a screenshot): a plain
       // hand card has no `faceUp` field at all (visibility is a
       // PILE-level "in-hand" rule, not per-card like a zone's) - `!card.
@@ -689,11 +691,11 @@ export function renderZoneCards(container, zone, allZones, opts = {}) {
         const hiddenTag = document.createElement('div');
         hiddenTag.className = 'owner-tag';
         hiddenTag.textContent = 'hidden from others';
-        wrapper.appendChild(hiddenTag);
+        wrapper.append(hiddenTag);
       }
     }
 
-    container.appendChild(wrapper);
+    container.append(wrapper);
   });
 }
 
@@ -703,8 +705,8 @@ export function renderZoneCards(container, zone, allZones, opts = {}) {
  * to… controls below the card, so wrapper rects would make the "on the
  * card body" region reach well under the card into its own buttons.
  */
-function cardBoxesIn(rowEl) {
-  return [...rowEl.querySelectorAll('.middle-card[data-card-id]')].flatMap((wrapper) => {
+function cardBoxesIn(rowElement) {
+  return [...rowElement.querySelectorAll('.middle-card[data-card-id]')].flatMap((wrapper) => {
     const face = wrapper.querySelector('.card');
     if (!face) return [];
     const r = face.getBoundingClientRect();
@@ -718,8 +720,8 @@ function cardBoxesIn(rowEl) {
 
 const DROP_HINTS = ['drop-onto', 'drop-before', 'drop-after'];
 
-function clearDropHints(rowEl) {
-  for (const el of rowEl.querySelectorAll('.middle-card')) el.classList.remove(...DROP_HINTS);
+function clearDropHints(rowElement) {
+  for (const element of rowElement.querySelectorAll('.middle-card')) element.classList.remove(...DROP_HINTS);
 }
 
 /**
@@ -729,10 +731,10 @@ function clearDropHints(rowEl) {
  * body reads "will stack here"; an insertion line beside it reads "will
  * slot in here".
  */
-function showDropHint(rowEl, placement) {
-  clearDropHints(rowEl);
+function showDropHint(rowElement, placement) {
+  clearDropHints(rowElement);
   if (!placement.targetCardId) return;
-  const target = rowEl.querySelector(`.middle-card[data-card-id="${CSS.escape(placement.targetCardId)}"]`);
+  const target = rowElement.querySelector(`.middle-card[data-card-id="${CSS.escape(placement.targetCardId)}"]`);
   if (!target) return;
   if (placement.layout === 'stack') target.classList.add('drop-onto');
   else target.classList.add(placement.side === 'before' ? 'drop-before' : 'drop-after');
@@ -754,18 +756,18 @@ function showDropHint(rowEl, placement) {
  * to `{}` (plain append, no positional choice) - same outcomes as
  * before, just owned by each module instead of switched on centrally.
  */
-function showZoneDragOver(zoneEl, row, point, kind) {
-  zoneEl.classList.add('zone-drag-over');
+function showZoneDragOver(zoneElement, row, point, kind) {
+  zoneElement.classList.add('zone-drag-over');
   showDropHint(row, resolveDropTargetFor(kind, cardBoxesIn(row), point));
 }
 
-function clearZoneDragOver(zoneEl, row) {
-  zoneEl.classList.remove('zone-drag-over');
+function clearZoneDragOver(zoneElement, row) {
+  zoneElement.classList.remove('zone-drag-over');
   clearDropHints(row);
 }
 
-function performZoneDrop(zoneEl, row, zoneId, cardId, point, onDropCard, kind) {
-  clearZoneDragOver(zoneEl, row);
+function performZoneDrop(zoneElement, row, zoneId, cardId, point, onDropCard, kind) {
+  clearZoneDragOver(zoneElement, row);
   if (!cardId) return;
   // US-32/33: the drop point decides stack vs. overlap vs. plain
   // append. Aiming at the card being dragged itself is meaningless
@@ -814,10 +816,10 @@ function performZoneDrop(zoneEl, row, zoneId, cardId, point, onDropCard, kind) {
  * actually the same capability wearing two names, despite both being
  * "drag this panel."
  */
-export function wirePanelLayout(panelEl, id, headingEl, opts) {
-  if (opts.onResizePanel) {
-    panelEl.classList.add('panel-resizable');
-    const stored = opts.layout?.[id];
+export function wirePanelLayout(panelElement, id, headingElement, options) {
+  if (options.onResizePanel) {
+    panelElement.classList.add('panel-resizable');
+    const stored = options.layout?.[id];
     // *nit (2026-08-26), real bug found live: a Zone's own `flex-grow:
     // 1` (`#zones > .zone`, every shared/standalone panel) OUTRANKS an
     // explicit `style.width` - the resize handle set the width
@@ -828,26 +830,26 @@ export function wirePanelLayout(panelEl, id, headingEl, opts) {
     // `attachPanelResize` applies the same class live, for a resize
     // that just happened this session.
     if (typeof stored?.w === 'number') {
-      panelEl.style.width = `${stored.w}px`;
-      panelEl.classList.add('panel-sized');
+      panelElement.style.width = `${stored.w}px`;
+      panelElement.classList.add('panel-sized');
     }
     if (typeof stored?.h === 'number') {
-      panelEl.style.height = `${stored.h}px`;
+      panelElement.style.height = `${stored.h}px`;
       // A resized-short panel needs somewhere for overflow to go rather
       // than spilling past its own border - scroll, not clip, so cards
       // already in it are never simply hidden.
-      panelEl.style.overflowY = 'auto';
+      panelElement.style.overflowY = 'auto';
     }
-    attachPanelResize(panelEl, id, opts.onResizePanel);
+    attachPanelResize(panelElement, id, options.onResizePanel);
   }
-  if (opts.onMovePanel) {
-    const stored = opts.layout?.[id];
+  if (options.onMovePanel) {
+    const stored = options.layout?.[id];
     if (typeof stored?.x === 'number' && typeof stored?.y === 'number') {
-      panelEl.classList.add('panel-moved');
-      panelEl.style.left = `${stored.x}px`;
-      panelEl.style.top = `${stored.y}px`;
+      panelElement.classList.add('panel-moved');
+      panelElement.style.left = `${stored.x}px`;
+      panelElement.style.top = `${stored.y}px`;
     }
-    attachPanelDrag(headingEl, panelEl, id, opts.onMovePanel);
+    attachPanelDrag(headingElement, panelElement, id, options.onMovePanel);
   }
 }
 
@@ -870,8 +872,8 @@ export function wirePanelLayout(panelEl, id, headingEl, opts) {
  * (`renderZonePanel`, below), which owns both of those exactly once for
  * everything inside it.
  */
-export function renderPileShell(container, zone, allZones, opts, buildRow) {
-  container.innerHTML = '';
+export function renderPileShell(container, zone, allZones, options, buildRow) {
+  container.replaceChildren();
   container.className = 'pile-section';
   container.dataset.zoneId = zone.id; // D25: addressable as a drop target
   // D45/D53: the kind travels with the element so the touch-drag path
@@ -901,7 +903,7 @@ export function renderPileShell(container, zone, allZones, opts, buildRow) {
   // client-side order layer reintroduced generically, or a real reducer
   // action, now that a hand is state-level).
   const heading = document.createElement('header-actions');
-  container.appendChild(heading);
+  container.append(heading);
   heading.render(
     // *nit (2026-08-26), direct user request: the card count no longer
     // appears in a pile's own title text ("Deck (32)" -> "Deck") - the
@@ -909,13 +911,13 @@ export function renderPileShell(container, zone, allZones, opts, buildRow) {
     // deck's own stack badge, a zone's actual card row).
     zone.name,
     pileLevelActions(zone.kind, {
-      isOwner: zone.ownerId === opts.viewerId,
-      isHost: opts.isHost,
+      isOwner: zone.ownerId === options.viewerId,
+      isHost: options.isHost,
       // US-60/61 (Sprint 23): a shared (ownerless) zone/discard pile's
       // split/take are open to any player - `zonePile`/`discardPile`'s
       // own `pileActions` can't tell "shared" from "someone else's
       // personal pile" from `isOwner` alone (both are simply `false`).
-      isShared: zone.ownerId == null,
+      isShared: zone.ownerId == undefined,
       // US-62 (Sprint 23): hide/show are mutually exclusive, keyed off
       // the pile's OWN current orientation (`zonePile`/`discardPile`'s
       // `orientationActions`) - needs the actual cards, not just counts.
@@ -939,10 +941,10 @@ export function renderPileShell(container, zone, allZones, opts, buildRow) {
       // unconditionally EXCEPT a 1-card pile, where it's identical in
       // effect to that card's own un-confirmed single-card `pickup`.
       noConfirm: (zone.cards?.length ?? zone.count) === 1 ? ['take'] : [],
-      onAction: (id) => opts.onPileAction?.(zone.id, id),
+      onAction: (id) => options.onPileAction?.(zone.id, id),
       // *nit (2026-08-26): rename affordance, any player.
       rawName: zone.name,
-      onRename: opts.onRenamePile ? (name) => opts.onRenamePile(zone.id, name) : undefined,
+      onRename: options.onRenamePile ? (name) => options.onRenamePile(zone.id, name) : undefined,
       // *nit (2026-08-26), direct user request: "All Movables can be
       // drag/drop" - every pile's title is a drag source now (was
       // gated to `isReparentable` kinds only). A non-reparentable kind
@@ -951,14 +953,14 @@ export function renderPileShell(container, zone, allZones, opts, buildRow) {
       // `MOVE_PILE`'s own game-rule eligibility) but CAN be reordered
       // among its own zone's siblings - that half is purely cosmetic,
       // never a game-rule concern, for any kind.
-      pileDraggable: Boolean(opts.onMovePile) || Boolean(opts.onReorderPile),
+      pileDraggable: Boolean(options.onMovePile) || Boolean(options.onReorderPile),
       pileId: zone.id,
     },
   );
 
   const row = buildRow(container);
 
-  if (opts.onDropCard) {
+  if (options.onDropCard) {
     container.addEventListener('dragover', (e) => {
       e.preventDefault();
       showZoneDragOver(container, row, { x: e.clientX, y: e.clientY }, zone.kind);
@@ -974,7 +976,7 @@ export function renderPileShell(container, zone, allZones, opts, buildRow) {
       // path, so Draw dropped on a hand pile draws instead of being
       // misread as a bogus card id.
       const pileAction = pileActionFromDrop(e.dataTransfer);
-      if (pileAction) { opts.onPileActionDrop?.(pileAction, zone.id); return; }
+      if (pileAction) { options.onPileActionDrop?.(pileAction, zone.id); return; }
       // *nit (2026-08-26), direct user request: "relocated within their
       // zone (ordering)" - a dragged PILE dropped directly onto ANOTHER
       // pile now reorders it to sit right there if they already share a
@@ -990,7 +992,7 @@ export function renderPileShell(container, zone, allZones, opts, buildRow) {
         const draggedZoneId = allZones.find((z) => z.id === draggedPileId)?.zoneId;
         if (draggedPileId !== zone.id && draggedZoneId === zone.zoneId) {
           e.stopPropagation();
-          opts.onReorderPile?.(draggedPileId, zone.id);
+          options.onReorderPile?.(draggedPileId, zone.id);
         }
         return;
       }
@@ -999,7 +1001,7 @@ export function renderPileShell(container, zone, allZones, opts, buildRow) {
       // spawn a redundant new pile for the same drop.
       e.stopPropagation();
       performZoneDrop(container, row, zone.id, e.dataTransfer.getData('text/plain'),
-        { x: e.clientX, y: e.clientY }, opts.onDropCard, zone.kind);
+        { x: e.clientX, y: e.clientY }, options.onDropCard, zone.kind);
     });
   }
 }
@@ -1010,12 +1012,12 @@ export function renderPileShell(container, zone, allZones, opts, buildRow) {
  * wrapper around `renderPileShell`, same shape `<fan-pile>`/
  * `<deck-stack>` now have for their own row shapes.
  */
-export function renderPile(container, zone, allZones, opts = {}) {
-  renderPileShell(container, zone, allZones, opts, (c) => {
+export function renderPile(container, zone, allZones, options = {}) {
+  renderPileShell(container, zone, allZones, options, (c) => {
     const row = document.createElement('div');
     row.className = 'card-row';
-    c.appendChild(row);
-    renderZoneCards(row, zone, allZones, opts);
+    c.append(row);
+    renderZoneCards(row, zone, allZones, options);
     return row;
   });
 }
@@ -1037,13 +1039,13 @@ export function renderPile(container, zone, allZones, opts = {}) {
  * whole Zone - "Piles move with their containing Zone." A Pile
  * (`renderPile`, above) never wires its own.
  */
-export function renderZonePanel(zoneEl, id, title, piles, allZones, opts) {
-  zoneEl.innerHTML = '';
-  zoneEl.className = 'zone';
+export function renderZonePanel(zoneElement, id, title, piles, allZones, options) {
+  zoneElement.replaceChildren();
+  zoneElement.className = 'zone';
   // The Zone's own stable identity (`opts.layout` key) - distinct from
   // any one pile's own `data-zone-id` (`renderPile`), since a Zone can
   // hold several piles and so has no single pile id of its own.
-  zoneEl.dataset.groupId = id;
+  zoneElement.dataset.groupId = id;
 
   // *nit (2026-08-26): restored - see `wirePanelLayout`'s own comment
   // for the full "zones need free positioning, piles need discrete
@@ -1054,19 +1056,19 @@ export function renderZonePanel(zoneEl, id, title, piles, allZones, opts) {
   let dragHandle;
   if (title) {
     const heading = document.createElement('header-actions');
-    zoneEl.appendChild(heading);
+    zoneElement.append(heading);
     heading.render(title, [], {
       headingClass: 'panel-title',
       // *nit (2026-08-26): rename affordance, any player.
       rawName: title,
-      onRename: opts.onRenameZone ? (name) => opts.onRenameZone(id, name) : undefined,
+      onRename: options.onRenameZone ? (name) => options.onRenameZone(id, name) : undefined,
     });
     dragHandle = heading;
   }
 
   const body = document.createElement('div');
   body.className = 'zone-body';
-  zoneEl.appendChild(body);
+  zoneElement.append(body);
 
   // (bloop: piles/zones/cards are all Movable) - a card dropped on the
   // Zone's own EMPTY space (not onto any pile inside it) spawns a
@@ -1082,7 +1084,7 @@ export function renderZonePanel(zoneEl, id, title, piles, allZones, opts) {
   // unhandled (rather than misreading it as a card id) - a pile
   // reparents into the ZONE it lands in, not specifically the other
   // pile pixel it happened to land on top of.
-  if (opts.onDropCardOnZone || opts.onMovePile) {
+  if (options.onDropCardOnZone || options.onMovePile) {
     // D35 note (unchanged reasoning): real browsers don't expose
     // `dataTransfer` values during `dragover`, only `.types` - so the
     // pile-action/pile-drag/card distinction only happens at DROP time,
@@ -1095,14 +1097,14 @@ export function renderZonePanel(zoneEl, id, title, piles, allZones, opts) {
       // "reuses `.zone-drag-over`"); toggling it on `body` alone
       // wouldn't match either that rule or `.pile-section.zone-drag-over`,
       // so nothing would actually render.
-      zoneEl.classList.add('zone-drag-over');
+      zoneElement.classList.add('zone-drag-over');
     });
     body.addEventListener('dragleave', (e) => {
-      if (e.target === body) zoneEl.classList.remove('zone-drag-over');
+      if (e.target === body) zoneElement.classList.remove('zone-drag-over');
     });
     body.addEventListener('drop', (e) => {
       e.preventDefault();
-      zoneEl.classList.remove('zone-drag-over');
+      zoneElement.classList.remove('zone-drag-over');
       // A pile-action token (Draw) dropped on open zone space has
       // nowhere sensible to go - same exclusion the per-pile drop
       // handler already makes for itself.
@@ -1113,9 +1115,9 @@ export function renderZonePanel(zoneEl, id, title, piles, allZones, opts) {
       // reparent-into-this-zone AND an ungroup for the same drop.
       e.stopPropagation();
       const pileId = pileDragFromDrop(e.dataTransfer);
-      if (pileId) { opts.onMovePile?.(pileId, id); return; }
+      if (pileId) { options.onMovePile?.(pileId, id); return; }
       const cardId = e.dataTransfer.getData('text/plain');
-      if (cardId) opts.onDropCardOnZone?.(cardId, id);
+      if (cardId) options.onDropCardOnZone?.(cardId, id);
     });
   }
 
@@ -1131,12 +1133,12 @@ export function renderZonePanel(zoneEl, id, title, piles, allZones, opts) {
   // equally-thin wrapper, not a generic container the other two nest
   // inside any more.
   for (const zone of piles) {
-    const el = document.createElement(componentFor(zone.kind));
-    body.appendChild(el);
-    el.render(zone, allZones, opts);
+    const element = document.createElement(componentFor(zone.kind));
+    body.append(element);
+    element.render(zone, allZones, options);
   }
 
-  wirePanelLayout(zoneEl, id, dragHandle, opts);
+  wirePanelLayout(zoneElement, id, dragHandle, options);
 }
 
 
@@ -1166,8 +1168,8 @@ export function renderZonePanel(zoneEl, id, title, piles, allZones, opts) {
  * seat its owner's roster entry is drawn at; one with no seated owner
  * (shouldn't happen) is skipped defensively.
  */
-export function renderZones(container, zones, seatedPlayers, zoneRecords, opts = {}) {
-  container.innerHTML = '';
+export function renderZones(container, zones, seatedPlayers, zoneRecords, options = {}) {
+  container.replaceChildren();
 
   const byZoneId = new Map();
   for (const zone of zones) {
@@ -1188,25 +1190,25 @@ export function renderZones(container, zones, seatedPlayers, zoneRecords, opts =
       if (seatIndex === -1) continue; // owner not in the current roster (shouldn't happen) - skip defensively
     }
 
-    const zoneEl = document.createElement('zone-panel');
-    container.appendChild(zoneEl);
+    const zoneElement = document.createElement('zone-panel');
+    container.append(zoneElement);
 
     if (record.ownerId) {
-      const ownerName = opts.resolveOwnerName?.(record.ownerId) ?? record.ownerId;
-      zoneEl.render(record.id, ownerName, piles, zones, opts);
+      const ownerName = options.resolveOwnerName?.(record.ownerId) ?? record.ownerId;
+      zoneElement.render(record.id, ownerName, piles, zones, options);
       // AFTER `.render()`, not before - `renderZonePanel`'s own first
       // line (`zoneEl.className = 'zone'`) would otherwise wipe this
       // class out.
-      if (zoneType.className) zoneEl.classList.add(zoneType.className);
+      if (zoneType.className) zoneElement.classList.add(zoneType.className);
       // `wirePanelLayout` (called inside `render` above) only ever sets
       // `left`/`top` once a REAL stored position exists - a player zone
       // with none yet still needs its ring-position default, same as it
       // always has.
-      if (!zoneEl.classList.contains('panel-moved')) {
+      if (!zoneElement.classList.contains('panel-moved')) {
         const pos = zoneType.defaultPosition(seatIndex, seatedPlayers.length);
         if (pos) {
-          zoneEl.style.left = `${pos.leftPct}%`;
-          zoneEl.style.top = `${pos.topPct}%`;
+          zoneElement.style.left = `${pos.leftPct}%`;
+          zoneElement.style.top = `${pos.topPct}%`;
         }
       }
     } else {
@@ -1214,7 +1216,7 @@ export function renderZones(container, zones, seatedPlayers, zoneRecords, opts =
       // `null` for a standalone zone - the lone pile's own heading
       // already says the same thing a redundant second title would
       // (`renderZonePanel`'s own `title: null` handling, unchanged).
-      zoneEl.render(record.id, record.name, piles, zones, opts);
+      zoneElement.render(record.id, record.name, piles, zones, options);
     }
   }
 }
@@ -1252,10 +1254,10 @@ const MIN_PANEL_HEIGHT_PX = 90;
  * native drag for its own different, discrete-target capability
  * instead - see `wirePanelLayout`'s own comment for the full reasoning.
  */
-function attachPanelDrag(headingEl, panelEl, id, onMove) {
-  if (!headingEl) return;
-  headingEl.classList.add('panel-drag-handle');
-  headingEl.addEventListener('pointerdown', (e) => {
+function attachPanelDrag(headingElement, panelElement, id, onMove) {
+  if (!headingElement) return;
+  headingElement.classList.add('panel-drag-handle');
+  headingElement.addEventListener('pointerdown', (e) => {
     // Buttons in the header (pile-action-btn, score +/-) must keep
     // working as plain clicks, not become a drag's starting point.
     if (e.pointerType !== 'mouse' || e.target.closest('button')) return;
@@ -1263,8 +1265,8 @@ function attachPanelDrag(headingEl, panelEl, id, onMove) {
     // `offsetParent`, not a hardcoded `#table-surface`: every panel is a
     // direct child of `#zones` now, but this still generalizes correctly
     // regardless of what any panel's positioning ancestor actually is.
-    const parentRect = (panelEl.offsetParent || document.getElementById('table-surface')).getBoundingClientRect();
-    const startRect = panelEl.getBoundingClientRect();
+    const parentRect = (panelElement.offsetParent || document.querySelector('#table-surface')).getBoundingClientRect();
+    const startRect = panelElement.getBoundingClientRect();
     // Offset from the pointer to the panel's own top-left, so the panel
     // doesn't jump to re-center itself on the cursor the instant the
     // drag starts - it moves exactly as far as the pointer does.
@@ -1279,30 +1281,30 @@ function attachPanelDrag(headingEl, panelEl, id, onMove) {
     // drag starts. Idempotent for a panel already in `panel-moved` mode
     // (a second drag, or a personal zone whose position was already
     // stored) - this produces the same left/top it already had.
-    panelEl.classList.add('panel-moved');
-    panelEl.style.left = `${startRect.left - parentRect.left}px`;
-    panelEl.style.top = `${startRect.top - parentRect.top}px`;
+    panelElement.classList.add('panel-moved');
+    panelElement.style.left = `${startRect.left - parentRect.left}px`;
+    panelElement.style.top = `${startRect.top - parentRect.top}px`;
 
-    panelEl.classList.add('panel-dragging');
+    panelElement.classList.add('panel-dragging');
     document.body.classList.add('panel-drag-active');
 
-    const onPointerMove = (ev) => {
-      const x = ev.clientX - grabDx - parentRect.left;
-      const y = ev.clientY - grabDy - parentRect.top;
-      panelEl.style.left = `${x}px`;
-      panelEl.style.top = `${y}px`;
-      panelEl.dataset.dragX = x;
-      panelEl.dataset.dragY = y;
+    const onPointerMove = (event) => {
+      const x = event.clientX - grabDx - parentRect.left;
+      const y = event.clientY - grabDy - parentRect.top;
+      panelElement.style.left = `${x}px`;
+      panelElement.style.top = `${y}px`;
+      panelElement.dataset.dragX = x;
+      panelElement.dataset.dragY = y;
     };
     const onPointerUp = () => {
       document.removeEventListener('pointermove', onPointerMove);
       document.removeEventListener('pointerup', onPointerUp);
-      panelEl.classList.remove('panel-dragging');
+      panelElement.classList.remove('panel-dragging');
       document.body.classList.remove('panel-drag-active');
-      const x = Number(panelEl.dataset.dragX);
-      const y = Number(panelEl.dataset.dragY);
-      delete panelEl.dataset.dragX;
-      delete panelEl.dataset.dragY;
+      const x = Number(panelElement.dataset.dragX);
+      const y = Number(panelElement.dataset.dragY);
+      delete panelElement.dataset.dragX;
+      delete panelElement.dataset.dragY;
       if (Number.isFinite(x) && Number.isFinite(y)) onMove(id, x, y);
     };
     document.addEventListener('pointermove', onPointerMove);
@@ -1327,11 +1329,11 @@ function attachPanelDrag(headingEl, panelEl, id, onMove) {
  * zone while width (and personal zones, already `position: absolute`
  * either way) looked fine. Plain pixels sidestep the whole question.
  */
-function attachPanelResize(panelEl, id, onResize) {
+function attachPanelResize(panelElement, id, onResize) {
   const handle = document.createElement('div');
   handle.className = 'panel-resize-handle';
   handle.title = 'Drag to resize';
-  panelEl.appendChild(handle);
+  panelElement.append(handle);
 
   handle.addEventListener('pointerdown', (e) => {
     if (e.pointerType !== 'mouse') return;
@@ -1343,43 +1345,43 @@ function attachPanelResize(panelEl, id, onResize) {
     // a smaller, offset box within it. The clamp below only needs SOME
     // stable outer bound to avoid an unbounded resize, not that specific
     // element.
-    const bound = (panelEl.offsetParent || document.getElementById('table-surface')).getBoundingClientRect();
-    const startRect = panelEl.getBoundingClientRect();
+    const bound = (panelElement.offsetParent || document.querySelector('#table-surface')).getBoundingClientRect();
+    const startRect = panelElement.getBoundingClientRect();
     const startX = e.clientX;
     const startY = e.clientY;
-    panelEl.classList.add('panel-resizing');
+    panelElement.classList.add('panel-resizing');
     // *nit (2026-08-26): `flex-grow: 1` would otherwise grow the panel
     // right back past whatever width this drag is about to set - see
     // `wirePanelLayout`'s own comment on `.panel-sized`. Added the
     // instant the drag STARTS (not just on the next full render from
     // stored layout), so even a first-ever resize actually holds.
-    panelEl.classList.add('panel-sized');
+    panelElement.classList.add('panel-sized');
     document.body.classList.add('panel-resize-active');
 
-    const onPointerMove = (ev) => {
+    const onPointerMove = (event) => {
       const w = Math.min(
-        Math.max(startRect.width + (ev.clientX - startX), MIN_PANEL_WIDTH_PX),
+        Math.max(startRect.width + (event.clientX - startX), MIN_PANEL_WIDTH_PX),
         bound.width * 0.9,
       );
       const h = Math.min(
-        Math.max(startRect.height + (ev.clientY - startY), MIN_PANEL_HEIGHT_PX),
+        Math.max(startRect.height + (event.clientY - startY), MIN_PANEL_HEIGHT_PX),
         bound.height * 0.9,
       );
-      panelEl.style.width = `${w}px`;
-      panelEl.style.height = `${h}px`;
-      panelEl.style.overflowY = 'auto';
-      panelEl.dataset.resizeW = w;
-      panelEl.dataset.resizeH = h;
+      panelElement.style.width = `${w}px`;
+      panelElement.style.height = `${h}px`;
+      panelElement.style.overflowY = 'auto';
+      panelElement.dataset.resizeW = w;
+      panelElement.dataset.resizeH = h;
     };
     const onPointerUp = () => {
       document.removeEventListener('pointermove', onPointerMove);
       document.removeEventListener('pointerup', onPointerUp);
-      panelEl.classList.remove('panel-resizing');
+      panelElement.classList.remove('panel-resizing');
       document.body.classList.remove('panel-resize-active');
-      const w = Number(panelEl.dataset.resizeW);
-      const h = Number(panelEl.dataset.resizeH);
-      delete panelEl.dataset.resizeW;
-      delete panelEl.dataset.resizeH;
+      const w = Number(panelElement.dataset.resizeW);
+      const h = Number(panelElement.dataset.resizeH);
+      delete panelElement.dataset.resizeW;
+      delete panelElement.dataset.resizeH;
       if (Number.isFinite(w) && Number.isFinite(h)) onResize(id, w, h);
     };
     document.addEventListener('pointermove', onPointerMove);
@@ -1409,8 +1411,8 @@ function attachPanelResize(panelEl, id, onResize) {
  * set) and directly by the pre-game preview screen (`#host-deck-area`,
  * no opts - no host controls exist on that screen at all).
  */
-export function renderDeckStack(container, count, opts = {}) {
-  container.innerHTML = '';
+export function renderDeckStack(container, count, options = {}) {
+  container.replaceChildren();
   // `classList.add`, not `className =` - `#host-deck-area` (the pre-game
   // preview screen) already carries `.deck-area` from static markup and
   // must keep it; `<deck-stack>` (inside `renderPile`) starts with none,
@@ -1425,33 +1427,33 @@ export function renderDeckStack(container, count, opts = {}) {
   const stack = document.createElement('div');
   stack.className = 'deck-stack';
   if (count > 0) {
-    for (let i = 0; i < Math.min(count, 3); i++) {
-      const back = cardBackEl();
+    for (let index = 0; index < Math.min(count, 3); index++) {
+      const back = cardBackElement();
       back.classList.add('deck-stack-card');
-      back.style.top = `${-i * 2}px`;
-      back.style.left = `${i * 2}px`;
-      stack.appendChild(back);
+      back.style.top = `${-index * 2}px`;
+      back.style.left = `${index * 2}px`;
+      stack.append(back);
     }
     const badge = document.createElement('span');
     badge.className = 'deck-count-badge';
     badge.textContent = count;
-    stack.appendChild(badge);
+    stack.append(badge);
   } else {
     const empty = document.createElement('div');
     empty.className = 'deck-empty';
     empty.textContent = 'Deck empty';
-    stack.appendChild(empty);
+    stack.append(empty);
   }
-  container.appendChild(stack);
+  container.append(stack);
 
   // Deal's count input stays persistent/always-visible - unchanged from
   // D52. UX follow-up (direct user request): "just make the split action
   // always split in half" - no count input for split any more, it's a
   // one-click action like every other deck action now.
-  const actions = pileLevelActions('deck', { isHost: opts.isHost === true });
+  const actions = pileLevelActions('deck', { isHost: options.isHost === true });
   if (actions.includes('deal') || actions.includes('reshuffleDeal')) {
-    container.appendChild(pileCountInput({
-      value: opts.dealCount ?? 1, onChange: opts.onDealCountChange,
+    container.append(pileCountInput({
+      value: options.dealCount ?? 1, onChange: options.onDealCountChange,
       min: 1, max: 20, ariaLabel: 'Cards to deal each player', inputId: 'deck-deal-count',
     }));
   }
@@ -1476,7 +1478,9 @@ function pileCountInput({ value, onChange, min, max, ariaLabel, inputId }) {
 
 const PILE_ACTION_TOKEN_PREFIX = 'pile-action:';
 
-/** The dataTransfer payload a draggable pile-action button carries. */
+/**
+The dataTransfer payload a draggable pile-action button carries.
+*/
 function pileActionToken(actionId) {
   return `${PILE_ACTION_TOKEN_PREFIX}${actionId}`;
 }
@@ -1507,7 +1511,9 @@ function pileDragToken(pileId) {
   return `${PILE_DRAG_TOKEN_PREFIX}${pileId}`;
 }
 
-/** Same shape as `pileActionFromDrop` - only meaningful at `drop` time. */
+/**
+Same shape as `pileActionFromDrop` - only meaningful at `drop` time.
+*/
 export function pileDragFromDrop(dataTransfer) {
   const raw = dataTransfer.getData('text/plain');
   return raw.startsWith(PILE_DRAG_TOKEN_PREFIX) ? raw.slice(PILE_DRAG_TOKEN_PREFIX.length) : null;
@@ -1519,7 +1525,7 @@ export function pileDragFromDrop(dataTransfer) {
  * smaller: there's no card identity to broadcast mid-drag (US-29 doesn't
  * apply - nothing has been drawn yet), just a ghost and a drop check.
  */
-function attachPileActionTouchDrag(sourceEl, actionId, onDrop) {
+function attachPileActionTouchDrag(sourceElement, actionId, onDrop) {
   let state = null;
   let timer = null;
   let ghost = null;
@@ -1531,16 +1537,16 @@ function attachPileActionTouchDrag(sourceEl, actionId, onDrop) {
   };
 
   const handle = {
-    lift: (ev) => {
-      ghost = sourceEl.cloneNode(true);
+    lift: (event) => {
+      ghost = sourceElement.cloneNode(true);
       ghost.classList.add('touch-drag-ghost');
-      document.body.appendChild(ghost);
-      moveDragGhost(ghost, ev.x, ev.y);
+      document.body.append(ghost);
+      moveDragGhost(ghost, event.x, event.y);
     },
-    move: (ev) => { if (ghost) moveDragGhost(ghost, ev.x, ev.y); },
-    drop: (ev) => {
+    move: (event) => { if (ghost) moveDragGhost(ghost, event.x, event.y); },
+    drop: (event) => {
       teardown();
-      if (document.elementFromPoint(ev.x, ev.y)?.closest('#hand-area')) onDrop();
+      if (document.elementFromPoint(event.x, event.y)?.closest('#hand-area')) onDrop();
     },
     cancel: teardown,
   };
@@ -1551,27 +1557,27 @@ function attachPileActionTouchDrag(sourceEl, actionId, onDrop) {
     for (const e of out.events) handle[e.type](e);
   };
 
-  sourceEl.addEventListener('pointerdown', (e) => {
+  sourceElement.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'mouse') return;
     feed({ type: 'down', x: e.clientX, y: e.clientY, t: performance.now() });
     clearTimeout(timer);
     timer = setTimeout(() => feed({ type: 'tick', t: performance.now() }), HOLD_MS);
-    sourceEl.setPointerCapture(e.pointerId);
+    sourceElement.setPointerCapture(e.pointerId);
   });
-  sourceEl.addEventListener('pointermove', (e) => {
+  sourceElement.addEventListener('pointermove', (e) => {
     if (e.pointerType === 'mouse') return;
     feed({ type: 'move', x: e.clientX, y: e.clientY, t: performance.now() });
   });
-  sourceEl.addEventListener('pointerup', (e) => {
+  sourceElement.addEventListener('pointerup', (e) => {
     if (e.pointerType === 'mouse') return;
     clearTimeout(timer);
     feed({ type: 'up', x: e.clientX, y: e.clientY, t: performance.now() });
   });
-  sourceEl.addEventListener('pointercancel', () => {
+  sourceElement.addEventListener('pointercancel', () => {
     clearTimeout(timer);
     feed({ type: 'cancel', t: performance.now() });
   });
-  sourceEl.addEventListener('touchmove', (e) => {
+  sourceElement.addEventListener('touchmove', (e) => {
     if (state?.phase === 'dragging') e.preventDefault();
   }, { passive: false });
 }
@@ -1588,11 +1594,11 @@ function attachPileActionTouchDrag(sourceEl, actionId, onDrop) {
 function renderMiniHand(container, count) {
   container.className = 'mini-hand';
   const shown = Math.min(count, 5);
-  for (let i = 0; i < shown; i++) {
+  for (let index = 0; index < shown; index++) {
     const back = document.createElement('div');
     back.className = 'mini-card-back';
-    back.style.marginLeft = i === 0 ? '0' : '-0.85rem';
-    container.appendChild(back);
+    back.style.marginLeft = index === 0 ? '0' : '-0.85rem';
+    container.append(back);
   }
 }
 
@@ -1606,8 +1612,8 @@ function renderMiniHand(container, count) {
  * `players` must already be in seat order (viewer first) when seated.
  */
 export function renderRoster(container, players, { movingIds, scores, onAdjustScore, myId, passed, seated, hideId } = {}) {
-  container.innerHTML = '';
-  players.forEach((p, i) => {
+  container.replaceChildren();
+  players.forEach((p, index) => {
     // UX follow-up: the viewer's own seat now lives in the merged
     // hand+zone panel (`renderSeatZones`'s `opts.own`), not the ring -
     // skipping the `<li>` here (not filtering `players` itself) keeps
@@ -1617,16 +1623,16 @@ export function renderRoster(container, players, { movingIds, scores, onAdjustSc
     const li = document.createElement('li');
     li.className = `roster-player roster-${p.connection}`;
     if (seated) {
-      const { leftPct, topPct } = seatPosition(i, players.length);
+      const { leftPct, topPct } = seatPosition(index, players.length);
       li.style.left = `${leftPct}%`;
       li.style.top = `${topPct}%`;
       li.classList.add('seat');
       if (p.id === myId) li.classList.add('seat-you');
     }
     const count = typeof p.handCount === 'number' ? ` (${p.handCount} cards)` : '';
-    const moving = movingIds?.has(p.id) ? ' \u270B organizing hand' : '';
-    const passedTag = passed?.[p.id] ? ' \uD83D\uDE45 Passed' : '';
-    const youTag = seated && p.id === myId ? ' \uD83E\uDDD1 You' : '';
+    const moving = movingIds?.has(p.id) ? ' \u{270B} organizing hand' : '';
+    const passedTag = passed?.[p.id] ? ' \u{1F645} Passed' : '';
+    const youTag = seated && p.id === myId ? ' \u{1F9D1} You' : '';
 
     // A seat is one horizontal row: [-] [who they are + score] [+].
     // The score buttons used to be appended *after* the text inside the
@@ -1639,38 +1645,38 @@ export function renderRoster(container, players, { movingIds, scores, onAdjustSc
     info.append(`${p.name} - ${p.connection}${count}${moving}${passedTag}${youTag}`);
 
     if (p.id !== myId && typeof p.handCount === 'number') {
-      const miniHandEl = document.createElement('div');
-      renderMiniHand(miniHandEl, p.handCount);
-      info.appendChild(miniHandEl);
+      const miniHandElement = document.createElement('div');
+      renderMiniHand(miniHandElement, p.handCount);
+      info.append(miniHandElement);
     }
 
     const hasScore = scores && p.id in scores;
     if (hasScore) {
-      const scoreEl = document.createElement('span');
-      scoreEl.className = 'score-row';
-      scoreEl.append(`Score: ${scores[p.id]}`);
-      info.appendChild(scoreEl);
+      const scoreElement = document.createElement('span');
+      scoreElement.className = 'score-row';
+      scoreElement.append(`Score: ${scores[p.id]}`);
+      info.append(scoreElement);
     }
 
     if (hasScore && onAdjustScore) {
-      const minusBtn = document.createElement('button');
-      minusBtn.type = 'button';
-      minusBtn.className = 'score-btn';
-      minusBtn.textContent = '-';
-      minusBtn.addEventListener('click', () => onAdjustScore(p.id, -1));
+      const minusButton = document.createElement('button');
+      minusButton.type = 'button';
+      minusButton.className = 'score-btn';
+      minusButton.textContent = '-';
+      minusButton.addEventListener('click', () => onAdjustScore(p.id, -1));
 
-      const plusBtn = document.createElement('button');
-      plusBtn.type = 'button';
-      plusBtn.className = 'score-btn';
-      plusBtn.textContent = '+';
-      plusBtn.addEventListener('click', () => onAdjustScore(p.id, 1));
+      const plusButton = document.createElement('button');
+      plusButton.type = 'button';
+      plusButton.className = 'score-btn';
+      plusButton.textContent = '+';
+      plusButton.addEventListener('click', () => onAdjustScore(p.id, 1));
 
-      li.append(minusBtn, info, plusBtn);
+      li.append(minusButton, info, plusButton);
     } else {
-      li.appendChild(info);
+      li.append(info);
     }
 
-    container.appendChild(li);
+    container.append(li);
   });
 }
 
@@ -1679,13 +1685,13 @@ export function renderRoster(container, players, { movingIds, scores, onAdjustSc
  * One consistent block per game (goal/setup/turns), per Smith's Gate 1 AC.
  */
 export function renderRulesPanel(container, rulesReference) {
-  container.innerHTML = '';
+  container.replaceChildren();
   for (const [name, entry] of Object.entries(rulesReference)) {
     const block = document.createElement('div');
     block.className = 'rules-entry';
     const heading = document.createElement('h3');
     heading.textContent = name;
-    block.appendChild(heading);
+    block.append(heading);
 
     const dl = document.createElement('dl');
     for (const [label, value] of [['Goal', entry.goal], ['Setup', entry.setup], ['Turns', entry.turns]]) {
@@ -1695,8 +1701,8 @@ export function renderRulesPanel(container, rulesReference) {
       dd.textContent = value;
       dl.append(dt, dd);
     }
-    block.appendChild(dl);
-    container.appendChild(block);
+    block.append(dl);
+    container.append(block);
   }
 }
 
@@ -1707,7 +1713,7 @@ export function renderRulesPanel(container, rulesReference) {
  */
 export function setCardLifted(cardId, active) {
   const els = document.querySelectorAll(`[data-card-id="${CSS.escape(cardId)}"]`);
-  for (const el of els) el.classList.toggle('card-lifted', active);
+  for (const element of els) element.classList.toggle('card-lifted', active);
 }
 
 /**
@@ -1716,19 +1722,19 @@ export function setCardLifted(cardId, active) {
  * game screen element, matching how the position was captured).
  */
 export function updateRemoteCursor(container, playerId, name, x, y) {
-  let el = container.querySelector(`[data-cursor-id="${CSS.escape(playerId)}"]`);
-  if (!el) {
-    el = document.createElement('div');
-    el.className = 'remote-cursor';
-    el.dataset.cursorId = playerId;
+  let element = container.querySelector(`[data-cursor-id="${CSS.escape(playerId)}"]`);
+  if (!element) {
+    element = document.createElement('div');
+    element.className = 'remote-cursor';
+    element.dataset.cursorId = playerId;
     const label = document.createElement('span');
     label.className = 'remote-cursor-label';
     label.textContent = name;
-    el.appendChild(label);
-    container.appendChild(el);
+    element.append(label);
+    container.append(element);
   }
-  el.style.left = `${x * 100}%`;
-  el.style.top = `${y * 100}%`;
+  element.style.left = `${x * 100}%`;
+  element.style.top = `${y * 100}%`;
 }
 
 export function removeRemoteCursor(container, playerId) {
@@ -1745,17 +1751,17 @@ export function removeRemoteCursor(container, playerId) {
  * resolvable id in the first place, not by this function).
  */
 export function updateCardDragGhost(container, playerId, card, x, y) {
-  let el = container.querySelector(`[data-card-drag-id="${CSS.escape(playerId)}"]`);
-  if (!el) {
-    el = document.createElement('div');
-    el.className = 'card-drag-ghost';
-    el.dataset.cardDragId = playerId;
-    container.appendChild(el);
+  let element = container.querySelector(`[data-card-drag-id="${CSS.escape(playerId)}"]`);
+  if (!element) {
+    element = document.createElement('div');
+    element.className = 'card-drag-ghost';
+    element.dataset.cardDragId = playerId;
+    container.append(element);
   }
-  el.innerHTML = '';
-  el.appendChild(card ? cardEl(card, { disabled: true }) : cardBackEl(null));
-  el.style.left = `${x * 100}%`;
-  el.style.top = `${y * 100}%`;
+  element.replaceChildren();
+  element.append(card ? cardElement(card, { disabled: true }) : cardBackElement(null));
+  element.style.left = `${x * 100}%`;
+  element.style.top = `${y * 100}%`;
 }
 
 export function removeCardDragGhost(container, playerId) {
@@ -1768,7 +1774,7 @@ export function renderBanner(container, message) {
 }
 
 export function showScreen(screens, name) {
-  for (const [key, el] of Object.entries(screens)) {
-    el.hidden = key !== name;
+  for (const [key, element] of Object.entries(screens)) {
+    element.hidden = key !== name;
   }
 }

@@ -26,7 +26,9 @@
  * meaning rather than introducing a rival one.
  */
 
-/** How long a finger must stay put before the card lifts. */
+/**
+How long a finger must stay put before the card lifts.
+*/
 export const HOLD_MS = 250;
 
 /**
@@ -98,12 +100,12 @@ export function step(state, sample, { holdMs = HOLD_MS, slopPx = SLOP_PX } = {})
     // US-28), so the recognizer stays entirely out of its way.
     if (type === 'up') return IDLE;
 
-    const held = t - state.downAt >= holdMs;
+    const isHeld = t - state.downAt >= holdMs;
     // Time is checked before distance: having held long enough, the
     // gesture is a drag and the finger is free to move. Checking
     // distance first would cancel a legitimate drag whose first sample
     // happens to arrive late and far.
-    if (!held) {
+    if (!isHeld) {
       return type === 'move' && beyondSlop(state, x, y, slopPx)
         ? IDLE
         : { state, events: [] };

@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { createInitialState, reduce, handsOf, zonesOf, deckOf } from '../src/state.js';
 import { SNAPSHOT_VERSION, snapshot, save, load, clear, expectedReturners, STORAGE_KEY } from '../src/persistence.js';
 
-/** A stand-in for localStorage: same three methods, no browser. */
+/**
+A stand-in for localStorage: same three methods, no browser.
+*/
 function fakeStorage(initial = {}) {
   const map = new Map(Object.entries(initial));
   return {

@@ -146,4 +146,6 @@ sequenceDiagram
     Note right of Trin: "*qa uat phase-74 PASSED.<br/>Independently re-ran npm<br/>run lint:js (1021<br/>findings, exit 1 as<br/>expected for a bare<br/>gate) and npm test<br/>(358/358). Z…"
     Morpheus->>Neo: "lead handoff"
     Note right of Morpheus: "Phase 74 review PASSED -<br/>config/rationale sound,<br/>zero behavior touched.<br/>Phase 75 split: 75a =<br/>run eslint --fix<br/>everywhere (604/1021<br/>auto-fi…"
+    Neo->>Cypher: "swe finding"
+    Note right of Neo: "*swe fix finding (pre-<br/>existing, NOT caused by<br/>techdebt sprint): npm<br/>run test:e2e times out<br/>at 'copy control' step<br/>(waitForFunction) on<br/>the…"
 ```

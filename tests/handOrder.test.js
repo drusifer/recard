@@ -7,27 +7,27 @@ function card(id, rank, suit) {
 }
 
 test('reconcileOrder: keeps existing ids in their prior position', () => {
-  const prev = ['a', 'b', 'c'];
+  const previous = ['a', 'b', 'c'];
   const current = [card('a', '2', 'clubs'), card('b', '3', 'clubs'), card('c', '4', 'clubs')];
-  assert.deepEqual(reconcileOrder(prev, current), ['a', 'b', 'c']);
+  assert.deepEqual(reconcileOrder(previous, current), ['a', 'b', 'c']);
 });
 
 test('reconcileOrder: appends newly seen ids at the end, in arrival order', () => {
-  const prev = ['a', 'b'];
+  const previous = ['a', 'b'];
   const current = [card('a', '2', 'clubs'), card('b', '3', 'clubs'), card('c', '4', 'clubs'), card('d', '5', 'clubs')];
-  assert.deepEqual(reconcileOrder(prev, current), ['a', 'b', 'c', 'd']);
+  assert.deepEqual(reconcileOrder(previous, current), ['a', 'b', 'c', 'd']);
 });
 
 test('reconcileOrder: drops ids no longer present', () => {
-  const prev = ['a', 'b', 'c'];
+  const previous = ['a', 'b', 'c'];
   const current = [card('a', '2', 'clubs'), card('c', '4', 'clubs')];
-  assert.deepEqual(reconcileOrder(prev, current), ['a', 'c']);
+  assert.deepEqual(reconcileOrder(previous, current), ['a', 'c']);
 });
 
 test('reconcileOrder: reorders after a manual drag (moved id keeps its new prior position)', () => {
-  const prev = ['b', 'a', 'c']; // caller already reordered a<->b via drag
+  const previous = ['b', 'a', 'c']; // caller already reordered a<->b via drag
   const current = [card('a', '2', 'clubs'), card('b', '3', 'clubs'), card('c', '4', 'clubs')];
-  assert.deepEqual(reconcileOrder(prev, current), ['b', 'a', 'c']);
+  assert.deepEqual(reconcileOrder(previous, current), ['b', 'a', 'c']);
 });
 
 test('reconcileOrder: starting from an empty order just takes arrival order', () => {

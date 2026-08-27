@@ -77,6 +77,8 @@ export function applyPresetLayout(storage, layout) {
   try {
     storage.setItem(PANEL_LAYOUT_KEY, JSON.stringify(merged));
   } catch {
-    /* private mode / quota - same "not worth throwing" call saveEntry already makes. */
+    /*
+    private mode / quota - same "not worth throwing" call saveEntry already makes.
+    */
   }
 }

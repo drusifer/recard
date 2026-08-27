@@ -16,8 +16,8 @@ import { renderActionHeader } from '../ui.js';
  * of a bespoke heading-building function per call site.
  */
 export class HeaderActionsElement extends HTMLElement {
-  render(titleText, actionIds, opts) {
-    renderActionHeader(this, titleText, actionIds, opts);
+  render(titleText, actionIds, options) {
+    renderActionHeader(this, titleText, actionIds, options);
   }
 }
 

@@ -11,13 +11,13 @@ const RANK_ORDER = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q',
 const SUIT_ORDER = ['clubs', 'diamonds', 'hearts', 'spades'];
 
 function rankIndex(rank) {
-  const i = RANK_ORDER.indexOf(rank);
-  return i === -1 ? RANK_ORDER.length : i; // JOKER (or anything unknown) sorts last
+  const index = RANK_ORDER.indexOf(rank);
+  return index === -1 ? RANK_ORDER.length : index; // JOKER (or anything unknown) sorts last
 }
 
 function suitIndex(suit) {
-  const i = SUIT_ORDER.indexOf(suit);
-  return i === -1 ? SUIT_ORDER.length : i; // JOKER (suit: null) sorts last
+  const index = SUIT_ORDER.indexOf(suit);
+  return index === -1 ? SUIT_ORDER.length : index; // JOKER (suit: null) sorts last
 }
 
 /**

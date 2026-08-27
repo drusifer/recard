@@ -70,9 +70,11 @@
  * separate, un-started item (see neo.docs/state.md).
  */
 
-/** Evenly spaces `ids` in one horizontal row, all the same `w`/`h`. */
+/**
+Evenly spaces `ids` in one horizontal row, all the same `w`/`h`.
+*/
 function row(ids, { x: startX, y, w, h, gap }) {
-  return Object.fromEntries(ids.map((id, i) => [id, { x: startX + i * (w + gap), y, w, h }]));
+  return Object.fromEntries(ids.map((id, index) => [id, { x: startX + index * (w + gap), y, w, h }]));
 }
 
 // Deck+Table(+Discard) group, and the viewer's own score - the only two

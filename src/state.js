@@ -86,7 +86,9 @@ function ensureZoneRecord(zones, id, name = null, ownerId = null, type = 'shared
  * parallel copy of the same rule.
  */
 
-/** The visibility rule a pile follows, derived from its type (D23/D42). */
+/**
+The visibility rule a pile follows, derived from its type (D23/D42).
+*/
 export function pileVisibility(pile) {
   return PILE_TYPES[pile.kind]?.visibility;
 }
@@ -169,18 +171,18 @@ function configuredZoneId(kind, index, count, ownerId = null) {
  * here since a 1:1 "this exact pile, alone" relationship needs no
  * separate declaration to be unambiguous.
  */
-function buildPiles(pileDecls, zoneRegistry) {
+function buildPiles(pileDeclarations, zoneRegistry) {
   const piles = [];
   let zones = zoneRegistry;
-  for (const { kind, ownerId, count = 1, zoneId: declaredZoneId } of pileDecls) {
+  for (const { kind, ownerId, count = 1, zoneId: declaredZoneId } of pileDeclarations) {
     if (ownerId === 'perPlayer') continue;
-    for (let i = 0; i < count; i++) {
-      const id = configuredZoneId(kind, i, count);
-      if (declaredZoneId && !zones.some((z) => z.id === declaredZoneId)) {
+    for (let index = 0; index < count; index++) {
+      const id = configuredZoneId(kind, index, count);
+      if (declaredZoneId && zones.every((z) => z.id !== declaredZoneId)) {
         throw new Error(`GameConfig.piles: "${id}" declares zoneId "${declaredZoneId}", but no such Zone is declared in GameConfig.zones`);
       }
       const zoneId = declaredZoneId ?? id;
-      piles.push(makeTableSidePile(kind, configuredZoneName(kind, i, count), null, id, zoneId));
+      piles.push(makeTableSidePile(kind, configuredZoneName(kind, index, count), null, id, zoneId));
       zones = ensureZoneRecord(zones, zoneId);
     }
   }
@@ -204,21 +206,21 @@ function buildPiles(pileDecls, zoneRegistry) {
  *   preset actually sets it" shape.
  */
 export function createInitialState(deckConfig = {}, rng = Math.random, gameConfig = {}) {
-  const pileDecls = gameConfig.piles ?? [];
-  const zoneDecls = gameConfig.zones ?? [];
+  const pileDeclarations = gameConfig.piles ?? [];
+  const zoneDeclarations = gameConfig.zones ?? [];
 
   // D55: the real Zone registry - the always-present Table Zone, plus
   // whatever Zone entities this game's own `GameConfig.zones` declares
   // (`{id, name, type}`). Every pile declaration's own `zoneId` (below)
   // is validated against exactly this list - nothing implicit.
   let zoneRegistry = ensureZoneRecord([], TABLE_ZONE_RECORD.id, TABLE_ZONE_RECORD.name, TABLE_ZONE_RECORD.ownerId, TABLE_ZONE_RECORD.type);
-  for (const z of zoneDecls) zoneRegistry = ensureZoneRecord(zoneRegistry, z.id, z.name ?? null, null, z.type ?? 'shared');
+  for (const z of zoneDeclarations) zoneRegistry = ensureZoneRecord(zoneRegistry, z.id, z.name ?? null, null, z.type ?? 'shared');
 
-  const built = buildPiles(pileDecls, zoneRegistry);
+  const built = buildPiles(pileDeclarations, zoneRegistry);
 
   return {
     deckConfig,
-    gameConfig: { allowsPlayerZones: gameConfig.allowsPlayerZones ?? true, piles: pileDecls, zones: zoneDecls },
+    gameConfig: { allowsPlayerZones: gameConfig.allowsPlayerZones ?? true, piles: pileDeclarations, zones: zoneDeclarations },
     zones: built.zones,
     piles: [
       makeDeckPile(deckConfig, rng, TABLE_ZONE_ID),
@@ -255,7 +257,9 @@ export function deckOf(state) {
   return state.piles.find((p) => p.id === DECK_PILE_ID).cards;
 }
 
-/** One player's hand. Empty (not undefined) if they have no hand pile yet. */
+/**
+One player's hand. Empty (not undefined) if they have no hand pile yet.
+*/
 export function handOf(state, playerId) {
   return state.piles.find((p) => p.kind === 'hand' && p.ownerId === playerId)?.cards ?? [];
 }
@@ -326,14 +330,16 @@ function dealRoundRobin(deck, destinationCount, cardsPerDestination, describeSho
 
   const rounds = cardsPerDestination ?? Infinity;
   for (let round = 0; round < rounds && remaining.length > 0; round++) {
-    for (let i = 0; i < destinationCount && remaining.length > 0; i++) {
-      dealt[i].push(remaining.shift());
+    for (let index = 0; index < destinationCount && remaining.length > 0; index++) {
+      dealt[index].push(remaining.shift());
     }
   }
   return { remaining, dealt };
 }
 
-/** The subset of an action describing where/how a dropped card lands (D21). */
+/**
+The subset of an action describing where/how a dropped card lands (D21).
+*/
 function placementOf(action) {
   return { targetCardId: action.targetCardId, side: action.side, layout: action.layout };
 }
@@ -359,14 +365,18 @@ function findZoneAndCard(state, cardId) {
  */
 function middleCardVisibility(visibility, playerId) {
   switch (visibility) {
-    case 'public':
+    case 'public': {
       return { owner: null, faceUp: true };
-    case 'shared-facedown':
+    }
+    case 'shared-facedown': {
       return { owner: null, faceUp: false };
-    case 'private-facedown':
+    }
+    case 'private-facedown': {
       return { owner: playerId, faceUp: false };
-    default:
+    }
+    default: {
       throw new Error(`Unknown visibility: ${visibility}`);
+    }
   }
 }
 
@@ -466,10 +476,10 @@ const ACTIONS = {
       : (state.gameConfig?.piles ?? [])
           .filter((z) => z.ownerId === 'perPlayer')
           .flatMap(({ kind, count = 1 }) =>
-            Array.from({ length: count }, (_, i) =>
+            Array.from({ length: count }, (_, index) =>
               makeTableSidePile(
-                kind, `${action.name}'s ${configuredZoneName(kind, i, count)}`, action.playerId,
-                configuredZoneId(kind, i, count, action.playerId),
+                kind, `${action.name}'s ${configuredZoneName(kind, index, count)}`, action.playerId,
+                configuredZoneId(kind, index, count, action.playerId),
               )));
     return {
       ...state,
@@ -502,7 +512,7 @@ const ACTIONS = {
   // hands are cleared first - one function, assigned to both keys
   // below, rather than two call paths that could drift apart.
   DEAL(state, action) {
-    const fresh = action.type === 'DEAL';
+    const isFresh = action.type === 'DEAL';
     const players = state.players;
     const { remaining, dealt } = dealRoundRobin(
       deckOf(state),
@@ -519,8 +529,8 @@ const ACTIONS = {
       if (p.id === DECK_PILE_ID) return withCards(p, remaining);
       if (p.kind !== 'hand') return p;
       const index = players.findIndex((pl) => pl.id === p.ownerId);
-      if (index === -1) return fresh ? withCards(p, []) : p;
-      return withCards(p, [...(fresh ? [] : p.cards), ...dealt[index]]);
+      if (index === -1) return isFresh ? withCards(p, []) : p;
+      return withCards(p, [...(isFresh ? [] : p.cards), ...dealt[index]]);
     });
     return { ...state, piles };
   },
@@ -584,7 +594,7 @@ const ACTIONS = {
    * host and a guest's own separate action).
    */
   CREATE_PILE(state, action) {
-    if (!state.zones.some((z) => z.id === action.zoneId)) {
+    if (state.zones.every((z) => z.id !== action.zoneId)) {
       throw new Error(`Zone ${action.zoneId} does not exist`);
     }
     const kind = action.kind ?? 'zone';
@@ -650,7 +660,7 @@ const ACTIONS = {
     let targetZoneId = action.targetZoneId;
     let zones = state.zones;
     if (targetZoneId) {
-      if (!zones.some((z) => z.id === targetZoneId)) {
+      if (zones.every((z) => z.id !== targetZoneId)) {
         throw new Error(`Zone ${targetZoneId} does not exist`);
       }
     } else {
@@ -841,7 +851,7 @@ const ACTIONS = {
     // count-only, no per-card owner/faceUp/layout fields needed at all
     // (those were only ever there to make a zone-kind pile behave like
     // a hidden draw pile; a real deck-kind pile already IS one).
-    const piles = dealt.map((cards, i) => withCards(makeTableSidePile('deck', `Pile ${i + 1}`), cards));
+    const piles = dealt.map((cards, index) => withCards(makeTableSidePile('deck', `Pile ${index + 1}`), cards));
     // D24 invariant: the ORIGINAL deck pile (`DECK_PILE_ID`) stays, now
     // empty - matched by id, not kind, now that split piles are ALSO
     // deck-kind (see `deckOf`'s own comment on why this matters).
@@ -855,7 +865,7 @@ const ACTIONS = {
 
   PLAY(state, action) {
     const zoneId = action.zoneId ?? DEFAULT_ZONE_ID;
-    if (!zonesOf(state).some((z) => z.id === zoneId)) {
+    if (zonesOf(state).every((z) => z.id !== zoneId)) {
       throw new Error(`Zone ${zoneId} does not exist`);
     }
     const { owner, faceUp } = middleCardVisibility(action.visibility ?? 'public', action.playerId);
@@ -944,7 +954,7 @@ const ACTIONS = {
     if (!found) {
       throw new Error(`Card ${action.cardId} is not in any zone`);
     }
-    if (!zonesOf(state).some((z) => z.id === action.toZoneId)) {
+    if (zonesOf(state).every((z) => z.id !== action.toZoneId)) {
       throw new Error(`Zone ${action.toZoneId} does not exist`);
     }
     // D21: no same-zone early return - a move within one zone is a
@@ -1004,7 +1014,7 @@ const ACTIONS = {
   /** *nit (2026-08-26): same reasoning as RENAME_PILE, for a Zone
    * record's own name (D55's `state.zones`). */
   RENAME_ZONE(state, action) {
-    if (!state.zones.some((z) => z.id === action.zoneId)) {
+    if (state.zones.every((z) => z.id !== action.zoneId)) {
       throw new Error(`Zone ${action.zoneId} does not exist`);
     }
     const name = action.name?.trim();
@@ -1092,7 +1102,7 @@ export function viewFor(state, playerId) {
       // 'hidden'/'in-hand' piles never send contents to a non-viewer -
       // only a count, so a hand's *size* stays public (needed for the
       // roster's card counts) while its cards never leave the host.
-      case 'hidden':
+      case 'hidden': {
         // UX follow-up (real bug, found live): more than one deck-kind
         // (hidden-visibility) pile can exist now (`deckPile.tableSide`)
         // - this used to blindly overwrite `deckCount` with whichever
@@ -1114,7 +1124,8 @@ export function viewFor(state, playerId) {
         if (pile.id === DECK_PILE_ID) deckCount = pile.cards.length;
         zones.push({ id: pile.id, name: pile.name, ownerId: pile.ownerId ?? null, kind: pile.kind, zoneId: pile.zoneId, cards: [], count: pile.cards.length });
         break;
-      case 'in-hand':
+      }
+      case 'in-hand': {
         if (pile.ownerId === playerId) myHand = pile.cards;
         else otherHandCounts[pile.ownerId] = pile.cards.length;
         // UX follow-up (direct user request): the D17 personal seat zone
@@ -1136,7 +1147,8 @@ export function viewFor(state, playerId) {
           cards: pile.cards.map((card) => PILE_TYPES[pile.kind].redactCard(card, playerId, pile)),
         });
         break;
-      case 'mixed':
+      }
+      case 'mixed': {
         zones.push({
           id: pile.id,
           name: pile.name,
@@ -1155,6 +1167,7 @@ export function viewFor(state, playerId) {
           cards: pile.cards.map((card) => PILE_TYPES[pile.kind].redactCard(card, playerId)),
         });
         break;
+      }
     }
   }
 

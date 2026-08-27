@@ -52,7 +52,7 @@ test('pinochle: numDecks combines whole pinochle decks, same meaning as standard
 test('pinochle: jokers is accepted but silently ignored - not a rule in this deck type', () => {
   const deck = buildDeck({ type: 'pinochle', jokers: 4 });
   assert.equal(deck.length, 48, 'jokers must not appear or change the count');
-  assert.ok(!deck.some((c) => c.rank === 'JOKER'));
+  assert.ok(deck.every((c) => c.rank !== 'JOKER'));
 });
 
 test('buildDeck: jokers and multiple decks scale linearly', () => {
@@ -114,10 +114,10 @@ test('deal: throws if asking for more cards than the deck has', () => {
 function mulberry32(seed) {
   let a = seed;
   return function rng() {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
+    a = Math.trunc(a);
+    a = (a + 0x6D_2B_79_F5) | 0;
     let t = Math.imul(a ^ (a >>> 15), 1 | a);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    return ((t ^ (t >>> 14)) >>> 0) / 4_294_967_296;
   };
 }

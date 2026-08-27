@@ -67,17 +67,17 @@ export async function copyText(text) {
   textarea.style.position = 'fixed';
   textarea.style.left = '-9999px';
   textarea.setAttribute('readonly', '');
-  document.body.appendChild(textarea);
+  document.body.append(textarea);
   textarea.select();
   textarea.setSelectionRange(0, text.length); // iOS Safari needs this explicitly, select() alone isn't enough
-  let copied = false;
+  let isCopied = false;
   try {
-    copied = document.execCommand('copy');
+    isCopied = document.execCommand('copy');
   } catch {
-    copied = false;
+    isCopied = false;
   }
   textarea.remove();
-  return copied;
+  return isCopied;
 }
 
 /**
@@ -99,36 +99,36 @@ export async function copyText(text) {
  * on every state broadcast, and `addEventListener` would stack a new
  * handler each time.
  */
-export function wireCopyCode(btn, code) {
-  btn.classList.add('icon-btn');
-  btn.innerHTML = COPY_ICON;
-  btn.setAttribute('aria-label', COPY_LABEL);
-  btn.title = COPY_LABEL;
-  btn.onclick = async () => {
+export function wireCopyCode(button, code) {
+  button.classList.add('icon-btn');
+  button.innerHTML = COPY_ICON;
+  button.setAttribute('aria-label', COPY_LABEL);
+  button.title = COPY_LABEL;
+  button.addEventListener('click', async () => {
     const ok = await copyText(code);
-    btn.innerHTML = ok ? DONE_ICON : COPY_ICON;
+    button.innerHTML = ok ? DONE_ICON : COPY_ICON;
     const label = ok ? 'Copied' : "Couldn't copy - select and copy the code manually";
-    btn.setAttribute('aria-label', label);
-    btn.title = label;
+    button.setAttribute('aria-label', label);
+    button.title = label;
     setTimeout(() => {
-      btn.innerHTML = COPY_ICON;
-      btn.setAttribute('aria-label', COPY_LABEL);
-      btn.title = COPY_LABEL;
+      button.innerHTML = COPY_ICON;
+      button.setAttribute('aria-label', COPY_LABEL);
+      button.title = COPY_LABEL;
     }, 1500);
-  };
+  });
 }
 
 export function renderShareCode(container, { code }) {
-  container.innerHTML = '';
+  container.replaceChildren();
 
-  const codeEl = document.createElement('div');
-  codeEl.className = 'share-code';
-  codeEl.textContent = code;
+  const codeElement = document.createElement('div');
+  codeElement.className = 'share-code';
+  codeElement.textContent = code;
 
-  const copyBtn = document.createElement('button');
-  copyBtn.type = 'button';
-  copyBtn.className = 'copy-link-btn';
-  wireCopyCode(copyBtn, code);
+  const copyButton = document.createElement('button');
+  copyButton.type = 'button';
+  copyButton.className = 'copy-link-btn';
+  wireCopyCode(copyButton, code);
 
-  container.append(codeEl, copyBtn);
+  container.append(codeElement, copyButton);
 }

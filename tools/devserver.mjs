@@ -29,8 +29,8 @@ const MIME = {
   '.ico': 'image/x-icon',
 };
 
-const server = http.createServer(async (req, res) => {
-  const pathname = decodeURIComponent(req.url.split('?')[0]);
+const server = http.createServer(async (request, res) => {
+  const pathname = decodeURIComponent(request.url.split('?', 1)[0]);
   const filePath = path.join(ROOT, pathname === '/' ? 'index.html' : pathname);
 
   // Don't serve anything outside the project root.

@@ -3,16 +3,16 @@ import assert from 'node:assert/strict';
 import { makeStateMessage, makeMotionMessage, createMotionThrottler, cardDragPayload } from '../src/protocol.js';
 
 test('makeStateMessage: wraps a state payload with type "state"', () => {
-  const msg = makeStateMessage({ foo: 'bar' });
-  assert.equal(msg.type, 'state');
-  assert.deepEqual(msg.payload, { foo: 'bar' });
+  const message = makeStateMessage({ foo: 'bar' });
+  assert.equal(message.type, 'state');
+  assert.deepEqual(message.payload, { foo: 'bar' });
 });
 
 test('makeMotionMessage: wraps cosmetic data with type "motion" and a kind', () => {
-  const msg = makeMotionMessage('hand-slot', { slot: 2, x: 10, y: 20 });
-  assert.equal(msg.type, 'motion');
-  assert.equal(msg.kind, 'hand-slot');
-  assert.deepEqual(msg.data, { slot: 2, x: 10, y: 20 });
+  const message = makeMotionMessage('hand-slot', { slot: 2, x: 10, y: 20 });
+  assert.equal(message.type, 'motion');
+  assert.equal(message.kind, 'hand-slot');
+  assert.deepEqual(message.data, { slot: 2, x: 10, y: 20 });
 });
 
 test('createMotionThrottler: coalesces repeated schedules for the same key, latest wins', () => {
@@ -38,7 +38,7 @@ test('createMotionThrottler: drain() clears pending state (best-effort, not repl
 
 test('createMotionThrottler: independent keys never overwrite each other', () => {
   const throttler = createMotionThrottler();
-  for (let i = 0; i < 5; i++) throttler.schedule(`slot-${i}`, { i });
+  for (let index = 0; index < 5; index++) throttler.schedule(`slot-${index}`, { i: index });
   const due = throttler.drain();
   assert.equal(due.length, 5);
 });

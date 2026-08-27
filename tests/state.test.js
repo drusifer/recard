@@ -123,7 +123,7 @@ test('PLAY: moves a card from a hand to the table', () => {
   assert.equal(handOf(state, 'p1').length, 2);
   assert.equal(tableOf(state).cards.length, 1);
   assert.equal(tableOf(state).cards[0].id, cardId);
-  assert.ok(!handOf(state, 'p1').some((c) => c.id === cardId));
+  assert.ok(handOf(state, 'p1').every((c) => c.id !== cardId));
 });
 
 test('PLAY: throws if the card is not in that player\'s hand', () => {
@@ -646,9 +646,9 @@ test('createInitialState: a configured zone\'s id is deterministic (kind alone w
 });
 
 test('createInitialState: a configured zone\'s id is deterministic AND stable across separate calls with the same preset', () => {
-  const pileDecls = [{ kind: 'foundation', ownerId: null, count: 4 }, { kind: 'cascade', ownerId: null, count: 7 }];
-  const first = createInitialState({}, () => 0.5, { piles: pileDecls });
-  const second = createInitialState({}, () => 0.5, { piles: pileDecls });
+  const pileDeclarations = [{ kind: 'foundation', ownerId: null, count: 4 }, { kind: 'cascade', ownerId: null, count: 7 }];
+  const first = createInitialState({}, () => 0.5, { piles: pileDeclarations });
+  const second = createInitialState({}, () => 0.5, { piles: pileDeclarations });
   const idsOf = (state) => zonesOf(state).filter((z) => z.kind === 'foundation' || z.kind === 'cascade')
     .map((z) => z.id).sort();
   assert.deepEqual(idsOf(first), idsOf(second), 'the same preset must produce the same zone ids every game, so a saved panel layout still applies');
@@ -1076,7 +1076,9 @@ test('RankAdjacent end-to-end: accepts +/-1 either direction and the King<->Ace 
 
 // --- Card stack/overlap layout (D21, US-32/US-33) ---
 
-/** Deals p1 three cards and plays them all public into the default zone. */
+/**
+Deals p1 three cards and plays them all public into the default zone.
+*/
 function threeCardsOnTable(rng = () => 0.5) {
   let state = withPlayers(createInitialState({}, rng), ['p1', 'p2']);
   state = reduce(state, { type: 'DEAL', cardsPerPlayer: 3 });
@@ -1235,7 +1237,7 @@ test('SHUFFLE_DECK reorders the deck without touching anything else', () => {
 
   // A seeded rng that actually permutes, so "did it reorder" is testable.
   let n = 0;
-  const next = reduce(state, { type: 'SHUFFLE_DECK', rng: () => ((n = (n * 9301 + 49297) % 233280), n / 233280) });
+  const next = reduce(state, { type: 'SHUFFLE_DECK', rng: () => ((n = (n * 9301 + 49_297) % 233_280), n / 233_280) });
 
   assert.deepEqual([...deckOf(next)].map((c) => c.id).sort(), [...deckBefore].sort(),
     'same cards, no additions or losses');
@@ -1573,7 +1575,7 @@ test('viewFor: carries zoneRecords (the real Zone registry) and each pile-view i
 // --- Sprint 23, Phase 68: SPLIT_PILE + TAKE_PILE (US-60/61) ---
 
 function dealPublicCardsTo(state, playerId, zoneId, count) {
-  for (let i = 0; i < count; i++) {
+  for (let index = 0; index < count; index++) {
     const cardId = handOf(state, playerId)[0].id;
     state = reduce(state, { type: 'PLAY', playerId, cardId, zoneId, visibility: 'public' });
   }
@@ -1757,8 +1759,8 @@ test('SET_PILE_ORIENTATION: a shared pile can only be set by the host - reducer 
 });
 
 test('zonePile/discardPile pileActions: hide/show are mutually exclusive, keyed off the pile\'s own current orientation', () => {
-  const faceUp = (n) => Array.from({ length: n }, (_, i) => ({ id: `c${i}`, faceUp: true }));
-  const faceDown = (n) => Array.from({ length: n }, (_, i) => ({ id: `c${i}`, faceUp: false }));
+  const faceUp = (n) => Array.from({ length: n }, (_, index) => ({ id: `c${index}`, faceUp: true }));
+  const faceDown = (n) => Array.from({ length: n }, (_, index) => ({ id: `c${index}`, faceUp: false }));
   assert.deepEqual(PILE_TYPES.zone.pileActions({ isShared: true, cards: faceUp(2) }).filter((a) => a === 'hide' || a === 'show'), ['hide']);
   assert.deepEqual(PILE_TYPES.zone.pileActions({ isShared: true, cards: faceDown(2) }).filter((a) => a === 'hide' || a === 'show'), ['show']);
   assert.deepEqual(PILE_TYPES.zone.pileActions({ isShared: true, cards: [] }).filter((a) => a === 'hide' || a === 'show'), [], 'an empty pile offers neither');
@@ -1789,7 +1791,7 @@ test('RENAME_PILE: rejects a blank name (whitespace-only counts as blank)', () =
   const state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
   const table = tableOf(state);
   assert.throws(
-    () => reduce(state, { type: 'RENAME_PILE', pileId: table.id, playerId: 'p1', name: '   ' }),
+    () => reduce(state, { type: 'RENAME_PILE', pileId: table.id, playerId: 'p1', name: ' '.repeat(3) }),
     /blank/,
   );
 });

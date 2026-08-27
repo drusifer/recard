@@ -29,9 +29,9 @@ export function buildDeck({ type = 'standard', numDecks = 1, jokers = 0 } = {}) 
  */
 export function shuffle(deck, rng = Math.random) {
   const result = [...deck];
-  for (let i = result.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [result[i], result[j]] = [result[j], result[i]];
+  for (let index = result.length - 1; index > 0; index--) {
+    const index_ = Math.floor(rng() * (index + 1));
+    [result[index], result[index_]] = [result[index_], result[index]];
   }
   return result;
 }

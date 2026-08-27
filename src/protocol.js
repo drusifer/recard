@@ -47,7 +47,7 @@ export function createMotionThrottler() {
       pending.set(key, data);
     },
     drain() {
-      const due = [...pending.entries()].map(([key, data]) => ({ key, data }));
+      const due = [...pending].map(([key, data]) => ({ key, data }));
       pending.clear();
       return due;
     },

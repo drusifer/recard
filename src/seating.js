@@ -16,9 +16,9 @@
  * @returns {{id: string}[]}
  */
 export function seatedOrder(players, viewerId) {
-  const idx = players.findIndex((p) => p.id === viewerId);
-  if (idx <= 0) return players;
-  return [...players.slice(idx), ...players.slice(0, idx)];
+  const index = players.findIndex((p) => p.id === viewerId);
+  if (index <= 0) return players;
+  return [...players.slice(index), ...players.slice(0, index)];
 }
 
 /**

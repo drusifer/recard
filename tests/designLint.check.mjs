@@ -30,8 +30,8 @@ const PORT = 8211;
 const BASE = `http://localhost:${PORT}`;
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
 
-const server = http.createServer(async (req, res) => {
-  const pathname = req.url.split('?')[0];
+const server = http.createServer(async (request, res) => {
+  const pathname = request.url.split('?', 1)[0];
   const filePath = path.join(ROOT, pathname === '/' ? 'index.html' : pathname);
   try {
     const body = await readFile(filePath);
@@ -50,13 +50,13 @@ const SYSTEM_CHROMIUM_PATHS = ['/usr/bin/chromium', '/usr/bin/chromium-browser',
 async function launchChromium() {
   try {
     return await chromium.launch({ args: ['--no-sandbox'] });
-  } catch (err) {
+  } catch (error) {
     for (const executablePath of SYSTEM_CHROMIUM_PATHS) {
       try {
         return await chromium.launch({ executablePath, args: ['--no-sandbox'] });
       } catch { /* try the next candidate */ }
     }
-    throw err;
+    throw error;
   }
 }
 
@@ -84,15 +84,15 @@ try {
   await host.click('#show-host');
   await host.fill('#host-name', 'Alice');
   await host.click('#create-table');
-  await host.waitForSelector('#host-share:not([hidden])', { timeout: 20000 });
+  await host.waitForSelector('#host-share:not([hidden])', { timeout: 20_000 });
   const code = (await host.locator('.share-code').textContent()).trim();
 
   await guest.goto(`${BASE}/?join=${encodeURIComponent(code)}`);
   await guest.fill('#join-name', 'Bob');
   await guest.click('#join-btn');
   await guest.waitForFunction(
-    () => document.getElementById('join-status').textContent.includes('Connected'),
-    undefined, { timeout: 20000 },
+    () => document.querySelector('#join-status').textContent.includes('Connected'),
+    undefined, { timeout: 20_000 },
   );
   await host.fill('#cards-per-player', '7');
   await host.click('#deal-btn');
@@ -107,7 +107,7 @@ try {
   // host's own page.
   await host.waitForFunction(
     () => document.querySelector('[data-kind="hand"]')?.querySelectorAll('.card').length === 7,
-    undefined, { timeout: 15000 },
+    undefined, { timeout: 15_000 },
   );
   // A card in the pot, matching the state the original regression was
   // found under (an empty pot doesn't exercise the overlap check at all).
@@ -143,7 +143,7 @@ try {
       // just "mine", which the DOM no longer marks distinctly), so this
       // stays a real check rather than silently matching nothing the
       // way the `#seat-zones`/`#table-area` selector below once did.
-      handRects: [...document.querySelectorAll('[data-kind="hand"]')].map((el) => el.getBoundingClientRect()),
+      handRects: [...document.querySelectorAll('[data-kind="hand"]')].map((element) => element.getBoundingClientRect()),
       // UX follow-up (real bug, found live): this selector still named
       // `#seat-zones`/`#table-area`, both retired by the DOM-flattening
       // pass ("table-surface -> #zones -> .zone", no more container
@@ -160,9 +160,9 @@ try {
       // Zones, with no exclusion needed for a Zone's own members the
       // way an earlier cut of this check (when piles still borrowed the
       // `.zone` class) required.
-      zones: [...document.querySelectorAll('#zones .zone')].map((el) => ({
-        label: el.querySelector('.zone-name')?.textContent?.trim() || el.className,
-        rect: el.getBoundingClientRect(),
+      zones: [...document.querySelectorAll('#zones .zone')].map((element) => ({
+        label: element.querySelector('.zone-name')?.textContent?.trim() || element.className,
+        rect: element.getBoundingClientRect(),
       })),
       // `.card` buttons (the playing cards themselves) are deliberately
       // excluded: the user explicitly authorized shrinking them to fit
@@ -224,18 +224,18 @@ try {
 
     // Check 3: no zone (shared or personal) overlaps another - D24's
     // invariant, generalized to every zone pair instead of just seat-vs-pot.
-    for (let i = 0; i < g.zones.length; i++) {
-      for (let j = i + 1; j < g.zones.length; j++) {
-        if (rectsOverlap(g.zones[i].rect, g.zones[j].rect)) {
-          report(vp.name, `zone "${g.zones[i].label}" overlaps zone "${g.zones[j].label}"`);
+    for (let index = 0; index < g.zones.length; index++) {
+      for (let index_ = index + 1; index_ < g.zones.length; index_++) {
+        if (rectsOverlap(g.zones[index].rect, g.zones[index_].rect)) {
+          report(vp.name, `zone "${g.zones[index].label}" overlaps zone "${g.zones[index_].label}"`);
         }
       }
     }
 
     // Check 4: every visible button clears the 44px touch-target floor.
-    for (const btn of g.buttons) {
-      if (!meetsMinTouchTarget(btn.rect)) {
-        report(vp.name, `button "${btn.label}" is ${Math.round(btn.rect.width)}x${Math.round(btn.rect.height)}px, under the 44px floor`);
+    for (const button of g.buttons) {
+      if (!meetsMinTouchTarget(button.rect)) {
+        report(vp.name, `button "${button.label}" is ${Math.round(button.rect.width)}x${Math.round(button.rect.height)}px, under the 44px floor`);
       }
     }
   }

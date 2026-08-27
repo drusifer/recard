@@ -10,7 +10,9 @@
  * have nothing worth persisting.
  */
 
-/** Bump when the snapshot shape changes; older blobs are then discarded. */
+/**
+Bump when the snapshot shape changes; older blobs are then discarded.
+*/
 export const SNAPSHOT_VERSION = 3; // 3 = real Zone entity + per-pile zoneId (D55); a v2 pile has neither, so `ui.js`'s zoneId-based grouping would put every pile in its own zone-of-one - discarded rather than silently mis-rendered, same reasoning as D31's hands bump
 
 export const STORAGE_KEY = 'recard:host-state:v1';
@@ -122,7 +124,9 @@ export function load(storage) {
   };
 }
 
-/** Forgets the save. Safe to call when storage is unavailable. */
+/**
+Forgets the save. Safe to call when storage is unavailable.
+*/
 export function clear(storage) {
   try {
     storage.removeItem(STORAGE_KEY);
@@ -131,9 +135,11 @@ export function clear(storage) {
   }
 }
 
-/** "3 minutes ago" - so the host can judge whether a save is worth restoring. */
+/**
+"3 minutes ago" - so the host can judge whether a save is worth restoring.
+*/
 export function describeAge(ageMs) {
-  const mins = Math.floor(ageMs / 60000);
+  const mins = Math.floor(ageMs / 60_000);
   if (mins < 1) return 'less than a minute ago';
   if (mins < 60) return `${mins} minute${mins === 1 ? '' : 's'} ago`;
   const hours = Math.floor(mins / 60);

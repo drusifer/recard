@@ -20,8 +20,8 @@ import { renderZonePanel } from '../ui.js';
  * pass uses.
  */
 export class ZonePanelElement extends HTMLElement {
-  render(id, title, piles, allZones, opts) {
-    renderZonePanel(this, id, title, piles, allZones, opts);
+  render(id, title, piles, allZones, options) {
+    renderZonePanel(this, id, title, piles, allZones, options);
   }
 }
 

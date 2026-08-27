@@ -2,8 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { step, HOLD_MS, SLOP_PX } from '../src/touchDrag.js';
 
-/** Feeds a sequence of samples through the reducer, collecting every event. */
-/** Idle is represented as `null`, so name it rather than asserting on null. */
+/**
+Feeds a sequence of samples through the reducer, collecting every event.
+*/
+/**
+Idle is represented as `null`, so name it rather than asserting on null.
+*/
 const phaseOf = (state) => state?.phase ?? 'idle';
 
 function run(samples, state = null) {
@@ -52,7 +56,7 @@ test('slop is measured from the origin, not from the previous sample', () => {
   // scroll. Comparing against the previous sample would let a slow drag
   // of the page creep arbitrarily far and then be treated as a hold.
   const stepsOut = [];
-  for (let i = 1; i <= 5; i++) stepsOut.push(move(i * 10, 100, 100 + i * 3));
+  for (let index = 1; index <= 5; index++) stepsOut.push(move(index * 10, 100, 100 + index * 3));
   const { state, events } = run([down(0), ...stepsOut]);
   assert.equal(phaseOf(state), 'idle');
   assert.deepEqual(events, []);

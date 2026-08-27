@@ -43,18 +43,18 @@ const MOTION_FLUSH_MS = 50;
 const MOTION_TTL_MS = 2000; // auto-clear a stale "organizing hand" cue if the end-event is dropped
 
 const screens = {
-  landing: document.getElementById('screen-landing'),
-  host: document.getElementById('screen-host'),
-  join: document.getElementById('screen-join'),
-  game: document.getElementById('screen-game'),
+  landing: document.querySelector('#screen-landing'),
+  host: document.querySelector('#screen-host'),
+  join: document.querySelector('#screen-join'),
+  game: document.querySelector('#screen-game'),
 };
-const bannerEl = document.getElementById('banner');
+const bannerElement = document.querySelector('#banner');
 
 // UX follow-up (direct user request): "just have table-surface -> zone"
 // - every pile/zone panel (shared, personal, the deck) is a direct
 // child of this one flat container now, no `#table-center`/
 // `#table-area`/`#seat-zones` split.
-const zonesEl = document.getElementById('zones');
+const zonesElement = document.querySelector('#zones');
 // (bloop: piles/zones/cards are all Movable) - "drop here to ungroup"
 // (Phase 72's own task.md AC): a pile dropped on the open TABLE
 // background, not onto any specific Zone, becomes its own standalone
@@ -65,8 +65,8 @@ const zonesEl = document.getElementById('zones');
 // (`renderZonePanel`, `ui.js`) `stopPropagation()`s a pile-token drop
 // it actually handles, so this only ever fires for a drop that lands
 // on truly empty space between zones, never a double-dispatch.
-zonesEl.addEventListener('dragover', (e) => e.preventDefault());
-zonesEl.addEventListener('drop', (e) => {
+zonesElement.addEventListener('dragover', (e) => e.preventDefault());
+zonesElement.addEventListener('drop', (e) => {
   e.preventDefault();
   const pileId = pileDragFromDrop(e.dataTransfer);
   if (pileId) performMovePile(pileId, null);
@@ -85,7 +85,7 @@ let myId = null;
 let myName = '';
 let gameState = null; // authoritative, host only
 let latestView = null; // last view received from host, join only
-let sessionEnded = false;
+let isSessionEnded = false;
 let selectedPreset = null; // US-15: applied to cards-per-player once host-share is shown
 
 function describeDeckConfig({ type, numDecks, jokers }) {
@@ -102,9 +102,9 @@ function describeDeckConfig({ type, numDecks, jokers }) {
  * `zones` - D55; Solitaire's 4 foundations + 7 cascades, Spit's 2
  * rank-adjacent piles + a stock per player), or `''` for every
  * pre-Sprint-22 preset that has none. */
-function describeConfiguredZones(pileDecls) {
-  if (!pileDecls?.length) return '';
-  return pileDecls
+function describeConfiguredZones(pileDeclarations) {
+  if (!pileDeclarations?.length) return '';
+  return pileDeclarations
     .map(({ kind, ownerId, count = 1 }) => {
       const word = count === 1 ? kind : `${kind}s`;
       return ownerId === 'perPlayer' ? `${count} ${word}/player` : `${count} ${word}`;
@@ -114,28 +114,28 @@ function describeConfiguredZones(pileDecls) {
 
 // --- Rules reference (US-18): a toggleable overlay, not a showScreen()
 // swap, so opening it never loses table state (Smith Gate 1 AC). ---
-renderRulesPanel(document.getElementById('rules-content'), RULES_REFERENCE);
-document.getElementById('rules-toggle').addEventListener('click', () => {
-  document.getElementById('rules-panel').hidden = false;
+renderRulesPanel(document.querySelector('#rules-content'), RULES_REFERENCE);
+document.querySelector('#rules-toggle').addEventListener('click', () => {
+  document.querySelector('#rules-panel').hidden = false;
 });
-document.getElementById('rules-close').addEventListener('click', () => {
-  document.getElementById('rules-panel').hidden = true;
+document.querySelector('#rules-close').addEventListener('click', () => {
+  document.querySelector('#rules-panel').hidden = true;
 });
 
 // --- Presets (US-15) ---
-const presetSelect = document.getElementById('host-preset');
+const presetSelect = document.querySelector('#host-preset');
 for (const preset of PRESETS) {
   const opt = document.createElement('option');
   opt.value = preset.name;
   opt.textContent = preset.name;
-  presetSelect.appendChild(opt);
+  presetSelect.append(opt);
 }
 presetSelect.addEventListener('change', () => {
   const preset = PRESETS.find((p) => p.name === presetSelect.value);
-  const previewEl = document.getElementById('host-preset-preview');
+  const previewElement = document.querySelector('#host-preset-preview');
   selectedPreset = preset ?? null;
   if (!preset) {
-    previewEl.hidden = true;
+    previewElement.hidden = true;
     return;
   }
   // D49: `type` is optional on a preset ('standard' by omission, same
@@ -143,18 +143,18 @@ presetSelect.addEventListener('change', () => {
   // never set it, so this must not clobber a host's own manual
   // deck-type choice with 'standard' every time they merely preview a
   // preset that doesn't care.
-  if (preset.type) document.getElementById('host-deck-type').value = preset.type;
-  document.getElementById('host-num-decks').value = String(preset.numDecks);
-  document.getElementById('host-jokers').value = String(preset.jokers);
+  if (preset.type) document.querySelector('#host-deck-type').value = preset.type;
+  document.querySelector('#host-num-decks').value = String(preset.numDecks);
+  document.querySelector('#host-jokers').value = String(preset.jokers);
   const cardsWord = preset.cardsPerPlayer === 1 ? 'card' : 'cards';
   // D53 (Smith Gate 2): a preset that declares a starting table layout
   // says so in the preview too, same "prefill on select" spirit as the
   // deck/deal fields above - the host sees what they're getting before
   // clicking Create Table, not only after.
   const zonesText = describeConfiguredZones(preset.piles);
-  previewEl.textContent = `${describeDeckConfig(preset)}, ${preset.cardsPerPlayer} ${cardsWord}/player`
+  previewElement.textContent = `${describeDeckConfig(preset)}, ${preset.cardsPerPlayer} ${cardsWord}/player`
     + (zonesText ? ` — table: ${zonesText}` : '');
-  previewEl.hidden = false;
+  previewElement.hidden = false;
 });
 
 const motionThrottler = createMotionThrottler();
@@ -167,17 +167,17 @@ const cardDragTimers = new Map();
 // the game screen, broadcast its position normalized to that screen's
 // own bounding box (0-1 on each axis) - the only value that means the
 // same thing across devices with different viewport sizes. ---
-const gameScreenEl = document.getElementById('screen-game');
-let pointerActive = false;
-gameScreenEl.addEventListener('pointerdown', () => {
-  pointerActive = true;
+const gameScreenElement = document.querySelector('#screen-game');
+let isPointerActive = false;
+gameScreenElement.addEventListener('pointerdown', () => {
+  isPointerActive = true;
 });
-window.addEventListener('pointerup', () => {
-  pointerActive = false;
+globalThis.addEventListener('pointerup', () => {
+  isPointerActive = false;
 });
-gameScreenEl.addEventListener('pointermove', (e) => {
-  if (!pointerActive || sessionEnded) return;
-  const rect = gameScreenEl.getBoundingClientRect();
+gameScreenElement.addEventListener('pointermove', (e) => {
+  if (!isPointerActive || isSessionEnded) return;
+  const rect = gameScreenElement.getBoundingClientRect();
   const x = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
   const y = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
   motionThrottler.schedule('cursor', { x, y });
@@ -188,42 +188,42 @@ gameScreenEl.addEventListener('pointermove', (e) => {
 // One button covers both roles: if this browser was hosting, restore the
 // table; if it was playing, rejoin it. Disabled (not hidden) when there's
 // nothing to resume, so the option is still discoverable.
-const resumeBtn = document.getElementById('resume-game');
-const resumeHint = document.getElementById('resume-hint');
+const resumeButton = document.querySelector('#resume-game');
+const resumeHint = document.querySelector('#resume-hint');
 
 function refreshResumeOption() {
-  const savedHost = loadGame(window.localStorage);
-  const savedGuest = recallSession(window.localStorage);
+  const savedHost = loadGame(localStorage);
+  const savedGuest = recallSession(localStorage);
   if (savedHost.ok) {
-    resumeBtn.disabled = false;
+    resumeButton.disabled = false;
     resumeHint.textContent = `You were hosting a table, saved ${describeAge(savedHost.ageMs)}.`;
-    resumeBtn.dataset.mode = 'host';
+    resumeButton.dataset.mode = 'host';
   } else if (savedGuest) {
-    resumeBtn.disabled = false;
+    resumeButton.disabled = false;
     resumeHint.textContent = `You were playing at table ${savedGuest.code} as ${savedGuest.name}.`;
-    resumeBtn.dataset.mode = 'guest';
+    resumeButton.dataset.mode = 'guest';
   } else {
-    resumeBtn.disabled = true;
+    resumeButton.disabled = true;
     resumeHint.textContent = '';
-    delete resumeBtn.dataset.mode;
+    delete resumeButton.dataset.mode;
   }
 }
 refreshResumeOption();
 
-resumeBtn.addEventListener('click', () => {
-  if (resumeBtn.dataset.mode === 'host') { resumeHostedTable(); return; }
-  const remembered = recallSession(window.localStorage);
+resumeButton.addEventListener('click', () => {
+  if (resumeButton.dataset.mode === 'host') { resumeHostedTable(); return; }
+  const remembered = recallSession(localStorage);
   if (!remembered) return;
-  document.getElementById('join-code').value = remembered.code;
-  document.getElementById('join-name').value = remembered.name;
+  document.querySelector('#join-code').value = remembered.code;
+  document.querySelector('#join-name').value = remembered.name;
   showScreen(screens, 'join');
-  document.getElementById('join-btn').click();
+  document.querySelector('#join-btn').click();
 });
 
-document.getElementById('show-host').addEventListener('click', () => {
+document.querySelector('#show-host').addEventListener('click', () => {
   showScreen(screens, 'host');
 });
-document.getElementById('show-join').addEventListener('click', () => showScreen(screens, 'join'));
+document.querySelector('#show-join').addEventListener('click', () => showScreen(screens, 'join'));
 
 
 // --- Host flow ---
@@ -267,7 +267,7 @@ session.on('roster', (transportRoster) => {
       identityAnnounced.add(r.id);
       session.sendTo(r.id, { type: 'identity', playerKey: key });
     }
-    if (!gameState.players.some((p) => p.id === key)) {
+    if (gameState.players.every((p) => p.id !== key)) {
       gameState = reduce(gameState, { type: 'JOIN', playerId: key, name: r.name });
     }
     gameState = reduce(gameState, { type: 'SET_CONNECTION', playerId: key, connection: r.connection });
@@ -289,8 +289,8 @@ session.on('data', ({ fromId, msg }) => {
     const actorKey = peerToKey.get(fromId);
     if (!actorKey) return;
     dispatch({ ...msg.action, playerId: actorKey });
-  } catch (err) {
-    console.warn('Rejected action from', fromId, err);
+  } catch (error) {
+    console.warn('Rejected action from', fromId, error);
   }
 });
 }
@@ -309,9 +309,11 @@ let expectedPlayers = 0;
  * waiting for them means the resume never fires).
  */
 let awaitedReturners = [];
-let resumePending = false;
+let isResumePending = false;
 
-/** Names still missing, resolved live against the current roster. */
+/**
+Names still missing, resolved live against the current roster.
+*/
 function stillMissing() {
   const back = new Set((gameState?.players ?? [])
     .filter((p) => p.connection === 'connected').map((p) => p.id));
@@ -319,26 +321,26 @@ function stillMissing() {
 }
 
 function renderWaitingForReturners() {
-  const el = document.getElementById('restore-waiting');
-  if (!el) return;
-  if (!resumePending) { el.hidden = true; return; }
+  const element = document.querySelector('#restore-waiting');
+  if (!element) return;
+  if (!isResumePending) { element.hidden = true; return; }
   const missing = stillMissing();
   const back = awaitedReturners.length - missing.length;
-  el.hidden = false;
-  el.querySelector('.waiting-summary').textContent =
+  element.hidden = false;
+  element.querySelector('.waiting-summary').textContent =
     missing.length === 0
-      ? 'Everyone is back \u2014 resuming\u2026'
+      ? 'Everyone is back \u{2014} resuming\u{2026}'
       : `Waiting for ${missing.length} of ${awaitedReturners.length} players to reconnect (${back} back).`;
-  const list = el.querySelector('.waiting-list');
-  list.innerHTML = '';
+  const list = element.querySelector('.waiting-list');
+  list.replaceChildren();
   for (const p of awaitedReturners) {
     const li = document.createElement('li');
-    const isBack = !missing.some((m) => m.id === p.id);
+    const isBack = missing.every((m) => m.id !== p.id);
     li.className = isBack ? 'returner-back' : 'returner-missing';
     // Smith Gate 1 #4: by NAME. "2 of 3" doesn't tell a host whether to
     // keep waiting; "Bob is still out" does.
-    li.textContent = `${p.name} \u2014 ${isBack ? 'back' : 'still disconnected'}`;
-    list.appendChild(li);
+    li.textContent = `${p.name} \u{2014} ${isBack ? 'back' : 'still disconnected'}`;
+    list.append(li);
   }
 }
 
@@ -352,34 +354,34 @@ function renderWaitingForReturners() {
  * flag, so the two paths cannot both fire.
  */
 function maybeResumeRestored() {
-  if (!resumePending) return;
+  if (!isResumePending) return;
   renderWaitingForReturners();
   if (stillMissing().length > 0) return;
   finishRestore();
 }
 
 function finishRestore() {
-  if (!resumePending) return;
-  resumePending = false;
-  document.getElementById('restore-waiting').hidden = true;
-  document.getElementById('host-share').hidden = true;
+  if (!isResumePending) return;
+  isResumePending = false;
+  document.querySelector('#restore-waiting').hidden = true;
+  document.querySelector('#host-share').hidden = true;
   broadcastViews();
   if (latestView) renderGameFromView(latestView);
   showScreen(screens, 'game');
 }
 
 function startGame() {
-  const cardsPerPlayer = Number(document.getElementById('cards-per-player').value);
+  const cardsPerPlayer = Number(document.querySelector('#cards-per-player').value);
   dispatch({ type: 'DEAL', cardsPerPlayer });
   showScreen(screens, 'game');
 }
 
-document.getElementById('deal-btn').addEventListener('click', startGame);
+document.querySelector('#deal-btn').addEventListener('click', startGame);
 
 // US-45 AC: a table that can only resume at full strength is a table one
 // closed tab can hold hostage. Clears the same flag the auto-resume does,
 // so the two paths can never both fire.
-document.getElementById('resume-anyway-btn').addEventListener('click', finishRestore);
+document.querySelector('#resume-anyway-btn').addEventListener('click', finishRestore);
 
 /**
  * Fires at most once, without needing a flag to say so: the guard is a
@@ -413,7 +415,7 @@ function scheduleAutoStartCheck() {
 }
 
 function maybeAutoStart() {
-  if (role !== 'host' || !expectedPlayers || sessionEnded) return;
+  if (role !== 'host' || !expectedPlayers || isSessionEnded) return;
   // `showScreen` hides `#screen-host`, NOT `#host-share` (which is a div
   // inside it), so checking `#host-share.hidden` here was dead code -
   // it never became true. The game screen being visible is the real
@@ -427,7 +429,7 @@ function maybeAutoStart() {
   // seat holding nothing. Waiting for `connected` is the same settled-state
   // condition D27 uses, not a timing guess.
   const joined = gameState?.players.filter((p) => p.connection === 'connected').length ?? 0;
-  const statusEl = document.getElementById('autostart-status');
+  const statusElement = document.querySelector('#autostart-status');
   if (joined >= expectedPlayers) {
     // Zeroed BEFORE starting, not after. D30 argued the share-screen
     // check was a sufficient once-only guard; writing it showed it isn't,
@@ -437,14 +439,14 @@ function maybeAutoStart() {
     // recurses. The screen check still earns its place for later rejoins;
     // this closes the re-entrant path it can't see.
     expectedPlayers = 0;
-    statusEl.hidden = true;
+    statusElement.hidden = true;
     startGame();
     return;
   }
   // Smith Gate 1 #3: state what we're waiting for, before it happens.
-  statusEl.textContent =
-    `Starting automatically when ${expectedPlayers} players have joined \u2014 ${joined} so far.`;
-  statusEl.hidden = false;
+  statusElement.textContent =
+    `Starting automatically when ${expectedPlayers} players have joined \u{2014} ${joined} so far.`;
+  statusElement.hidden = false;
 }
 
 /**
@@ -460,18 +462,18 @@ function maybeAutoStart() {
  * @returns {{state: object, code: string|null}|null}
  */
 function offerRestore() {
-  const found = loadGame(window.localStorage);
+  const found = loadGame(localStorage);
   if (!found.ok) {
     if (found.reason === 'corrupt' || found.reason === 'version') {
-      clearGame(window.localStorage);
-      window.alert('A saved game was found but could not be read, so it has been discarded. Starting a new table.');
+      clearGame(localStorage);
+      globalThis.alert('A saved game was found but could not be read, so it has been discarded. Starting a new table.');
     }
     return null;
   }
-  const accepted = window.confirm(
+  const accepted = globalThis.confirm(
     `Restore your saved table from ${describeAge(found.ageMs)}?\n\n` +
       'The table, piles, scores and everyone\'s hands come back.\n\n' +
-      'Players reconnect on their own \u2014 you\'ll see who\'s still missing, ' +
+      'Players reconnect on their own \u{2014} you\'ll see who\'s still missing, ' +
       'and the game resumes by itself once they\'re back.',
   );
   if (!accepted) return null;
@@ -485,26 +487,26 @@ async function resumeHostedTable() {
   role = 'host';
   // US-39: the saved table remembers who was hosting it, so restoring
   // doesn't ask again. A typed name still wins if there is one.
-  myName = document.getElementById('host-name').value.trim() || restored.hostName || 'Host';
+  myName = document.querySelector('#host-name').value.trim() || restored.hostName || 'Host';
   session = Session.host({ name: myName, code: restored.code });
-  const createErrorEl = document.getElementById('host-create-error');
-  let reclaimed = true;
+  const createErrorElement = document.querySelector('#host-create-error');
+  let isReclaimed = true;
   try {
     myId = await session.ready();
   } catch {
     // The broker may refuse the old code (still held, or taken since).
     // Falling back is fine, but say so - guests hold the old code.
-    reclaimed = false;
+    isReclaimed = false;
     session = Session.host({ name: myName });
     try {
       myId = await session.ready();
     } catch {
-      createErrorEl.textContent = 'Could not restore the table (network issue). Try again.';
-      createErrorEl.hidden = false;
+      createErrorElement.textContent = 'Could not restore the table (network issue). Try again.';
+      createErrorElement.hidden = false;
       return;
     }
   }
-  createErrorEl.hidden = true;
+  createErrorElement.hidden = true;
 
   // D33/US-43: KEEP the saved players, marked away until they come back.
   //
@@ -528,7 +530,7 @@ async function resumeHostedTable() {
   );
   awaitedReturners = expectedReturners(restored.state, restored.code);
 
-  document.getElementById('host-form').hidden = true;
+  document.querySelector('#host-form').hidden = true;
   // Resume goes straight back to the table. Deal & Start would begin a
   // *new round* - the whole point of restoring is to carry on the one
   // that was interrupted, so requiring it to see your own table is both
@@ -542,20 +544,20 @@ async function resumeHostedTable() {
   // remembered is now wrong.
   wireHostSession();
   showGameCode(myId);
-  if (reclaimed) {
+  if (isReclaimed) {
     // US-45: if anyone was at the table when it was saved, wait for them
     // and say who by name, rather than dropping the host into a game
     // whose other seats are silently empty.
     if (awaitedReturners.length > 0) {
-      resumePending = true;
-      document.getElementById('restore-waiting').hidden = false;
+      isResumePending = true;
+      document.querySelector('#restore-waiting').hidden = false;
       renderWaitingForReturners();
       broadcastViews();
       showScreen(screens, 'host');
-      document.getElementById('host-share').hidden = false;
-      const shareEl = document.getElementById('share-code-container');
-      renderShareCode(shareEl, { code: myId });
-      document.getElementById('host-deck-config').textContent =
+      document.querySelector('#host-share').hidden = false;
+      const shareElement = document.querySelector('#share-code-container');
+      renderShareCode(shareElement, { code: myId });
+      document.querySelector('#host-deck-config').textContent =
         `Deck: ${describeDeckConfig(gameState.deckConfig)}`;
       renderRosterOnly();
       return;
@@ -563,26 +565,26 @@ async function resumeHostedTable() {
     broadcastViews();
     showScreen(screens, 'game');
   } else {
-    const shareContainer = document.getElementById('share-code-container');
+    const shareContainer = document.querySelector('#share-code-container');
     renderShareCode(shareContainer, { code: myId });
-    document.getElementById('host-share').hidden = false;
-    document.getElementById('host-deck-config').textContent =
+    document.querySelector('#host-share').hidden = false;
+    document.querySelector('#host-deck-config').textContent =
       `Deck: ${describeDeckConfig(gameState.deckConfig)} — the table code changed, share the new one`;
     renderRosterOnly();
   }
 }
 
-document.getElementById('create-table').addEventListener('click', async () => {
+document.querySelector('#create-table').addEventListener('click', async () => {
   // A new table supersedes any save - clearing here (rather than on a
   // decline) means a mis-click on "no" never destroys the only copy.
-  clearGame(window.localStorage);
+  clearGame(localStorage);
   role = 'host';
-  myName = document.getElementById('host-name').value.trim() || 'Host';
-  expectedPlayers = Number(document.getElementById('host-expected-players').value) || 0;
+  myName = document.querySelector('#host-name').value.trim() || 'Host';
+  expectedPlayers = Number(document.querySelector('#host-expected-players').value) || 0;
   const deckConfig = {
-    type: document.getElementById('host-deck-type').value,
-    numDecks: Number(document.getElementById('host-num-decks').value),
-    jokers: Number(document.getElementById('host-jokers').value),
+    type: document.querySelector('#host-deck-type').value,
+    numDecks: Number(document.querySelector('#host-num-decks').value),
+    jokers: Number(document.querySelector('#host-jokers').value),
   };
   // D46: GameConfig's first real field. D53: `piles` (renamed from
   // `zones` - D55, that name now belongs to the real Zone-entity list)
@@ -593,43 +595,43 @@ document.getElementById('create-table').addEventListener('click', async () => {
   // Zone - Gin Rummy's discard only ever references it, never declares
   // a new one).
   const gameConfig = {
-    allowsPlayerZones: document.getElementById('host-allow-player-zones').checked,
+    allowsPlayerZones: document.querySelector('#host-allow-player-zones').checked,
     piles: selectedPreset?.piles ?? [],
     zones: selectedPreset?.zones ?? [],
   };
 
   session = Session.host({ name: myName });
-  const createErrorEl = document.getElementById('host-create-error');
+  const createErrorElement = document.querySelector('#host-create-error');
   try {
     myId = await session.ready();
-  } catch (err) {
-    createErrorEl.textContent = 'Could not create a table (code collision or network issue). Try again.';
-    createErrorEl.hidden = false;
-    console.warn('host session failed to open', err);
+  } catch (error) {
+    createErrorElement.textContent = 'Could not create a table (code collision or network issue). Try again.';
+    createErrorElement.hidden = false;
+    console.warn('host session failed to open', error);
     return;
   }
-  createErrorEl.hidden = true;
+  createErrorElement.hidden = true;
 
   gameState = reduce(createInitialState(deckConfig, Math.random, gameConfig), { type: 'JOIN', playerId: myId, name: myName });
 
   // Table is created - the setup form no longer does anything, so stop
   // implying it's still live (Smith Gate-close finding #2).
-  document.getElementById('host-form').hidden = true;
+  document.querySelector('#host-form').hidden = true;
 
-  const shareContainer = document.getElementById('share-code-container');
+  const shareContainer = document.querySelector('#share-code-container');
   renderShareCode(shareContainer, { code: myId });
   showGameCode(myId);
-  document.getElementById('host-share').hidden = false;
-  document.getElementById('host-deck-config').textContent = `Deck: ${describeDeckConfig(deckConfig)}`;
+  document.querySelector('#host-share').hidden = false;
+  document.querySelector('#host-deck-config').textContent = `Deck: ${describeDeckConfig(deckConfig)}`;
   if (selectedPreset) {
-    document.getElementById('cards-per-player').value = String(selectedPreset.cardsPerPlayer);
+    document.querySelector('#cards-per-player').value = String(selectedPreset.cardsPerPlayer);
     // UX follow-up (direct user request): "update the preset to use
     // this layout... and preset the layouts for the other games too" -
     // a preset's own `layout` (its shared, deterministically-id'd
     // panels only - never a per-player one) seeds this browser's local
     // panel arrangement (`panelLayout.js`) the moment its table is
     // actually created, not merely previewed in the dropdown.
-    applyPresetLayout(window.localStorage, selectedPreset.layout);
+    applyPresetLayout(localStorage, selectedPreset.layout);
   }
   renderRosterOnly();
 
@@ -643,7 +645,7 @@ document.getElementById('create-table').addEventListener('click', async () => {
 // to the user as a real functionality gap, not silently dropped.
 
 function adjustScore(targetPlayerId, delta) {
-  if (sessionEnded) return;
+  if (isSessionEnded) return;
   if (role === 'host') dispatch({ type: 'ADJUST_SCORE', targetPlayerId, delta });
   else session.send({ type: 'action', action: { type: 'ADJUST_SCORE', targetPlayerId, delta } });
 }
@@ -672,17 +674,19 @@ const identityAnnounced = new Set();
 
 let saveTimer = null;
 function scheduleSave() {
-  if (role !== 'host' || sessionEnded) return;
+  if (role !== 'host' || isSessionEnded) return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    if (gameState) saveGame(window.localStorage, gameState, myId, myName);
+    if (gameState) saveGame(localStorage, gameState, myId, myName);
   }, 400);
 }
 
-/** The table code, shown for the whole game (host and guest alike). */
+/**
+The table code, shown for the whole game (host and guest alike).
+*/
 function showGameCode(code) {
-  document.getElementById('game-code').textContent = code;
-  wireCopyCode(document.getElementById('copy-code-btn'), code);
+  document.querySelector('#game-code').textContent = code;
+  wireCopyCode(document.querySelector('#copy-code-btn'), code);
 }
 
 function broadcastViews() {
@@ -720,23 +724,25 @@ function broadcastViews() {
 // against network flakiness, which would have justified something far
 // shorter. Longer would also mean a client hammering a code that no
 // longer exists (a host who *declines* the restore gets a new one).
-const RECONNECT_DELAYS_MS = [1000, 2000, 4000, 6000, 8000, 10000, 10000, 10000];
-/** How long one attempt may hang before it counts as failed - see `attemptReconnect`. */
+const RECONNECT_DELAYS_MS = [1000, 2000, 4000, 6000, 8000, 10_000, 10_000, 10_000];
+/**
+How long one attempt may hang before it counts as failed - see `attemptReconnect`.
+*/
 const ATTEMPT_TIMEOUT_MS = 5000;
 let reconnectAttempt = 0;
 let reconnectTimer = null;
-let reconnecting = false;
+let isReconnecting = false;
 
 function stopReconnecting() {
   clearTimeout(reconnectTimer);
   reconnectTimer = null;
-  reconnecting = false;
+  isReconnecting = false;
   reconnectAttempt = 0;
 }
 
 function beginReconnecting() {
-  if (reconnecting || sessionEnded) return;
-  reconnecting = true;
+  if (isReconnecting || isSessionEnded) return;
+  isReconnecting = true;
   reconnectAttempt = 0;
   scheduleReconnect();
 }
@@ -747,21 +753,21 @@ function scheduleReconnect() {
     // Budget spent. Say so and stop - a loop with no end is a battery
     // cost the player never agreed to, and an app that looks busy forever
     // is worse than one that admits it failed (Smith Gate 1 answer 1).
-    reconnecting = false;
+    isReconnecting = false;
     endSessionForGood('Could not reconnect to the host.', { retryable: true });
     return;
   }
   reconnectAttempt += 1;
-  renderBanner(bannerEl,
-    `Lost the host \u2014 reconnecting\u2026 (attempt ${reconnectAttempt} of ${RECONNECT_DELAYS_MS.length})`);
+  renderBanner(bannerElement,
+    `Lost the host \u{2014} reconnecting\u{2026} (attempt ${reconnectAttempt} of ${RECONNECT_DELAYS_MS.length})`);
   reconnectTimer = setTimeout(attemptReconnect, delay);
 }
 
 async function attemptReconnect() {
-  const remembered = recallSession(window.localStorage);
-  if (!remembered) { stopReconnecting(); endSessionForGood('Host disconnected \u2014 session ended.'); return; }
+  const remembered = recallSession(localStorage);
+  if (!remembered) { stopReconnecting(); endSessionForGood('Host disconnected \u{2014} session ended.'); return; }
   let storedKey = null;
-  try { storedKey = window.localStorage.getItem(CLIENT_KEY_STORAGE); } catch { /* private mode */ }
+  try { storedKey = localStorage.getItem(CLIENT_KEY_STORAGE); } catch { /* private mode */ }
   const attempt = Session.join(remembered.code, { name: remembered.name, playerKey: storedKey });
   try {
     // `ready()` resolves on the data connection opening. When the host
@@ -776,7 +782,7 @@ async function attemptReconnect() {
     session = attempt;
     wireGuestSession();
     stopReconnecting();
-    renderBanner(bannerEl, '');
+    renderBanner(bannerElement, '');
     showGameCode(remembered.code);
   } catch {
     // Drop the half-open peer, or one leaks per attempt for the whole budget.
@@ -785,19 +791,19 @@ async function attemptReconnect() {
   }
 }
 
-document.getElementById('join-btn').addEventListener('click', () => {
+document.querySelector('#join-btn').addEventListener('click', () => {
   role = 'join';
   stopReconnecting();
-  myName = document.getElementById('join-name').value.trim() || 'Player';
-  const hostId = document.getElementById('join-code').value.trim();
-  const statusEl = document.getElementById('join-status');
-  statusEl.textContent = 'Connecting...';
+  myName = document.querySelector('#join-name').value.trim() || 'Player';
+  const hostId = document.querySelector('#join-code').value.trim();
+  const statusElement = document.querySelector('#join-status');
+  statusElement.textContent = 'Connecting...';
 
   // US-38: present the identity the host issued us last time, if any.
   // The host validates it - an unknown or in-use key just gets a fresh
   // seat, so a stale key can never wedge the join.
   let storedKey = null;
-  try { storedKey = window.localStorage.getItem(CLIENT_KEY_STORAGE); } catch { /* private mode */ }
+  try { storedKey = localStorage.getItem(CLIENT_KEY_STORAGE); } catch { /* private mode */ }
   session = Session.join(hostId, { name: myName, playerKey: storedKey });
   session
     .ready()
@@ -805,12 +811,12 @@ document.getElementById('join-btn').addEventListener('click', () => {
       myId = id;
       // US-39: remember where we were, so a reload rejoins the game in
       // progress instead of dropping us on an empty form.
-      rememberSession(window.localStorage, { code: hostId, name: myName });
+      rememberSession(localStorage, { code: hostId, name: myName });
       showGameCode(hostId);
-      statusEl.textContent = 'Connected. Waiting for host to deal...';
+      statusElement.textContent = 'Connected. Waiting for host to deal...';
     })
     .catch(() => {
-      statusEl.textContent = 'Could not connect. Check the code and try again.';
+      statusElement.textContent = 'Could not connect. Check the code and try again.';
     });
 
   wireGuestSession();
@@ -823,20 +829,20 @@ document.getElementById('join-btn').addEventListener('click', () => {
  * whole phase avoiding on the drop path.
  */
 function wireGuestSession() {
-  session.on('data', (msg) => {
-    if (msg.type === 'identity') {
+  session.on('data', (message) => {
+    if (message.type === 'identity') {
       // The host decides who we are; we just remember it, so a refresh
       // brings us back to this seat and hand rather than a new one.
-      try { window.localStorage.setItem(CLIENT_KEY_STORAGE, msg.playerKey); } catch { /* private mode */ }
-      myId = msg.playerKey;
+      try { localStorage.setItem(CLIENT_KEY_STORAGE, message.playerKey); } catch { /* private mode */ }
+      myId = message.playerKey;
       return;
     }
-    if (msg.type === 'motion') {
-      applyIncomingMotion(msg.fromId, msg);
+    if (message.type === 'motion') {
+      applyIncomingMotion(message.fromId, message);
       return;
     }
-    if (msg.type !== 'state') return;
-    latestView = msg.payload;
+    if (message.type !== 'state') return;
+    latestView = message.payload;
     renderGameFromView(latestView);
     showScreen(screens, 'game');
   });
@@ -847,7 +853,7 @@ function wireGuestSession() {
   // this sprint. It moves to `endSessionForGood`, where the session
   // really is over.
   session.on('host-lost', () => {
-    if (sessionEnded) return;
+    if (isSessionEnded) return;
     beginReconnecting();
   });
 
@@ -860,11 +866,11 @@ function wireGuestSession() {
  * so outright. Only here does the remembered table get dropped.
  */
 function endSessionForGood(message, { retryable = false } = {}) {
-  if (sessionEnded) return;
+  if (isSessionEnded) return;
   stopReconnecting();
-  forgetSession(window.localStorage);
-  renderBanner(bannerEl, retryable ? `${message} Reload to try again.` : message);
-  sessionEnded = true;
+  forgetSession(localStorage);
+  renderBanner(bannerElement, retryable ? `${message} Reload to try again.` : message);
+  isSessionEnded = true;
   // Re-render with no action handlers so every control (hand cards,
   // reveal/pickup buttons) is inert, and force the roster to reflect
   // reality instead of the last-known (now stale) connection states
@@ -872,7 +878,7 @@ function endSessionForGood(message, { retryable = false } = {}) {
   // live once the session is actually over).
   if (latestView) {
     const nameById = new Map(latestView.players.map((p) => [p.id, p.id === myId ? 'You' : p.name]));
-    const frozenOpts = {
+    const frozenOptions = {
       resolveOwnerName: (ownerId) => nameById.get(ownerId) ?? ownerId,
     };
     // UX follow-up (direct user request): "a Deck is a specific kind of
@@ -883,22 +889,22 @@ function endSessionForGood(message, { retryable = false } = {}) {
     // and even that has nothing to dispatch to), matching every other
     // control in this frozen re-render. No separate `<deck-zone>`
     // element to build here any more.
-    renderZones(zonesEl, latestView.zones, seatedOrder(latestView.players, myId), latestView.zoneRecords, frozenOpts);
+    renderZones(zonesElement, latestView.zones, seatedOrder(latestView.players, myId), latestView.zoneRecords, frozenOptions);
     // Same inert Score panels the live render builds (one per seated
     // player with a score, "need a score zone for our opponent" too),
     // just no move/resize/adjust wiring - the session is over.
     const frozenSeated = seatedOrder(latestView.players, myId);
     for (const [seatIndex, player] of frozenSeated.entries()) {
       if (latestView.scores?.[player.id] === undefined) continue;
-      const scoreEl = document.createElement('score-zone');
-      scoreEl.score = latestView.scores[player.id];
-      if (player.id !== myId) scoreEl.label = `${player.name} Score`;
-      scoreEl.classList.add('panel-moved');
+      const scoreElement = document.createElement('score-zone');
+      scoreElement.score = latestView.scores[player.id];
+      if (player.id !== myId) scoreElement.label = `${player.name} Score`;
+      scoreElement.classList.add('panel-moved');
       const seatDefault = seatPosition(seatIndex, frozenSeated.length, 26);
-      scoreEl.style.position = 'absolute';
-      scoreEl.style.left = `${seatDefault.leftPct}%`;
-      scoreEl.style.top = `${Math.max(seatDefault.topPct - 14, 4)}%`;
-      zonesEl.appendChild(scoreEl);
+      scoreElement.style.position = 'absolute';
+      scoreElement.style.left = `${seatDefault.leftPct}%`;
+      scoreElement.style.top = `${Math.max(seatDefault.topPct - 14, 4)}%`;
+      zonesElement.append(scoreElement);
     }
   }
   renderRosterOnly();
@@ -916,21 +922,21 @@ function renderRosterOnly() {
   scheduleAutoStartCheck(); // US-42: the roster changing is exactly when to re-check
   maybeResumeRestored();    // US-45: and when to re-check who is back
   let players = rosterWithCounts(view);
-  if (sessionEnded) players = players.map((p) => ({ ...p, connection: 'disconnected' }));
-  const opts = {
+  if (isSessionEnded) players = players.map((p) => ({ ...p, connection: 'disconnected' }));
+  const options = {
     movingIds,
     scores: view.scores,
-    onAdjustScore: sessionEnded ? null : adjustScore,
+    onAdjustScore: isSessionEnded ? null : adjustScore,
     myId,
     passed: view.passed,
   };
-  const hostRosterEl = document.getElementById('host-roster');
-  if (hostRosterEl) {
-    renderRoster(hostRosterEl, players, opts);
+  const hostRosterElement = document.querySelector('#host-roster');
+  if (hostRosterElement) {
+    renderRoster(hostRosterElement, players, options);
     // No control strip here (Smith Gate 2 #2): this screen already has
     // "Deal & Start", and two adjacent deal controls with different
     // semantics is worse than the one badly-placed control we started with.
-    renderDeckStack(document.getElementById('host-deck-area'), view.deckCount);
+    renderDeckStack(document.querySelector('#host-deck-area'), view.deckCount);
   }
   // UX follow-up (direct user request): the in-game roster ring
   // (`#game-roster`) is retired entirely - every player's seat is its
@@ -943,7 +949,7 @@ function renderRosterOnly() {
   // Scales the table surface's size with player count (style.css) so
   // seats have room to spread out - confirmed necessary at 8 players,
   // not just a theoretical density concern (Phase 26 T26.3 finding).
-  document.getElementById('table-surface').style.setProperty('--seat-count', players.length);
+  document.querySelector('#table-surface').style.setProperty('--seat-count', players.length);
 }
 
 function renderGameFromView(view) {
@@ -965,10 +971,10 @@ function renderGameFromView(view) {
   // pass, and the "organizing hand" motion cue are all temporarily gone
   // - direct instruction was to get the pile rendering working first,
   // parity/polish is a following step.
-  const zoneOpts = {
+  const zoneOptions = {
     viewerId: myId,
     resolveOwnerName: (ownerId) => nameById.get(ownerId) ?? ownerId,
-    onPlay: sessionEnded ? null : (cardId, targetId) => playCard(cardId, 'public', targetId),
+    onPlay: isSessionEnded ? null : (cardId, targetId) => playCard(cardId, 'public', targetId),
     onReveal: (cardId) => revealCard(cardId),
     onRotate: (cardId) => rotateCard(cardId),
     onPickup: (cardId) => pickupCard(cardId),
@@ -978,7 +984,7 @@ function renderGameFromView(view) {
     // D35: a dragged pile-action token (Draw is the only draggable one
     // today) dropped on any zone panel - generalizes what used to be the
     // merged own-zone panel's own bespoke hand-drop check.
-    onPileActionDrop: sessionEnded ? null : (actionId) => { if (actionId === 'draw') performDraw(); },
+    onPileActionDrop: isSessionEnded ? null : (actionId) => { if (actionId === 'draw') performDraw(); },
     // UX follow-up (direct user request): "like zones, Piles are
     // Actionable and should have a title bar with action buttons for
     // that pile type" - every pile's heading is a real action header now
@@ -989,7 +995,7 @@ function renderGameFromView(view) {
     // `renderPile`'s own note) - `pass` and every deck action
     // (`dealFromDeck` already handles draw/deal/reshuffleDeal/shuffle/
     // split generically) are the two real dispatch tables today.
-    onPileAction: sessionEnded ? null : (pileId, actionId) => {
+    onPileAction: isSessionEnded ? null : (pileId, actionId) => {
       if (actionId === 'pass') return togglePass();
       // Sprint 23: `split` is offered by BOTH the deck (`SPLIT_DECK`,
       // deck-only pile count) and a zone/discard pile (`SPLIT_PILE`,
@@ -1007,16 +1013,16 @@ function renderGameFromView(view) {
     // *nit (2026-08-26): "allow user to rename zones and piles - any
     // user can edit - persisted by host." Same `sessionEnded` gate
     // every other dispatching handler in this object already uses.
-    onRenamePile: sessionEnded ? null : (pileId, name) => performRenamePile(pileId, name),
-    onRenameZone: sessionEnded ? null : (zoneId, name) => performRenameZone(zoneId, name),
+    onRenamePile: isSessionEnded ? null : (pileId, name) => performRenamePile(pileId, name),
+    onRenameZone: isSessionEnded ? null : (zoneId, name) => performRenameZone(zoneId, name),
     // (bloop: piles/zones/cards are all Movable)
-    onMovePile: sessionEnded ? null : (pileId, targetZoneId) => performMovePile(pileId, targetZoneId),
+    onMovePile: isSessionEnded ? null : (pileId, targetZoneId) => performMovePile(pileId, targetZoneId),
     // *nit (2026-08-26): "relocated within their zone (ordering)" -
     // every pile can be reordered among its own zone's siblings, even
     // a kind `onMovePile`/`MOVE_PILE` would reject for a cross-zone
     // move (purely cosmetic, no game-rule concern either way).
-    onReorderPile: sessionEnded ? null : (pileId, beforePileId) => performReorderPile(pileId, beforePileId),
-    onDropCardOnZone: sessionEnded ? null : (cardId, zoneId) => performCreatePileWithCard(cardId, zoneId),
+    onReorderPile: isSessionEnded ? null : (pileId, beforePileId) => performReorderPile(pileId, beforePileId),
+    onDropCardOnZone: isSessionEnded ? null : (cardId, zoneId) => performCreatePileWithCard(cardId, zoneId),
     isHost: role === 'host',
     // US-41/D29: dealing lives on the deck, where the cards are - the
     // whole point of the story. Read/written here since the deck now
@@ -1024,7 +1030,7 @@ function renderGameFromView(view) {
     // stack>`, `renderPile`'s row) as any other pile, not a bespoke
     // `<deck-zone>` element with its own property surface any more.
     dealCount: lastDealCount,
-    onDealCountChange: sessionEnded ? null : (value) => { lastDealCount = value; },
+    onDealCountChange: isSessionEnded ? null : (value) => { lastDealCount = value; },
     onCardDrag: broadcastCardDrag,
     // UX follow-up (direct user request): panel position/size is a
     // local, per-browser preference (`panelLayout.js`) - read fresh on
@@ -1037,7 +1043,7 @@ function renderGameFromView(view) {
     // `onMovePanel` was briefly removed, then directly restored - see
     // `wirePanelLayout`'s own comment ("zones can be moved anywhere on
     // the table").
-    layout: loadPanelLayout(window.localStorage),
+    layout: loadPanelLayout(localStorage),
     onMovePanel: movePanel,
     onResizePanel: resizePanel,
   };
@@ -1054,7 +1060,7 @@ function renderGameFromView(view) {
   // what `renderPile` uses for its row instead - see `zoneOpts.
   // dealCount`/`onDealCountChange` above for the one piece of deck-
   // specific state this file still owns: the Deal count input's value).
-  renderZones(zonesEl, view.zones, seatedOrder(view.players, myId), view.zoneRecords, zoneOpts);
+  renderZones(zonesElement, view.zones, seatedOrder(view.players, myId), view.zoneRecords, zoneOptions);
   // UX follow-up (direct user request): Score is a real sibling
   // `<score-zone>` Web Component now (`src/components/ScoreZone.js`),
   // not content nested inside the own-zone panel - built the same
@@ -1069,44 +1075,44 @@ function renderGameFromView(view) {
   for (const [seatIndex, player] of seated.entries()) {
     if (view.scores?.[player.id] === undefined) continue;
     const isMe = player.id === myId;
-    const scoreEl = document.createElement('score-zone');
-    scoreEl.score = view.scores[player.id];
-    scoreEl.adjustable = !sessionEnded;
-    if (!isMe) scoreEl.label = `${player.name} Score`;
-    scoreEl.addEventListener('score-adjust', (e) => adjustScore(player.id, e.detail.delta));
-    zonesEl.appendChild(scoreEl);
+    const scoreElement = document.createElement('score-zone');
+    scoreElement.score = view.scores[player.id];
+    scoreElement.adjustable = !isSessionEnded;
+    if (!isMe) scoreElement.label = `${player.name} Score`;
+    scoreElement.addEventListener('score-adjust', (e) => adjustScore(player.id, e.detail.delta));
+    zonesElement.append(scoreElement);
     const panelId = isMe ? SCORE_PANEL_ID : `score-${player.id}`;
-    wirePanelLayout(scoreEl, panelId, scoreEl.querySelector('.panel-title'), zoneOpts);
-    if (!scoreEl.classList.contains('panel-moved')) {
+    wirePanelLayout(scoreElement, panelId, scoreElement.querySelector('.panel-title'), zoneOptions);
+    if (!scoreElement.classList.contains('panel-moved')) {
       // No stored position yet - default near THIS player's own seat
       // ring point (same one their personal zone uses), offset up so it
       // doesn't land exactly on top of it before either panel has ever
       // been moved.
       const seatDefault = seatPosition(seatIndex, seated.length, 26);
-      scoreEl.classList.add('panel-moved');
-      scoreEl.style.position = 'absolute';
-      scoreEl.style.left = `${seatDefault.leftPct}%`;
-      scoreEl.style.top = `${Math.max(seatDefault.topPct - 14, 4)}%`;
+      scoreElement.classList.add('panel-moved');
+      scoreElement.style.position = 'absolute';
+      scoreElement.style.left = `${seatDefault.leftPct}%`;
+      scoreElement.style.top = `${Math.max(seatDefault.topPct - 14, 4)}%`;
     }
   }
   renderRosterOnly();
 }
 
 function playCard(cardId, visibility, zoneId, placement = {}) {
-  if (sessionEnded) return;
+  if (isSessionEnded) return;
   const { targetCardId, side, layout } = placement;
   if (role === 'host') dispatch({ type: 'PLAY', playerId: myId, cardId, visibility, zoneId, targetCardId, side, layout });
   else session.send({ type: 'action', action: { type: 'PLAY', cardId, visibility, zoneId, targetCardId, side, layout } });
 }
 
 function revealCard(cardId) {
-  if (sessionEnded) return;
+  if (isSessionEnded) return;
   if (role === 'host') dispatch({ type: 'REVEAL', playerId: myId, cardId });
   else session.send({ type: 'action', action: { type: 'REVEAL', cardId } });
 }
 
 function rotateCard(cardId) {
-  if (sessionEnded) return;
+  if (isSessionEnded) return;
   if (role === 'host') dispatch({ type: 'ROTATE_CARD', playerId: myId, cardId });
   else session.send({ type: 'action', action: { type: 'ROTATE_CARD', cardId } });
 }
@@ -1123,24 +1129,24 @@ function rotateCard(cardId) {
 // see `wirePanelLayout`'s own comment. Zone panels only now (a Pile's
 // own title uses native drag for a different capability instead).
 function movePanel(id, x, y) {
-  savePanelPosition(window.localStorage, id, x, y);
+  savePanelPosition(localStorage, id, x, y);
 }
 
 // The resize-handle counterpart to movePanel above - same local-only
 // shape. Both axes together (the corner handle always drags width AND
 // height at once, matching its own two-way cursor).
 function resizePanel(id, w, h) {
-  savePanelSize(window.localStorage, id, w, h);
+  savePanelSize(localStorage, id, w, h);
 }
 
 function pickupCard(cardId) {
-  if (sessionEnded) return;
+  if (isSessionEnded) return;
   if (role === 'host') dispatch({ type: 'PICKUP', playerId: myId, cardId });
   else session.send({ type: 'action', action: { type: 'PICKUP', cardId } });
 }
 
 function moveCard(cardId, toZoneId, placement = {}) {
-  if (sessionEnded) return;
+  if (isSessionEnded) return;
   const { targetCardId, side, layout } = placement;
   if (role === 'host') dispatch({ type: 'MOVE_CARD', playerId: myId, cardId, toZoneId, targetCardId, side, layout });
   else session.send({ type: 'action', action: { type: 'MOVE_CARD', cardId, toZoneId, targetCardId, side, layout } });
@@ -1156,7 +1162,7 @@ function moveCard(cardId, toZoneId, placement = {}) {
 // stack/overlap intent through unchanged - this function still doesn't
 // need to know which mode was chosen, only to forward it.
 function dropCardOnZone(cardId, targetZoneId, placement = {}) {
-  if (sessionEnded) return;
+  if (isSessionEnded) return;
   const view = currentView();
   if (!view) return;
   if (view.myHand.some((c) => c.id === cardId)) {
@@ -1189,7 +1195,7 @@ function dropCardOnZone(cardId, targetZoneId, placement = {}) {
 // Sprint 12 (T56.1): named so the deck's pile anchor calls the same
 // implementation the legacy shuffle/split buttons did.
 function performShuffle() {
-  if (sessionEnded) return;
+  if (isSessionEnded) return;
   dispatch({ type: 'SHUFFLE_DECK' });
 }
 // UX follow-up (direct user request): "just make the split action
@@ -1197,20 +1203,20 @@ function performShuffle() {
 // to choose any more - always exactly 2.
 const SPLIT_PILE_COUNT = 2;
 function performSplit() {
-  if (sessionEnded) return;
+  if (isSessionEnded) return;
   try {
     dispatch({ type: 'SPLIT_DECK', pileCount: SPLIT_PILE_COUNT });
-  } catch (err) {
+  } catch (error) {
     // Nielsen #9: say what went wrong and what would work, in the same
     // place the action was taken - not a silent no-op.
-    window.alert(err.message);
+    globalThis.alert(error.message);
   }
 }
 // Sprint 12 (D34/D35/D36, T54.1): named so the deck's pile anchor - both
 // its click/tap shortcut and its drag-onto-hand drop - calls the same
 // implementation the legacy button did, rather than a second one.
 function performDraw() {
-  if (sessionEnded) return;
+  if (isSessionEnded) return;
   if (role === 'host') dispatch({ type: 'DRAW', playerId: myId });
   else session.send({ type: 'action', action: { type: 'DRAW' } });
 }
@@ -1225,26 +1231,26 @@ function performDraw() {
 // precedent as `performSplit` - the reducer's authorization/eligibility
 // throws would otherwise run silently off the click handler.
 function performSplitPile(pileId) {
-  if (sessionEnded) return;
+  if (isSessionEnded) return;
   if (role === 'host') {
     try { dispatch({ type: 'SPLIT_PILE', playerId: myId, pileId }); }
-    catch (err) { window.alert(err.message); }
+    catch (error) { globalThis.alert(error.message); }
   } else session.send({ type: 'action', action: { type: 'SPLIT_PILE', pileId } });
 }
 
 function performTakePile(pileId) {
-  if (sessionEnded) return;
+  if (isSessionEnded) return;
   if (role === 'host') {
     try { dispatch({ type: 'TAKE_PILE', playerId: myId, pileId }); }
-    catch (err) { window.alert(err.message); }
+    catch (error) { globalThis.alert(error.message); }
   } else session.send({ type: 'action', action: { type: 'TAKE_PILE', pileId } });
 }
 
 function performSetPileOrientation(pileId, faceUp) {
-  if (sessionEnded) return;
+  if (isSessionEnded) return;
   if (role === 'host') {
     try { dispatch({ type: 'SET_PILE_ORIENTATION', playerId: myId, pileId, faceUp }); }
-    catch (err) { window.alert(err.message); }
+    catch (error) { globalThis.alert(error.message); }
   } else session.send({ type: 'action', action: { type: 'SET_PILE_ORIENTATION', pileId, faceUp } });
 }
 
@@ -1254,18 +1260,18 @@ function performSetPileOrientation(pileId, faceUp) {
 // throw the UI itself can't prevent in advance (here: a concurrent
 // delete of the pile/zone between the dblclick and the commit).
 function performRenamePile(pileId, name) {
-  if (sessionEnded) return;
+  if (isSessionEnded) return;
   if (role === 'host') {
     try { dispatch({ type: 'RENAME_PILE', playerId: myId, pileId, name }); }
-    catch (err) { window.alert(err.message); }
+    catch (error) { globalThis.alert(error.message); }
   } else session.send({ type: 'action', action: { type: 'RENAME_PILE', pileId, name } });
 }
 
 function performRenameZone(zoneId, name) {
-  if (sessionEnded) return;
+  if (isSessionEnded) return;
   if (role === 'host') {
     try { dispatch({ type: 'RENAME_ZONE', playerId: myId, zoneId, name }); }
-    catch (err) { window.alert(err.message); }
+    catch (error) { globalThis.alert(error.message); }
   } else session.send({ type: 'action', action: { type: 'RENAME_ZONE', zoneId, name } });
 }
 
@@ -1274,10 +1280,10 @@ function performRenameZone(zoneId, name) {
 // existing design). Same dispatch shape as every other pile-affecting
 // action above.
 function performMovePile(pileId, targetZoneId) {
-  if (sessionEnded) return;
+  if (isSessionEnded) return;
   if (role === 'host') {
     try { dispatch({ type: 'MOVE_PILE', playerId: myId, pileId, targetZoneId }); }
-    catch (err) { window.alert(err.message); }
+    catch (error) { globalThis.alert(error.message); }
   } else session.send({ type: 'action', action: { type: 'MOVE_PILE', pileId, targetZoneId } });
 }
 
@@ -1286,10 +1292,10 @@ function performMovePile(pileId, targetZoneId) {
 // cosmetic (no authorization beyond "these two piles share a zone",
 // which the reducer itself re-checks).
 function performReorderPile(pileId, beforePileId) {
-  if (sessionEnded) return;
+  if (isSessionEnded) return;
   if (role === 'host') {
     try { dispatch({ type: 'REORDER_PILE', playerId: myId, pileId, beforePileId }); }
-    catch (err) { window.alert(err.message); }
+    catch (error) { globalThis.alert(error.message); }
   } else session.send({ type: 'action', action: { type: 'REORDER_PILE', pileId, beforePileId } });
 }
 
@@ -1300,7 +1306,7 @@ function performReorderPile(pileId, beforePileId) {
 // which would race a guest's own relayed send against the host's
 // broadcast of the intermediate state.
 function performCreatePileWithCard(cardId, zoneId) {
-  if (sessionEnded) return;
+  if (isSessionEnded) return;
   const view = currentView();
   if (!view) return;
   // Same hand-vs-table source distinction `dropCardOnZone` already
@@ -1314,7 +1320,7 @@ function performCreatePileWithCard(cardId, zoneId) {
   if (!fromPileId) return;
   if (role === 'host') {
     try { dispatch({ type: 'CREATE_PILE', playerId: myId, zoneId, fromPileId, cardId }); }
-    catch (err) { window.alert(err.message); }
+    catch (error) { globalThis.alert(error.message); }
   } else session.send({ type: 'action', action: { type: 'CREATE_PILE', zoneId, fromPileId, cardId } });
 }
 
@@ -1350,7 +1356,7 @@ let lastDealCount = 1;
  * either.
  */
 function dealFromDeck(action, count) {
-  if (sessionEnded) return;
+  if (isSessionEnded) return;
   if (action === 'draw') return performDraw();
   if (action === 'shuffle') return performShuffle();
   if (action === 'split') return performSplit();
@@ -1362,28 +1368,30 @@ function dealFromDeck(action, count) {
     } else {
       dispatch({ type: 'DEAL_MORE', cardsPerPlayer: count });
     }
-  } catch (err) {
+  } catch (error) {
     // US-41 AC: "fail the way it already does - a clear message, no
     // partial deal". It did NOT already do that: the reducer's throw ran
     // straight out of the click handler as an uncaught error, so the host
     // saw nothing at all. Only visible now because moving the control
     // somewhere reachable made it easy to hit.
-    showDeckError(err.message);
+    showDeckError(error.message);
   }
 }
 
-/** Transient, beside the deck - where the click that caused it happened. */
+/**
+Transient, beside the deck - where the click that caused it happened.
+*/
 function showDeckError(message) {
-  const el = document.getElementById('deck-error');
-  el.textContent = message;
-  el.hidden = false;
+  const element = document.querySelector('#deck-error');
+  element.textContent = message;
+  element.hidden = false;
   clearTimeout(showDeckError.timer);
-  showDeckError.timer = setTimeout(() => { el.hidden = true; }, 4000);
+  showDeckError.timer = setTimeout(() => { element.hidden = true; }, 4000);
 }
 
 // --- Pass marker (US-25): self-toggle only, like US-13's precedent. ---
 function togglePass() {
-  if (sessionEnded) return;
+  if (isSessionEnded) return;
   if (role === 'host') dispatch({ type: 'TOGGLE_PASS', playerId: myId });
   else session.send({ type: 'action', action: { type: 'TOGGLE_PASS' } });
 }
@@ -1415,7 +1423,7 @@ function markCursorStale(playerId) {
   clearTimeout(cursorTimers.get(playerId));
   cursorTimers.set(
     playerId,
-    setTimeout(() => removeRemoteCursor(gameScreenEl, playerId), MOTION_TTL_MS),
+    setTimeout(() => removeRemoteCursor(gameScreenElement, playerId), MOTION_TTL_MS),
   );
 }
 
@@ -1438,7 +1446,7 @@ function markCardDragStale(playerId) {
   clearTimeout(cardDragTimers.get(playerId));
   cardDragTimers.set(
     playerId,
-    setTimeout(() => removeCardDragGhost(gameScreenEl, playerId), MOTION_TTL_MS),
+    setTimeout(() => removeCardDragGhost(gameScreenElement, playerId), MOTION_TTL_MS),
   );
 }
 
@@ -1453,36 +1461,50 @@ function broadcastCardDrag(card, clientX, clientY) {
     motionThrottler.schedule('card-drag', { cardId: null, x: 0, y: 0, active: false });
     return;
   }
-  const rect = gameScreenEl.getBoundingClientRect();
+  const rect = gameScreenElement.getBoundingClientRect();
   const x = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
   const y = Math.min(1, Math.max(0, (clientY - rect.top) / rect.height));
   motionThrottler.schedule('card-drag', { ...cardDragPayload(card, x, y), active: true });
 }
 
-function applyIncomingMotion(playerId, msg) {
-  if (msg.kind === 'hand') {
-    markMoving(playerId, msg.data.active);
+function applyIncomingMotion(playerId, message) {
+  switch (message.kind) {
+  case 'hand': {
+    markMoving(playerId, message.data.active);
     renderRosterOnly();
-  } else if (msg.kind === 'cursor') {
+  
+  break;
+  }
+  case 'cursor': {
     if (playerId === myId) return; // never render my own cursor back at me
-    updateRemoteCursor(gameScreenEl, playerId, resolvePlayerName(playerId), msg.data.x, msg.data.y);
+    updateRemoteCursor(gameScreenElement, playerId, resolvePlayerName(playerId), message.data.x, message.data.y);
     markCursorStale(playerId);
-  } else if (msg.kind === 'card-lift') {
-    setCardLifted(msg.data.cardId, msg.data.active);
-  } else if (msg.kind === 'card-drag') {
+  
+  break;
+  }
+  case 'card-lift': {
+    setCardLifted(message.data.cardId, message.data.active);
+  
+  break;
+  }
+  case 'card-drag': {
     if (playerId === myId) return; // never render my own drag ghost back at me
-    if (!msg.data.active) {
+    if (!message.data.active) {
       clearTimeout(cardDragTimers.get(playerId));
-      removeCardDragGhost(gameScreenEl, playerId);
+      removeCardDragGhost(gameScreenElement, playerId);
       return;
     }
-    const card = msg.data.cardId ? resolveVisibleCard(msg.data.cardId) : null;
-    updateCardDragGhost(gameScreenEl, playerId, card, msg.data.x, msg.data.y);
+    const card = message.data.cardId ? resolveVisibleCard(message.data.cardId) : null;
+    updateCardDragGhost(gameScreenElement, playerId, card, message.data.x, message.data.y);
     markCardDragStale(playerId);
+  
+  break;
+  }
+  // No default
   }
 }
 
-function relayMotion(fromPeerId, msg) {
+function relayMotion(fromPeerId, message) {
   // D27: motion arrives addressed by peer id but is *labelled* by
   // identity - the cue says who is moving, and "who" survives a
   // reconnect while a peer id does not.
@@ -1490,17 +1512,17 @@ function relayMotion(fromPeerId, msg) {
   for (const player of gameState.players) {
     if (player.id === fromKey || player.id === myId) continue;
     const peerId = peerFor(player.id, peerToKey);
-    if (peerId) session.sendTo(peerId, { ...msg, fromId: fromKey });
+    if (peerId) session.sendTo(peerId, { ...message, fromId: fromKey });
   }
 }
 
 setInterval(() => {
-  if (!session || sessionEnded) return;
+  if (!session || isSessionEnded) return;
   for (const { key, data } of motionThrottler.drain()) {
-    const msg = makeMotionMessage(key, data);
-    applyIncomingMotion(myId, msg);
-    if (role === 'host') relayMotion(myId, msg);
-    else session.send(msg);
+    const message = makeMotionMessage(key, data);
+    applyIncomingMotion(myId, message);
+    if (role === 'host') relayMotion(myId, message);
+    else session.send(message);
   }
 }, MOTION_FLUSH_MS);
 
@@ -1508,13 +1530,13 @@ setInterval(() => {
 // Runs at the very end of the module: it can *click* the join button, so
 // every handler it depends on must already be attached.
 (function resumeOrDeepLink() {
-  const params = new URLSearchParams(window.location.search);
-  const remembered = recallSession(window.localStorage);
-  const code = params.get('join') || remembered?.code;
+  const parameters = new URLSearchParams(globalThis.location.search);
+  const remembered = recallSession(localStorage);
+  const code = parameters.get('join') || remembered?.code;
   if (!code) return;
 
-  document.getElementById('join-code').value = code;
-  if (remembered?.name) document.getElementById('join-name').value = remembered.name;
+  document.querySelector('#join-code').value = code;
+  if (remembered?.name) document.querySelector('#join-name').value = remembered.name;
   showScreen(screens, 'join');
 
   // US-39: auto-rejoin only when returning to a table we were already in
@@ -1522,7 +1544,7 @@ setInterval(() => {
   // still waits for a name, so it never signs someone in as whoever last
   // used this browser.
   if (remembered && remembered.code === code && remembered.name) {
-    document.getElementById('join-status').textContent = 'Rejoining your table...';
-    document.getElementById('join-btn').click();
+    document.querySelector('#join-status').textContent = 'Rejoining your table...';
+    document.querySelector('#join-btn').click();
   }
 })();

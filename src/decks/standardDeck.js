@@ -19,8 +19,8 @@ export function build({ numDecks = 1, jokers = 0 } = {}) {
         deck.push({ id: `${rank}-${suit}-${d}`, rank, suit });
       }
     }
-    for (let j = 0; j < jokers; j++) {
-      deck.push({ id: `JOKER-${j}-${d}`, rank: 'JOKER', suit: null });
+    for (let index = 0; index < jokers; index++) {
+      deck.push({ id: `JOKER-${index}-${d}`, rank: 'JOKER', suit: null });
     }
   }
   return deck;

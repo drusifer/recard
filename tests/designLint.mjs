@@ -77,10 +77,10 @@ export function pageOverflow(documentScrollHeight, viewportHeight) {
  */
 export function findOverlaps(entries) {
   const collisions = [];
-  for (let i = 0; i < entries.length; i++) {
-    for (let j = i + 1; j < entries.length; j++) {
-      if (rectsOverlap(entries[i].rect, entries[j].rect)) {
-        collisions.push({ a: entries[i].label, b: entries[j].label });
+  for (let index = 0; index < entries.length; index++) {
+    for (let index_ = index + 1; index_ < entries.length; index_++) {
+      if (rectsOverlap(entries[index].rect, entries[index_].rect)) {
+        collisions.push({ a: entries[index].label, b: entries[index_].label });
       }
     }
   }

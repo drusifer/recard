@@ -18,7 +18,9 @@
  * specifically to keep both targets comfortably large.
  */
 
-/** How far above/below the row still counts as aiming at it. */
+/**
+How far above/below the row still counts as aiming at it.
+*/
 const VERTICAL_SLACK = 0.5;
 
 /**
@@ -34,8 +36,8 @@ export function resolveDropTarget(cardBoxes, point) {
   let nearest = null;
 
   for (const box of cardBoxes) {
-    const withinRow = point.y >= box.top && point.y <= box.bottom;
-    if (withinRow && point.x >= box.left && point.x <= box.right) {
+    const isWithinRow = point.y >= box.top && point.y <= box.bottom;
+    if (isWithinRow && point.x >= box.left && point.x <= box.right) {
       return { targetCardId: box.cardId, side: 'after', layout: 'stack' };
     }
 
@@ -44,19 +46,19 @@ export function resolveDropTarget(cardBoxes, point) {
       continue;
     }
 
-    const before = point.x < box.left;
-    const distance = before ? box.left - point.x : point.x - box.right;
+    const isBefore = point.x < box.left;
+    const distance = isBefore ? box.left - point.x : point.x - box.right;
     if (distance > box.width) continue;
 
     // Ties are broken by card id rather than by array position, so the
     // same point always resolves the same way regardless of the order
     // the caller happened to collect boxes in.
-    const better =
+    const isBetter =
       nearest === null ||
       distance < nearest.distance ||
       (distance === nearest.distance && box.cardId < nearest.targetCardId);
-    if (better) {
-      nearest = { distance, targetCardId: box.cardId, side: before ? 'before' : 'after' };
+    if (isBetter) {
+      nearest = { distance, targetCardId: box.cardId, side: isBefore ? 'before' : 'after' };
     }
   }
 
