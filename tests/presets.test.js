@@ -85,15 +85,15 @@ test('Spit preset: 2 shared rank-adjacent piles + a cascade per player', () => {
 });
 
 test('every preset without a declared piles field is unaffected (undefined, not [])', () => {
-  const declaresPiles = new Set(['Solitaire', 'Spit', 'Gin Rummy']);
+  const declaresPiles = new Set(['Solitaire', 'Spit']);
   for (const preset of PRESETS) {
     if (declaresPiles.has(preset.name)) continue;
     assert.equal(preset.piles, undefined, `${preset.name} should not declare piles`);
   }
 });
 
-test('Gin Rummy preset: a real discard pile, declared - not the generic shared Table zone standing in for one', () => {
+test('Gin Rummy preset: no discard pile - the game does not use one', () => {
   const preset = PRESETS.find((p) => p.name === 'Gin Rummy');
   assert.ok(preset);
-  assert.deepEqual(preset.piles, [{ kind: 'discard', ownerId: null, count: 1, zoneId: 'table-zone' }]);
+  assert.equal(preset.piles, undefined);
 });

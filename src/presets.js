@@ -31,12 +31,10 @@
  * validate the Pile/Zone primitives (D53), not to be a full solitaire
  * engine; the host draws/moves cards into place same as any other game.
  *
- * Gin Rummy also declares `piles` (a single real `discard`-kind pile) -
- * direct user follow-up to D53: replaces the generic shared Table zone
- * that used to stand in for a discard pile with the real thing, now
- * that a declared pile is one line instead of a manual Add Zone click.
- * One system, not two - no preset keeps relying on the generic zone
- * where a real Pile kind now fits.
+ * Gin Rummy briefly declared a real `discard`-kind `piles` entry (a D53
+ * follow-up); removed again per direct user request - the game doesn't
+ * use a discard pile, so nothing should auto-create one. It falls back
+ * to the generic shared Table zone, same as War/Hearts.
  *
  * D53 audit follow-up (retired, not left as dead weight): `usesMiddle`
  * used to flag presets depending on the middle-zone privacy mechanics
@@ -99,16 +97,9 @@ export const PRESETS = [
     numDecks: 1,
     jokers: 0,
     cardsPerPlayer: 10,
-    // D53 follow-up: a real discard pile, declared - not the generic
-    // shared Table zone standing in for one (which is all this preset
-    // had before Sprint 22's Pile/Zone framework existed to do better).
-    // `zoneId: 'table-zone'` (D55, direct user request - "layout is
-    // declarative now"): the discard pile joins the Table Zone
-    // explicitly, by declaration - not by `ui.js` or `state.js`
-    // inferring it from `kind: 'discard'`. Matches this preset's own
-    // captured `layout` blob below, which has no separate 'discard'
-    // entry because it was captured with the discard grouped in.
-    piles: [{ kind: 'discard', ownerId: null, count: 1, zoneId: 'table-zone' }],
+    // *nit (direct user request): no discard pile - this game doesn't
+    // use one. The generic shared Table zone covers whatever ad hoc
+    // table-side play this preset needs, same as War/Hearts below.
     // Direct user request: captured from an actual arranged table
     // (devtools -> `recard:panel-layout:v1`) rather than calibrated
     // like the other presets' below - kept verbatim, including several
@@ -123,19 +114,28 @@ export const PRESETS = [
       'zone-1787670038402-0.2629345589587625': { w: 487.968796, h: 127.671886, x: 61.080688, y: 167.617218 },
       'zone-1787614397561-0.5513049884546531': { x: 47.42170000318735, y: 25.587802773915048 },
       'zone-1787614371244-0.5730961717906486': { w: 17.320217382901074, h: 7.673292614934287 },
-      'zone-1787614371244-0.5141461779167045': { x: 40.305122386871695, y: 63.50230059805833, w: 52.263806179055486, h: 38.220969491322386 },
-      'zone-1787672543726-0.8023572234786502': { x: 314.335968, y: 843.402809, w: 619.175354, h: 399.166687 },
-      deck: { x: 45.4296875, y: 482.03125762939453, w: 263.9757385253906, h: 201.55816650390625 },
+      'zone-1787614371244-0.5141461779167045': { w: 52.263806179055486, h: 38.220969491322386, x: 40.305122386871695, y: 63.50230059805833 },
+      'zone-1787672543726-0.8023572234786502': { w: 619.175354, h: 399.166687, x: 314.335968, y: 843.402809 },
+      deck: { w: 263.9757385253906, h: 201.55816650390625, x: 45.4296875, y: 482.03125762939453 },
       'zone-1787672554751-0.3855307837355365': { x: 402.0573425292969, y: 178.07294464111328 },
-      'zone-1787672543726-0.8160163792174508': { x: 41.332427978515625, y: 279.5529556274414, w: 272.5347137451172, h: 182.4349365234375 },
-      score: { x: 146.210968, y: 945.876747, w: 160, h: 119.683228 },
+      'zone-1787672543726-0.8160163792174508': { w: 272.5347137451172, h: 182.4349365234375, x: 41.332427978515625, y: 279.5529556274414 },
+      score: { w: 160, h: 119.6832275390625, x: 194.6953125, y: 427.171875 },
       'hand:pk-1787672554750-dz30ba1hyo': { x: 647.8255615234375, y: 53.32465362548828 },
-      'hand:RLBX7D': { x: 335.5295104980469, y: 1008.6545791625977, w: 268.1466979980469, h: 217.96876525878906 },
-      'table-zone': { x: 213.415802, y: 387.660622, w: 993.463623, h: 387.087738 },
-      'player-RLBX7D': { x: 136.7664794921875, y: 853.9930801391602, w: 583.6762084960938, h: 383.2855529785156 },
-      'player-pk-1787672554750-dz30ba1hyo': { x: 243.007843, y: 51.918404, w: 696.558228, h: 286.896683 },
+      'hand:RLBX7D': { w: 268.1466979980469, h: 217.96876525878906, x: 335.5295104980469, y: 1008.6545791625977 },
+      'table-zone': { w: 929.875, h: 164.89453125, x: 88.19921875, y: 186.6796875 },
+      'player-RLBX7D': { w: 583.6762084960938, h: 383.2855529785156, x: 136.7664794921875, y: 853.9930801391602 },
+      'player-pk-1787672554750-dz30ba1hyo': { w: 696.558228, h: 286.896683, x: 243.007843, y: 51.918404 },
       'player-pk-1787691970079-p54pp88bbve': { x: 470.2691345214844, y: 61.076393127441406 },
       'player-ESGSR3': { x: 407.5911560058594, y: 932.0920791625977 },
+      'player-pk-1787769037434-ya2k37s60i': { x: 336.6796875, y: -17.44140625 },
+      'player-WUX6BS': { x: 322.94921875, y: 353.49609375 },
+      'score-pk-1787769037434-ya2k37s60i': { x: 708.546875, y: 7.921875 },
+      'player-pk-1787792998068-ba0xc1cksnn': { x: 222.1171875, y: 19.390625 },
+      'player-VKWECT': { x: 367.60546875, y: 317.05859375 },
+      'score-pk-1787792998068-ba0xc1cksnn': { w: 160, h: 90.98828125 },
+      'player-N7D39S': { x: 380.1015625, y: 360.1015625 },
+      'score-pk-1787797411912-a9cuh3ytdcu': { x: 585.62109375, y: 8.54296875 },
+      'player-pk-1787797411912-a9cuh3ytdcu': { x: 350.16796875, y: 9.4921875 },
     },
   },
   {
