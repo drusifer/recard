@@ -9,11 +9,6 @@ import { ZONE_TYPES } from './zones/zoneTypes.js';
 const SUIT_SYMBOL = { clubs: '♣', diamonds: '♦', hearts: '♥', spades: '♠' };
 const RED_SUITS = new Set(['diamonds', 'hearts']);
 
-export function cardLabel(card) {
-  if (card.rank === 'JOKER') return 'JOKER';
-  return `${card.rank}${SUIT_SYMBOL[card.suit]}`;
-}
-
 function cardElement(card, { onClick, disabled } = {}) {
   const element = document.createElement('button');
   element.type = 'button';

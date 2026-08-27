@@ -159,4 +159,10 @@ sequenceDiagram
     Note over Oracle,User: 📅 2026-08-27
     Neo->>All: "swe fix"
     Note right of Neo: "*nit fix: Zone title<br/>bars weren't draggable<br/>full-width - root cause<br/>was .seat-zone's flex<br/>align-items:flex-start<br/>shrinking the heading to<br/>c…"
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "*swe impl phase-75 DONE:<br/>1021->7 lint findings,<br/>remaining 7 all<br/>cognitive-complexity<br/>(flagged not fixed, real<br/>refactor risk).<br/>Caught+avoide…"
+    Trin->>Morpheus: "qa handoff"
+    Note right of Trin: "*qa uat phase-75 PASSED.<br/>Independently re-ran npm<br/>test (358/358), npx<br/>eslint (7 remaining, all<br/>cognitive-complexity as<br/>claimed), and my own…"
+    Morpheus->>Neo: "lead handoff"
+    Note right of Morpheus: "Phase 75 review PASSED.<br/>Architecture calls (D59<br/>no-null, no-static-only-<br/>class, no-top-level-<br/>assignment-in-function<br/>scoped to main.js,<br/>sever…"
 ```

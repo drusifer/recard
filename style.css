@@ -504,31 +504,11 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   overflow: visible;
 }
 
-.hand-card-fd-row {
-  display: flex;
-  gap: 0.4rem;
-}
-
-/* Real touch targets (~44px, iOS HIG / Material minimum) - Smith Gate-close
-   finding: the original small icon buttons measured ~25x20px on a real
-   mobile viewport, well under the floor for reliable tapping. */
-.fd-btn {
-  min-width: 2.75rem;
-  min-height: 2.75rem;
-  padding: 0.3rem;
-  font-size: 1rem;
-  background: var(--surface-2);
-  color: var(--muted);
-  font-weight: 400;
-}
-
 .middle-card {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.3rem;
-  /* Capped so a card's controls (wider than the card) can't set its
-     width - see .middle-card-controls. */
   max-width: 8.5rem;
   /* Anchor for the hover action row (D25). */
   position: relative;
@@ -701,12 +681,12 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   z-index: 4;
 }
 
-/* Without this, a pile's stacked cards each render their own Pick up /
-   Move to… controls at full width underneath, which collide into an
-   unreadable smear (measured, not guessed - see the Phase 31
-   screenshot). The controls are still one hover/focus away, and the
-   cards' own overlap already communicates that they're a group. */
-.middle-card[data-layout] > :not(.card):not(.middle-card-controls) {
+/* Without this, a pile's stacked cards each render their own owner tag
+   at full width underneath, which collides into an unreadable smear
+   (measured, not guessed - see the Phase 31 screenshot). Still one
+   hover/focus away, and the cards' own overlap already communicates
+   that they're a group. */
+.middle-card[data-layout] > :not(.card) {
   display: none;
 }
 
@@ -851,12 +831,6 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   padding: 0 0.2rem;
   min-width: 4rem;
   max-width: 10rem;
-}
-
-.move-to-select {
-  font-size: 0.85rem;
-  padding: 0.25rem 0.35rem;
-  min-height: 2.75rem;
 }
 
 /* Top-down table surface (US-26, D18): one visual "table" instead of
@@ -1096,27 +1070,6 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   text-align: center;
 }
 
-.hand-heading { margin-top: 0.4rem; }
-
-/* D52 follow-up, found live: `#hand-zone-name` is a thin one-line text
-   heading, and the shared `.pile-hover-host:hover` raise (`translateY(
-   -0.35rem) scale(1.02)`) shifts a box that short by enough of its own
-   height that the pointer (still at its ORIGINAL position) ends up
-   outside the now-moved box - which un-hovers it, which un-raises it,
-   which puts it back under the pointer, which re-hovers it. A genuine
-   self-triggering oscillation, not a test-timing flake: confirmed live
-   by watching its own `getBoundingClientRect()` change on every single
-   hover attempt, and the radial menu it opens repeatedly detaching and
-   reattaching as the hover flips. "Raise it off the table" reads fine
-   for a card or a whole pile's body; it never needed to apply to a bare
-   text label in the first place - cancelled here rather than only
-   worked around at the call site, since a real mouse user hitting this
-   would see the same jitter. */
-#hand-zone-name.pile-hover-host:hover,
-#hand-zone-name.pile-hover-host:focus-within {
-  transform: none;
-}
-
 /* Visual deck stack (US-20) instead of a bare "N cards left" line.
    UX follow-up: now a COLUMN (the action header row, then this original
    row) instead of the row itself directly - see `ui.js`'s `renderDeck`
@@ -1215,16 +1168,6 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   background: #465066;
   border: 1px solid #5a6684;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-}
-
-/* Same small-button pattern and Smith Gate-close finding as .fd-btn/
-   .score-btn - not separately measured, but identical root cause
-   (undersized secondary buttons), so fixed together for consistency
-   rather than leaving one type fixed next to an unfixed twin. */
-.reveal-btn, .pickup-btn {
-  min-height: 2.75rem;
-  padding: 0.3rem 0.6rem;
-  font-size: 0.85rem;
 }
 
 .deck-config { color: var(--muted); font-size: 0.9rem; }
@@ -1491,26 +1434,6 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   border-radius: var(--radius-sm);
 }
 
-/* One horizontal control row per zone card, rather than each control
-   stacked under the card. Two 44px rows per card made every zone about
-   twice the height of the card itself, which is exactly what pushed the
-   pot into the seat-zone ring (D24) and forced page scrolling. */
-.middle-card-controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /* Wrap rather than widen: the controls are wider than the card they
-     belong to, and letting them set the card's width made each zone card
-     ~4x a card wide. At a large minimum font size that pushed the third
-     card in a zone onto a clipped second row - i.e. cards silently
-     vanished. Capping the wrapper keeps a zone a row of *cards*. */
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  max-width: 100%;
-}
-
-.middle-card .move-to-select { max-width: 100%; }
-
 /* Your hand no longer needs `position: sticky` here - that was the
    previous fix for the same complaint this whole change addresses, and
    it only mattered because the PAGE used to scroll. Now #screen-game is
@@ -1629,19 +1552,6 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
      (Smith's Gate 2 #2 finding at sprint close). */
   left: -9999px;
   top: -9999px;
-}
-
-/* Smith Gate 1 #4: a gesture nobody is told about is not parity. */
-.touch-hint {
-  display: none;
-  margin: 0.25rem 0 0;
-  font-size: 0.8rem;
-  color: var(--muted, #9aa);
-  text-align: center;
-}
-
-@media (pointer: coarse) {
-  .touch-hint { display: block; }
 }
 
 /* --- Pile-level and card-level actions (US-41, D29; generalized D34/D37;
