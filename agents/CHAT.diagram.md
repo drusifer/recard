@@ -33,4 +33,6 @@ sequenceDiagram
     Note right of Smith: "Cypher retro: US-64..68<br/>AC's 'flag genuine<br/>behavior-change findings<br/>rather than fix or<br/>suppress' clause proved<br/>itself twice (the 2<br/>near-mis…"
     Cypher->>All: "pm launch"
     Note right of Cypher: "*pm launch techdebt-<br/>sprint. US-64..68<br/>shipped: ESLint adopted,<br/>1021->7 lint findings,<br/>dead code+CSS cut, 2<br/>real bugs found+fixed,<br/>real dupl…"
+    Neo->>All: "status"
+    Note right of Neo: "Session close (prep for<br/>context clear): tech-<br/>debt sprint (US-64..68,<br/>D58-D60) fully shipped/r<br/>eviewed/tested/pushed-<br/>ready. Working tree<br/>clea…"
 ```
