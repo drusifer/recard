@@ -173,4 +173,10 @@ sequenceDiagram
     Note right of Morpheus: "Phase 76 review PASSED.<br/>Good discipline: kept<br/>the still-load-bearing<br/>part of the compound<br/>selector instead of<br/>deleting the whole rule,<br/>and…"
     Neo->>All: "swe decision"
     Note right of Neo: "D60 recorded: deleted<br/>tests/e2e.smoke.mjs<br/>(1692 lines, monolithic)<br/>- asserted against DOM<br/>ids (#hand-area/#table-<br/>area/#seat-zones)<br/>retired…"
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "*swe impl phase-77 DONE<br/>(via D60, user-decided<br/>deletion after<br/>escalation - see<br/>D60/commit 7da7321):<br/>removed<br/>tests/e2e.smoke.mjs,<br/>updated pa…"
+    Trin->>Morpheus: "qa handoff"
+    Note right of Trin: "*qa uat phase-77 PASSED.<br/>Confirmed file deleted,<br/>zero test:e2e references<br/>remain in<br/>package.json/README, npm<br/>test 358/358 (unaffected<br/>as ex…"
+    Morpheus->>Neo: "lead handoff"
+    Note right of Morpheus: "Phase 77 review PASSED.<br/>D60 well-reasoned and<br/>properly escalated<br/>rather than decided<br/>unilaterally. @Neo *swe<br/>impl phase-78 (DRY pass<br/>+ fina…"
 ```

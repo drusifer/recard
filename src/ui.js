@@ -125,9 +125,56 @@ function moveDragGhost(ghost, x, y) {
  * them, and it gives us the drag image, Escape-to-cancel and cursor
  * feedback for free.
  */
+
+/**
+ * Wires the 5 pointer/touch events every touch-drag attachment needs
+ * onto `feed` (the caller's own `touchDragStep` state-machine driver) -
+ * shared by `attachTouchDrag` (cards) and `attachPileActionTouchDrag`
+ * (pile actions), which differed only in their own `handle` callbacks,
+ * never in this wiring - it had drifted into two copies, one of which
+ * had silently dropped the `pointerType === 'mouse'` guard on
+ * `pointercancel`. Returns a timer ref so the caller's own `teardown()`
+ * can clear the same hold-timer this wiring starts.
+ */
+function wireTouchDragEvents(sourceElement, feed, isDragging) {
+  const timerReference = { id: null };
+  sourceElement.addEventListener('pointerdown', (event) => {
+    if (event.pointerType === 'mouse') return;
+    feed({ type: 'down', x: event.clientX, y: event.clientY, t: performance.now() });
+    clearTimeout(timerReference.id);
+    // A finger that never moves fires no pointermove, so the timer is
+    // the only thing that can start the drag.
+    timerReference.id = setTimeout(() => feed({ type: 'tick', t: performance.now() }), HOLD_MS);
+    sourceElement.setPointerCapture(event.pointerId);
+  });
+  sourceElement.addEventListener('pointermove', (event) => {
+    if (event.pointerType === 'mouse') return;
+    feed({ type: 'move', x: event.clientX, y: event.clientY, t: performance.now() });
+  });
+  sourceElement.addEventListener('pointerup', (event) => {
+    if (event.pointerType === 'mouse') return;
+    clearTimeout(timerReference.id);
+    feed({ type: 'up', x: event.clientX, y: event.clientY, t: performance.now() });
+  });
+  sourceElement.addEventListener('pointercancel', (event) => {
+    if (event.pointerType === 'mouse') return;
+    clearTimeout(timerReference.id);
+    feed({ type: 'cancel', t: performance.now() });
+  });
+  // `touch-action` is resolved when the touch STARTS, so switching it to
+  // `none` at lift time does nothing for the gesture already in flight —
+  // and setting it up front would kill scrolling on every card forever,
+  // which is the exact failure the AC forbids. Cancelling `touchmove`
+  // instead works mid-gesture, and is safe here because a drag only
+  // exists after 250ms of stillness, by which point the browser has not
+  // begun scrolling and will still honour preventDefault.
+  sourceElement.addEventListener('touchmove', (event) => {
+    if (isDragging()) event.preventDefault();
+  }, { passive: false });
+  return timerReference;
+}
 function attachTouchDrag(sourceElement, card, context) {
   let state = null;
-  let timer = null;
   let ghost = null;
   let hinted = null; // the zone currently showing drop feedback
 
@@ -137,7 +184,7 @@ function attachTouchDrag(sourceElement, card, context) {
   };
 
   const teardown = () => {
-    clearTimeout(timer);
+    clearTimeout(timerReference.id);
     ghost?.remove();
     ghost = null;
     sourceElement.classList.remove('card-dragging');
@@ -210,40 +257,7 @@ function attachTouchDrag(sourceElement, card, context) {
     for (const event of out.events) handle[event.type](event);
   };
 
-  sourceElement.addEventListener('pointerdown', (event) => {
-    if (event.pointerType === 'mouse') return;
-    feed({ type: 'down', x: event.clientX, y: event.clientY, t: performance.now() });
-    clearTimeout(timer);
-    // A finger that never moves fires no pointermove, so the timer is
-    // the only thing that can start the drag.
-    timer = setTimeout(() => feed({ type: 'tick', t: performance.now() }), HOLD_MS);
-    sourceElement.setPointerCapture(event.pointerId);
-  });
-  sourceElement.addEventListener('pointermove', (event) => {
-    if (event.pointerType === 'mouse') return;
-    feed({ type: 'move', x: event.clientX, y: event.clientY, t: performance.now() });
-  });
-  sourceElement.addEventListener('pointerup', (event) => {
-    if (event.pointerType === 'mouse') return;
-    clearTimeout(timer);
-    feed({ type: 'up', x: event.clientX, y: event.clientY, t: performance.now() });
-  });
-  sourceElement.addEventListener('pointercancel', (event) => {
-    if (event.pointerType === 'mouse') return;
-    clearTimeout(timer);
-    feed({ type: 'cancel', t: performance.now() });
-  });
-
-  // `touch-action` is resolved when the touch STARTS, so switching it to
-  // `none` at lift time does nothing for the gesture already in flight —
-  // and setting it up front would kill scrolling on every card forever,
-  // which is the exact failure the AC forbids. Cancelling `touchmove`
-  // instead works mid-gesture, and is safe here because a drag only
-  // exists after 250ms of stillness, by which point the browser has not
-  // begun scrolling and will still honour preventDefault.
-  sourceElement.addEventListener('touchmove', (event) => {
-    if (state?.phase === 'dragging') event.preventDefault();
-  }, { passive: false });
+  const timerReference = wireTouchDragEvents(sourceElement, feed, () => state?.phase === 'dragging');
 }
 
 // NOTE (flagged, not yet done): `renderHand`/`performHandReorder` (the
@@ -1492,11 +1506,10 @@ export function pileDragFromDrop(dataTransfer) {
  */
 function attachPileActionTouchDrag(sourceElement, actionId, onDrop) {
   let state = null;
-  let timer = null;
   let ghost = null;
 
   const teardown = () => {
-    clearTimeout(timer);
+    clearTimeout(timerReference.id);
     ghost?.remove();
     ghost = null;
   };
@@ -1511,7 +1524,7 @@ function attachPileActionTouchDrag(sourceElement, actionId, onDrop) {
     move: (event) => { if (ghost) moveDragGhost(ghost, event.x, event.y); },
     drop: (event) => {
       teardown();
-      if (document.elementFromPoint(event.x, event.y)?.closest('#hand-area')) onDrop();
+      if (document.elementFromPoint(event.x, event.y)?.closest('[data-kind="hand"]')) onDrop();
     },
     cancel: teardown,
   };
@@ -1522,29 +1535,7 @@ function attachPileActionTouchDrag(sourceElement, actionId, onDrop) {
     for (const dragEvent of out.events) handle[dragEvent.type](dragEvent);
   };
 
-  sourceElement.addEventListener('pointerdown', (event) => {
-    if (event.pointerType === 'mouse') return;
-    feed({ type: 'down', x: event.clientX, y: event.clientY, t: performance.now() });
-    clearTimeout(timer);
-    timer = setTimeout(() => feed({ type: 'tick', t: performance.now() }), HOLD_MS);
-    sourceElement.setPointerCapture(event.pointerId);
-  });
-  sourceElement.addEventListener('pointermove', (event) => {
-    if (event.pointerType === 'mouse') return;
-    feed({ type: 'move', x: event.clientX, y: event.clientY, t: performance.now() });
-  });
-  sourceElement.addEventListener('pointerup', (event) => {
-    if (event.pointerType === 'mouse') return;
-    clearTimeout(timer);
-    feed({ type: 'up', x: event.clientX, y: event.clientY, t: performance.now() });
-  });
-  sourceElement.addEventListener('pointercancel', () => {
-    clearTimeout(timer);
-    feed({ type: 'cancel', t: performance.now() });
-  });
-  sourceElement.addEventListener('touchmove', (event) => {
-    if (state?.phase === 'dragging') event.preventDefault();
-  }, { passive: false });
+  const timerReference = wireTouchDragEvents(sourceElement, feed, () => state?.phase === 'dragging');
 }
 
 /**

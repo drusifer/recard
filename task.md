@@ -1321,5 +1321,6 @@ they build, so it gets its own pure/UI pair rather than folding into 70.
       Phases 75-77 review into shared helpers, matching existing
       patterns (`renderZonePanel`, `makeZone`, `dealCards`). No
       speculative new abstractions.
-- [ ] Full regression: `npm test`, `npm run test:e2e`, `npm run lint`
-      (style + design + js) all green. Sprint-close groom next.
+- [ ] Full regression: `npm test`, `npm run lint` (style + design + js)
+      all green (`test:e2e` no longer exists - D60). Sprint-close groom
+      next.
