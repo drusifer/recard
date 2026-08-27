@@ -25,6 +25,17 @@ export default [
       // confirmed live (all piles/zones subclassing it crashed at
       // import). Real architectural pattern, not smell.
       'unicorn/no-static-only-class': 'off',
+      // `null` is a real, deliberate, JSON-serializable sentinel in this
+      // codebase's wire/persistence layer (state.js piles/zones -
+      // `ownerId: null` etc. - `persistence.js` JSON.stringify()s a raw
+      // state snapshot). `undefined` is NOT interchangeable here:
+      // `JSON.stringify({a: undefined})` silently drops the key,
+      // `JSON.stringify({a: null})` keeps it - blanket-replacing null
+      // with undefined risks silently corrupting the persisted/networked
+      // shape this project has repeatedly called "byte-identical" and
+      // load-bearing (D23, Phase 29). Dominant finding (189/435) -
+      // flagged and resolved as one call, not fixed line-by-line.
+      'unicorn/no-null': 'off',
     },
   },
   {

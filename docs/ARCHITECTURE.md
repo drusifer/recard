@@ -3237,3 +3237,42 @@ suppression.
 
 **Verified:** none yet — architecture-only decision, no code written.
 Phase Bloop starts fresh against this config.
+
+---
+
+### D59. Two D58 rules disabled after Phase 75a's autofix pass: `unicorn/no-static-only-class`, `unicorn/no-null`
+
+**Decision:** disable both rules project-wide rather than fix their
+findings.
+
+1. **`unicorn/no-static-only-class`** — its `--fix` rewrote `Pile`/`Zone`
+   (D56's deliberately static-members-only base classes, an extensible
+   interface every pile/zone kind `extends`) from `class X {}` to
+   `const X = {}`. Confirmed live: every subclass crashed at import
+   (`Class extends value #<Object> is not a constructor`). Real pattern,
+   not smell — no unit test caught it because nothing imports `Pile.js`
+   standalone.
+2. **`unicorn/no-null`** (189 of 435 remaining findings — the dominant
+   one) — this codebase's wire/persistence layer relies on `null` as a
+   real, JSON-serializable sentinel distinct from "absent" (`state.js`
+   piles/zones: `ownerId: null` etc.; `persistence.js` calls
+   `JSON.stringify()` directly on a state snapshot).
+   `JSON.stringify({a: undefined})` drops the key entirely;
+   `JSON.stringify({a: null})` keeps it. Blanket-converting `null` to
+   `undefined` across 189 sites risks silently corrupting the persisted/
+   networked shape this project has repeatedly called "byte-identical"
+   and load-bearing (D23, Phase 29's `viewFor` guarantee). Rejected
+   fixing line-by-line (189 individual judgment calls, most touching the
+   reducer) in favor of one architectural call: this is what the rule is
+   actually complaining about being wrong for, not 189 separate bugs.
+
+**Why not just leave `no-static-only-class` on and fix the two real
+base classes only:** disabling was chosen over per-file suppression
+comments because the underlying pattern (a static-only base meant to be
+subclassed) is a general, reusable idiom in this codebase's design, not
+a one-off — a future Pile/Zone-like base class should get the same
+treatment without needing to remember a suppression comment.
+
+**Verified:** `npm run lint:js` 435 → 246 findings from this change
+alone. `npm test` 358/358 unchanged throughout (no code touched, config
+only).
