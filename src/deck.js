@@ -15,10 +15,10 @@ export { RANKS, SUITS } from './decks/standardDeck.js';
  * @param {{type?: string, numDecks?: number, jokers?: number}} [options]
  * @returns {{id: string, rank: string, suit: string|null}[]}
  */
-export function buildDeck({ type = 'standard', numDecks = 1, jokers = 0 } = {}) {
+export function buildDeck({ type = 'standard', numDecks: numberDecks = 1, jokers = 0 } = {}) {
   const deckType = DECK_TYPES[type];
   if (!deckType) throw new Error(`Unknown deck type: "${type}"`);
-  return deckType.build({ numDecks, jokers });
+  return deckType.build({ numDecks: numberDecks, jokers });
 }
 
 /**
@@ -30,8 +30,10 @@ export function buildDeck({ type = 'standard', numDecks = 1, jokers = 0 } = {}) 
 export function shuffle(deck, rng = Math.random) {
   const result = [...deck];
   for (let index = result.length - 1; index > 0; index--) {
-    const index_ = Math.floor(rng() * (index + 1));
-    [result[index], result[index_]] = [result[index_], result[index]];
+    const swapIndex = Math.floor(rng() * (index + 1));
+    const temporary = result[index];
+    result[index] = result[swapIndex];
+    result[swapIndex] = temporary;
   }
   return result;
 }
@@ -43,18 +45,18 @@ export function shuffle(deck, rng = Math.random) {
  * @param {number} numPlayers
  * @param {number} cardsPerPlayer
  */
-export function deal(deck, numPlayers, cardsPerPlayer) {
-  const totalNeeded = numPlayers * cardsPerPlayer;
+export function deal(deck, numberPlayers, cardsPerPlayer) {
+  const totalNeeded = numberPlayers * cardsPerPlayer;
   if (totalNeeded > deck.length) {
     throw new Error(
-      `Cannot deal ${cardsPerPlayer} cards to ${numPlayers} players: deck only has ${deck.length} cards`,
+      `Cannot deal ${cardsPerPlayer} cards to ${numberPlayers} players: deck only has ${deck.length} cards`,
     );
   }
 
-  const hands = Array.from({ length: numPlayers }, () => []);
+  const hands = Array.from({ length: numberPlayers }, () => []);
   const remaining = [...deck];
   for (let round = 0; round < cardsPerPlayer; round++) {
-    for (let p = 0; p < numPlayers; p++) {
+    for (let p = 0; p < numberPlayers; p++) {
       hands[p].push(remaining.shift());
     }
   }

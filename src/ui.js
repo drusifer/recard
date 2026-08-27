@@ -353,10 +353,10 @@ function applyIconButton(button, spec, labelOverride) {
  *   headingId?: string, headingClass?: string, rawName?: string,
  *   onRename?: (name: string) => void}} opts
  */
-export function renderActionHeader(container, titleText, actionIds, opts = {}) {
+export function renderActionHeader(container, titleText, actionIds, options = {}) {
   container.replaceChildren();
-  container.className = `zone-name pile-action-header${opts.headingClass ? ` ${opts.headingClass}` : ''}`;
-  if (opts.headingId) container.id = opts.headingId;
+  container.className = `zone-name pile-action-header${options.headingClass ? ` ${options.headingClass}` : ''}`;
+  if (options.headingId) container.id = options.headingId;
 
   const label = document.createElement('span');
   label.className = 'zone-name-text';
@@ -366,12 +366,12 @@ export function renderActionHeader(container, titleText, actionIds, opts = {}) {
   // *nit (2026-08-26): "allow user to rename zones and piles - any user
   // can edit". `titleText` often carries a derived suffix a pile's own
   // heading appends ("Hand (7)") that isn't part of the actual stored
-  // name, so editing needs the RAW name (`opts.rawName`) as its
+  // name, so editing needs the RAW name (`options.rawName`) as its
   // starting value, not `titleText` itself - only wired when a caller
   // supplies `onRename` (a Zone with no name, e.g. the common
   // single-pile case, never gets this at all, matching how it already
   // renders no heading there).
-  if (opts.onRename) {
+  if (options.onRename) {
     label.title = 'Double-click to rename';
     label.classList.add('renamable');
     label.addEventListener('dblclick', (e) => {
@@ -379,7 +379,7 @@ export function renderActionHeader(container, titleText, actionIds, opts = {}) {
       const input = document.createElement('input');
       input.type = 'text';
       input.className = 'zone-name-edit';
-      input.value = opts.rawName ?? titleText;
+      input.value = options.rawName ?? titleText;
       label.replaceWith(input);
       input.focus();
       input.select();
@@ -393,7 +393,7 @@ export function renderActionHeader(container, titleText, actionIds, opts = {}) {
         // tripping a no-op (or a reducer throw the user never asked
         // for) through the network - same "cancel is a valid outcome"
         // spirit as the split/take confirm dialogs' Cancel button.
-        if (name && name !== (opts.rawName ?? titleText)) opts.onRename(name);
+        if (name && name !== (options.rawName ?? titleText)) options.onRename(name);
         input.replaceWith(label);
       };
       input.addEventListener('blur', commit);
@@ -417,20 +417,20 @@ export function renderActionHeader(container, titleText, actionIds, opts = {}) {
   // positioning, which a discrete native-drop-target model can't give.
   // Two different Movable mechanisms for two different entities, not
   // one shared one - see `wirePanelLayout`'s own comment.
-  if (opts.pileDraggable) {
+  if (options.pileDraggable) {
     container.draggable = true;
     container.addEventListener('dragstart', (e) => {
-      e.dataTransfer.setData('text/plain', pileDragToken(opts.pileId));
+      e.dataTransfer.setData('text/plain', pileDragToken(options.pileId));
     });
   }
 
   for (const id of actionIds) {
-    if (opts.disabled?.includes(id)) continue;
+    if (options.disabled?.includes(id)) continue;
     const spec = ACTION_SPECS[id];
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'pile-action-btn' + (spec.destructive ? ' btn-danger' : '');
-    applyIconButton(button, spec, opts.labels?.[id]);
+    applyIconButton(button, spec, options.labels?.[id]);
     button.addEventListener('click', (e) => {
       e.stopPropagation();
       // US-61 (Sprint 23), Smith's ruling (Phase 70): each spec's own
@@ -441,20 +441,20 @@ export function renderActionHeader(container, titleText, actionIds, opts = {}) {
       // destructive action except reshuffleDeal, silently inherited by
       // `take` the moment it became destructive (Phase 68). One prompt,
       // built from the actual action's own hint, for all of them.
-      // `opts.noConfirm` (a 1-card `take`, Smith's ruling) skips the
+      // `options.noConfirm` (a 1-card `take`, Smith's ruling) skips the
       // dialog entirely - identical in effect to that card's own
       // un-confirmed single-card `pickup`.
-      if (spec.destructive && !opts.noConfirm?.includes(id) &&
+      if (spec.destructive && !options.noConfirm?.includes(id) &&
         !globalThis.confirm(`${spec.hint}\n\nContinue?`)) return;
-      opts.onAction(id);
+      options.onAction(id);
     });
     // D35: `draw`'s own action-token drag protocol, unrelated to the
     // menu it used to live in - preserved as-is, just hosted on a plain
     // button now instead of a radial one.
-    if (opts.draggable && spec.target) {
+    if (options.draggable && spec.target) {
       button.draggable = true;
       button.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', pileActionToken(id)));
-      attachPileActionTouchDrag(button, id, () => opts.onAction(id));
+      attachPileActionTouchDrag(button, id, () => options.onAction(id));
     }
     container.append(button);
   }

@@ -224,11 +224,11 @@ export function targetsForAction(action, piles, { viewerId, fromPileId } = {}) {
  * since both make `isOwner` simply `false`.
  *
  * @param {'deck'|'hand'|'zone'|'discard'} kind
- * @param {{isHost?: boolean, isOwner?: boolean, isShared?: boolean}} ctx
+ * @param {{isHost?: boolean, isOwner?: boolean, isShared?: boolean}} context
  * @returns {string[]} action ids
  */
-export function pileLevelActions(kind, ctx = {}) {
-  return PILE_TYPES[kind]?.pileActions(ctx) ?? [];
+export function pileLevelActions(kind, context = {}) {
+  return PILE_TYPES[kind]?.pileActions(context) ?? [];
 }
 
 /**

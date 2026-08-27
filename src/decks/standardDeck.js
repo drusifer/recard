@@ -11,9 +11,9 @@ export const SUITS = ['clubs', 'diamonds', 'hearts', 'spades'];
  * @param {{numDecks?: number, jokers?: number}} [options]
  * @returns {{id: string, rank: string, suit: string|null}[]}
  */
-export function build({ numDecks = 1, jokers = 0 } = {}) {
+export function build({ numDecks: numberDecks = 1, jokers = 0 } = {}) {
   const deck = [];
-  for (let d = 0; d < numDecks; d++) {
+  for (let d = 0; d < numberDecks; d++) {
     for (const suit of SUITS) {
       for (const rank of RANKS) {
         deck.push({ id: `${rank}-${suit}-${d}`, rank, suit });

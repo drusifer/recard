@@ -29,27 +29,27 @@ const MIME = {
   '.ico': 'image/x-icon',
 };
 
-const server = http.createServer(async (request, res) => {
+const server = http.createServer(async (request, response) => {
   const pathname = decodeURIComponent(request.url.split('?', 1)[0]);
   const filePath = path.join(ROOT, pathname === '/' ? 'index.html' : pathname);
 
   // Don't serve anything outside the project root.
   if (!filePath.startsWith(ROOT)) {
-    res.writeHead(403);
-    res.end('forbidden');
+    response.writeHead(403);
+    response.end('forbidden');
     return;
   }
 
   try {
     const body = await readFile(filePath);
-    res.writeHead(200, {
+    response.writeHead(200, {
       'Content-Type': MIME[path.extname(filePath)] ?? 'application/octet-stream',
       'Cache-Control': 'no-store, must-revalidate',
     });
-    res.end(body);
+    response.end(body);
   } catch {
-    res.writeHead(404, { 'Content-Type': 'text/plain' });
-    res.end('not found');
+    response.writeHead(404, { 'Content-Type': 'text/plain' });
+    response.end('not found');
   }
 });
 

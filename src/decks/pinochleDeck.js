@@ -25,9 +25,9 @@ const COPIES_PER_DECK = 2;
  * @param {{numDecks?: number, jokers?: number}} [options]
  * @returns {{id: string, rank: string, suit: string|null}[]}
  */
-export function build({ numDecks = 1 } = {}) {
+export function build({ numDecks: numberDecks = 1 } = {}) {
   const deck = [];
-  for (let d = 0; d < numDecks; d++) {
+  for (let d = 0; d < numberDecks; d++) {
     for (const suit of SUITS) {
       for (const rank of RANKS) {
         for (let copy = 0; copy < COPIES_PER_DECK; copy++) {

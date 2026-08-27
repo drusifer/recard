@@ -111,6 +111,16 @@ export default [
     },
   },
   {
+    files: ['src/components/**/*.js'],
+    rules: {
+      // Every one of these is `customElements.define(...)` at module
+      // top level - the ONLY correct place to register a native Web
+      // Component, not an incidental side effect. No alternative
+      // pattern exists that isn't strictly worse.
+      'unicorn/no-top-level-side-effects': 'off',
+    },
+  },
+  {
     files: ['src/main.js'],
     rules: {
       // main.js is the app's entry-point controller module - there is

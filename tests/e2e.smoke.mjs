@@ -17,16 +17,16 @@ const PORT = 8123;
 const BASE = `http://localhost:${PORT}`;
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
 
-const server = http.createServer(async (request, res) => {
+const server = http.createServer(async (request, response) => {
   const pathname = request.url.split('?', 1)[0];
   const filePath = path.join(ROOT, pathname === '/' ? 'index.html' : pathname);
   try {
     const body = await readFile(filePath);
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(filePath)] ?? 'application/octet-stream' });
-    res.end(body);
+    response.writeHead(200, { 'Content-Type': MIME[path.extname(filePath)] ?? 'application/octet-stream' });
+    response.end(body);
   } catch {
-    res.writeHead(404);
-    res.end('not found');
+    response.writeHead(404);
+    response.end('not found');
   }
 });
 await new Promise((resolve) => server.listen(PORT, resolve));
