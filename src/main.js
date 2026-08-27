@@ -790,7 +790,7 @@ async function attemptReconnect() {
   }
 }
 
-document.querySelector('#join-btn').addEventListener('click', () => {
+document.querySelector('#join-btn').addEventListener('click', async () => {
   role = 'join';
   stopReconnecting();
   myName = document.querySelector('#join-name').value.trim() || 'Player';
@@ -804,19 +804,16 @@ document.querySelector('#join-btn').addEventListener('click', () => {
   let storedKey = null;
   try { storedKey = localStorage.getItem(CLIENT_KEY_STORAGE); } catch { /* private mode */ }
   session = Session.join(hostId, { name: myName, playerKey: storedKey });
-  session
-    .ready()
-    .then((id) => {
-      myId = id;
-      // US-39: remember where we were, so a reload rejoins the game in
-      // progress instead of dropping us on an empty form.
-      rememberSession(localStorage, { code: hostId, name: myName });
-      showGameCode(hostId);
-      statusElement.textContent = 'Connected. Waiting for host to deal...';
-    })
-    .catch(() => {
-      statusElement.textContent = 'Could not connect. Check the code and try again.';
-    });
+  try {
+    myId = await session.ready();
+    // US-39: remember where we were, so a reload rejoins the game in
+    // progress instead of dropping us on an empty form.
+    rememberSession(localStorage, { code: hostId, name: myName });
+    showGameCode(hostId);
+    statusElement.textContent = 'Connected. Waiting for host to deal...';
+  } catch {
+    statusElement.textContent = 'Could not connect. Check the code and try again.';
+  }
 
   wireGuestSession();
 });

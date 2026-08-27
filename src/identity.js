@@ -44,7 +44,7 @@ export function resolvePlayer(presentedKey, knownPlayers, peerToKey) {
   // it: two tabs sharing one key would otherwise both claim the hand,
   // and the roster would flip between them. The newcomer gets a fresh
   // identity instead of silently hijacking a live player.
-  const isAlreadyLive = [...peerToKey.values()].includes(presentedKey);
+  const isAlreadyLive = peerToKey.values().toArray().includes(presentedKey);
   if (isAlreadyLive) return { playerKey: newPlayerKey(), returning: false };
 
   return { playerKey: presentedKey, returning: true };

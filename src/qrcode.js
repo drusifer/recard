@@ -70,7 +70,7 @@ export async function copyText(text) {
   document.body.append(textarea);
   textarea.select();
   textarea.setSelectionRange(0, text.length); // iOS Safari needs this explicitly, select() alone isn't enough
-  let isCopied = false;
+  let isCopied;
   try {
     isCopied = document.execCommand('copy');
   } catch {

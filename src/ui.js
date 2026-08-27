@@ -30,7 +30,7 @@ function cardElement(card, { onClick, disabled } = {}) {
     const symbol = SUIT_SYMBOL[card.suit];
     const corner = document.createElement('span');
     corner.className = 'card-corner';
-    corner.textContent = `${card.rank} ${symbol}`;
+    corner.textContent = `${card.rank}\u{A0}${symbol}`; // non-breaking space - keeps "10 ♠" from wrapping mid-corner
     const pip = document.createElement('span');
     pip.className = 'card-pip';
     pip.textContent = symbol;
@@ -355,7 +355,8 @@ function applyIconButton(button, spec, labelOverride) {
  */
 export function renderActionHeader(container, titleText, actionIds, options = {}) {
   container.replaceChildren();
-  container.className = `zone-name pile-action-header${options.headingClass ? ` ${options.headingClass}` : ''}`;
+  const extraClass = options.headingClass ? ` ${options.headingClass}` : '';
+  container.className = `zone-name pile-action-header${extraClass}`;
   if (options.headingId) container.id = options.headingId;
 
   const label = document.createElement('span');
@@ -494,7 +495,7 @@ export function renderZoneCards(container, zone, allZones, options = {}) {
   // The fan math (rotate + arc, pivoting from the bottom like cards
   // actually held in a hand) is exactly `renderHand`'s old formula,
   // just applied generically by index instead of being hand-specific.
-  zone.cards.forEach((card, index) => {
+  for (const [index, card] of zone.cards.entries()) {
     const wrapper = document.createElement('div');
     // *nit (2026-08-26): `pile-hover-host` used to arrive via the now-
     // deleted `attachActionRow` (the popup mechanism) as a side effect
@@ -585,7 +586,7 @@ export function renderZoneCards(container, zone, allZones, options = {}) {
         // UX follow-up: 'play' joins 'move'/'pickup' here now that a
         // hand pile's own cards flow through this same generic path.
         highlightDragTargets(
-          cardActions.filter((a) => a === 'move' || a === 'pickup' || a === 'play'),
+          cardActions.filter((a) => ['move', 'pickup', 'play'].includes(a)),
           piles,
           { viewerId: options.viewerId, fromPileId: zone.id },
         );
@@ -640,11 +641,11 @@ export function renderZoneCards(container, zone, allZones, options = {}) {
         wrapper.append(ownerTag(resolveOwnerName?.(card.owner) ?? card.owner));
       }
     } else {
-      const face = cardElement(card, canReveal
-        ? { onClick: () => performReveal(card, options.viewerId, options.onReveal) }
-        : (canRotate
-          ? { onClick: () => options.onRotate(card.id) }
-          : { disabled: true }));
+      let cardOptions;
+      if (canReveal) cardOptions = { onClick: () => performReveal(card, options.viewerId, options.onReveal) };
+      else if (canRotate) cardOptions = { onClick: () => options.onRotate(card.id) };
+      else cardOptions = { disabled: true };
+      const face = cardElement(card, cardOptions);
       if (canReveal) face.classList.add('revealable');
       if (canRotate) face.classList.add('rotatable');
       wrapper.append(face);
@@ -666,7 +667,7 @@ export function renderZoneCards(container, zone, allZones, options = {}) {
     }
 
     container.append(wrapper);
-  });
+  }
 }
 
 /**
@@ -1319,13 +1320,12 @@ function attachPanelResize(panelElement, id, onResize) {
     const startRect = panelElement.getBoundingClientRect();
     const startX = event.clientX;
     const startY = event.clientY;
-    panelElement.classList.add('panel-resizing');
     // *nit (2026-08-26): `flex-grow: 1` would otherwise grow the panel
     // right back past whatever width this drag is about to set - see
     // `wirePanelLayout`'s own comment on `.panel-sized`. Added the
     // instant the drag STARTS (not just on the next full render from
     // stored layout), so even a first-ever resize actually holds.
-    panelElement.classList.add('panel-sized');
+    panelElement.classList.add('panel-resizing', 'panel-sized');
     document.body.classList.add('panel-resize-active');
 
     const onPointerMove = (event) => {
@@ -1583,13 +1583,13 @@ function renderMiniHand(container, count) {
  */
 export function renderRoster(container, players, { movingIds, scores, onAdjustScore, myId, passed, seated, hideId } = {}) {
   container.replaceChildren();
-  players.forEach((p, index) => {
+  for (const [index, p] of players.entries()) {
     // UX follow-up: the viewer's own seat now lives in the merged
     // hand+zone panel (`renderSeatZones`'s `opts.own`), not the ring -
     // skipping the `<li>` here (not filtering `players` itself) keeps
     // everyone ELSE's seat index/angle math unchanged, since it's still
     // computed against the real roster length and position.
-    if (p.id === hideId) return;
+    if (p.id === hideId) continue;
     const li = document.createElement('li');
     li.className = `roster-player roster-${p.connection}`;
     if (seated) {
@@ -1601,6 +1601,7 @@ export function renderRoster(container, players, { movingIds, scores, onAdjustSc
     }
     const count = typeof p.handCount === 'number' ? ` (${p.handCount} cards)` : '';
     const moving = movingIds?.has(p.id) ? ' \u{270B} organizing hand' : '';
+    // eslint-disable-next-line unicorn/no-computed-property-existence-check -- this reads a boolean VALUE (state.passed[id] is false, not absent, until toggled - see state.js JOIN/TOGGLE_PASS), not a key-existence check; Object.hasOwn would be wrong here.
     const passedTag = passed?.[p.id] ? ' \u{1F645} Passed' : '';
     const youTag = seated && p.id === myId ? ' \u{1F9D1} You' : '';
 
@@ -1620,7 +1621,7 @@ export function renderRoster(container, players, { movingIds, scores, onAdjustSc
       info.append(miniHandElement);
     }
 
-    const hasScore = scores && p.id in scores;
+    const hasScore = scores && Object.hasOwn(scores, p.id);
     if (hasScore) {
       const scoreElement = document.createElement('span');
       scoreElement.className = 'score-row';
@@ -1647,7 +1648,7 @@ export function renderRoster(container, players, { movingIds, scores, onAdjustSc
     }
 
     container.append(li);
-  });
+  }
 }
 
 /**
