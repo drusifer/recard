@@ -51,6 +51,14 @@ export default [
       // before-fields), never converging - a sign its opinionated
       // default just doesn't fit this file, not a real smell.
       'unicorn/consistent-class-member-order': 'off',
+      // Every instance is a completely standard, unambiguous pattern:
+      // a `switch`'s own `break` (viewFor's per-pile-kind switch,
+      // state.js) or a "found it, stop checking" loop `break`
+      // (designLint.check.mjs), both nested inside an outer loop. JS
+      // break semantics here are not ambiguous; extracting each into
+      // its own function for this rule's sake would be a bigger,
+      // riskier restructure than the "smell" it's flagging.
+      'unicorn/no-break-in-nested-loop': 'off',
       // Several destructures exist ONLY to omit a field via the rest
       // sibling (`const { owner, faceUp, layout, ...plainCard } = card`)
       // - the named binding itself is never read, that's the point.

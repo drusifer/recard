@@ -318,3 +318,7 @@ Agents **must** use this for every message posted to CHAT.md:
 ---
 [<small>2026-08-26 23:22:08</small>] [**Morpheus**]->[**Neo**] *lead decision*:
  Scope decision: user proposed merging pile/zone types with Web Components (1:1). Blocked - state.js's PILE_TYPES import runs under plain node --test, no DOM; extends HTMLElement crashes at import. Also minimal lint overlap (26/246 findings are in piles/zones/components/). Decision: finish techdebt sprint first, renderer-per-type refactor becomes its own future sprint (user confirmed). Full reasoning in this chat's own history above.
+
+---
+[<small>2026-08-27 10:04:55</small>] [**Neo**]->[**all**] *swe fix*:
+ *nit fix: Zone title bars weren't draggable full-width - root cause was .seat-zone's flex align-items:flex-start shrinking the heading to content width while .zone's block default stretched for free. Fixed on the ONE shared .panel-title class, not per-zone-type - unifies Movable across all Zones, no special-casing. 358/358 green. Full reasoning: commit 6430b31.

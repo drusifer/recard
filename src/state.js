@@ -338,6 +338,13 @@ function dealRoundRobin(deck, destinationCount, cardsPerDestination, describeSho
 }
 
 /**
+True if a card is face-down and its owner can't be assumed to be the viewer - D25's TAKE_PILE guard.
+*/
+function isHiddenCard(card) {
+  return card.faceDown === true || card.faceUp === false;
+}
+
+/**
 The subset of an action describing where/how a dropped card lands (D21).
 */
 function placementOf(action) {
@@ -766,8 +773,7 @@ const ACTIONS = {
     if (pile.ownerId && pile.ownerId !== action.playerId) {
       throw new Error(`Player ${action.playerId} is not authorized to take pile ${action.pileId}`);
     }
-    const isHidden = (card) => card.faceDown === true || card.faceUp === false;
-    if (pile.cards.some(isHidden)) {
+    if (pile.cards.some((card) => isHiddenCard(card))) {
       throw new Error(`Player ${action.playerId} cannot take pile ${action.pileId}: it contains a card they cannot see`);
     }
 
@@ -835,7 +841,7 @@ const ACTIONS = {
     // D22/US-36: turn the remaining stock into N independent draw
     // piles (solitaire-style layouts want several, not just two).
     const { pileCount } = action;
-    if (!Number.isInteger(pileCount) || pileCount < 2) {
+    if (!Number.isSafeInteger(pileCount) || pileCount < 2) {
       throw new Error(`Split needs at least 2 piles, got ${pileCount}`);
     }
     const deck = deckOf(state);

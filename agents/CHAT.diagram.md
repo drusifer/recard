@@ -156,4 +156,7 @@ sequenceDiagram
     Note right of Morpheus: "D59 recorded: disabled<br/>unicorn/no-null project-<br/>wide (189/435 remaining<br/>findings) rather than<br/>fix line-by-line - this<br/>codebase's wire/persis…"
     Morpheus->>Neo: "lead decision"
     Note right of Morpheus: "Scope decision: user<br/>proposed merging<br/>pile/zone types with Web<br/>Components (1:1).<br/>Blocked - state.js's<br/>PILE_TYPES import runs<br/>under plain no…"
+    Note over Oracle,User: 📅 2026-08-27
+    Neo->>All: "swe fix"
+    Note right of Neo: "*nit fix: Zone title<br/>bars weren't draggable<br/>full-width - root cause<br/>was .seat-zone's flex<br/>align-items:flex-start<br/>shrinking the heading to<br/>c…"
 ```
