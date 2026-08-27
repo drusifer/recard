@@ -2674,3 +2674,93 @@ Open items, none blocking, in `docs/USER_STORIES.md` backlog:
 On resume cold: read this file's own history above for the full
 reasoning trail on any of the above; `docs/ARCHITECTURE.md` D56/D57
 have the durable design record.
+
+## Tech-debt sprint close (2026-08-27) — US-64..68, D58-D60
+
+Branch `touch-targets-and-pile-actions-sprint`, working tree clean,
+358/358 unit tests green, HEAD at `6541a58` ("Sprint close: tech-debt
+sprint retro + launch"). Full Bloop cycle ran (Cypher→Smith→Morpheus→
+Mouse→[Neo→Trin→Morpheus]×5→Oracle→Smith→retro→Cypher launch), fully
+committed and CHAT.md archived to
+`agents/chat_archive/CHAT_techdebt_sprint.md`.
+
+### What shipped
+- **D58**: ESLint adopted (flat config, `eslint.config.js`, unicorn +
+  sonarjs). Baseline 1021 findings.
+- **D59 + Phase 75**: 1021 → 7 findings. Real fixes (renames, safe
+  autofix reviewed by hand, dead-code removal). Several rules disabled
+  with a documented per-rule reason where they conflicted with real
+  architecture (`no-null` vs the wire/persistence layer's real use of
+  null, `no-static-only-class` vs Pile/Zone's extensible-base-class
+  pattern, `no-top-level-assignment-in-function` vs main.js's
+  deliberate no-framework module state, several test-file-only
+  relaxations). The remaining 7 are `sonarjs/cognitive-complexity`,
+  deliberately flagged not fixed (real refactor risk) — open backlog.
+  **Caught two near-miss regressions before shipping**: a mechanical
+  "fix" of `passed?.[p.id]` to `Object.hasOwn` would have shown "Passed"
+  on every player (value check, not existence — `state.passed[id]` is
+  seeded to `false`, not absent); `Number.parseFloat(cs.maxWidth)` →
+  `Number()` would have returned `NaN` on CSS's `"993px"` string.
+- **Phase 76**: cut 1 dead JS export (`cardLabel`) + 8 orphaned CSS
+  rules from already-retired features (found via a reference-audit
+  script, not guessing).
+- **Phase 77 / D60 — the big one**: `tests/e2e.smoke.mjs` (1692 lines,
+  one monolithic script, no discrete `test()` cases) turned out to
+  assert against `#hand-area`/`#table-area`/`#seat-zones` — DOM ids
+  retired by the D51/D52 table-unification redesign and **absent from
+  the app entirely** (confirmed via full-tree grep). Everything past
+  its first failure had gone unexercised for an unknown but long
+  stretch despite repeated "e2e green" claims in project history.
+  Escalated to the user with 3 options rather than deciding solo; user
+  chose deletion over deferring or attempting a full rewrite mid-sprint.
+  **No E2E suite exists today** — `npm run lint:design` + manual
+  two-tab testing are what's left; rebuilding one against the current
+  `#zones` DOM is open backlog (`docs/USER_STORIES.md`).
+- **Phase 78**: found real duplication (touch-drag pointer/touch event
+  wiring, copy-pasted between `attachTouchDrag`/
+  `attachPileActionTouchDrag` in `ui.js`) and extracted
+  `wireTouchDragEvents()`. **Found and fixed a real live bug while
+  consolidating**: the pile-action drop handler checked the same
+  retired `#hand-area` id from the Phase 77 finding — touch-dragging a
+  pile action (e.g. Draw) onto your hand had done nothing since D51/D52
+  shipped. Fixed to `[data-kind="hand"]`; verified via live bisection
+  (7→7 broken on baseline, 7→8/9 working after).
+
+### Two direct user nits, same session, also shipped
+- **Zone title-bar drag unified across all Zone types**: root cause was
+  `.seat-zone`'s `display:flex; align-items:flex-start` shrinking its
+  heading to content width while `.zone`'s plain `display:block`
+  stretched a heading to full width for free — only Table/Score zones
+  "worked" by accident. Fixed on the one shared `.panel-title` class
+  (`width:100%` + `align-self:stretch`), not per-zone-type. Measured
+  live before/after (13% → 90%+ of zone width).
+- **Gin Rummy preset**: refreshed its captured `layout` blob from a
+  fresh devtools export the user provided (`layout.json` — see the
+  lesson below), and removed its declared `discard`-kind pile entirely
+  per direct correction ("no discard in gin game"). Updated
+  `tests/presets.test.js`'s dedicated assertion to match.
+
+### A real mistake made and corrected this session (see
+`agents/oracle.docs/lessons.md` for the durable version)
+Found an untracked `layout.json` in the repo root during Phase 76/78
+cleanup, decided (wrongly) it was orphaned debris (nothing in the
+codebase writes that filename), deleted it and added it to
+`.gitignore`. It was the user's own intentional Chrome-storage export
+for updating the Gin Rummy preset. Recovered from git history (it had
+briefly been swept into a commit) once corrected — no data was actually
+lost, but the judgment call was wrong. **Lesson applied going forward**:
+an unexplained file the user didn't mention is not automatically debris
+just because nothing in the code writes it.
+
+### Immediate Next Action
+None — sprint fully closed, nothing pending. Next work starts when the
+user brings a new request.
+
+### Open backlog (not blocking, just known)
+1. Rebuild a real E2E/integration suite against the current `#zones`
+   DOM — full re-authoring, not a patch (D60).
+2. 7 `sonarjs/cognitive-complexity` findings (`dropTarget.js`,
+   `main.js` ×2, `touchDrag.js`, `ui.js` ×3) — flagged, not fixed.
+3. Pre-existing `lint:design` baseline: 5 violations (Table Zone
+   overlapping "Bob"/"Score-+" at desktop widths) — unrelated to this
+   sprint, unchanged throughout.
