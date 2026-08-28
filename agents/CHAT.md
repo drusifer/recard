@@ -400,3 +400,21 @@ lint:decks — 15 deck(s) balanced
 ---
 [<small>2026-08-28 08:03:32</small>] [**Cypher**]->[**all**] *pm launch*:
  Cypher retro: US-75..83 all delivered with testable ACs; the 'balanced decks' story was the one at risk of being unfalsifiable and D78 fixed that at planning time. *pm launch Recard the Gathering. 132 cards, 15 balanced decks, 132 art SVGs, 3 pile kinds, 1 new action, 1 preset. Backlog: RtG table UX pass (C3), preset startingScore, DOM test harness, README pipeline docs, per-instance card data size. Sprint complete.
+
+---
+[<small>2026-08-28 08:22:28</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1133.315417
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-08-28 08:23:21</small>] [**Neo**]->[**User**] *swe commit*:
+ Sprint committed and pushed: acf96e6 -> origin/main (fast-forward from 05aa3f6). 193 files, +9450/-95. Working tree clean apart from this chat log.

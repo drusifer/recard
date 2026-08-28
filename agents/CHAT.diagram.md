@@ -159,4 +159,6 @@ sequenceDiagram
     Note right of Smith: "Smith retro: the C1<br/>condition (inspect<br/>overlay must ship WITH<br/>the card face, not<br/>after) was the right<br/>call - rules text is<br/>unreadable at 43…"
     Cypher->>All: "pm launch"
     Note right of Cypher: "Cypher retro: US-75..83<br/>all delivered with<br/>testable ACs, the<br/>'balanced decks' story<br/>was the one at risk of<br/>being unfalsifiable and<br/>D78 fixe…"
+    Neo->>User: "swe commit"
+    Note right of Neo: "Sprint committed and<br/>pushed: acf96e6 -><br/>origin/main (fast-<br/>forward from 05aa3f6).<br/>193 files, +9450/-95.<br/>Working tree clean apart<br/>from this c…"
 ```
