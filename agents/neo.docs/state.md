@@ -3160,6 +3160,75 @@ Content: 132 cards, 15 decks, 132 art SVGs.
   wire).
 
 ### Next Steps
-Nothing pending. NOT committed - the user has not asked, and this is a
-large diff (27 modified files + Makefile, content/, assets/ with 132
-generated SVGs) they will likely want to review first.
+Superseded - see the art-pipeline entry below. Everything is committed
+and pushed.
+
+---
+## Art pipeline: real generated art + imagegen tool — 2026-08-28 (SHIPPED)
+
+Committed `6721b5c`, pushed to `origin/main`. Working tree clean.
+
+**What changed.** The procedural SVG card art was replaced with real
+generated illustration for all 132 cards, a Recard-branded card back was
+added, and the whole pipeline was extracted into `tools/imagegen`.
+
+**Generator choice was MEASURED, not assumed** - worth not re-litigating:
+- `claude` — cannot generate images at all (text/vision in, text out).
+- `gemini` — retired: `IneligibleTierError`, folded into Antigravity.
+- `agy` — works, but individual quota died at 27/132 with a 4h reset.
+  It also ignores the requested output path and writes into ONE shared
+  scratch dir, which is what made its parallel runs collide.
+- local diffusion — no torch/diffusers, and the host is a Raspberry Pi 5.
+- **`codex`** — has a built-in `image_gen` tool, takes a per-card
+  absolute output path, and did all 132 with ZERO failures. (I initially
+  told the user Codex couldn't generate images. That was wrong.)
+
+**`tools/imagegen`** (generic, not Recard-specific; 15 tests on the pure
+core): `gen` + `pack` subcommands, backend registry (`codex`/`agy`) in
+the same one-entry pattern as PILE_TYPES/DECK_TYPES/CARD_FACES.
+Resumable; quota treated as terminal and never retried; validates by
+image DIMENSIONS not bytes (the two smallest images in one run were good
+art that merely compressed well - a size threshold would have deleted
+them); the prompt explicitly forbids code-drawn output (an agent once
+wrote `painter.py` and produced a 38 KB hand-drawn PNG).
+
+**Where the images live:**
+- `assets/cards/rtg/*.webp` — 132 files, 5.2 MB, COMMITTED (what the app
+  loads). `assets/brand/card-back.webp` — 46 KB, used by EVERY preset.
+- `build/rtg-art-raw/*.png` — 132 masters, 346 MB, GITIGNORED.
+  `make art` re-derives the webp from these in seconds, so changing
+  size/quality never needs regeneration or quota.
+- `build/rtg-art-agy/` — 27 PNGs from the abandoned agy run, 38 MB.
+  Dead weight; user was offered deletion and had not answered by
+  shutdown. Safe to delete.
+
+**Two rendering bugs, both found by MEASURING not reviewing:**
+1. `packArt` forced every image square, visibly distorting non-square
+   art (generators return 1024x1536, 1122x1402, 1200x800). Now
+   aspect-preserving + `object-fit: cover`.
+2. `.card-rtg` sizing was `button.card-rtg`, but a face-down card is a
+   `div` (`cardBackElement`), so RtG card backs rendered 43x59 beside
+   70x98 faces. Now `.card.card-rtg` (0,2,0) which beats `button.card`
+   (0,1,1) AND matches either tag.
+
+**Checked but deliberately NOT changed:** 21 of 132 images are landscape
+and crop under `object-fit: cover`. I rendered them at real card size
+before judging - every one keeps a centred, coherent composition. No
+action needed. (One card DID need fixing: `rtg-wg-006`, whose own prompt
+said "panoramic", came back 2:1 and would have cropped to a sliver -
+regenerated with an explicit vertical instruction.)
+
+**Verification:** 490 tests, `make check` exit 0, lint baselines
+unchanged (7 js / 3 design), 15/15 decks balanced, real-app Playwright
+check shows 7/7 hand cards with art, 0 fallbacks, 0 console errors, no
+failed requests.
+
+### Open / next
+- User asked whether `imagegen` should be made portable BEYOND this repo
+  (bob skill / npm package / own repo). Three options were offered; no
+  answer before shutdown. Nothing is blocked on it.
+- `build/rtg-art-agy/` (38 MB) can be deleted.
+- Standing backlog unchanged: RtG table UX pass (Smith C3 - 14 deck
+  panels is the busiest table any preset makes), preset `startingScore`
+  (life starts at 0, not 20), DOM test harness, per-instance card data
+  size on the wire.

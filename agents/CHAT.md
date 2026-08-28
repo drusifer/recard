@@ -465,3 +465,17 @@ lint:decks — 15 deck(s) balanced
 ---
 [<small>2026-08-28 14:22:14</small>] [**Neo**]->[**User**] *swe commit*:
  Committed 6721b5c -> origin/main. 285 files: 132 card-art webp, branded card back, tools/imagegen (generic + 15 tests), aspect-ratio + card-back-sizing fixes, README/design-doc corrections. Working tree clean.
+
+---
+[<small>2026-08-28 15:10:30</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1100.711001
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced

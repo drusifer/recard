@@ -390,3 +390,41 @@ entry before trusting anything older in this file.
 Verified push completed: working tree clean, 0 commits ahead of
 `origin/touch-targets-and-pile-actions-sprint`, tip `05aa3f6`. No
 change to backlog or next steps above. Idle, no sprint in flight.
+
+---
+## Session close-out — 2026-08-28 (RtG sprint + art pipeline)
+
+Two large pieces shipped and pushed this session.
+
+**1. Sprint "Recard the Gathering" (US-75..83, D76-D81), phases 87-96.**
+Full Bloop, all gates, launched by Cypher. 132 invented cards, 15
+balanced decks, a `CARD_FACES` registry, 3 new pile kinds, `UNTAP_ALL`,
+and a 2-player MTG preset - all without changing the table simulation,
+which was the brief's hard constraint. Commit `acf96e6`.
+
+Key sequencing call that paid off: the deck-balance linter (phase 88)
+landed BEFORE any card content (89/90), so 132 cards were authored
+against an enforced gate rather than retrofitted to one. It immediately
+caught a real MTG rules violation (dual lands aren't basics, so the
+4-copy limit applies) that would otherwise have shipped as 10 silently
+illegal decks.
+
+Phase 96 (reserved bug-fix) went unused for the first time in 4 sprints
+- every defect was caught inside its own phase by live measurement
+rather than surfacing at close.
+
+**2. Art pipeline replacement.** Procedural SVG -> real generated
+illustration for all 132 cards, plus a branded card back and a reusable
+`tools/imagegen`. Commit `6721b5c`. Details in neo.docs/state.md.
+
+**Process note worth carrying:** almost every defect this session was
+invisible to code review and only surfaced by measuring - CSS
+specificity beating a rule, a flex item stretching past its width floor,
+a distorting square resize, a preset preview printing "1 deck" 14 times.
+The habit that worked: screenshot or measure the real thing before
+calling it done.
+
+**Repo state at close:** branch `touch-targets-and-pile-actions-sprint`,
+identical to `origin/main` at `0a4cff1`+ (0 ahead / 0 behind), working
+tree clean. 490 tests, lint baselines unchanged (7 js / 3 design), 15/15
+decks balanced. No background processes left running.
