@@ -6,6 +6,13 @@
  * game, per Smith's Gate 1 AC.
  */
 export const RULES_REFERENCE = {
+  'Recard the Gathering': {
+    goal: 'Reduce your opponent from 20 life to 0 using creatures and spells.',
+    setup:
+      'Two players. Each picks one of the fifteen decks on the table (five mono-colour, ten two-colour), shuffles it, and draws an opening hand of 7. Set both Score panels to 20 - that is your life total. Each player has a Battlefield, a Graveyard and an Exile pile; the Stack is shared.',
+    turns:
+      'On your turn: untap everything (the Battlefield\'s "Untap all" button does this in one click), draw a card, then play one land and as many spells as you can pay for. Tap a land or creature by rotating it. Spells wait on the shared Stack until both players are done responding, then resolve top-down. Creatures attack, the defender blocks, and unblocked damage comes off life. Recard tracks the table, not the rules - you and your opponent enforce costs, timing and combat between you.',
+  },
   War: {
     goal: 'Win all the cards.',
     setup: 'Split the deck evenly between two players, face-down, no one looks at their cards.',

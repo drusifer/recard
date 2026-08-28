@@ -13,6 +13,9 @@ import { DiscardPile } from './DiscardPile.js';
 import { FoundationPile } from './FoundationPile.js';
 import { CascadePile } from './CascadePile.js';
 import { RankAdjacentPile } from './RankAdjacentPile.js';
+import { BattlefieldPile } from './BattlefieldPile.js';
+import { ExilePile } from './ExilePile.js';
+import { StackPile } from './StackPile.js';
 
 export const PILE_TYPES = {
   zone: Pile,
@@ -22,6 +25,9 @@ export const PILE_TYPES = {
   foundation: FoundationPile,
   cascade: CascadePile,
   rankAdjacent: RankAdjacentPile,
+  battlefield: BattlefieldPile,
+  exile: ExilePile,
+  stack: StackPile,
 };
 
 /**
@@ -34,4 +40,11 @@ export const PILE_TYPES = {
  * regardless of the pile being empty. Registry-declaration order
  * (Smith Gate 1 - no strong reason to prefer another).
  */
-export const CHANGE_PILE_TYPE_CYCLE = ['zone', 'discard', 'foundation', 'cascade', 'rankAdjacent'];
+export const CHANGE_PILE_TYPE_CYCLE = [
+  'zone', 'discard', 'foundation', 'cascade', 'rankAdjacent',
+  // D79 (US-82): the MTG kinds join the cycle rather than being carved
+  // out. They're general-purpose containers like the rest, and excluding
+  // them would be exactly the kind of unprompted special case this
+  // project's own discipline warns against.
+  'battlefield', 'exile', 'stack',
+];

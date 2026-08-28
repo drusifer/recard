@@ -1,0 +1,489 @@
+# Recard the Gathering — gold cards, guilds B (US-78): UR, UG, BR, BG, RG.
+#
+# Same fixed curve as guilds-a, for the same reason — every guild deck
+# lands inside the balance bands without bespoke tuning:
+#   cmc2 x2   cmc3 x2   cmc4 x1   cmc5 x1
+
+# --- UR: the Steam Accord — Concord + Clans ----------------------------
+# Two forces that cancel each other perfectly, loudly, forever. Spells
+# matter: cheap interaction that rewards casting a lot of it.
+
+- id: rtg-ur-001
+  name: Quenchfire Adept
+  cost: '{1}{R}'
+  type: Creature
+  subtype: Human Shaman
+  rarity: common
+  power: 2
+  toughness: 2
+  text: 'Whenever you cast an instant or sorcery spell, Quenchfire Adept gets +1/+0 until end of turn.'
+  art: >-
+    A shaman standing in surf on black volcanic rock with steam exploding
+    around their braced legs, one hand in the water one raised burning,
+    cyan and hot ember palette, high fantasy oil painting
+  flavor: >-
+    The Concord taught her to hold the sea. The Clans taught her to let
+    go of it all at once.
+
+- id: rtg-ur-002
+  name: Flashsteam
+  cost: '{U}{R}'
+  type: Instant
+  rarity: uncommon
+  text: 'Flashsteam deals 2 damage to any target. Draw a card.'
+  art: >-
+    A blast of white steam erupting between a wave and a lance of fire,
+    the shockwave ring visible in spray, cyan white and hot orange
+    palette, high fantasy oil painting, explosive instant
+  flavor: >-
+    Water plus fire equals a third thing that neither party predicted and
+    both immediately wanted more of.
+
+- id: rtg-ur-003
+  name: Accord Stormcaller
+  cost: '{1}{U}{R}'
+  type: Creature
+  subtype: Merfolk Shaman
+  rarity: common
+  power: 3
+  toughness: 2
+  text: 'Whenever you cast an instant or sorcery spell, Accord Stormcaller deals 1 damage to each opponent.'
+  art: >-
+    A merfolk shaman riding a wave of superheated steam up a black cliff
+    face, lightning forking from their raised trident, cyan and ember
+    palette, high fantasy oil painting, vertical dynamic
+  flavor: >-
+    The Accord has no leadership, no charter and no fixed membership. It
+    has weather, and everyone agrees the weather is working.
+
+- id: rtg-ur-004
+  name: Boil the Strait
+  cost: '{2}{U}{R}'
+  type: Sorcery
+  rarity: uncommon
+  text: 'Boil the Strait deals 3 damage to each creature. Draw a card.'
+  art: >-
+    An entire narrow strait erupting into rolling steam, ships and figures
+    silhouetted and scattering, magma glow under churning water, cyan and
+    ember palette, high fantasy oil painting, wide catastrophe
+  flavor: >-
+    The Concord filed an objection. The Clans filed the strait under
+    "improved".
+
+- id: rtg-ur-005
+  name: Coastfire Elemental
+  cost: '{2}{U}{R}'
+  type: Creature
+  subtype: Elemental
+  rarity: rare
+  power: 4
+  toughness: 3
+  text: 'Flying, haste'
+  art: >-
+    A towering elemental of intertwined steam and living flame striding
+    out of surf onto black rock, its edges boiling into cloud, cyan white
+    and hot ember palette, high fantasy oil painting, imposing scale
+  flavor: >-
+    It is not a truce between the sea and the mountain. It is the
+    argument, walking.
+
+- id: rtg-ur-006
+  name: The Great Quenching
+  cost: '{3}{U}{R}'
+  type: Sorcery
+  rarity: rare
+  text: 'The Great Quenching deals 6 damage divided as you choose among any number of targets. Draw a card.'
+  art: >-
+    The sea pouring into an open magma caldera in a colossal column of
+    steam that blots out the sky, tiny figures on the rim, cyan and ember
+    palette, high fantasy oil painting, apocalyptic scale
+  flavor: >-
+    Both peoples still argue about whose idea it was. Both are lying, and
+    both are proud of it.
+
+# --- UG: the Tidegrowth — Concord + Wardens ----------------------------
+# Study and cultivation, each unaware of the other's hand in it. Ramp
+# into card advantage and very large creatures.
+
+- id: rtg-ug-001
+  name: Delta Cultivator
+  cost: '{1}{G}'
+  type: Creature
+  subtype: Elf Druid
+  rarity: common
+  power: 1
+  toughness: 3
+  text: '{T}: Add one mana of any color.'
+  art: >-
+    An elf druid waist-deep in a clear braided river channel guiding kelp
+    and root to interweave, glowing spores on the water, emerald and
+    turquoise palette, high fantasy oil painting
+  flavor: >-
+    She is not planting. She is suggesting. The delta has always been
+    unusually willing to take a suggestion.
+
+- id: rtg-ug-002
+  name: Chart the Growth
+  cost: '{U}{G}'
+  type: Sorcery
+  rarity: uncommon
+  text: 'Search your library for a land card, put it onto the battlefield tapped, then shuffle. Draw a card.'
+  art: >-
+    A Concord scholar in a shallow boat unrolling a living chart made of
+    woven kelp that is still growing new channels as they read it,
+    turquoise and emerald palette, high fantasy oil painting
+  flavor: >-
+    The chart updates itself. The Concord finds this invaluable and
+    slightly rude.
+
+- id: rtg-ug-003
+  name: Tidegrowth Warden
+  cost: '{1}{U}{G}'
+  type: Creature
+  subtype: Merfolk Druid
+  rarity: common
+  power: 2
+  toughness: 4
+  text: 'Reach. When Tidegrowth Warden enters the battlefield, draw a card.'
+  art: >-
+    A merfolk druid standing where kelp forest meets tree root, one hand
+    in each, glowing spores drifting through clear water, deep emerald and
+    turquoise palette, high fantasy oil painting
+  flavor: >-
+    Half the Thornwild's roots drink from the delta. Half the Concord's
+    archives are bound in its kelp. Neither has mentioned it.
+
+- id: rtg-ug-004
+  name: Deep Current Growth
+  cost: '{1}{U}{G}'
+  type: Instant
+  rarity: uncommon
+  text: 'Target creature gets +3/+3 until end of turn. Draw a card.'
+  art: >-
+    A forest beast surging upward through a river channel as kelp and root
+    wind visibly up its limbs making it larger, spores streaming, emerald
+    and turquoise palette, high fantasy oil painting
+  flavor: >-
+    Everything in the delta grows toward the current. Some things grow
+    faster than the current expected.
+
+- id: rtg-ug-005
+  name: Colossus of the Delta
+  cost: '{2}{U}{G}'
+  type: Creature
+  subtype: Treefolk
+  rarity: rare
+  power: 5
+  toughness: 5
+  text: 'Trample, reach'
+  art: >-
+    A colossal treefolk of intergrown root and kelp wading up a wide river
+    delta, water sheeting off its shoulders, birds and fish around it,
+    emerald and turquoise palette, high fantasy oil painting, vast scale
+  flavor: >-
+    It began as a snag in the channel. The delta built the rest of it over
+    nine hundred patient years.
+
+- id: rtg-ug-006
+  name: The Delta Answers
+  cost: '{3}{U}{G}'
+  type: Sorcery
+  rarity: rare
+  text: 'Draw two cards. Create a 4/4 green Beast creature token with trample.'
+  art: >-
+    The surface of a river delta bulging and breaking as an enormous shape
+    of root and kelp stands up out of it, charts and pages scattering from
+    a boat, emerald and turquoise palette, high fantasy oil painting
+  flavor: >-
+    The Concord asked the delta a question in writing. This is the reply,
+    and it is considered, and it is enormous.
+
+# --- BR: the Ashcord — Covens + Clans ----------------------------------
+# Everything here is either owed or burning. Sacrifice and reach: spend
+# your own things to end it faster.
+
+- id: rtg-br-001
+  name: Ashmire Scavenger
+  cost: '{1}{B}'
+  type: Creature
+  subtype: Goblin Rogue
+  rarity: common
+  power: 2
+  toughness: 2
+  text: 'When Ashmire Scavenger dies, it deals 1 damage to each opponent.'
+  art: >-
+    A soot-caked goblin knee-deep in black fen water stuffing still-glowing
+    embers into a sack, dead cypress and ashfall around, charcoal rust and
+    sick green palette, high fantasy oil painting
+  flavor: >-
+    Takes what is owed. Burns what is not. Has never been entirely clear
+    on which is which, and does not care to be.
+
+- id: rtg-br-002
+  name: Blood for Embers
+  cost: '{B}{R}'
+  type: Instant
+  rarity: uncommon
+  text: 'Blood for Embers deals 4 damage to target creature. You lose 1 life.'
+  art: >-
+    A red cord igniting along its length like a fuse, the flame racing
+    toward a figure's wrist, witchlight and ember mixing, charcoal rust
+    and green palette, high fantasy oil painting, tense close shot
+  flavor: >-
+    The Covens lend the spark. The Clans supply everything else, loudly,
+    and all at once.
+
+- id: rtg-br-003
+  name: Ashcord Raider
+  cost: '{1}{B}{R}'
+  type: Creature
+  subtype: Human Warrior
+  rarity: common
+  power: 3
+  toughness: 2
+  text: 'Haste. When Ashcord Raider dies, each opponent loses 2 life.'
+  art: >-
+    A raider in ash-streaked black leathers charging across fen shallows
+    with a burning brand, water and embers spraying from their stride,
+    charcoal and ember palette, high fantasy oil painting, motion
+  flavor: >-
+    Paid in advance. Intends to be very expensive to have bought.
+
+- id: rtg-br-004
+  name: Cut the Losses
+  cost: '{1}{B}{R}'
+  type: Sorcery
+  rarity: uncommon
+  text: 'As an additional cost, sacrifice a creature. Cut the Losses deals 5 damage to any target.'
+  art: >-
+    A figure hurling a burning bound bundle into a fen while stepping
+    backward, the blast lighting dead cypress from beneath, charcoal rust
+    and green palette, high fantasy oil painting
+  flavor: >-
+    "Everything in the ledger is a tool," said Grandmother Ash, "and every
+    tool is for spending. You included, dear."
+
+- id: rtg-br-005
+  name: Emberdebt Fiend
+  cost: '{2}{B}{R}'
+  type: Creature
+  subtype: Devil
+  rarity: rare
+  power: 4
+  toughness: 3
+  text: 'Haste. Whenever another creature you control dies, Emberdebt Fiend deals 1 damage to any target.'
+  art: >-
+    A lean charred devil crouched on a dead cypress branch above black
+    water with red cords smouldering around its horns, embers falling,
+    charcoal rust and sick green palette, high fantasy oil painting
+  flavor: >-
+    It does not collect the debt. It simply enjoys being nearby, very
+    much, when the debt collects itself.
+
+- id: rtg-br-006
+  name: The Ashcord Called Due
+  cost: '{3}{B}{R}'
+  type: Sorcery
+  rarity: rare
+  text: 'The Ashcord Called Due deals 3 damage to each creature and 3 damage to each opponent.'
+  art: >-
+    A ring of fire racing outward across black fen water igniting every
+    red cord strung between the cypress trunks at once, charcoal rust and
+    green palette, high fantasy oil painting, catastrophic wide shot
+  flavor: >-
+    Every cord in the Mirefen is tied to every other. The Clans had been
+    saying so for years, and nobody had asked them to prove it.
+
+# --- BG: the Rootdebt — Covens + Wardens -------------------------------
+# The forest remembers, the mire keeps receipts, and between them nothing
+# is ever genuinely gone. Grinding graveyard value.
+
+- id: rtg-bg-001
+  name: Rootmire Grubcaller
+  cost: '{1}{G}'
+  type: Creature
+  subtype: Elf Druid
+  rarity: common
+  power: 2
+  toughness: 2
+  text: 'When Rootmire Grubcaller dies, return target land card from your graveyard to your hand.'
+  art: >-
+    An elf druid kneeling among huge pale roots in black water coaxing
+    grubs and beetles up out of the bark, witchlight and moss glow,
+    emerald and charcoal palette, high fantasy oil painting
+  flavor: >-
+    The mire eats what falls. The roots drink the mire. She simply asks
+    them both to hurry.
+
+- id: rtg-bg-002
+  name: Compost the Fallen
+  cost: '{B}{G}'
+  type: Instant
+  rarity: uncommon
+  text: 'Target creature gets -2/-2 until end of turn. You gain 2 life.'
+  art: >-
+    A creature sinking into black water as roots and pale fungus visibly
+    climb it and green shoots break the surface nearby, emerald and
+    charcoal palette, high fantasy oil painting
+  flavor: >-
+    Nothing is wasted in the Rootmire. This is meant as reassurance and
+    is almost never received as such.
+
+- id: rtg-bg-003
+  name: Rootdebt Collector
+  cost: '{1}{B}{G}'
+  type: Creature
+  subtype: Treefolk Warlock
+  rarity: common
+  power: 3
+  toughness: 3
+  text: 'Whenever another creature you control dies, you gain 1 life.'
+  art: >-
+    A gaunt treefolk with red cords wound through its bark wading through
+    fen water, witchlight caught in the hollows of its trunk, emerald and
+    sick green charcoal palette, high fantasy oil painting
+  flavor: >-
+    It carries the forest's memory and the mire's ledger in the same
+    rings, and it has never confused the two.
+
+- id: rtg-bg-004
+  name: What the Roots Kept
+  cost: '{1}{B}{G}'
+  type: Sorcery
+  rarity: uncommon
+  text: 'Return target creature card from your graveyard to your hand. You gain 2 life.'
+  art: >-
+    Pale roots parting in black water to lift a moss-covered shape back
+    toward the surface, witchlight and green glow tangled together,
+    emerald and charcoal palette, high fantasy oil painting
+  flavor: >-
+    You do not get it back the way you left it. You get it back the way
+    the forest has decided to remember it.
+
+- id: rtg-bg-005
+  name: Grandmother Ash, Rootbound
+  cost: '{2}{B}{G}'
+  type: Creature
+  subtype: Legendary Treefolk Warlock
+  rarity: rare
+  power: 4
+  toughness: 5
+  text: 'Deathtouch. Whenever another creature you control dies, draw a card and you lose 1 life.'
+  art: >-
+    A small ancient woman grown into a cypress trunk to the waist, bark
+    creeping up her folded arms, red cords trailing from every branch,
+    emerald and sick green palette, high fantasy oil painting
+  flavor: >-
+    She stopped collecting and let the roots collect her instead. She
+    describes it as the best arrangement she ever negotiated.
+
+- id: rtg-bg-006
+  name: The Mire Reclaims All
+  cost: '{3}{B}{G}'
+  type: Sorcery
+  rarity: rare
+  text: 'Return two target creature cards from your graveyard to the battlefield. You lose 2 life.'
+  art: >-
+    Two moss-and-bone shapes rising upright out of black water wrapped in
+    living root, witchlight streaming from their joints, dead cypress
+    around, emerald and charcoal palette, high fantasy oil painting
+  flavor: >-
+    The Wardens call it regrowth. The Covens call it collection. The
+    things standing up out of the water have never been asked.
+
+# --- RG: the Wildfire — Clans + Wardens --------------------------------
+# Burn the slope, regrow the slope, both entirely sincere. The biggest,
+# fastest creatures in the set.
+
+- id: rtg-rg-001
+  name: Burnscar Sapling
+  cost: '{1}{G}'
+  type: Creature
+  subtype: Plant Warrior
+  rarity: common
+  power: 3
+  toughness: 1
+  text: 'Haste'
+  art: >-
+    A charred sapling creature with glowing ember cracks along its bark
+    sprinting across fresh black burn scar, green shoots at its crown,
+    ember and emerald palette, high fantasy oil painting, motion
+  flavor: >-
+    Grew back angry. The Wardens consider this a normal and healthy stage
+    of regrowth.
+
+- id: rtg-rg-002
+  name: Slopefire Rite
+  cost: '{R}{G}'
+  type: Instant
+  rarity: uncommon
+  text: 'Target creature you control gets +3/+3 and gains trample until end of turn.'
+  art: >-
+    A forest beast rearing as fire runs harmlessly up its mossy hide and
+    new growth erupts from its shoulders, embers and spores mixing, ember
+    and emerald palette, high fantasy oil painting
+  flavor: >-
+    The fire is not an attack. On this slope, the fire has always been
+    part of how a thing gets bigger.
+
+- id: rtg-rg-003
+  name: Wildfire Outrider
+  cost: '{1}{R}{G}'
+  type: Creature
+  subtype: Elf Warrior
+  rarity: common
+  power: 4
+  toughness: 3
+  text: 'Trample, haste'
+  art: >-
+    An elf rider on a great antlered elk charging across a burning slope,
+    embers streaming past, green canopy above and black burn below, ember
+    and emerald palette, high fantasy oil painting, dynamic
+  flavor: >-
+    Rides ahead of the fire to tell the forest it is coming. Rides behind
+    it to see what the forest decided to do about that.
+
+- id: rtg-rg-004
+  name: Clear the Slope
+  cost: '{1}{R}{G}'
+  type: Sorcery
+  rarity: uncommon
+  text: 'Clear the Slope deals 3 damage to each creature you don''t control. Create a 2/2 green Beast creature token.'
+  art: >-
+    A controlled burn sweeping up a forested volcanic slope while a single
+    great beast walks calmly down through it unharmed, ember and emerald
+    palette, high fantasy oil painting, wide dramatic
+  flavor: >-
+    The Clans light it. The Wardens choose the day. Nothing that respects
+    the schedule has ever been hurt.
+
+- id: rtg-rg-005
+  name: Emberhide Behemoth
+  cost: '{2}{R}{G}'
+  type: Creature
+  subtype: Beast
+  rarity: rare
+  power: 6
+  toughness: 5
+  text: 'Trample, haste'
+  art: >-
+    A massive beast armoured in bark and cooled lava with glowing seams
+    between the plates charging down a smoking slope, saplings snapping,
+    ember and emerald palette, high fantasy oil painting, vast momentum
+  flavor: >-
+    It sheds its shell every burn season. Whatever comes out is always
+    larger, and always in a hurry about it.
+
+- id: rtg-rg-006
+  name: The Slope Renewed
+  cost: '{3}{R}{G}'
+  type: Sorcery
+  rarity: rare
+  text: 'Create two 4/4 green Beast creature tokens with trample and haste.'
+  art: >-
+    Two enormous beasts of ember-veined bark and antler rising out of a
+    smoking burn scar as green shoots race across the ground around them,
+    ember and emerald palette, high fantasy oil painting, emergence
+  flavor: >-
+    Fire is not the end of the Thornwild's memory. Fire is how the
+    Thornwild turns the page.

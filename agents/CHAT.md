@@ -218,3 +218,185 @@ Agents **must** use this for every message posted to CHAT.md:
 ---
 [<small>2026-08-27 21:28:01</small>] [**Mouse**]->[**all**] *sm status*:
  Session close-out #2, context-clear prep: US-74 sprint (changePileType 5-kind cycle, D71) + D72-D75 nits (default naming, zone-heading visibility fix for a real user-reported bug, pass feature removed, make-zone code paths unified). Full detail in mouse.docs/state.md incl. a process note on scope-creep pushback this session. 407/407, lint baseline clean. Committing+pushing next.
+
+---
+[<small>2026-08-27 22:01:49</small>] [**User**]->[**all**] *request*:
+ *mouse status update
+
+---
+[<small>2026-08-27 22:01:55</small>] [**Mouse**]->[**User**] *sm status*:
+ Status: idle between sprints. Branch touch-targets-and-pile-actions-sprint clean, fully pushed to origin (verified: 0 commits ahead), tip 05aa3f6 (D72-D75 + US-74). No sprint plan awaiting review. Open backlog: e2e suite rebuild (D60), cognitive-complexity pass (7 findings), builder screen (blocked on product/UX input), 2 minor pre-existing visual overlaps, SaveAs window.prompt() cleanup. Awaiting user direction on next sprint.
+
+---
+[<small>2026-08-27 22:03:36</small>] [**User**]->[**all**] *request*:
+ *nit I don't see any controls for the change pile type button
+
+---
+[<small>2026-08-27 22:05:57</small>] [**Neo**]->[**Trin**] *swe fix*:
+ Root cause: renderActionHeader (ui.js:438) hid disabled pile actions entirely instead of showing them disabled - changePileType is disabled on any non-empty pile, so it was invisible unless the pile was empty. Fixed: now renders visible+disabled, matching cardElement's pattern. Reuses existing button:disabled CSS, no style changes. 407/407 tests, lint baselines unchanged. @Trin *qa uat
+
+---
+[<small>2026-08-28 00:57:05</small>] [**User**]->[**all**] *request*:
+ I want to Allow change type on non empty piles. and I prefer the invisible unavailable-actions to the change you just made. don't clutter. also in the same vein, remove the confirm dialogue when removing a pile (it's already empty so stop asking)
+
+---
+[<small>2026-08-28 00:59:45</small>] [**Neo**]->[**Trin**] *swe fix*:
+ Reverted ui.js's hidden-vs-disabled change per user preference. changePileType now allowed on non-empty piles (state.js guard removed, Pile.disabledActions no longer includes it) - flagged risk: foundation/cascade/rankAdjacent don't re-validate existing cards against new kind's rules. remove's confirm dialog skipped via noConfirm (always empty-only when enabled, so nothing to confirm). 407/407 tests, lint baselines unchanged.
+
+---
+[<small>2026-08-28 01:11:21</small>] [**User**]->[**all**] *request*:
+ *sprint: Recard the Gathering - MTG-like simulation. Balanced mono-color + 2-color decks, invented cards w/ art, new Pile/Zone classes + Action types, new preset w/ 2 players + standard MTG zones. Table sim should not fundamentally change.
+
+---
+[<small>2026-08-28 01:20:22</small>] [**Cypher**]->[**Smith**] *pm plan sprint*:
+ *pm plan sprint: Recard the Gathering. 9 stories US-75..US-83. Brief: docs/RTG_DESIGN.md. Scope decisions: (1) table simulator, players enforce rules - rejected mana/phase tracking and full rules engine; (2) offline YAML->JSON->SVG content pipeline, NO in-app deck builder; (3) balance is a lint check (lint:decks), not taste. 15 decks = ~135 unique cards (4-ofs). @Smith *user review
+
+---
+[<small>2026-08-28 01:20:42</small>] [**Smith**]->[**Morpheus**] *user approve*:
+ *user approve WITH CONDITIONS. Stories are testable and the balance-as-lint call is exactly right (measurable, not taste). 3 conditions: (C1) MTG rules text is unreadable at recard's card size - the RtG card face MUST ship a zoom/inspect affordance in the SAME phase, not deferred, or the preset is unusable. (C2) battlefield with 10+ permanents must wrap/scroll, not overflow. (C3) 15 decks on one table is heavy clutter - flag layout at preset phase. @Morpheus *lead arch sprint
+
+---
+[<small>2026-08-28 01:20:53</small>] [**Morpheus**]->[**Smith**] *lead arch*:
+ *lead arch sprint. D76 CARD_FACES registry: cardElement becomes a thin dispatcher on card.face (default 'standard'); existing rank/suit render moves to StandardCardFace UNCHANGED. Chose a registry over branching in cardElement because branching is what would rot the table sim. D77 content pipeline: YAML source -> committed cards.json -> assets/ svg (build/ is gitignored). D78 balance linter. D79 battlefield/exile/stack pile kinds. D80 buildDeck gains additive deckList param. @Smith *user feedback
+
+---
+[<small>2026-08-28 01:20:57</small>] [**Smith**]->[**Mouse**] *user approve*:
+ *user approve. Architecture approved - D76's dispatcher keeps every existing card render byte-identical, which is the whole 'table sim must not change' requirement made concrete. C1 (zoom/inspect) must land in D76's own phase. @Mouse *sm plan sprint
+
+---
+[<small>2026-08-28 01:21:14</small>] [**Mouse**]->[**Morpheus**] *sm plan sprint*:
+ *sm plan sprint: 10 phases (task.md 87-96). 87 schema+compiler, 88 balance linter, 89 mono pools+5 decks, 90 guild+duals+10 decks, 91 SVG art gen, 92 CARD_FACES+RtG face+zoom (C1), 93 rtg deck type, 94 battlefield/exile/stack (C2), 95 preset+layout (C3), 96 reserved bug-fix. Key call: 88 BEFORE 89/90 so content is authored against an enforced gate, not retrofitted. Content precedes engine. @Morpheus *lead review sprint plan
+
+---
+[<small>2026-08-28 01:21:18</small>] [**Morpheus**]->[**Neo**] *lead review sprint plan*:
+ Sprint plan approved, no changes. Linter-before-content (88 before 89/90) is the right call and matches the project's own 'measure, don't assert' discipline. Phase 87 ready. @Neo *swe impl phase-87
+
+---
+[<small>2026-08-28 02:32:37</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1103.691426
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-08-28 02:32:55</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phases 87-91 complete. 132 cards / 15 decks, all passing make lint-decks. 452 tests green, lint baseline held at 7. Linter caught a real rules error mid-build: duals aren't basics so the 4-copy limit applies - fixed by printing a SECOND dual cycle (Wellsprings) rather than lowering the source minimum. Art is deterministic (verified idempotent). Remaining: 92-96 (engine side). @Trin *qa uat phases-87-91
+
+---
+[<small>2026-08-28 07:47:00</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1125.045655
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-08-28 07:47:10</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 92 complete: CARD_FACES registry (D76). cardElement is now a thin dispatcher on card.face; rank/suit render moved VERBATIM to StandardCardFace, so every existing preset uses literally the same code path. RtgCardFace + Smith C1 inspect overlay shipped together. Live-verified in Chromium: rtg 70x98, standard 43x59 unchanged, overlay readable, 0 console errors. 459 tests, lint baseline 7. @Trin *qa uat phase-92
+
+---
+[<small>2026-08-28 07:47:10</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 92 PASSED. Verified independently: faceFor falls back to standard for both absent AND unknown face (degrades, never blanks the table). Two real bugs were caught by live measurement rather than review - button.card specificity beating .card-rtg (a trap this CSS file already documents from a prior incident), and a long card name stretching the flex item past its width floor. Both fixed and re-measured. @Morpheus *lead review phase-92
+
+---
+[<small>2026-08-28 07:49:53</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1087.172744
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-08-28 07:50:00</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 93 complete: rtg deck type (D80). buildDeck gains an additive deckList param - ignored by standard/pinochle, asserted unaffected. Instance ids (rtg-w-001#0..3) are distinct from the printed cardId, since state keys on card.id and 4 copies sharing one id would move as a single card. Compiler now emits ONE ES-module catalog the browser and every tool import, replacing the JSON only tooling could read. 469 tests. @Trin *qa uat phase-93
+
+---
+[<small>2026-08-28 07:54:49</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1194.198702
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-08-28 07:55:03</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 94 complete: battlefield/exile/stack pile kinds (D79) + UNTAP_ALL. Real classes, not renames: battlefield refuses split/take (permanents are distinct objects, not an interchangeable stack) and offers untapAll; exile inherits discard's drop-only shape but drops take (one-way); stack is LIFO so a new spell can't splice under an older one. UNTAP_ALL is atomic, not N rotates. Smith C2: [data-kind=battlefield] max-height+scroll. 483 tests. @Trin *qa uat phase-94
+
+---
+[<small>2026-08-28 08:01:22</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1107.98215
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-08-28 08:02:23</small>] [**Oracle**]->[**Smith**] *ora groom*:
+ *ora groom: D76-D81 recorded in docs/ARCHITECTURE.md (card-face registry, offline content pipeline, balance-as-lint, the three MTG pile kinds + UNTAP_ALL, additive deckList, pre-stocked declared piles). task.md phases 87-96 closed out. Phase 96 consumed by in-phase fixes - all 6 defects were caught by measurement (screenshots, live browser) rather than review. @Smith *user test rtg-sprint
+
+---
+[<small>2026-08-28 08:02:59</small>] [**Smith**]->[**all**] *user approve*:
+ *user test passed WITH FINDINGS. Regression check is the important one: War/Solitaire/Pinochle all render 0 rtg-faced cards, standard corners intact, no console errors - D76's 'existing presets are literally unchanged' claim verified, not asserted. RtG preset plays: 15 decks, per-player battlefield/graveyard/exile, shared stack, 7-card opening hand, Untap all live, inspect overlay readable. @all *sprint retro
+
+---
+[<small>2026-08-28 08:02:59</small>] [**Smith**]->[**Cypher**] *user feedback*:
+ *user feedback, 2 non-blocking: (1) C3 stands - 14 deck panels is the busiest table any preset makes; readable now but wants a real UX pass, possibly a deck-picker instead of all 15 on the felt. (2) Life starts at 0, not 20 - players must set it by hand. The rules entry says so, but a startingScore field on a preset would be the honest fix. Both backlogged, neither blocks launch.
+
+---
+[<small>2026-08-28 08:03:13</small>] [**Neo**]->[**Cypher**] *retro*:
+ Neo retro: the registry patterns paid off exactly as designed - deck type, pile kinds and card face were each one module + one entry, and ui.js's only change was becoming a dispatcher. Friction was all in CSS/layout, not architecture: every one of the 6 defects came from rendering assumptions I could not have caught by reading. Debt: rtg cards duplicate full printed data per instance (~24KB/deck over the wire) - fine now, worth revisiting if deck count grows.
+
+---
+[<small>2026-08-28 08:03:13</small>] [**Trin**]->[**Cypher**] *retro*:
+ Trin retro: the balance linter is the highest-value artifact this sprint - it caught a real MTG rules violation (4-copy limit on duals) that would have shipped as 10 silently illegal decks. Also caught my own bad test fixture. Coverage went 426->483. Gap: still no DOM unit tests; every UI claim rests on Playwright runs I drive by hand. A jsdom or Playwright-based test harness is the obvious next investment.
+
+---
+[<small>2026-08-28 08:03:13</small>] [**Morpheus**]->[**Cypher**] *retro*:
+ Morpheus retro: D76 is the decision to revisit if anything. Moving StandardCardFace verbatim was the right call and made the regression check trivially provable - but 'face renders content, shell stays in ui.js' is an unwritten contract enforced only by convention. If a third face appears, that split needs a real interface test. D81's pre-stocked piles were unplanned and forced by the preset; worth watching that GameConfig.piles doesn't accrete fields ad hoc.
+
+---
+[<small>2026-08-28 08:03:25</small>] [**Mouse**]->[**Cypher**] *retro*:
+ Mouse retro: 10 phases, all shipped, no fix-loop and no anti-loop escalation. The sequencing call that mattered was linter-before-content (88 before 89/90) - content authored against an enforced gate needed zero retrofitting. Phase 96 (reserved bug-fix) went unused for the first time in 4 sprints, because defects were caught inside their own phase by live measurement instead of surfacing at close.
+
+---
+[<small>2026-08-28 08:03:25</small>] [**Oracle**]->[**Cypher**] *retro*:
+ Oracle retro: D76-D81 recorded WITH their rejected alternatives, which is the half that usually goes missing. docs/RTG_DESIGN.md carries the framing decisions the user made at the gates. Gap: the content pipeline is documented in the design brief but not in README - a newcomer running make would not know cards:build exists before lint-decks.
+
+---
+[<small>2026-08-28 08:03:25</small>] [**Smith**]->[**Cypher**] *retro*:
+ Smith retro: the C1 condition (inspect overlay must ship WITH the card face, not after) was the right call - rules text is unreadable at 43px and deferring it would have made the preset unusable on arrival. C2 was cheap. C3 I under-called: I flagged 15 decks as 'clutter' but the real failure was titles colliding at 96px, which only a screenshot revealed. Lesson: a clutter concern needs a measurement, same as everything else here.
+
+---
+[<small>2026-08-28 08:03:32</small>] [**Cypher**]->[**all**] *pm launch*:
+ Cypher retro: US-75..83 all delivered with testable ACs; the 'balanced decks' story was the one at risk of being unfalsifiable and D78 fixed that at planning time. *pm launch Recard the Gathering. 132 cards, 15 balanced decks, 132 art SVGs, 3 pile kinds, 1 new action, 1 preset. Backlog: RtG table UX pass (C3), preset startingScore, DOM test harness, README pipeline docs, per-instance card data size. Sprint complete.

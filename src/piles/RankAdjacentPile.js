@@ -38,8 +38,10 @@ export class RankAdjacentPile extends Pile {
   }
 
   /** D71 (US-74): `changePileType` is the one pile-level action
-   * offered here, empty-only (the reducer's own guard) - same
-   * `isOwner`/`isShared` gate `Pile`'s own `pileActions()` uses. */
+   * offered here. Allowed on a non-empty pile too as of a direct user
+   * request (2026-08-27) - see `state.js`'s `CHANGE_PILE_TYPE` doc
+   * comment for the risk that carries. Same `isOwner`/`isShared` gate
+   * `Pile`'s own `pileActions()` uses. */
   static pileActions({ isOwner, isShared } = {}) {
     if (!isOwner && !isShared) return [];
     return ['changePileType'];

@@ -1,0 +1,96 @@
+# Recard the Gathering — basic lands (US-75).
+#
+# Authored source of truth. `cmc` and `colors` are NOT written here:
+# the compiler derives them from `cost` (D77), so a card's curve
+# position can never drift from its printed cost. Lands have an empty
+# cost, which the schema enforces.
+#
+# `art:` is written as a real image-generation prompt (subject,
+# composition, palette, medium) so generated illustration can be swapped
+# in later without re-authoring the pool.
+#
+# `flavor:` is the card's lore, required on every card. The five basics
+# introduce the five powers whose names recur across the whole set, so
+# the pool reads as one world rather than 135 unrelated cards:
+#   W  the Dawnbreak Legion   — oath-bound, sun-sworn, relentless
+#   U  the Tidewatch Concord  — scholars who drowned their own city
+#   B  the Mirefen Covens     — bargainers; every gift is a debt
+#   R  the Emberscar Clans    — exiles who made the burning mountain home
+#   G  the Thornwild Wardens  — the forest's memory, and its grudge
+
+- id: rtg-land-plains
+  name: Sunlit Expanse
+  cost: ''
+  type: Land
+  subtype: Basic Land — Plains
+  rarity: common
+  text: '{T}: Add {W}.'
+  art: >-
+    Endless sunlit grassland beneath a vast pale-gold sky, a distant white
+    marble spire on the horizon, long morning shadows, warm ivory and honey
+    palette, high fantasy oil painting, wide establishing shot
+  flavor: >-
+    "The Legion built no walls here. On the Expanse there is nowhere to
+    hide — and we have never needed anywhere to hide."
+    —Ser Calla, Dawnbreak Legion
+
+- id: rtg-land-island
+  name: Tidewatch Shallows
+  cost: ''
+  type: Land
+  subtype: Basic Land — Island
+  rarity: common
+  text: '{T}: Add {U}.'
+  art: >-
+    Glassy turquoise shallows over pale sand, half-sunken stone archways
+    trailing kelp, low mist and a cool cyan dawn, deep blues and silver
+    highlights, high fantasy oil painting, wide establishing shot
+  flavor: >-
+    The Concord sank their own city to keep what they had learned. The
+    archways still stand, patient as a held breath, waiting for a student
+    brave enough to swim down and ask.
+
+- id: rtg-land-swamp
+  name: Mirefen Hollow
+  cost: ''
+  type: Land
+  subtype: Basic Land — Swamp
+  rarity: common
+  text: '{T}: Add {B}.'
+  art: >-
+    Black still water between dead cypress trunks, drifting green fog and
+    faint witchlight, bone-pale roots breaking the surface, desaturated
+    charcoal and sickly green palette, high fantasy oil painting
+  flavor: >-
+    "Take what you need, child. Take freely." The covens never lie about
+    the price. They simply never mention when it comes due.
+
+- id: rtg-land-mountain
+  name: Emberscar Ridge
+  cost: ''
+  type: Land
+  subtype: Basic Land — Mountain
+  rarity: common
+  text: '{T}: Add {R}.'
+  art: >-
+    Jagged volcanic ridgeline cracked with glowing magma veins, ash column
+    rising against a bruised orange sky, scorched black rock, hot ember and
+    rust palette, high fantasy oil painting, dramatic backlight
+  flavor: >-
+    Every other people called the Emberscar a wasteland and turned back.
+    The clans called it empty, unclaimed, and warm — and stayed.
+
+- id: rtg-land-forest
+  name: Thornwild Canopy
+  cost: ''
+  type: Land
+  subtype: Basic Land — Forest
+  rarity: common
+  text: '{T}: Add {G}.'
+  art: >-
+    Colossal moss-furred trees with sunbeams lancing through dense canopy,
+    ferns and glowing spores in the understory, deep emerald and amber
+    palette, high fantasy oil painting, low upward angle
+  flavor: >-
+    Cut one trunk and the Wardens will not come. Cut a hundred and they
+    will arrive at dusk, carrying the names of all hundred.

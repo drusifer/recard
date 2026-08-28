@@ -15,8 +15,12 @@ test('buildDeck: standard 52, no jokers, single deck', () => {
 // per D38's rejected-alternative wording - proves it's a real, separate
 // axis from Pile type by building a second real deck type. ---
 
-test('DECK_TYPES registry exposes standard and pinochle', () => {
-  assert.deepEqual(Object.keys(DECK_TYPES).toSorted(), ['pinochle', 'standard']);
+// D80 (US-81): `rtg` joins the registry. The exact-contents assertion is
+// kept exact rather than loosened to a `.includes` - knowing precisely
+// which deck types ship is the point of the guard, and a new one should
+// have to be added here deliberately.
+test('DECK_TYPES registry exposes standard, pinochle and rtg', () => {
+  assert.deepEqual(Object.keys(DECK_TYPES).toSorted(), ['pinochle', 'rtg', 'standard']);
   assert.equal(DECK_TYPES.standard, standardDeck);
   assert.equal(DECK_TYPES.pinochle, pinochleDeck);
 });

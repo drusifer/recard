@@ -34,11 +34,12 @@ export class MeldPile extends Pile {
 
   /**
    * D71 (US-74): `changePileType` is the first pile-level action ever
-   * offered on a meld - only when empty (the reducer's own guard;
-   * `disabledActions`, inherited from `Pile`, already hides it
-   * otherwise). Same `isOwner`/`isShared` gate `Pile.pileActions()`
-   * uses, for consistency - a meld is normally ownerless/shared
-   * (Solitaire's foundations), same as any other shared pile.
+   * offered on a meld. Allowed on a non-empty pile too as of a direct
+   * user request (2026-08-27) - see `state.js`'s `CHANGE_PILE_TYPE`
+   * doc comment for the risk that carries. Same `isOwner`/`isShared`
+   * gate `Pile.pileActions()` uses, for consistency - a meld is
+   * normally ownerless/shared (Solitaire's foundations), same as any
+   * other shared pile.
    */
   static pileActions({ isOwner, isShared } = {}) {
     if (!isOwner && !isShared) return [];

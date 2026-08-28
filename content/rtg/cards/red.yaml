@@ -1,0 +1,168 @@
+# Recard the Gathering — Red: the Emberscar Clans (US-77).
+#
+# Exiles who were told the burning mountain was a wasteland, looked at
+# it, and called it home. Mechanically an AGGRO deck: the cheapest,
+# fastest board in the set plus direct damage to finish. The clans'
+# throughline is that everything worth having was something nobody else
+# wanted.
+#
+# Curve (10 cards x4 = 40 spells, 20 lands):
+#   cmc1 x2  cmc2 x3  cmc3 x3  cmc4 x1  cmc5 x1
+
+- id: rtg-r-001
+  name: Emberscar Scrapper
+  cost: '{R}'
+  type: Creature
+  subtype: Goblin Warrior
+  rarity: common
+  power: 2
+  toughness: 1
+  text: 'Haste'
+  art: >-
+    A wiry goblin sprinting across cracked volcanic rock with a salvaged
+    blade in each hand, ash kicking up behind, embers streaking past, hot
+    ember and rust palette, high fantasy oil painting, motion blur
+  flavor: >-
+    Ran toward the eruption. Came back with a better knife. Considers the
+    matter settled.
+
+- id: rtg-r-002
+  name: Cinder Bolt
+  cost: '{R}'
+  type: Instant
+  rarity: common
+  text: 'Cinder Bolt deals 3 damage to any target.'
+  art: >-
+    A compact lance of white-hot fire streaking across a dark ashfall sky,
+    trailing sparks, its glare lighting the rocks below, hot orange and
+    charcoal palette, high fantasy oil painting, sharp diagonal
+  flavor: >-
+    The clans do not consider this magic. They consider it throwing
+    something, correctly.
+
+- id: rtg-r-003
+  name: Ashfall Raider
+  cost: '{1}{R}'
+  type: Creature
+  subtype: Human Warrior
+  rarity: common
+  power: 3
+  toughness: 1
+  text: 'Haste'
+  art: >-
+    A rider on a lean ash-grey beast bursting through a falling curtain of
+    grey ash, scarf whipping, ember light on their goggles, rust and
+    charcoal palette, high fantasy oil painting, dynamic charge
+  flavor: >-
+    Ashfall is the best cover in the Emberscar. It is also, obviously, the
+    worst possible time to be outside.
+
+- id: rtg-r-004
+  name: Forge-Tender Ilka
+  cost: '{1}{R}'
+  type: Creature
+  subtype: Legendary Human Artificer
+  rarity: rare
+  power: 2
+  toughness: 2
+  text: 'Whenever Forge-Tender Ilka attacks, it gets +1/+0 until end of turn for each other attacking creature.'
+  art: >-
+    A soot-streaked woman with burn-scarred forearms hauling a glowing bar
+    from a magma vent with long tongs, sparks fountaining, fierce grin,
+    ember and rust palette, high fantasy oil painting, warm rim light
+  flavor: >-
+    "Everyone else looked at a mountain that was on fire and saw a
+    problem. I saw a forge nobody was using."
+
+- id: rtg-r-005
+  name: Scorch the Ridge
+  cost: '{1}{R}'
+  type: Sorcery
+  rarity: uncommon
+  text: 'Scorch the Ridge deals 2 damage to each creature your opponents control.'
+  art: >-
+    A wave of fire rolling along a jagged ridgeline, silhouetted figures
+    scattering ahead of it, ash column rising behind, bruised orange and
+    black palette, high fantasy oil painting, wide panoramic
+  flavor: >-
+    The ridge burns every few years on its own. The clans have simply
+    learned to schedule it.
+
+- id: rtg-r-006
+  name: Magma Vein Brawler
+  cost: '{2}{R}'
+  type: Creature
+  subtype: Human Warrior
+  rarity: common
+  power: 4
+  toughness: 2
+  text: ''
+  art: >-
+    A heavyset brawler standing astride a glowing magma crack with a
+    salvaged hammer over one shoulder, heat shimmer distorting the air,
+    hot ember and scorched black palette, high fantasy oil painting
+  flavor: >-
+    The crack is nine hundred degrees. He fights over it because nobody
+    sensible will follow him there.
+
+- id: rtg-r-007
+  name: Emberscar Warcaller
+  cost: '{2}{R}'
+  type: Creature
+  subtype: Goblin Shaman
+  rarity: uncommon
+  power: 2
+  toughness: 3
+  text: 'Other creatures you control have haste.'
+  art: >-
+    A goblin shaman on a high rock blowing a horn of blackened bone, embers
+    streaming from the bell of it, clan figures rising below, ember and
+    rust palette, high fantasy oil painting, low upward angle
+  flavor: >-
+    One note means come. Two means come armed. There has never needed to
+    be a third.
+
+- id: rtg-r-008
+  name: Rockslide Charge
+  cost: '{2}{R}'
+  type: Instant
+  rarity: common
+  text: 'Creatures you control get +2/+0 until end of turn.'
+  art: >-
+    A wave of clan warriors pouring down a scree slope amid tumbling
+    glowing rocks, dust and embers everywhere, weapons raised, rust and
+    hot orange palette, high fantasy oil painting, downhill momentum
+  flavor: >-
+    Gravity is the Emberscar's oldest ally. The clans merely arrive with
+    it.
+
+- id: rtg-r-009
+  name: Cinderwing Drake
+  cost: '{3}{R}'
+  type: Creature
+  subtype: Dragon
+  rarity: uncommon
+  power: 3
+  toughness: 3
+  text: 'Flying, haste'
+  art: >-
+    A lean red drake banking hard through an ash column with embers caught
+    in its wing membranes, glowing cracks along its hide, bruised orange
+    sky, high fantasy oil painting, sweeping motion
+  flavor: >-
+    It nests in the vents where the rock is still soft. The clans leave it
+    the high ridge and it leaves them the low one.
+
+- id: rtg-r-010
+  name: Eruption of the Emberscar
+  cost: '{4}{R}'
+  type: Sorcery
+  rarity: rare
+  text: 'Eruption of the Emberscar deals 5 damage to any target and 2 damage to each other creature.'
+  art: >-
+    The mountain's summit blowing outward in a column of fire and rock, the
+    shockwave flattening ash clouds outward in a ring, tiny silhouettes
+    below, ember and black palette, high fantasy oil painting, vast scale
+  flavor: >-
+    The clans do not flee an eruption. They put their backs to the nearest
+    rock, and they count, and they go back to work.

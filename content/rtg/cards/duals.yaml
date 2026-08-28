@@ -1,0 +1,164 @@
+# Recard the Gathering — the ten guild dual lands (US-78).
+#
+# One per colour pair. Every dual ENTERS TAPPED: the guild decks are all
+# midrange, and a fully untapped dual cycle would quietly make every
+# two-colour deck faster than the mono decks it shares a table with —
+# the opposite of the balance this set is trying to demonstrate.
+#
+# The `text` must name both colours in an "Add ... or ..." clause:
+# `deckSchema.mjs`'s `landColorSources` parses colour sources out of the
+# land's own rules text, so a dual counts toward BOTH colours' 15-source
+# minimum through exactly the same path a basic land does.
+#
+# Each dual is the physical place where two powers meet, which is also
+# what each guild deck is about.
+
+- id: rtg-dual-wu
+  name: Oathwatch Causeway
+  cost: ''
+  type: Land
+  subtype: Land
+  rarity: uncommon
+  text: 'Oathwatch Causeway enters the battlefield tapped. {T}: Add {W} or {U}.'
+  art: >-
+    A white stone causeway running straight out across shallow turquoise
+    water toward half-sunken archways, Legion banners along its rail, ivory
+    gold and cool cyan palette, high fantasy oil painting, deep perspective
+  flavor: >-
+    The Legion built it to reach the Concord. The Concord let them, and
+    quietly measured how long it took.
+
+- id: rtg-dual-wb
+  name: The Ledger Crossing
+  cost: ''
+  type: Land
+  subtype: Land
+  rarity: uncommon
+  text: 'The Ledger Crossing enters the battlefield tapped. {T}: Add {W} or {B}.'
+  art: >-
+    A pale marble bridge half-swallowed by black swamp water, red cords
+    knotted along its balustrade, dawn light failing into fog, ivory and
+    sick green charcoal palette, high fantasy oil painting
+  flavor: >-
+    An oath and a debt are the same promise. Only the direction of the
+    obligation differs, and only at first.
+
+- id: rtg-dual-wr
+  name: Emberoath Pass
+  cost: ''
+  type: Land
+  subtype: Land
+  rarity: uncommon
+  text: 'Emberoath Pass enters the battlefield tapped. {T}: Add {W} or {R}.'
+  art: >-
+    A narrow pass between white cliffs and glowing volcanic rock, a Legion
+    banner planted beside a clan firepit, ash drifting through dawn light,
+    ivory gold and hot ember palette, high fantasy oil painting
+  flavor: >-
+    The Legion arrived to hold the pass. The Clans were already holding it
+    and saw no reason to mention this.
+
+- id: rtg-dual-wg
+  name: Wardensgate Meadow
+  cost: ''
+  type: Land
+  subtype: Land
+  rarity: uncommon
+  text: 'Wardensgate Meadow enters the battlefield tapped. {T}: Add {W} or {G}.'
+  art: >-
+    A sunlit meadow opening between colossal moss-furred trunks, a white
+    stone waystone at its centre wreathed in ferns, warm gold and deep
+    emerald palette, high fantasy oil painting, wide inviting composition
+  flavor: >-
+    The waystone marks where the Legion swore not to cut. It is the only
+    oath the Thornwild has ever agreed to remember on their behalf.
+
+- id: rtg-dual-ub
+  name: The Deep Bargain
+  cost: ''
+  type: Land
+  subtype: Land
+  rarity: uncommon
+  text: 'The Deep Bargain enters the battlefield tapped. {T}: Add {U} or {B}.'
+  art: >-
+    A drowned stone archway standing in black fen water, witchlight and
+    cold blue current mingling in a visible seam, kelp and dead cypress,
+    deep teal and sick green palette, high fantasy oil painting
+  flavor: >-
+    The Concord came to ask a question. The Covens answered it, and named
+    a price, and the Concord has been paying ever since.
+
+- id: rtg-dual-ur
+  name: Quenchfire Coast
+  cost: ''
+  type: Land
+  subtype: Land
+  rarity: uncommon
+  text: 'Quenchfire Coast enters the battlefield tapped. {T}: Add {U} or {R}.'
+  art: >-
+    Black volcanic rock meeting cold turquoise sea in an enormous wall of
+    steam, magma glowing under the waterline, spray and ash, cyan and hot
+    ember palette, high fantasy oil painting, dramatic elemental clash
+  flavor: >-
+    Two forces that cancel each other perfectly, forever, loudly. Both
+    sides consider this an excellent arrangement.
+
+- id: rtg-dual-ug
+  name: Tidegrowth Delta
+  cost: ''
+  type: Land
+  subtype: Land
+  rarity: uncommon
+  text: 'Tidegrowth Delta enters the battlefield tapped. {T}: Add {U} or {G}.'
+  art: >-
+    A braided river delta where kelp and forest root intergrow into living
+    channels, glowing spores drifting over clear water, deep emerald and
+    turquoise palette, high fantasy oil painting, aerial sweeping view
+  flavor: >-
+    The Concord studies the delta. The Wardens grew the delta. Neither has
+    told the other, and the delta is thriving.
+
+- id: rtg-dual-br
+  name: Ashmire Flats
+  cost: ''
+  type: Land
+  subtype: Land
+  rarity: uncommon
+  text: 'Ashmire Flats enters the battlefield tapped. {T}: Add {B} or {R}.'
+  art: >-
+    Black fen water under falling grey ash, dead cypress skeletons and
+    glowing embers hissing as they land on the surface, charcoal rust and
+    sick green palette, high fantasy oil painting, desolate wide shot
+  flavor: >-
+    Everything here is either owed or burning. The Ashcord has never seen
+    the distinction as important.
+
+- id: rtg-dual-bg
+  name: Rootmire Hollow
+  cost: ''
+  type: Land
+  subtype: Land
+  rarity: uncommon
+  text: 'Rootmire Hollow enters the battlefield tapped. {T}: Add {B} or {G}.'
+  art: >-
+    Colossal living roots plunging down into black fen water, moss and
+    witchlight competing on the same bark, bone-pale bones tangled in the
+    roots, emerald and charcoal palette, high fantasy oil painting
+  flavor: >-
+    The forest remembers. The mire keeps receipts. Between them, nothing
+    is ever genuinely gone.
+
+- id: rtg-dual-rg
+  name: Wildfire Slopes
+  cost: ''
+  type: Land
+  subtype: Land
+  rarity: uncommon
+  text: 'Wildfire Slopes enters the battlefield tapped. {T}: Add {R} or {G}.'
+  art: >-
+    A forested volcanic slope where new green growth pushes up through
+    fresh black burn scar, embers still glowing in the soil, saplings
+    backlit, emerald and ember palette, high fantasy oil painting
+  flavor: >-
+    The Clans burn the slope. The Wardens regrow it. Both are entirely
+    sincere, and the slope has never been healthier.

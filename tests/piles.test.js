@@ -16,9 +16,13 @@ import { RankAdjacentPile } from '../src/piles/RankAdjacentPile.js';
 // are called exactly the same way, so every call site outside this
 // file (state.js/pileActions.js) needed zero changes.
 
-test('the registry exposes exactly the seven pile kinds', () => {
+// D79 (US-82) added battlefield/exile/stack. Kept as an EXACT list
+// rather than relaxed to a subset check: knowing precisely which kinds
+// ship is the guard's whole value, so a new kind should have to be
+// added here on purpose.
+test('the registry exposes exactly the ten pile kinds', () => {
   assert.deepEqual(Object.keys(PILE_TYPES).toSorted(),
-    ['cascade', 'deck', 'discard', 'foundation', 'hand', 'rankAdjacent', 'zone']);
+    ['battlefield', 'cascade', 'deck', 'discard', 'exile', 'foundation', 'hand', 'rankAdjacent', 'stack', 'zone']);
   assert.equal(PILE_TYPES.deck, DeckPile);
   assert.equal(PILE_TYPES.hand, HandPile);
   assert.equal(PILE_TYPES.zone, Pile);
@@ -83,15 +87,17 @@ test('reparentable: hand opts out (D55/US-63/D64), everything else - including d
   assert.equal(DiscardPile.reparentable, true, 'inherited, not overridden');
 });
 
-// *nit (direct user request, "don't enable X unless empty"): remove/
-// changePileType (D62/D63) are empty-only at the reducer - disabled
-// client-side too now, so a click never reaches the reducer's block
-// message on a non-empty pile (Nielsen #5).
-test('disabledActions: remove/changePileType are disabled on a non-empty pile, enabled on an empty one', () => {
+// *nit (direct user request, "don't enable X unless empty"): remove
+// (D62) is empty-only at the reducer - disabled client-side too, so a
+// click never reaches the reducer's block message on a non-empty pile
+// (Nielsen #5). `changePileType` was disabled the same way under D62/
+// D63, but a later direct user request (2026-08-27) reopened it on
+// non-empty piles - it's no longer in this list.
+test('disabledActions: remove is disabled on a non-empty pile, enabled on an empty one; changePileType is never disabled', () => {
   assert.deepEqual(Pile.disabledActions(0), []);
-  assert.deepEqual(Pile.disabledActions(3), ['remove', 'changePileType']);
+  assert.deepEqual(Pile.disabledActions(3), ['remove']);
   assert.deepEqual(DiscardPile.disabledActions(0), [], 'inherited, not overridden');
-  assert.deepEqual(DiscardPile.disabledActions(1), ['remove', 'changePileType'], 'inherited, not overridden');
+  assert.deepEqual(DiscardPile.disabledActions(1), ['remove'], 'inherited, not overridden');
 });
 
 // --- cardActions: characterized against pileActions.js's actionsForCard ---

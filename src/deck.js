@@ -12,13 +12,17 @@ export { RANKS, SUITS } from './decks/standardDeck.js';
  * `PILE_TYPES` (D42) and `ACTIONS` (D44). Defaults to `'standard'`,
  * matching every prior sprint's behavior exactly (no caller has ever
  * passed a `type` before this field existed).
- * @param {{type?: string, numDecks?: number, jokers?: number}} [options]
+ * @param {{type?: string, numDecks?: number, jokers?: number, deckList?: string}} [options]
  * @returns {{id: string, rank: string, suit: string|null}[]}
  */
-export function buildDeck({ type = 'standard', numDecks: numberDecks = 1, jokers = 0 } = {}) {
+export function buildDeck({ type = 'standard', numDecks: numberDecks = 1, jokers = 0, deckList } = {}) {
   const deckType = DECK_TYPES[type];
   if (!deckType) throw new Error(`Unknown deck type: "${type}"`);
-  return deckType.build({ numDecks: numberDecks, jokers });
+  // `deckList` (D80) is additive - it names which catalogued list a
+  // deck type should build, and is simply ignored by every deck type
+  // that doesn't have lists (standard, pinochle), so no existing caller
+  // changes behaviour.
+  return deckType.build({ numDecks: numberDecks, jokers, deckList });
 }
 
 /**

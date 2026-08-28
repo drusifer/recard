@@ -222,18 +222,35 @@ function configuredZoneId(kind, index, count, ownerId = null) {
  * here since a 1:1 "this exact pile, alone" relationship needs no
  * separate declaration to be unambiguous.
  */
-function buildPiles(pileDeclarations, zoneRegistry) {
+function buildPiles(pileDeclarations, zoneRegistry, rng = Math.random) {
   const piles = [];
   let zones = zoneRegistry;
-  for (const { kind, ownerId, count = 1, zoneId: declaredZoneId } of pileDeclarations) {
+  for (const declaration of pileDeclarations) {
+    const { kind, ownerId, count = 1, zoneId: declaredZoneId, name: declaredName, id: declaredId } = declaration;
     if (ownerId === 'perPlayer') continue;
     for (let index = 0; index < count; index++) {
-      const id = configuredZoneId(kind, index, count);
+      // D81 (US-83): a declaration MAY name its own pile id. Ids are
+      // otherwise derived from `kind`, which silently collides the
+      // moment a preset declares several piles of the SAME kind as
+      // separate entries - fifteen `deck` piles would all have become
+      // one id. Additive: no declared id means the derived one, exactly
+      // as before.
+      const id = declaredId ?? configuredZoneId(kind, index, count);
       if (declaredZoneId && zones.every((z) => z.id !== declaredZoneId)) {
         throw new Error(`GameConfig.piles: "${id}" declares zoneId "${declaredZoneId}", but no such Zone is declared in GameConfig.zones`);
       }
       const zoneId = declaredZoneId ?? id;
-      piles.push(makeTableSidePile(kind, configuredZoneName(kind, index, count), null, id, zoneId));
+      const name = declaredName ?? configuredZoneName(kind, index, count);
+      const pile = makeTableSidePile(kind, name, null, id, zoneId);
+      // D81 (US-83): a declared pile MAY be pre-stocked with a built
+      // deck. Until now every declared pile started empty, which is
+      // right for a Solitaire foundation but useless for "all fifteen
+      // decks on the table" - a deck pile with no cards in it is just a
+      // label. Additive: a declaration without `deckList` behaves
+      // exactly as before.
+      piles.push(declaration.deckList
+        ? { ...pile, cards: shuffle(buildDeck({ type: declaration.deckType ?? 'rtg', deckList: declaration.deckList }), rng) }
+        : pile);
       zones = ensureZoneRecord(zones, zoneId);
     }
   }
@@ -267,7 +284,7 @@ export function createInitialState(deckConfig = {}, rng = Math.random, gameConfi
   let zoneRegistry = ensureZoneRecord([], TABLE_ZONE_RECORD.id, TABLE_ZONE_RECORD.name, TABLE_ZONE_RECORD.ownerId, TABLE_ZONE_RECORD.type);
   for (const z of zoneDeclarations) zoneRegistry = ensureZoneRecord(zoneRegistry, z.id, z.name ?? null, null, z.type ?? 'shared');
 
-  const built = buildPiles(pileDeclarations, zoneRegistry);
+  const built = buildPiles(pileDeclarations, zoneRegistry, rng);
 
   return {
     deckConfig,
@@ -1011,6 +1028,34 @@ const ACTIONS = {
     );
   },
 
+  /**
+   * D79 (US-82): the untap step — return every permanent in a pile to
+   * portrait in one action.
+   *
+   * A new ACTION rather than a loop of `ROTATE_CARD` on the client:
+   * untapping a wide board would otherwise be a burst of N separate
+   * actions across the network, each re-rendering the table, and a
+   * dropped one would leave the board half-untapped with no way to tell.
+   * One action is one atomic, replayable state change.
+   *
+   * Deliberately sets portrait outright rather than toggling: the untap
+   * step untaps: it does not flip an already-untapped permanent.
+   */
+  UNTAP_ALL(state, action) {
+    const pile = state.piles.find((p) => p.id === action.pileId);
+    if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
+    // Same owner-or-shared rule every pile-level action uses (D43: the
+    // read-side offer check IS the write-side authorization check).
+    const isOwner = pile.ownerId === action.playerId;
+    const isShared = pile.ownerId == undefined;
+    if (!isOwner && !isShared) {
+      throw new Error(`Player ${action.playerId} is not authorized to untap pile ${action.pileId}`);
+    }
+    return replacePile(state, action.pileId, (p) =>
+      withCards(p, p.cards.map((card) => ({ ...card, orientation: 'portrait' }))),
+    );
+  },
+
   PICKUP(state, action) {
     const found = findZoneAndCard(state, action.cardId);
     if (!found) {
@@ -1174,23 +1219,20 @@ const ACTIONS = {
   },
 
   /**
-   * US-73 (D63): change a pile's `kind` in place, `zone`<->`discard`
-   * only (both directions) - the two kinds `MOVE_PILE`/`SPLIT_PILE`
-   * already treat as interchangeable/general-purpose. `deck`/`hand`
-   * exempt for the same reason D62's remove actions exempt them.
-   * `foundation`/`cascade`/`rankAdjacent` excluded: they carry real
-   * game-rule `canAccept` logic a runtime swap could silently violate,
-   * and no per-card re-validation exists to check that. Empty-only,
-   * same discipline as D62.
-   */
-  /**
-   * D71 (US-74): widened from a zone/discard-only flip to the full
+   * D63/D71 (US-73/74): change a pile's `kind` in place, cycling through
    * `CHANGE_PILE_TYPE_CYCLE` (zone/discard/foundation/cascade/
-   * rankAdjacent) - D63's original per-card-revalidation concern is
-   * moot once the empty-only guard applies to every kind, not just the
-   * original two. Gate 1's auto-rename: if the pile's current name is
-   * still its OLD kind's own D70 default, it's renamed to the NEW
+   * rankAdjacent). `deck`/`hand` exempt for the same reason D62's remove
+   * actions exempt them. Gate 1's auto-rename: if the pile's current name
+   * is still its OLD kind's own D70 default, it's renamed to the NEW
    * kind's default too - a manually-chosen name is left untouched.
+   *
+   * Direct user request (2026-08-27): allowed on a non-empty pile too -
+   * the prior empty-only guard is gone. Note the risk this reopens for
+   * `foundation`/`cascade`/`rankAdjacent`, which carry real game-rule
+   * `canAccept` logic: swapping a pile with cards into one of those
+   * kinds does NOT re-validate the existing cards against the new
+   * kind's rules, so it can leave cards in a pile they'd never have
+   * been allowed to enter directly.
    */
   CHANGE_PILE_TYPE(state, action) {
     const pile = state.piles.find((p) => p.id === action.pileId);
@@ -1199,9 +1241,6 @@ const ACTIONS = {
     const isTargetEligible = CHANGE_PILE_TYPE_CYCLE.includes(action.kind);
     if (!isEligible || !isTargetEligible) {
       throw new Error(`Cannot change a "${pile.kind}" pile to kind "${action.kind}"`);
-    }
-    if (pile.cards.length > 0) {
-      throw new Error('Pile must be empty before its type can be changed');
     }
     const name = isDefaultPileName(pile.name, pile.kind) ? defaultKindName(action.kind) : pile.name;
     return {

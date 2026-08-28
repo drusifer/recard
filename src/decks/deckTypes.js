@@ -6,5 +6,6 @@
  */
 import * as standard from './standardDeck.js';
 import * as pinochle from './pinochleDeck.js';
+import * as rtg from './rtgDeck.js';
 
-export const DECK_TYPES = { standard, pinochle };
+export const DECK_TYPES = { standard, pinochle, rtg };

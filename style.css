@@ -1954,3 +1954,197 @@ body.panel-drag-active {
 body.panel-resize-active {
   cursor: nwse-resize;
 }
+
+/* ---- Recard the Gathering card face (D76, US-80) --------------------
+   Scoped entirely to `.card-rtg`. The global `--card-w`/`--card-h` are
+   deliberately NOT touched: an MTG card needs more room than a pip
+   card, but changing the shared tokens would resize every other
+   preset's table, which the RtG brief explicitly ruled out. */
+/* `button.card-rtg`, not `.card-rtg` - `button.card` (line ~296) sets
+   min-width/min-height/display with element+class specificity, which
+   outranks a plain class selector. That exact trap already caused a real
+   "tiny cards" bug once (see the comment above `button.card`), so this
+   matches its specificity deliberately rather than relying on source
+   order alone. Verified live in a browser, not assumed. */
+button.card-rtg {
+  --card-rtg-w: 4.4rem;
+  --card-rtg-h: 6.1rem;
+
+  /* A fixed box, not just a floor: `min-width` alone let a long card
+     name ("Ser Calla, Dawnbreak Captain") stretch the flex item well
+     past the intended width. Caught by measuring in a browser, not by
+     reading the rule. */
+  min-width: var(--card-rtg-w);
+  width: var(--card-rtg-w);
+  min-height: var(--card-rtg-h);
+  height: var(--card-rtg-h);
+  flex: 0 0 auto;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-start;
+  flex-direction: column;
+  background: #201d18;
+  border-color: #0d0b09;
+}
+
+.rtg-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rtg-top {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.12rem 0.15rem;
+}
+
+.rtg-cost {
+  display: inline-flex;
+  gap: 0.08rem;
+}
+
+.rtg-pip {
+  width: 0.72rem;
+  height: 0.72rem;
+  border-radius: 50%;
+  font-size: 0.5rem;
+  font-weight: 700;
+  line-height: 0.72rem;
+  text-align: center;
+  color: #1a1a1a;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+}
+
+.pip-generic { background: #cdc5b4; }
+.pip-w { background: #fbf7e6; }
+.pip-u { background: #9ed0e6; }
+.pip-b { background: #a6a29c; }
+.pip-r { background: #f0a081; }
+.pip-g { background: #a7d7a9; }
+
+/* Name strip sits at the bottom over the art, where it stays legible
+   against the ridge silhouettes (which are always the darkest band of
+   the generated art). */
+.rtg-name {
+  position: relative;
+  margin-top: auto;
+  font-size: 0.42rem;
+  line-height: 1.15;
+  font-weight: 600;
+  color: #f5f0e4;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.85) 45%);
+  /* Right padding reserves the corner the P/T box occupies - without it
+     a long name runs under the stats and both become unreadable
+     (caught on screenshot, not in review). */
+  padding: 0.3rem 1.15rem 0.12rem 0.18rem;
+  text-align: left;
+
+  /* Clamp to two lines - a long name must not push the art out of the
+     fixed-height card. The inspect overlay carries the full name. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.rtg-stats {
+  position: absolute;
+  right: 0.1rem;
+  bottom: 0.08rem;
+  font-size: 0.5rem;
+  font-weight: 700;
+  color: #f5f0e4;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 0.2rem;
+  padding: 0 0.16rem;
+}
+
+/* ---- Inspect overlay (Smith Gate-1 condition C1) --------------------
+   Rules text is unreadable at card size, so hovering or focusing an RtG
+   card opens a readable copy. Appended to <body>, not to the card, so it
+   escapes the pile's overflow and the zone's stacking context. */
+.rtg-inspect {
+  position: fixed;
+  z-index: 9000;
+  width: 15rem;
+  padding: 0.45rem;
+  border-radius: 0.4rem;
+  background: #24211b;
+  color: #f2ece0;
+  border: 1px solid #0d0b09;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  font-size: 0.72rem;
+}
+
+.rtg-inspect-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.rtg-inspect-name {
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+.rtg-inspect .rtg-pip {
+  width: 0.85rem;
+  height: 0.85rem;
+  font-size: 0.58rem;
+  line-height: 0.85rem;
+}
+
+.rtg-inspect-art {
+  display: block;
+  width: 100%;
+  height: 7rem;
+  object-fit: cover;
+  border-radius: 0.25rem;
+  margin: 0.35rem 0;
+}
+
+.rtg-inspect-types {
+  font-size: 0.68rem;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  padding-bottom: 0.2rem;
+  margin-bottom: 0.25rem;
+}
+
+.rtg-inspect-rules { margin: 0 0 0.3rem; }
+
+.rtg-inspect-flavor {
+  margin: 0;
+  font-style: italic;
+  opacity: 0.72;
+  font-size: 0.66rem;
+}
+
+.rtg-inspect-stats {
+  text-align: right;
+  font-weight: 700;
+  margin-top: 0.3rem;
+}
+
+/* ---- Battlefield overflow (Smith Gate-1 condition C2) ---------------
+   A battlefield routinely holds far more permanents than any other pile
+   (10+ by the midgame). `.card-row` already wraps, but without a height
+   ceiling the pile panel grows without bound and pushes the rest of the
+   table off screen. Cap it and scroll INSIDE the pile, so the table
+   layout stays stable no matter how wide the board gets.
+
+   Scoped by `[data-kind='battlefield']`, which `renderPileShell` already
+   sets - no JS change needed. */
+[data-kind='battlefield'] .card-row {
+  max-height: 15rem;
+  overflow-y: auto;
+  align-content: flex-start;
+}

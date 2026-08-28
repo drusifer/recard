@@ -106,12 +106,24 @@ function describeDeckConfig({ type, numDecks, jokers }) {
  * pre-Sprint-22 preset that has none. */
 function describeConfiguredZones(pileDeclarations) {
   if (!pileDeclarations?.length) return '';
-  return pileDeclarations
-    .map(({ kind, ownerId, count = 1 }) => {
-      const word = count === 1 ? kind : `${kind}s`;
-      return ownerId === 'perPlayer' ? `${count} ${word}/player` : `${count} ${word}`;
-    })
-    .join(' + ');
+  // US-83: TOTAL per kind, not one clause per declaration. A preset that
+  // declares each pile separately (Recard the Gathering lists fourteen
+  // decks by name so each gets its own deck list) previously rendered as
+  // "1 deck + 1 deck + 1 deck + ..." fourteen times - technically
+  // accurate and completely unreadable. Grouping is what the host
+  // actually wants to know: how many of each thing is on the table.
+  const totals = new Map();
+  for (const { kind, ownerId, count = 1 } of pileDeclarations) {
+    const key = `${kind}|${ownerId === 'perPlayer' ? 'perPlayer' : 'shared'}`;
+    totals.set(key, (totals.get(key) ?? 0) + count);
+  }
+  const parts = [];
+  for (const [key, count] of totals) {
+    const [kind, scope] = key.split('|', 2);
+    const word = count === 1 ? kind : `${kind}s`;
+    parts.push(scope === 'perPlayer' ? `${count} ${word}/player` : `${count} ${word}`);
+  }
+  return parts.join(' + ');
 }
 
 // --- Rules reference (US-18): a toggleable overlay, not a showScreen()
@@ -607,10 +619,16 @@ document.querySelector('#create-table').addEventListener('click', async () => {
   role = 'host';
   myName = document.querySelector('#host-name').value.trim() || 'Host';
   expectedPlayers = Number(document.querySelector('#host-expected-players').value) || 0;
+  // D81 (US-83): a preset MAY name which catalogued deck list its main
+  // deck pile builds (`rtg` is the first deck type with lists). Read off
+  // the selected preset rather than a new host control - there is no
+  // deck-list UI this sprint, same call D53 made for `piles`.
+  const selectedPreset = PRESETS.find((p) => p.name === presetSelect.value);
   const deckConfig = {
     type: document.querySelector('#host-deck-type').value,
     numDecks: Number(document.querySelector('#host-num-decks').value),
     jokers: Number(document.querySelector('#host-jokers').value),
+    ...(selectedPreset?.deckList && { deckList: selectedPreset.deckList }),
   };
   // D46: GameConfig's first real field. D53: `piles` (renamed from
   // `zones` - D55, that name now belongs to the real Zone-entity list)
@@ -1107,6 +1125,7 @@ function renderGameFromView(view) {
       if (actionId === 'hide') return performSetPileOrientation(pileId, false);
       if (actionId === 'show') return performSetPileOrientation(pileId, true);
       if (actionId === 'remove') return performRemovePile(pileId);
+      if (actionId === 'untapAll') return performUntapAll(pileId);
       // D71 (US-74): advances to the NEXT kind in CHANGE_PILE_TYPE_CYCLE
       // (wrapping), a real cycle now - not the old zone<->discard-only
       // flip. `indexOf` returning -1 for a pile whose kind somehow
@@ -1384,6 +1403,16 @@ function performRemoveZone(zoneId) {
     try { dispatch({ type: 'REMOVE_ZONE', playerId: myId, zoneId }); }
     catch (error) { globalThis.alert(error.message); }
   } else session.send({ type: 'action', action: { type: 'REMOVE_ZONE', zoneId } });
+}
+
+// D79 (US-82): the untap step. Same host-authoritative / guest-relay
+// dispatch shape as every other pile action here.
+function performUntapAll(pileId) {
+  if (isSessionEnded) return;
+  if (role === 'host') {
+    try { dispatch({ type: 'UNTAP_ALL', playerId: myId, pileId }); }
+    catch (error) { globalThis.alert(error.message); }
+  } else session.send({ type: 'action', action: { type: 'UNTAP_ALL', pileId } });
 }
 
 function performChangePileType(pileId, kind) {

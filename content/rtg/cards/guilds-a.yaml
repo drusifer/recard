@@ -1,0 +1,497 @@
+# Recard the Gathering — gold cards, guilds A (US-78): WU, WB, WR, WG, UB.
+#
+# Six cards per guild, on a fixed curve so every guild deck lands inside
+# the balance bands without bespoke tuning:
+#   cmc2 x2   cmc3 x2   cmc4 x1   cmc5 x1
+#
+# A gold card is the ARGUMENT between two factions, not a blend of them.
+# Each guild's six cards should read as one side borrowing the other's
+# method and being slightly changed by it.
+
+# --- WU: the Oathwatch — Legion + Concord ------------------------------
+# Order applied to knowledge. Fliers and tempo: hold the sky, hold the
+# terms.
+
+- id: rtg-wu-001
+  name: Causeway Sentinel
+  cost: '{1}{W}'
+  type: Creature
+  subtype: Human Soldier
+  rarity: common
+  power: 2
+  toughness: 3
+  text: 'Vigilance'
+  art: >-
+    A Legion soldier standing watch at the rail of a white causeway over
+    turquoise water, spear grounded, mist below, ivory gold and cyan
+    palette, high fantasy oil painting, lone figure composition
+  flavor: >-
+    Her orders are to watch the water. Nobody has ever specified what she
+    is watching it for.
+
+- id: rtg-wu-002
+  name: Codify the Oath
+  cost: '{W}{U}'
+  type: Instant
+  rarity: uncommon
+  text: 'Counter target spell unless its controller pays {3}. Draw a card.'
+  art: >-
+    A Concord scribe stamping a glowing seal onto a floating sheet of
+    water-script while a Legion knight holds the line behind, cyan and
+    ivory gold palette, high fantasy oil painting, tense collaboration
+  flavor: >-
+    The Legion swears. The Concord files. Between the two of them, very
+    little gets to happen unexamined.
+
+- id: rtg-wu-003
+  name: Oathwatch Skyguard
+  cost: '{1}{W}{U}'
+  type: Creature
+  subtype: Human Knight
+  rarity: common
+  power: 2
+  toughness: 4
+  text: 'Flying, vigilance'
+  art: >-
+    An armoured knight with broad feathered wings hovering above a
+    causeway at dawn, spear level, sea mist curling below, ivory gold and
+    cool cyan palette, high fantasy oil painting, elevated angle
+  flavor: >-
+    "The sky is a border like any other. It simply has fewer places to
+    stand while you defend it."
+
+- id: rtg-wu-004
+  name: Terms of the Concord
+  cost: '{1}{W}{U}'
+  type: Enchantment
+  rarity: uncommon
+  text: 'Whenever a creature you control deals combat damage to a player, draw a card.'
+  art: >-
+    An enormous open treaty of layered water and gold leaf suspended in
+    air between a marble spire and a drowned archway, glyphs rotating,
+    ivory and cyan palette, high fantasy oil painting, formal symmetry
+  flavor: >-
+    Forty-one clauses. Thirty-nine of them describe what happens if the
+    other two are ever broken.
+
+- id: rtg-wu-005
+  name: Archivist of the Spire
+  cost: '{2}{W}{U}'
+  type: Creature
+  subtype: Merfolk Wizard
+  rarity: rare
+  power: 3
+  toughness: 4
+  text: 'Flying. When Archivist of the Spire enters the battlefield, draw a card.'
+  art: >-
+    A winged merfolk archivist in white and blue robes ascending a marble
+    spire's interior stair with brass cylinders orbiting them, shafts of
+    light, ivory and cyan palette, high fantasy oil painting
+  flavor: >-
+    The Legion gave the Concord a tower so their knowledge would be above
+    the water. Neither side has admitted who won that exchange.
+
+- id: rtg-wu-006
+  name: Judgment of the Oathwatch
+  cost: '{3}{W}{U}'
+  type: Sorcery
+  rarity: rare
+  text: 'Return all creatures your opponents control to their owners'' hands. Draw a card.'
+  art: >-
+    A colossal wave of golden-lit water rising along a causeway and
+    sweeping figures backward off it, banners and spears tumbling, ivory
+    gold and deep cyan palette, high fantasy oil painting, vast motion
+  flavor: >-
+    Not an execution. A remand. The Oathwatch is very careful about the
+    difference, and very quick about the procedure.
+
+# --- WB: the Ledger — Legion + Covens ----------------------------------
+# An oath and a debt are the same promise pointed different ways.
+# Lifegain and drain: pay forward, collect back.
+
+- id: rtg-wb-001
+  name: Ledger Penitent
+  cost: '{1}{W}'
+  type: Creature
+  subtype: Human Cleric
+  rarity: common
+  power: 2
+  toughness: 2
+  text: 'Lifelink'
+  art: >-
+    A hooded cleric in white with a red cord knotted at the wrist kneeling
+    at a marble bridge rail above black water, ivory and charcoal green
+    palette, high fantasy oil painting, solemn composition
+  flavor: >-
+    He took the oath to cancel the debt. The cord stayed on. Nobody has
+    been able to tell him which one he is wearing it for.
+
+- id: rtg-wb-002
+  name: Call in the Marker
+  cost: '{W}{B}'
+  type: Instant
+  rarity: uncommon
+  text: 'Destroy target creature. You gain 2 life.'
+  art: >-
+    A white-gloved hand and a mire-black hand closing together around a
+    snapping red cord, a figure crumpling beyond them, ivory and sick
+    green charcoal palette, high fantasy oil painting, sharp close shot
+  flavor: >-
+    "You swore. She lent. Today those turn out to have been the same
+    sentence."
+
+- id: rtg-wb-003
+  name: Ledger Enforcer
+  cost: '{1}{W}{B}'
+  type: Creature
+  subtype: Human Knight
+  rarity: common
+  power: 3
+  toughness: 3
+  text: 'Lifelink'
+  art: >-
+    A knight in tarnished white plate wading through fen water with a
+    ledger chained to their belt and a drawn blade, fog and dawn behind,
+    ivory and charcoal green palette, high fantasy oil painting
+  flavor: >-
+    The Legion sent her to audit the Covens. She has not returned, and the
+    audit is going extremely well.
+
+- id: rtg-wb-004
+  name: Settle All Accounts
+  cost: '{2}{W}{B}'
+  type: Sorcery
+  rarity: uncommon
+  text: 'Each opponent loses 3 life. You gain 3 life.'
+  art: >-
+    A vast pair of scales made of bone and white marble balancing over
+    black water, red cords draped across both pans, witchlight and dawn
+    light meeting, ivory and green charcoal palette, high fantasy painting
+  flavor: >-
+    The scales are not a metaphor and they are not a judgment. They are a
+    receipt, and they are always, always accurate.
+
+- id: rtg-wb-005
+  name: Ash and Oath, Reconciled
+  cost: '{2}{W}{B}'
+  type: Creature
+  subtype: Legendary Human Cleric
+  rarity: rare
+  power: 3
+  toughness: 4
+  text: 'Lifelink. Whenever you gain life, each opponent loses 1 life.'
+  art: >-
+    A figure in half-white half-black vestments standing on a marble bridge
+    with dawn on one side and fen fog on the other, arms open, ivory and
+    charcoal green palette, high fantasy oil painting, symmetrical
+  flavor: >-
+    She swore the Legion's oath at dawn and signed the Covens' terms at
+    dusk. She insists there was never any contradiction.
+
+- id: rtg-wb-006
+  name: The Debt Made Manifest
+  cost: '{3}{W}{B}'
+  type: Creature
+  subtype: Angel Horror
+  rarity: rare
+  power: 5
+  toughness: 5
+  text: 'Flying, lifelink'
+  art: >-
+    A winged figure whose armour is white marble on one side and knotted
+    red cord and bone on the other, descending through fog over a marble
+    bridge, ivory and sick green palette, high fantasy oil painting
+  flavor: >-
+    Every promise anyone ever failed to keep, gathered into one shape, and
+    given wings, and pointed at the debtor.
+
+# --- WR: the Charge — Legion + Clans -----------------------------------
+# Two peoples who both attack, for opposite reasons: duty and appetite.
+# The fastest guild deck in the set.
+
+- id: rtg-wr-001
+  name: Pass-Warden Outrider
+  cost: '{1}{R}'
+  type: Creature
+  subtype: Human Warrior
+  rarity: common
+  power: 3
+  toughness: 1
+  text: 'Haste'
+  art: >-
+    A rider in mismatched Legion plate and clan leathers galloping through
+    a narrow ash-lit pass, banner shortened into a lance pennant, ivory
+    and hot ember palette, high fantasy oil painting, motion
+  flavor: >-
+    The Legion issued her the armour. The Clans taught her to cut the
+    banner down so it would stop slowing her.
+
+- id: rtg-wr-002
+  name: Sound the Emberoath
+  cost: '{W}{R}'
+  type: Instant
+  rarity: uncommon
+  text: 'Creatures you control get +1/+0 and gain haste until end of turn.'
+  art: >-
+    A bone horn and a gold trumpet sounded together on a cliff edge, ash
+    and dawn light mixing, ranks surging below, ivory gold and ember
+    palette, high fantasy oil painting, low upward hero angle
+  flavor: >-
+    One horn means the oath. One means the hunt. Sounded together they
+    have only ever meant one thing.
+
+- id: rtg-wr-003
+  name: Emberoath Vanguard
+  cost: '{1}{W}{R}'
+  type: Creature
+  subtype: Human Knight
+  rarity: common
+  power: 3
+  toughness: 3
+  text: 'Haste'
+  art: >-
+    A knight in scorched white-gold plate charging with a burning sword
+    through drifting ash, cloak alight at the hem, ivory and hot ember
+    palette, high fantasy oil painting, dynamic diagonal
+  flavor: >-
+    The plate was ceremonial once. Two seasons in the Emberscar have made
+    it entirely practical.
+
+- id: rtg-wr-004
+  name: Hold the Pass
+  cost: '{1}{W}{R}'
+  type: Instant
+  rarity: uncommon
+  text: 'Hold the Pass deals 4 damage to target creature. You gain 2 life.'
+  art: >-
+    A lone armoured figure braced in a narrow pass as a wall of flame
+    rushes past on both sides of their raised shield, ivory gold and
+    ember palette, high fantasy oil painting, tight dramatic framing
+  flavor: >-
+    "Narrow ground is a gift. It means only one of them can be wrong
+    about me at a time."
+
+- id: rtg-wr-005
+  name: Ilka, Oathsworn Smith
+  cost: '{2}{W}{R}'
+  type: Creature
+  subtype: Legendary Human Artificer
+  rarity: rare
+  power: 4
+  toughness: 3
+  text: 'Haste. Whenever Ilka, Oathsworn Smith attacks, other attacking creatures get +1/+0 until end of turn.'
+  art: >-
+    A soot-streaked smith in a Legion tabard hammering a glowing blade on
+    a field anvil while armoured riders stream past, sparks everywhere,
+    ivory gold and ember palette, high fantasy oil painting
+  flavor: >-
+    "You swear on a sword. I make the sword. Do not tell me my part of
+    that is the ceremonial one."
+
+- id: rtg-wr-006
+  name: The Dawnfire Charge
+  cost: '{3}{W}{R}'
+  type: Sorcery
+  rarity: rare
+  text: 'Create three 2/2 white Soldier creature tokens with haste. They gain first strike until end of turn.'
+  art: >-
+    A wedge of armoured figures erupting from a burning pass into sunrise,
+    ash and gold light behind them, spears levelled, ivory gold and ember
+    palette, high fantasy oil painting, wide sweeping charge
+  flavor: >-
+    They swore at dawn and set the pass alight behind them, so that
+    turning back would require an argument with the fire.
+
+# --- WG: the Grove Oath — Legion + Wardens -----------------------------
+# The one oath the forest agreed to remember. Wide boards of creatures
+# that grow together.
+
+- id: rtg-wg-001
+  name: Waystone Keeper
+  cost: '{1}{G}'
+  type: Creature
+  subtype: Elf Druid
+  rarity: common
+  power: 2
+  toughness: 2
+  text: 'Vigilance'
+  art: >-
+    An elf druid resting one palm on a white stone waystone wreathed in
+    fern and moss, dappled canopy light, deep emerald and warm ivory
+    palette, high fantasy oil painting, quiet composition
+  flavor: >-
+    She does not guard the stone. She keeps it legible, which the
+    Thornwild considers the greater service.
+
+- id: rtg-wg-002
+  name: Oath of Root and Banner
+  cost: '{W}{G}'
+  type: Enchantment
+  rarity: uncommon
+  text: 'Creatures you control get +1/+1.'
+  art: >-
+    A Legion banner and a living branch bound together around a white
+    waystone with green cord, sunlight through canopy, ivory gold and
+    deep emerald palette, high fantasy oil painting, ceremonial
+  flavor: >-
+    Sworn once, by both, in a meadow. The Thornwild has kept its half
+    without ever being asked again.
+
+- id: rtg-wg-003
+  name: Grovesworn Cavalier
+  cost: '{1}{W}{G}'
+  type: Creature
+  subtype: Human Knight
+  rarity: common
+  power: 3
+  toughness: 3
+  text: 'Vigilance, trample'
+  art: >-
+    A knight in white plate overgrown with living moss and small ferns
+    riding an antlered forest beast through a sunlit glade, ivory gold and
+    emerald palette, high fantasy oil painting, three-quarter view
+  flavor: >-
+    The moss came with the oath. It grows a little further up the plate
+    every year, and nobody has tried to remove it.
+
+- id: rtg-wg-004
+  name: Meadowmuster
+  cost: '{1}{W}{G}'
+  type: Sorcery
+  rarity: uncommon
+  text: 'Create two 2/2 green Warden creature tokens with vigilance.'
+  art: >-
+    Two figures of woven branch moss and white cloth rising out of a
+    sunlit meadow floor, ferns unfurling around their legs, warm gold and
+    deep emerald palette, high fantasy oil painting, emergence
+  flavor: >-
+    The meadow does not raise soldiers. It raises witnesses, and it has
+    noticed that these two things overlap.
+
+- id: rtg-wg-005
+  name: Oakenmoot, Oath-Witness
+  cost: '{2}{W}{G}'
+  type: Creature
+  subtype: Legendary Treefolk Druid
+  rarity: rare
+  power: 4
+  toughness: 5
+  text: 'Vigilance. Other creatures you control get +1/+1.'
+  art: >-
+    A colossal moss-furred treefolk standing over a white waystone with
+    small armoured figures gathered at its roots, sun shafts through
+    canopy, emerald and ivory gold palette, high fantasy oil painting
+  flavor: >-
+    "I did not agree to protect you. I agreed to remember that you asked.
+    You have been surprised by how much that covers."
+
+- id: rtg-wg-006
+  name: The Grove Rises
+  cost: '{3}{W}{G}'
+  type: Sorcery
+  rarity: rare
+  text: 'Creatures you control get +2/+2 and gain trample until end of turn.'
+  art: >-
+    An entire sunlit meadow surging upward as roots and armoured figures
+    advance together in one line, banners and branches mixed, ivory gold
+    and deep emerald palette, high fantasy oil painting, panoramic
+  flavor: >-
+    A hundred trunks cut, once, long ago. The Thornwild counted, and then
+    it waited, and then it brought friends.
+
+# --- UB: the Deep Bargain — Concord + Covens ---------------------------
+# Knowledge bought on credit. Control that wins by attrition and by
+# knowing exactly what the other player has.
+
+- id: rtg-ub-001
+  name: Bargain Broker
+  cost: '{1}{U}'
+  type: Creature
+  subtype: Merfolk Warlock
+  rarity: common
+  power: 1
+  toughness: 3
+  text: 'When Bargain Broker enters the battlefield, each player draws a card, then each player discards a card.'
+  art: >-
+    A merfolk in mire-stained Concord robes seated at a stone table half
+    underwater, sliding a sealed brass cylinder across it, teal and sick
+    green palette, high fantasy oil painting, conspiratorial
+  flavor: >-
+    "An even trade," he says, every time, and it always is, and it is
+    always somehow his idea.
+
+- id: rtg-ub-002
+  name: Terms of the Deep
+  cost: '{U}{B}'
+  type: Instant
+  rarity: uncommon
+  text: 'Counter target spell. You lose 2 life.'
+  art: >-
+    A wall of black water rising to swallow a spell's light entirely,
+    witchlight glyphs burning out one by one along its face, deep teal and
+    charcoal palette, high fantasy oil painting, ominous stillness
+  flavor: >-
+    The Concord no longer pays for knowledge with coin. The Covens
+    stopped accepting it a long time ago.
+
+- id: rtg-ub-003
+  name: Drowned Ledgerkeeper
+  cost: '{1}{U}{B}'
+  type: Creature
+  subtype: Zombie Wizard
+  rarity: common
+  power: 3
+  toughness: 2
+  text: 'When Drowned Ledgerkeeper enters the battlefield, target opponent discards a card.'
+  art: >-
+    A waterlogged robed figure with witchlight in its eye sockets holding
+    an open sodden ledger, standing in black water among drowned archways,
+    teal and sick green palette, high fantasy oil painting
+  flavor: >-
+    He was a Concord archivist. He is still doing the job. Nobody has had
+    the nerve to tell him the terms have changed.
+
+- id: rtg-ub-004
+  name: Foreclose
+  cost: '{1}{U}{B}'
+  type: Instant
+  rarity: uncommon
+  text: 'Return target creature to its owner''s hand. That creature''s controller discards a card.'
+  art: >-
+    A figure being pulled backward into black water by cords of witchlight
+    while their possessions float up out of frame, teal and charcoal
+    palette, high fantasy oil painting, downward motion
+  flavor: >-
+    Repossession is such an ugly word. The Covens prefer to say the item
+    has been recalled for study.
+
+- id: rtg-ub-005
+  name: What the Water Kept
+  cost: '{2}{U}{B}'
+  type: Sorcery
+  rarity: rare
+  text: 'Return target creature card from your graveyard to the battlefield. Draw a card. You lose 1 life.'
+  art: >-
+    A drowned figure rising upright out of black water with witchlight
+    pouring from its mouth while brass cylinders float up around it, deep
+    teal and sick green palette, high fantasy oil painting
+  flavor: >-
+    The Concord sank the city to keep its knowledge. It did not occur to
+    them that the water would want a share.
+
+- id: rtg-ub-006
+  name: The Price of Knowing
+  cost: '{3}{U}{B}'
+  type: Creature
+  subtype: Horror
+  rarity: rare
+  power: 5
+  toughness: 5
+  text: 'Flying. When The Price of Knowing enters the battlefield, each opponent discards two cards.'
+  art: >-
+    An immense pale winged horror composed of drifting pages brass
+    cylinders and knotted red cord, rising from a flooded archive, teal
+    and sick green palette, high fantasy oil painting, dread scale
+  flavor: >-
+    They asked what was at the bottom. Something at the bottom heard the
+    question, and considered it an invitation.

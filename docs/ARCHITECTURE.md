@@ -4000,3 +4000,122 @@ exactly - the D73 gap is closed.
 
 **Where the full text lives:** this entry; `src/state.js`'s
 `makeStandaloneZone`, `CREATE_ZONE`, `MOVE_PILE`.
+
+### D76. Card faces are a registry, not a branch in `cardElement`
+
+`cardElement` (`src/ui.js`) hardcoded rank/suit/JOKER. A Recard the
+Gathering card needs a name, mana cost, art, type line, rules text and
+power/toughness — nothing rank/suit can express.
+
+**Decided:** a `CARD_FACES` registry (`src/cards/cardFaces.js`)
+dispatched on `card.face`, defaulting to `'standard'`. `cardElement`
+becomes a thin dispatcher; the existing rank/suit rendering moves to
+`StandardCardFace` **verbatim**, so every pre-existing preset renders
+through literally the same code.
+
+**Rejected:** branching on card shape inside `cardElement` — precisely
+what would have rotted the table simulation the RtG brief said must not
+change. Same registry pattern as `PILE_TYPES` (D42), `ZONE_TYPES` (D56),
+`DECK_TYPES` (D47) and `ACTIONS` (D44).
+
+A face renders **content only**. The card shell (`<button class="card">`,
+`dataset.cardId`, and every drag/click/rotate behaviour) stays in
+`ui.js`, identical for all faces — that is what makes a new face
+incapable of breaking table interaction.
+
+### D77. Card content is an offline pipeline, not an in-app builder
+
+**Decided (user):** no interactive deck building in recard. Card data is
+authored as YAML, compiled to one committed ES module, and consumed as
+static data:
+`content/rtg/**.yaml` → `make cards` → `src/decks/rtg/catalog.js` →
+`make art` → `assets/cards/rtg/*.svg`.
+
+`cmc`, `colors` and `symbols` are **derived** from each card's cost
+string, never authored — hand-authoring them is exactly how a card's
+printed cost and its curve position drift apart. Output lands in `src/`
+and `assets/`, never `build/` (gitignored).
+
+Every card carries an `art:` string written as a real image-generation
+prompt. The SVG generator does not read it; it draws deterministic
+heraldic art from the card's own attributes. The prompt is the interface
+to real illustration later, so the pool needs no re-authoring then.
+
+**One compiled artifact**, an ES module rather than JSON: the browser
+imports it directly (no fetch, no import assertion) and so does every
+Node tool, instead of a `.json` for tooling plus a `.js` for the app
+that could disagree.
+
+### D78. Deck balance is a lint check, not a matter of taste
+
+**Decided:** `make lint-decks` fails the build unless every deck
+satisfies size 60, ≤4 copies of a nonland, its archetype's land band
+(aggro 20-23 / midrange 24-25 / control 25-27), a left-skewed curve
+(≥40% of spells at cmc≤2, ≤15% at cmc≥5), colour identity, and ≥15
+sources of each colour in a two-colour deck. The bands are asserted by
+their own test — they are the entire basis of the check and are exactly
+the kind of number that gets quietly "tidied" into something unsourced.
+
+**Rejected:** asserting decks are balanced. This project's own retros
+warn against asserting rather than measuring, and `lint:design` already
+set the precedent for layout.
+
+It earned this immediately: the first guild manabase ran 8 copies of one
+dual land. A dual is not a basic land, so the real 4-copy limit applies,
+and 10 of 15 decks failed. Fixed by printing a **second dual cycle**
+(the Wellsprings) — Magic's own answer — rather than lowering the source
+minimum or pushing every guild deck to 26 lands, which would have turned
+all ten into control decks.
+
+### D79. Battlefield / Exile / Stack are real pile types, and `UNTAP_ALL`
+
+**Decided:** three new `PILE_TYPES` entries with genuinely different
+behaviour, not renames:
+
+- **battlefield** — refuses `split`/`take`. Every other pile is a stack
+  of interchangeable cards you can cut or scoop; a battlefield is a set
+  of distinct game objects each with its own tapped state.
+- **exile** — inherits `DiscardPile`'s drop-only shape (they are the
+  same mechanism) but drops `take`: a discard pile can legitimately be
+  scooped back up, exile by definition cannot.
+- **stack** — LIFO, so a new spell cannot splice underneath an older
+  one, which a `zone` pile's halo-splicing insert would have allowed.
+
+**`UNTAP_ALL`** is a new action, not a client-side loop of `ROTATE_CARD`:
+untapping a wide board would otherwise be a burst of N networked actions,
+and a dropped one leaves the board half-untapped with no way to tell.
+
+Tapping itself needed nothing new — `rotate` already existed.
+
+### D80. `deckList`: an additive parameter on `buildDeck`
+
+**Decided:** `buildDeck({ deckList })` names which catalogued list a deck
+type builds. Ignored by `standard`/`pinochle`, which is asserted by test,
+so no existing caller changes behaviour.
+
+Each physical card gets a unique **instance id** (`rtg-w-001#0..3`) and
+keeps its **printed id** in `cardId`. `state.js` keys on `card.id`, so
+four copies sharing one id would move as a single card; art is per
+printed card, so it keys off `cardId`.
+
+The full printed data travels on the card, exactly as a standard card
+carries its own rank/suit — deliberately the same shape the table
+already replicates and redacts, rather than a catalog lookup bolted into
+the render path.
+
+### D81. A declared pile may be pre-stocked, and may name its own id
+
+**Decided:** a `GameConfig.piles` declaration may carry `deckList` (build
+and shuffle a deck into it) and `id` (name the pile explicitly). Both
+additive — a declaration with neither behaves exactly as before.
+
+Both were forced by "all the decks on the table": a declared deck pile
+with no cards is just a label, and pile ids were derived from `kind`, so
+fifteen `deck` declarations would all have collapsed onto one id.
+
+**Known cost (Smith Gate-1 condition C3, flagged not solved):** the RtG
+preset produces the most crowded table any preset makes — 14 deck panels
+plus both players' zones. The layout keeps them clear of the seat ring,
+but this deserves a real UX pass. Life totals also start at 0 rather
+than 20; the rules entry tells players to set them, since a
+starting-score field would be a new preset feature.

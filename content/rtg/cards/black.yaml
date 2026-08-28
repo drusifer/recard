@@ -1,0 +1,151 @@
+# Recard the Gathering — Black: the Mirefen Covens (US-77).
+#
+# Bargainers. Every gift is a debt, and the covens never lie about the
+# price — they simply never mention when it comes due. Mechanically a
+# MIDRANGE deck: efficient removal, cards that trade life for advantage,
+# and grinding recursion. Deliberate mirror of White's Legion, where a
+# debt is something you pay forward rather than something owed to you.
+#
+# Curve (9 cards x4 = 36 spells, 24 lands):
+#   cmc1 x1  cmc2 x3  cmc3 x2  cmc4 x2  cmc5 x1
+
+- id: rtg-b-001
+  name: Mirefen Debtor
+  cost: '{B}'
+  type: Creature
+  subtype: Human Warlock
+  rarity: common
+  power: 2
+  toughness: 1
+  text: ''
+  art: >-
+    A gaunt figure wading knee-deep in black swamp water with a knotted
+    red cord tied around one wrist, glancing back over their shoulder,
+    charcoal and sickly green palette, high fantasy oil painting
+  flavor: >-
+    The cord is not a decoration and it is not a punishment. It is a
+    receipt.
+
+- id: rtg-b-002
+  name: Bargain in the Reeds
+  cost: '{1}{B}'
+  type: Sorcery
+  rarity: common
+  text: 'You draw two cards and you lose 2 life.'
+  art: >-
+    Two silhouetted hands clasping over still black water between tall dead
+    reeds, faint witchlight rising from the handshake, desaturated charcoal
+    and green palette, high fantasy oil painting, intimate close composition
+  flavor: >-
+    "Ask for what you want, dear. Not for what you think you can afford —
+    that only wastes both our evenings."
+
+- id: rtg-b-003
+  name: Hollow the Vein
+  cost: '{1}{B}'
+  type: Instant
+  rarity: common
+  text: 'Target creature gets -3/-3 until end of turn.'
+  art: >-
+    An armoured figure buckling as black veins spread visibly up their neck
+    and their sword arm goes slack, green fog curling low, charcoal and
+    sick green palette, high fantasy oil painting, unsettling close shot
+  flavor: >-
+    It takes nothing from you that you were using. That is what makes it
+    such a bargain.
+
+- id: rtg-b-004
+  name: Covenkeeper's Familiar
+  cost: '{1}{B}'
+  type: Creature
+  subtype: Bat Horror
+  rarity: uncommon
+  power: 2
+  toughness: 2
+  text: 'Flying'
+  art: >-
+    A ragged pale bat-thing with too many joints perched on a cypress
+    branch above black water, witchlight caught in its eyes, drifting fog,
+    bone and sick green palette, high fantasy oil painting
+  flavor: >-
+    It carries the terms of the arrangement in its mouth. It has never once
+    dropped them.
+
+- id: rtg-b-005
+  name: Mirefen Collector
+  cost: '{2}{B}'
+  type: Creature
+  subtype: Human Warlock
+  rarity: uncommon
+  power: 3
+  toughness: 2
+  text: 'Whenever another creature you control dies, each opponent loses 1 life.'
+  art: >-
+    A tall figure in a wide black hat wading through the mire with a ledger
+    held dry above the water, bone-pale roots parting ahead of them,
+    charcoal and green palette, high fantasy oil painting, ominous stride
+  flavor: >-
+    She is unfailingly polite, she is never early, and she has never in
+    four hundred years been late.
+
+- id: rtg-b-006
+  name: Sever the Cord
+  cost: '{2}{B}'
+  type: Instant
+  rarity: common
+  text: 'Destroy target creature. Its controller gains 2 life.'
+  art: >-
+    A knotted red cord snapping under a curved black blade, the severed
+    ends whipping apart into smoke, a figure collapsing out of frame,
+    charcoal red and green palette, high fantasy oil painting
+  flavor: >-
+    Debts can be settled early. The covens permit it, and they remember
+    exactly who asked.
+
+- id: rtg-b-007
+  name: Witchlight Procession
+  cost: '{3}{B}'
+  type: Creature
+  subtype: Zombie
+  rarity: common
+  power: 4
+  toughness: 3
+  text: 'When Witchlight Procession enters the battlefield, each player discards a card.'
+  art: >-
+    A shambling line of pale drowned figures wading in single file through
+    the fen, each holding a small green witchlight, mist to the waist,
+    charcoal and luminous green palette, high fantasy oil painting
+  flavor: >-
+    They are not being punished. They are simply walking to where the debt
+    is kept, as agreed, at last.
+
+- id: rtg-b-008
+  name: Grandmother Ash
+  cost: '{3}{B}'
+  type: Creature
+  subtype: Legendary Human Warlock
+  rarity: rare
+  power: 3
+  toughness: 4
+  text: 'Whenever Grandmother Ash deals combat damage to a player, return target creature card from your graveyard to your hand.'
+  art: >-
+    A small ancient woman seated on a cypress root above black water,
+    smiling, hands folded, dozens of red cords trailing from her fingers
+    into the mire, charcoal and green palette, high fantasy oil painting
+  flavor: >-
+    "I have never taken a thing that was not offered. Sit down, dear.
+    Have you eaten?"
+
+- id: rtg-b-009
+  name: Reckoning Comes Due
+  cost: '{4}{B}'
+  type: Sorcery
+  rarity: rare
+  text: 'Destroy target creature. Return target creature card from your graveyard to the battlefield.'
+  art: >-
+    A vast spectral hand of green witchlight rising from black water to
+    close around a fleeing figure while a drowned shape stands up behind
+    it, charcoal and green palette, high fantasy oil painting, dread scale
+  flavor: >-
+    Nobody in the Mirefen is surprised when it comes due. They are only
+    ever surprised that they had forgotten it could.

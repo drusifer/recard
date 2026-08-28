@@ -5,32 +5,29 @@ import {
 } from './pileActions.js';
 import { seatPosition } from './seating.js';
 import { ZONE_TYPES } from './zones/zoneTypes.js';
+import { faceFor } from './cards/cardFaces.js';
 
-const SUIT_SYMBOL = { clubs: '♣', diamonds: '♦', hearts: '♥', spades: '♠' };
-const RED_SUITS = new Set(['diamonds', 'hearts']);
-
+/**
+ * The card SHELL, shared by every card face (D76). The `<button>`, its
+ * `dataset.cardId`, and the click/disabled wiring are identical for all
+ * faces - only the CONTENT is dispatched, via `CARD_FACES`. That split
+ * is what lets a new card type (Recard the Gathering) exist without the
+ * table simulation changing: nothing about how a card is dragged,
+ * clicked, rotated or targeted lives in a face.
+ *
+ * The rank/suit rendering that used to be inline here now lives in
+ * `StandardCardFace` unchanged, and is what any card without a `face`
+ * field still gets.
+ */
 function cardElement(card, { onClick, disabled } = {}) {
   const element = document.createElement('button');
   element.type = 'button';
-  element.className = 'card' + (RED_SUITS.has(card.suit) ? ' card-red' : '');
+  const face = faceFor(card);
+  const extraClass = face.className?.(card) ?? '';
+  element.className = 'card' + (extraClass ? ` ${extraClass}` : '');
   element.dataset.cardId = card.id;
 
-  if (card.rank === 'JOKER') {
-    const pip = document.createElement('span');
-    pip.className = 'card-pip';
-    pip.textContent = 'JOKER';
-    pip.style.fontSize = '0.65rem';
-    element.append(pip);
-  } else {
-    const symbol = SUIT_SYMBOL[card.suit];
-    const corner = document.createElement('span');
-    corner.className = 'card-corner';
-    corner.textContent = `${card.rank}\u{A0}${symbol}`; // non-breaking space - keeps "10 ♠" from wrapping mid-corner
-    const pip = document.createElement('span');
-    pip.className = 'card-pip';
-    pip.textContent = symbol;
-    element.append(corner, pip);
-  }
+  face.render(element, card);
 
   if (onClick && !disabled) element.addEventListener('click', () => onClick(card));
   else element.disabled = true;
@@ -932,7 +929,11 @@ export function renderPileShell(container, zone, allZones, options, buildRow) {
       // US-61 (Sprint 23), Smith's ruling (Phase 70): `take` confirms
       // unconditionally EXCEPT a 1-card pile, where it's identical in
       // effect to that card's own un-confirmed single-card `pickup`.
-      noConfirm: (zone.cards?.length ?? zone.count) === 1 ? ['take'] : [],
+      // `remove` (direct user request, 2026-08-27): "it's already empty
+      // so stop asking" - `disabledPileActionsFor` only ever ENABLES
+      // this button when the pile is already empty, so the confirm was
+      // asking about a consequence (losing cards) that can't happen.
+      noConfirm: [...((zone.cards?.length ?? zone.count) === 1 ? ['take'] : []), 'remove'],
       onAction: (id) => options.onPileAction?.(zone.id, id),
       // *nit (2026-08-26): rename affordance, any player.
       rawName: zone.name,

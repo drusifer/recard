@@ -85,7 +85,11 @@ test('Spit preset: 2 shared rank-adjacent piles + a cascade per player', () => {
 });
 
 test('every preset without a declared piles field is unaffected (undefined, not [])', () => {
-  const declaresPiles = new Set(['Solitaire', 'Spit']);
+  // US-83 joins Solitaire/Spit as a preset that declares a starting
+  // table. The guard's point is that presets which DON'T declare piles
+  // stay untouched (`undefined`, never `[]`), so new declaring presets
+  // get added here deliberately rather than the assertion being relaxed.
+  const declaresPiles = new Set(['Solitaire', 'Spit', 'Recard the Gathering']);
   for (const preset of PRESETS) {
     if (declaresPiles.has(preset.name)) continue;
     assert.equal(preset.piles, undefined, `${preset.name} should not declare piles`);

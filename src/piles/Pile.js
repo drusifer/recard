@@ -127,15 +127,20 @@ export class Pile {
 
   /**
    * Which of this pile's own offered actions are disabled by its
-   * current state (e.g. `DeckPile`'s `deal` at zero cards). `remove`/
-   * `changePileType` (D62/D63) are empty-only at the reducer - *nit,
-   * direct user request ("don't enable X unless empty"): disable them
-   * here too instead of letting a click reach the reducer's block
-   * message every time on a non-empty pile (Nielsen #5, prevent the
-   * error rather than catch it after the fact).
+   * current state (e.g. `DeckPile`'s `deal` at zero cards). `remove`
+   * (D62) is empty-only at the reducer - *nit, direct user request
+   * ("don't enable X unless empty"): disabled here too instead of
+   * letting a click reach the reducer's block message every time on a
+   * non-empty pile (Nielsen #5, prevent the error rather than catch it
+   * after the fact).
+   *
+   * `changePileType` was disabled here the same way under D62/D63, but
+   * direct user request (2026-08-27) reopened it on non-empty piles -
+   * the reducer's own empty-only guard is gone too, see `state.js`'s
+   * `CHANGE_PILE_TYPE` doc comment for the risk that reopens.
    */
   static disabledActions(count) {
-    return count > 0 ? ['remove', 'changePileType'] : [];
+    return count > 0 ? ['remove'] : [];
   }
 
   /** D43: the write-side authorization check is the READ-side offer

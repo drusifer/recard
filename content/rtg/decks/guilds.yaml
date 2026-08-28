@@ -1,0 +1,246 @@
+# Recard the Gathering — the ten guild (two-colour) decks (US-78).
+#
+# Every guild deck uses the same skeleton, so the ten differ by CONTENT
+# rather than by construction — which is what makes them comparable at a
+# table, and what makes the balance linter meaningful across all of them:
+#
+#   24 lands   8 basic A + 8 basic B + 4 dual + 4 Wellspring
+#              -> 16 sources of each colour, clearing the 15-source
+#              minimum with one to spare.
+#
+#              TWO dual cycles, not one, because a dual is not a basic
+#              land and so is limited to 4 copies (real Magic rule, and
+#              `make lint-decks` caught the first draft trying to run 8).
+#              One cycle alone caps a 24-land deck at 14 sources — one
+#              short — and the alternatives were pushing every guild deck
+#              to 26 lands (turning them all into control decks, wrong
+#              for the likes of the Emberoath) or lowering the source
+#              minimum. Printing a second cycle is Magic's own answer.
+#   24 gold    the guild's own 6 cards, 4 copies each
+#   12 mono    3 cheap cards borrowed from the two parent colour pools
+#   ---------
+#   60 cards, midrange band (24-25 lands), curve 20 cheap / 4 expensive
+#
+# The three borrowed mono cards are always cmc<=2: the gold cards supply
+# the guild's identity and its top end, and the borrowed cards supply the
+# early plays that keep the curve left-skewed.
+
+- id: rtg-guild-wu
+  name: The Oathwatch
+  colors: [W, U]
+  archetype: midrange
+  description: >-
+    Order applied to knowledge. Hold the sky with vigilant fliers, answer
+    what matters, and draw an extra card every time the board connects.
+  cards:
+    - {id: rtg-land-plains, count: 8}
+    - {id: rtg-land-island, count: 8}
+    - {id: rtg-dual-wu, count: 4}
+    - {id: rtg-well-wu, count: 4}
+    - {id: rtg-wu-001, count: 4}
+    - {id: rtg-wu-002, count: 4}
+    - {id: rtg-wu-003, count: 4}
+    - {id: rtg-wu-004, count: 4}
+    - {id: rtg-wu-005, count: 4}
+    - {id: rtg-wu-006, count: 4}
+    - {id: rtg-w-002, count: 4}
+    - {id: rtg-u-002, count: 4}
+    - {id: rtg-u-003, count: 4}
+
+- id: rtg-guild-wb
+  name: The Ledger
+  colors: [W, B]
+  archetype: midrange
+  description: >-
+    An oath and a debt pointed at each other. Gain life on every trade,
+    and turn each point gained into a point drained.
+  cards:
+    - {id: rtg-land-plains, count: 8}
+    - {id: rtg-land-swamp, count: 8}
+    - {id: rtg-dual-wb, count: 4}
+    - {id: rtg-well-wb, count: 4}
+    - {id: rtg-wb-001, count: 4}
+    - {id: rtg-wb-002, count: 4}
+    - {id: rtg-wb-003, count: 4}
+    - {id: rtg-wb-004, count: 4}
+    - {id: rtg-wb-005, count: 4}
+    - {id: rtg-wb-006, count: 4}
+    - {id: rtg-w-002, count: 4}
+    - {id: rtg-b-001, count: 4}
+    - {id: rtg-b-003, count: 4}
+
+- id: rtg-guild-wr
+  name: The Emberoath
+  colors: [W, R]
+  archetype: midrange
+  description: >-
+    Duty and appetite, both pointed downhill. The most aggressive guild
+    deck: haste, anthems, and a board that arrives all at once.
+  cards:
+    - {id: rtg-land-plains, count: 8}
+    - {id: rtg-land-mountain, count: 8}
+    - {id: rtg-dual-wr, count: 4}
+    - {id: rtg-well-wr, count: 4}
+    - {id: rtg-wr-001, count: 4}
+    - {id: rtg-wr-002, count: 4}
+    - {id: rtg-wr-003, count: 4}
+    - {id: rtg-wr-004, count: 4}
+    - {id: rtg-wr-005, count: 4}
+    - {id: rtg-wr-006, count: 4}
+    - {id: rtg-w-001, count: 4}
+    - {id: rtg-r-001, count: 4}
+    - {id: rtg-r-002, count: 4}
+
+- id: rtg-guild-wg
+  name: The Grove Oath
+  colors: [W, G]
+  archetype: midrange
+  description: >-
+    The one oath the forest agreed to remember. Go wide with vigilant
+    bodies and tokens, then make the whole board bigger at once.
+  cards:
+    - {id: rtg-land-plains, count: 8}
+    - {id: rtg-land-forest, count: 8}
+    - {id: rtg-dual-wg, count: 4}
+    - {id: rtg-well-wg, count: 4}
+    - {id: rtg-wg-001, count: 4}
+    - {id: rtg-wg-002, count: 4}
+    - {id: rtg-wg-003, count: 4}
+    - {id: rtg-wg-004, count: 4}
+    - {id: rtg-wg-005, count: 4}
+    - {id: rtg-wg-006, count: 4}
+    - {id: rtg-w-002, count: 4}
+    - {id: rtg-g-001, count: 4}
+    - {id: rtg-g-003, count: 4}
+
+- id: rtg-guild-ub
+  name: The Deep Bargain
+  colors: [U, B]
+  archetype: midrange
+  description: >-
+    Knowledge bought on credit. Strip the opponent's hand, answer the
+    board, and rebuy everything the water kept.
+  cards:
+    - {id: rtg-land-island, count: 8}
+    - {id: rtg-land-swamp, count: 8}
+    - {id: rtg-dual-ub, count: 4}
+    - {id: rtg-well-ub, count: 4}
+    - {id: rtg-ub-001, count: 4}
+    - {id: rtg-ub-002, count: 4}
+    - {id: rtg-ub-003, count: 4}
+    - {id: rtg-ub-004, count: 4}
+    - {id: rtg-ub-005, count: 4}
+    - {id: rtg-ub-006, count: 4}
+    - {id: rtg-u-002, count: 4}
+    - {id: rtg-b-001, count: 4}
+    - {id: rtg-b-003, count: 4}
+
+- id: rtg-guild-ur
+  name: The Steam Accord
+  colors: [U, R]
+  archetype: midrange
+  description: >-
+    Two forces cancelling each other loudly and forever. Cheap spells
+    that all reward casting more cheap spells.
+  cards:
+    - {id: rtg-land-island, count: 8}
+    - {id: rtg-land-mountain, count: 8}
+    - {id: rtg-dual-ur, count: 4}
+    - {id: rtg-well-ur, count: 4}
+    - {id: rtg-ur-001, count: 4}
+    - {id: rtg-ur-002, count: 4}
+    - {id: rtg-ur-003, count: 4}
+    - {id: rtg-ur-004, count: 4}
+    - {id: rtg-ur-005, count: 4}
+    - {id: rtg-ur-006, count: 4}
+    - {id: rtg-u-002, count: 4}
+    - {id: rtg-r-002, count: 4}
+    - {id: rtg-r-003, count: 4}
+
+- id: rtg-guild-ug
+  name: The Tidegrowth
+  colors: [U, G]
+  archetype: midrange
+  description: >-
+    Study and cultivation, each unaware of the other's hand in it. Ramp
+    and draw into creatures nothing blocks profitably.
+  cards:
+    - {id: rtg-land-island, count: 8}
+    - {id: rtg-land-forest, count: 8}
+    - {id: rtg-dual-ug, count: 4}
+    - {id: rtg-well-ug, count: 4}
+    - {id: rtg-ug-001, count: 4}
+    - {id: rtg-ug-002, count: 4}
+    - {id: rtg-ug-003, count: 4}
+    - {id: rtg-ug-004, count: 4}
+    - {id: rtg-ug-005, count: 4}
+    - {id: rtg-ug-006, count: 4}
+    - {id: rtg-u-001, count: 4}
+    - {id: rtg-g-001, count: 4}
+    - {id: rtg-g-003, count: 4}
+
+- id: rtg-guild-br
+  name: The Ashcord
+  colors: [B, R]
+  archetype: midrange
+  description: >-
+    Everything is either owed or burning. Spend your own board as
+    ammunition and close the door from across the table.
+  cards:
+    - {id: rtg-land-swamp, count: 8}
+    - {id: rtg-land-mountain, count: 8}
+    - {id: rtg-dual-br, count: 4}
+    - {id: rtg-well-br, count: 4}
+    - {id: rtg-br-001, count: 4}
+    - {id: rtg-br-002, count: 4}
+    - {id: rtg-br-003, count: 4}
+    - {id: rtg-br-004, count: 4}
+    - {id: rtg-br-005, count: 4}
+    - {id: rtg-br-006, count: 4}
+    - {id: rtg-b-001, count: 4}
+    - {id: rtg-r-001, count: 4}
+    - {id: rtg-r-002, count: 4}
+
+- id: rtg-guild-bg
+  name: The Rootdebt
+  colors: [B, G]
+  archetype: midrange
+  description: >-
+    The forest remembers and the mire keeps receipts. Trade freely —
+    nothing you lose is ever really gone.
+  cards:
+    - {id: rtg-land-swamp, count: 8}
+    - {id: rtg-land-forest, count: 8}
+    - {id: rtg-dual-bg, count: 4}
+    - {id: rtg-well-bg, count: 4}
+    - {id: rtg-bg-001, count: 4}
+    - {id: rtg-bg-002, count: 4}
+    - {id: rtg-bg-003, count: 4}
+    - {id: rtg-bg-004, count: 4}
+    - {id: rtg-bg-005, count: 4}
+    - {id: rtg-bg-006, count: 4}
+    - {id: rtg-b-001, count: 4}
+    - {id: rtg-g-001, count: 4}
+    - {id: rtg-g-003, count: 4}
+
+- id: rtg-guild-rg
+  name: The Wildfire
+  colors: [R, G]
+  archetype: midrange
+  description: >-
+    Burn the slope, regrow the slope, both entirely sincere. The largest
+    and fastest creatures in the set, with trample to finish.
+  cards:
+    - {id: rtg-land-mountain, count: 8}
+    - {id: rtg-land-forest, count: 8}
+    - {id: rtg-dual-rg, count: 4}
+    - {id: rtg-well-rg, count: 4}
+    - {id: rtg-rg-001, count: 4}
+    - {id: rtg-rg-002, count: 4}
+    - {id: rtg-rg-003, count: 4}
+    - {id: rtg-rg-004, count: 4}
+    - {id: rtg-rg-005, count: 4}
+    - {id: rtg-rg-006, count: 4}
+    - {id: rtg-r-001, count: 4}
+    - {id: rtg-g-001, count: 4}
+    - {id: rtg-g-003, count: 4}

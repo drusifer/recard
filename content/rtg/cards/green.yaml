@@ -1,0 +1,153 @@
+# Recard the Gathering — Green: the Thornwild Wardens (US-77).
+#
+# The forest's memory, and its grudge. Mechanically a MIDRANGE deck:
+# mana acceleration into large creatures, plus fight effects as removal.
+# The Wardens' throughline is that the forest forgives individual harm
+# and never forgets a pattern of it.
+#
+# Curve (9 cards x4 = 36 spells, 24 lands):
+#   cmc1 x1  cmc2 x3  cmc3 x2  cmc4 x2  cmc5 x1
+
+- id: rtg-g-001
+  name: Thornwild Seedling
+  cost: '{G}'
+  type: Creature
+  subtype: Plant
+  rarity: common
+  power: 1
+  toughness: 2
+  text: ''
+  art: >-
+    A knee-high sapling creature with bark skin and two glowing spore-lit
+    eyes standing among ferns, sunbeam falling on it through canopy, deep
+    emerald and amber palette, high fantasy oil painting
+  flavor: >-
+    It is eleven days old. It already knows every name the Wardens have
+    ever spoken near it.
+
+- id: rtg-g-002
+  name: Root the Path
+  cost: '{G}'
+  type: Sorcery
+  rarity: common
+  text: 'Search your library for a basic land card, put it onto the battlefield tapped, then shuffle.'
+  art: >-
+    Thick roots surging up to bridge a ravine into a walkable arch, moss
+    and ferns unfurling along it as it forms, shafts of green light,
+    emerald and amber palette, high fantasy oil painting
+  flavor: >-
+    The Thornwild has no roads. It has opinions about where you should be
+    going, and it is willing to help.
+
+- id: rtg-g-003
+  name: Spore-Lit Forager
+  cost: '{1}{G}'
+  type: Creature
+  subtype: Elf Druid
+  rarity: common
+  power: 2
+  toughness: 2
+  text: '{T}: Add one mana of any color.'
+  art: >-
+    An elf druid crouched among glowing fungal caps in deep understory,
+    cupping floating spores in one palm, green bioluminescence on their
+    face, emerald and gold palette, high fantasy oil painting
+  flavor: >-
+    The spores go where the forest needs them. She has simply learned to
+    be going the same way.
+
+- id: rtg-g-004
+  name: Bramblehide Stalker
+  cost: '{1}{G}'
+  type: Creature
+  subtype: Beast
+  rarity: common
+  power: 3
+  toughness: 2
+  text: 'Trample'
+  art: >-
+    A low heavy beast armoured in interwoven thorn and bark pushing through
+    dense bramble, thorns snapping off its hide, dappled canopy light,
+    emerald and umber palette, high fantasy oil painting
+  flavor: >-
+    The brambles do not part for it. The brambles simply grew, patiently,
+    into the shape of it.
+
+- id: rtg-g-005
+  name: Warden's Judgment
+  cost: '{1}{G}'
+  type: Instant
+  rarity: uncommon
+  text: 'Target creature you control fights target creature you don''t control.'
+  art: >-
+    An enormous antlered forest beast lunging past a Warden who stands
+    perfectly still with one hand raised, leaves exploding outward, deep
+    emerald and shadow palette, high fantasy oil painting, violent motion
+  flavor: >-
+    The Wardens pass no sentence. They only decide which of you the forest
+    is going to be standing behind.
+
+- id: rtg-g-006
+  name: Elder Warden Oakenmoot
+  cost: '{2}{G}'
+  type: Creature
+  subtype: Legendary Treefolk Druid
+  rarity: rare
+  power: 3
+  toughness: 4
+  text: 'Other creatures you control get +1/+1.'
+  art: >-
+    A towering moss-furred treefolk with a face half-hidden in bark
+    standing among smaller forest creatures that lean toward it, spores
+    drifting, deep emerald and amber palette, high fantasy oil painting
+  flavor: >-
+    "Cut one trunk and we will not come. We are not sentimental. We are
+    only very, very good at counting."
+
+- id: rtg-g-007
+  name: Canopy Stormbeast
+  cost: '{2}{G}'
+  type: Creature
+  subtype: Beast
+  rarity: common
+  power: 4
+  toughness: 3
+  text: 'Reach'
+  art: >-
+    A long-limbed beast braced high in the canopy between two colossal
+    trunks, reaching out over open air, storm light breaking through
+    leaves, emerald and slate palette, high fantasy oil painting
+  flavor: >-
+    Nothing crosses the Thornwild above the canopy without the canopy
+    having a word about it.
+
+- id: rtg-g-008
+  name: Thornwild Colossus
+  cost: '{3}{G}'
+  type: Creature
+  subtype: Treefolk
+  rarity: uncommon
+  power: 6
+  toughness: 5
+  text: 'Trample'
+  art: >-
+    A colossal walking tree wading through understory, ferns and saplings
+    bending in its wake, birds scattering from its shoulders, deep emerald
+    and gold shafts, high fantasy oil painting, low upward scale
+  flavor: >-
+    It was standing before the Legion swore its first oath. It intends to
+    be standing after the last one is broken.
+
+- id: rtg-g-009
+  name: The Thornwild Remembers
+  cost: '{4}{G}'
+  type: Sorcery
+  rarity: rare
+  text: 'Create two 3/3 green Beast creature tokens with trample.'
+  art: >-
+    The forest floor heaving as two enormous shapes of root moss and antler
+    rise up out of it fully formed, leaves streaming off their backs, deep
+    emerald and amber palette, high fantasy oil painting, dramatic emergence
+  flavor: >-
+    A hundred trunks cut. A hundred names carried. The Thornwild has never
+    once had to be told twice.

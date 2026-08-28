@@ -2940,3 +2940,226 @@ running app.
 ### Immediate Next Action
 None - implementation done, in Trin's hands. If Trin/Morpheus pass,
 this is ready to commit (nothing committed yet this session).
+
+---
+## *nit: changePileType control invisible — 2026-08-27
+
+Direct user report: "I don't see any controls for the change pile type
+button." Root cause found by reading, not guessing: `renderActionHeader`
+(`src/ui.js:438`, was `if (options.disabled?.includes(id)) continue;`)
+OMITTED any disabled pile-level action entirely instead of rendering it
+disabled. `changePileType`/`remove` are in `Pile.disabledActions(count)`
+whenever the pile is non-empty, so on any pile with cards in it the
+button simply never rendered - not greyed out, just absent. Inconsistent
+with `cardElement`'s own disabled pattern (`button.disabled = true`,
+visible+greyed), which is the fix applied: `isDisabled` now sets
+`button.disabled = true` instead of skipping the button. Picks up the
+pre-existing global `button:disabled { opacity: 0.45 }` (style.css:302)
+for free - no CSS change needed.
+
+**Verification:** 407/407 unit tests pass, `lint:design` unchanged
+(3 pre-existing violations), `lint:js` unchanged (7 pre-existing
+cognitive-complexity findings). **Not live-browser-verified this
+session** - no browser automation tool was available (no
+claude-in-chrome, no jsdom test harness for `ui.js`) - confidence is
+from code-path tracing + the passing suites, not a Playwright check,
+unlike the usual practice for DOM-behavior changes in this project.
+Flagged explicitly to Trin/the user rather than silently skipped.
+
+### Handed to Trin
+`*qa uat` posted to CHAT.md. Recommend a manual/live check of a
+non-empty pile's action row (should now show a greyed changePileType
+button) before this is called fully done, given the live-verification
+gap above.
+
+### Immediate Next Action
+Superseded by the follow-up below - user rejected the visibility fix.
+
+---
+## Follow-up: user overrides the prior fix — 2026-08-28
+
+User's actual preference, stated directly: keep disabled pile actions
+INVISIBLE (revert the change above - "don't clutter"), but fix the
+real complaint two other ways instead:
+1. Allow `changePileType` on non-empty piles (not just empty). Removed
+   the empty-only guard from `state.js`'s `CHANGE_PILE_TYPE` and from
+   `Pile.disabledActions` (now only disables `remove`, not
+   `changePileType`). Updated the stale doc comments in `state.js`,
+   `Pile.js`, `CascadePile.js`, `MeldPile.js`, `RankAdjacentPile.js`,
+   `pileActions.js`'s hint text - all previously said "empty-only",
+   now flag the real risk instead: `foundation`/`cascade`/
+   `rankAdjacent` don't re-validate existing cards against the new
+   kind's `canAccept` rules on a swap, so this can leave cards in a
+   pile they'd never have been allowed to enter directly. Flagged to
+   the user in the response, not silently absorbed.
+2. "in the same vein, remove the confirm dialogue when removing a
+   pile" - `remove` is still empty-only (unchanged), just no longer
+   asks to confirm, since `disabledPileActionsFor` only ever enables
+   the button on an already-empty pile - nothing to lose, nothing to
+   confirm. Added `'remove'` to the pile-panel's `noConfirm` list in
+   `ui.js` (same mechanism the 1-card `take` exemption already used).
+   Scoped to pile removal only (`REMOVE_PILE`) - zone removal
+   (`REMOVE_ZONE`, same `remove` action id, same ACTION_SPECS entry,
+   different `renderActionHeader` call site at `ui.js:1050`) still
+   confirms - user said "removing a pile" specifically, didn't ask
+   about zone removal, left it untouched per the standing "no
+   unprompted special cases" discipline.
+
+Tests updated (TDD - updated, not just made pass): `tests/piles.test.js`
+disabledActions case now expects only `['remove']` on a non-empty pile;
+`tests/state.test.js`'s CHANGE_PILE_TYPE "rejects non-empty" test
+replaced with one asserting it succeeds and cards carry over unchanged.
+
+**Verification:** 407/407 unit tests, `lint:design` unchanged (3
+pre-existing), `lint:js` unchanged (7 pre-existing cognitive-
+complexity). No unit coverage exists for `noConfirm` wiring itself
+(DOM-heavy, `ui.js` has no jsdom test harness - same pre-existing gap
+noted in the prior entry) and no browser automation tool was available
+this session either, so this is not live-verified - same caveat as
+before, flagged again rather than silently dropped.
+
+### Handed to Trin
+`*qa uat` posted to CHAT.md.
+
+### Immediate Next Action
+Awaiting Trin/user confirmation. Not committed yet - diff spans
+`state.js`, `Pile.js`, `CascadePile.js`, `MeldPile.js`,
+`RankAdjacentPile.js`, `pileActions.js`, `ui.js`, plus the two test
+files.
+
+---
+## Sprint: Recard the Gathering — phases 87-91 done, 2026-08-28
+
+Design brief `docs/RTG_DESIGN.md`, phase log in `task.md`. User asked
+for an MTG-like set to exercise the Pile/Zone/Deck/Action framework
+WITHOUT changing the table simulation.
+
+**Three framing decisions (user-made, at the planning gate):**
+1. Table simulator - players enforce rules. Rejected mana/phase
+   tracking and a full rules engine (the latter needs an ability
+   scripting language; it IS a different product).
+2. NO in-app deck builder. Offline pipeline instead: YAML -> compiled
+   JSON -> generated SVG art. User's own framing.
+3. All 15 decks (5 mono + 10 guild pairs), not a subset.
+
+**Build tooling change (direct user request, mid-sprint):** "start
+using the make skill more to save tokens on build actions - it can
+frontend npm". Added a `Makefile` fronting the npm scripts; run builds
+as `bobp make <target>` (captures to `build/build.out`, 10-line tail
+only). Saved to memory as `feedback-use-make-skill`. `make check` =
+cards + test + lint-decks; deliberately EXCLUDES `lint`, which carries
+the known 7+3 baseline and can never exit 0 - a permanently-red gate is
+a meaningless gate. `lint-decks` IS included since it starts clean.
+
+**Shipped (87-91):**
+- `tools/rtg/cardSchema.mjs` - pure validation + mana parsing. `cmc`
+  and `colors` are DERIVED from the cost string, never authored, so a
+  card's curve position can't drift from its printed cost.
+- `tools/rtg/compile.mjs` + `make cards` - YAML -> `src/decks/rtg/
+  cards.json` (not `build/`, which is gitignored).
+- `tools/rtg/deckSchema.mjs` + `lintDecks.mjs` + `make lint-decks` -
+  the balance gate: size 60, <=4 copies (basics exempt), archetype land
+  bands (aggro 20-23 / midrange 24-25 / control 25-27), left-skewed
+  curve (>=40% spells cmc<=2, <=15% cmc>=5), colour identity, >=15
+  sources per colour in 2-colour decks. Bands are asserted by a test
+  because they're the entire basis of the check and easy to "tidy".
+- 132 cards across 8 YAML pools; 15 decks; 132 deterministic art SVGs
+  (`tools/rtg/art.mjs` + `make art`, output `assets/cards/rtg/`).
+- `flavor` (lore) made a REQUIRED field per direct user request, so a
+  132-card pool can't ship lore on only the cards that got attention.
+
+**The linter earned its keep twice, both real catches:**
+1. My first guild manabase ran 8 copies of one dual. Duals aren't basic
+   lands, so the real 4-copy limit applies - it failed 10 of 15 decks.
+   Fixed the RIGHT way (printed a second dual cycle, `wellsprings.yaml`,
+   which is Magic's own answer) rather than the tempting way (lowering
+   MIN_SOURCES_PER_COLOR, or pushing every guild deck to 26 lands and
+   thereby making them all control decks).
+2. A test I wrote asserted the wrong thing - my "top-heavy" fixture was
+   32 two-drops, which is genuinely cheap, so the rule correctly didn't
+   fire. Fixed the fixture and added a negative assertion so it now
+   proves isolation.
+
+**Verification:** 452 tests green, `make check` exit 0, lint:js baseline
+held at the pre-existing 7, art regeneration verified byte-idempotent
+(md5 of all 132 SVGs unchanged across runs). NOT live-verified in a
+browser - no browser automation tool available this session, and
+nothing is wired into the app yet anyway (that starts at phase 92).
+
+### Next Steps
+Phase 92 is the one real architectural problem: `cardElement`
+(`src/ui.js:12`) hardcodes rank/suit/JOKER. Plan (D76, Morpheus-
+approved): a `CARD_FACES` registry dispatched on `card.face` (compiler
+already stamps `face: 'rtg'` on every RtG card; standard cards default
+to `'standard'`), with the existing rank/suit render moved to
+StandardCardFace UNCHANGED. Smith's Gate-1 condition C1 - a zoom/
+inspect affordance for rules text - must land in that same phase, not
+be deferred; MTG rules text is unreadable at table card size.
+Then 93 (`rtg` deck type + `deckList` param on buildDeck), 94
+(battlefield/exile/stack pile kinds; Smith C2 = battlefield must
+wrap/scroll past ~10 permanents), 95 (preset; Smith C3 = 15 decks on
+one table is heavy clutter, flag layout).
+
+Nothing committed - user has not asked.
+
+---
+## Sprint: Recard the Gathering — COMPLETE (phases 87-96), 2026-08-28
+
+All 10 phases shipped and launched (`*pm launch`, Cypher). Full Bloop
+run per phase; no fix-loop, no anti-loop escalation.
+
+**Engine phases (92-95), the half done after the content:**
+- **D76 `CARD_FACES` registry** (`src/cards/`). `cardElement` is a thin
+  dispatcher on `card.face`; rank/suit moved to `StandardCardFace`
+  VERBATIM. Verified by regression: War/Solitaire/Pinochle render 0
+  rtg-faced cards, corners intact, no console errors.
+  `RtgCardFace` + the Smith-C1 inspect overlay shipped together (rules
+  text is unreadable at 43px).
+- **D80 `rtg` deck type**. `buildDeck` gains an additive `deckList`;
+  standard/pinochle asserted unaffected. Instance ids (`rtg-w-001#0..3`)
+  distinct from printed `cardId` - state keys on `id`, so 4 copies
+  sharing one would move as a single card; art keys off `cardId`.
+- **D79 battlefield/exile/stack** + **`UNTAP_ALL`** (a genuinely new
+  action, atomic rather than N `ROTATE_CARD`s). Real behavioural
+  differences, not renames - see ARCHITECTURE.md.
+- **D81 preset**: 15 decks on the table, per-player battlefield/
+  graveyard/exile, shared stack, 7-card opening hand. Required two
+  additive `GameConfig.piles` fields (`deckList` to pre-stock, `id` to
+  avoid 14 deck declarations collapsing onto one derived id).
+
+**Every defect this sprint was found by MEASUREMENT, not review** - the
+pattern worth carrying forward:
+1. `button.card` (element+class) beat `.card-rtg` - cards never resized.
+   This CSS file already documents the same trap from a prior incident.
+2. A long card name stretched the flex item past its `min-width` floor.
+3. P/T box overlapped the name strip (screenshot).
+4. Preset preview printed "1 deck + 1 deck + ..." 14 times.
+5. Deck panels at 96px collided their titles and overlapped Table Zone.
+6. Dual lands aren't basics, so the 4-copy limit applies - the balance
+   linter failed 10 of 15 decks. Fixed by printing a SECOND dual cycle
+   (Magic's own answer), not by lowering the source minimum.
+Items 1-5 were invisible to code review and only surfaced via live
+Playwright measurement + screenshots. Playwright DOES work in this
+environment (`node -e` with `chromium.launch()`); the devserver runs on
+:8000 via `node tools/devserver.mjs`.
+
+**Final state:** 483 tests green, `make check` exit 0, lint:js at the
+pre-existing 7, lint:design at the pre-existing 3, 15/15 decks balanced.
+Content: 132 cards, 15 decks, 132 art SVGs.
+
+### Known, flagged, NOT fixed (backlog)
+- Smith C3: the RtG table is the busiest any preset produces (14 deck
+  panels + both players' zones). Readable, but wants a UX pass -
+  possibly a deck picker rather than all 15 on the felt.
+- Life starts at 0, not 20; players set it by hand (the rules entry
+  says so). A `startingScore` preset field would be the honest fix.
+- No DOM unit tests - every UI claim rests on hand-driven Playwright.
+- README doesn't document the content pipeline (`make cards` before
+  `make lint-decks`).
+- RtG cards carry full printed data per instance (~24KB/deck on the
+  wire).
+
+### Next Steps
+Nothing pending. NOT committed - the user has not asked, and this is a
+large diff (27 modified files + Makefile, content/, assets/ with 132
+generated SVGs) they will likely want to review first.

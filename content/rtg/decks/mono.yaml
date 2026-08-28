@@ -1,0 +1,114 @@
+# Recard the Gathering — the five mono-colour decks (US-77).
+#
+# Each is built to sit INSIDE the balance bands enforced by
+# `make lint-decks` (see docs/RTG_DESIGN.md), not merely near them:
+#
+#   size 60 | <=4 copies of a nonland | archetype land band
+#   curve: >=40% of spells at cmc<=2, <=15% at cmc>=5
+#
+# The archetype choice per colour is a flavour decision as much as a
+# mechanical one: the Legion and the Clans both attack (aggro) for
+# opposite reasons, the Concord stalls (control), and the Covens and
+# Wardens both grind (midrange) from opposite ends of the same idea
+# about debt and memory.
+
+- id: rtg-mono-white
+  name: Dawnbreak Legion
+  colors: [W]
+  archetype: aggro
+  description: >-
+    Go wide with cheap Soldiers, then make them all bigger at once. The
+    Legion wins by arriving in numbers before anyone has finished
+    deciding what to do about it.
+  cards:
+    - {id: rtg-land-plains, count: 20}
+    - {id: rtg-w-001, count: 4}
+    - {id: rtg-w-002, count: 4}
+    - {id: rtg-w-003, count: 4}
+    - {id: rtg-w-004, count: 4}
+    - {id: rtg-w-005, count: 4}
+    - {id: rtg-w-006, count: 4}
+    - {id: rtg-w-007, count: 4}
+    - {id: rtg-w-008, count: 4}
+    - {id: rtg-w-009, count: 4}
+    - {id: rtg-w-010, count: 4}
+
+- id: rtg-mono-blue
+  name: Tidewatch Concord
+  colors: [U]
+  archetype: control
+  description: >-
+    Bounce, counter, and draw until the game is a formality, then close
+    with something enormous that has been waiting in the dark the whole
+    time.
+  cards:
+    - {id: rtg-land-island, count: 26}
+    - {id: rtg-u-001, count: 4}
+    - {id: rtg-u-002, count: 4}
+    - {id: rtg-u-003, count: 4}
+    - {id: rtg-u-004, count: 4}
+    - {id: rtg-u-005, count: 4}
+    - {id: rtg-u-006, count: 4}
+    - {id: rtg-u-007, count: 4}
+    - {id: rtg-u-008, count: 4}
+    - {id: rtg-u-009, count: 2}
+
+- id: rtg-mono-black
+  name: Mirefen Covens
+  colors: [B]
+  archetype: midrange
+  description: >-
+    Trade life for cards, kill anything that matters, and keep bringing
+    the same threats back. Every advantage is borrowed, and the Covens
+    are extremely comfortable with that.
+  cards:
+    - {id: rtg-land-swamp, count: 24}
+    - {id: rtg-b-001, count: 4}
+    - {id: rtg-b-002, count: 4}
+    - {id: rtg-b-003, count: 4}
+    - {id: rtg-b-004, count: 4}
+    - {id: rtg-b-005, count: 4}
+    - {id: rtg-b-006, count: 4}
+    - {id: rtg-b-007, count: 4}
+    - {id: rtg-b-008, count: 4}
+    - {id: rtg-b-009, count: 4}
+
+- id: rtg-mono-red
+  name: Emberscar Clans
+  colors: [R]
+  archetype: aggro
+  description: >-
+    The fastest board in the set, backed by burn. If the Clans have not
+    won by turn six they have usually set enough on fire to be getting
+    on with.
+  cards:
+    - {id: rtg-land-mountain, count: 20}
+    - {id: rtg-r-001, count: 4}
+    - {id: rtg-r-002, count: 4}
+    - {id: rtg-r-003, count: 4}
+    - {id: rtg-r-004, count: 4}
+    - {id: rtg-r-005, count: 4}
+    - {id: rtg-r-006, count: 4}
+    - {id: rtg-r-007, count: 4}
+    - {id: rtg-r-008, count: 4}
+    - {id: rtg-r-009, count: 4}
+    - {id: rtg-r-010, count: 4}
+
+- id: rtg-mono-green
+  name: Thornwild Wardens
+  colors: [G]
+  archetype: midrange
+  description: >-
+    Accelerate into creatures nothing else in the set can block
+    profitably, and use those creatures themselves as the removal.
+  cards:
+    - {id: rtg-land-forest, count: 24}
+    - {id: rtg-g-001, count: 4}
+    - {id: rtg-g-002, count: 4}
+    - {id: rtg-g-003, count: 4}
+    - {id: rtg-g-004, count: 4}
+    - {id: rtg-g-005, count: 4}
+    - {id: rtg-g-006, count: 4}
+    - {id: rtg-g-007, count: 4}
+    - {id: rtg-g-008, count: 4}
+    - {id: rtg-g-009, count: 4}

@@ -138,14 +138,25 @@ export const ACTION_SPECS = {
   // "flip it back" cost the way `take`/`reshuffleDeal` have.
   hide: { label: 'Hide', destructive: false, hint: 'Turn every card in this pile face-down.', icon: '🙈' },
   show: { label: 'Show', destructive: false, hint: 'Turn every card in this pile face-up.', icon: '👁' },
-  // US-73 (D63): zone<->discard only, offered by Pile.pileActions() -
-  // same base method DiscardPile inherits unchanged, so both kinds get
-  // it "for free" without either subclass needing a separate opt-in.
+  // D71 (US-74): cycles through CHANGE_PILE_TYPE_CYCLE (zone/discard/
+  // foundation/cascade/rankAdjacent), offered by Pile.pileActions() -
+  // same base method every eligible subclass inherits/overrides, so
+  // each kind gets it "for free" without a separate opt-in. Allowed on
+  // a non-empty pile too as of a direct user request (2026-08-27).
   changePileType: {
     label: 'Change type',
     destructive: false,
-    hint: 'Change this pile between a plain zone and a discard pile. Must be empty.',
+    hint: 'Change this pile to the next kind.',
     icon: '⇋',
+  },
+  // D79 (US-82): the untap step, as one atomic action rather than N
+  // rotates. Not destructive - untapping loses nothing and is trivially
+  // reversible by tapping again, so it takes no confirm.
+  untapAll: {
+    label: 'Untap all',
+    destructive: false,
+    hint: 'Return every permanent in this pile to upright.',
+    icon: '⇧',
   },
   // US-71/72 (D62): empty-only, no cascade-delete - same base-method
   // reasoning as changePileType above.

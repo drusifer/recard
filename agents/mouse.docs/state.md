@@ -383,3 +383,10 @@ overlaps, SaveAs's `window.prompt()` (Smith, non-blocking), Morpheus's
 "check id survival before designing a save-for-reuse feature" note.
 On cold resume: read `docs/ARCHITECTURE.md`'s tail (D64-D75) and this
 entry before trusting anything older in this file.
+
+---
+## Status check confirmed — 2026-08-27, `*mouse status update`
+
+Verified push completed: working tree clean, 0 commits ahead of
+`origin/touch-targets-and-pile-actions-sprint`, tip `05aa3f6`. No
+change to backlog or next steps above. Idle, no sprint in flight.

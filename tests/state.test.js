@@ -2182,15 +2182,17 @@ test('CHANGE_PILE_TYPE: rejects changing the deck', () => {
   );
 });
 
-test('CHANGE_PILE_TYPE: rejects a non-empty pile, no mutation happens', () => {
+// Direct user request (2026-08-27): allow changePileType on a non-empty
+// pile too - see state.js's CHANGE_PILE_TYPE doc comment for the risk
+// that reopens for foundation/cascade/rankAdjacent targets.
+test('CHANGE_PILE_TYPE: allowed on a non-empty pile, cards carried over unchanged', () => {
   let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
   state = reduce(state, { type: 'CREATE_ZONE', name: 'Melds' });
   const pile = state.piles.find((p) => p.name === 'Melds');
   const card = { id: 'c1', rank: 'A', suit: 'S', faceUp: true };
   state = { ...state, piles: state.piles.map((p) => (p.id === pile.id ? { ...p, cards: [card] } : p)) };
-  assert.throws(
-    () => reduce(state, { type: 'CHANGE_PILE_TYPE', pileId: pile.id, kind: 'discard', playerId: 'p1' }),
-    /must be empty/,
-  );
-  assert.equal(state.piles.find((p) => p.id === pile.id).kind, 'zone', 'kind must be unchanged after rejection');
+  state = reduce(state, { type: 'CHANGE_PILE_TYPE', pileId: pile.id, kind: 'discard', playerId: 'p1' });
+  const changed = state.piles.find((p) => p.id === pile.id);
+  assert.equal(changed.kind, 'discard');
+  assert.deepEqual(changed.cards, [card], 'cards untouched by the kind change');
 });

@@ -1,0 +1,171 @@
+# Recard the Gathering — the ten Wellsprings, a SECOND dual-land cycle
+# (US-78).
+#
+# Why a second cycle exists at all: a dual land is not a basic land, so
+# the 4-copy limit applies to it (real Magic rule, enforced by
+# `make lint-decks`). With only one cycle, a 24-land guild deck maxes out
+# at 14 sources of each colour — one short of the 15-source minimum — and
+# the only fixes would have been to push every guild deck up to 26 lands
+# (making them all control decks, which is flavour-wrong for the likes of
+# the Emberoath) or to quietly lower the source minimum. Magic's own
+# answer is to print several dual cycles, each legal as a 4-of, which is
+# what this is.
+#
+# Mechanically distinct from the Causeway/Crossing cycle rather than a
+# reskin of it — the classic trade: these DON'T enter tapped, but cost
+# you a point of life when you draw coloured mana from them. Speed for
+# blood, which is a choice a deckbuilder should get to make.
+#
+# Flavour: the first cycle is where two peoples MEET. This cycle is
+# where their two magics well up out of the ground already mixed, with
+# nobody's permission.
+
+- id: rtg-well-wu
+  name: Clearwater Wellspring
+  cost: ''
+  type: Land
+  subtype: Land
+  rarity: rare
+  text: '{T}: Add {W} or {U}. Clearwater Wellspring deals 1 damage to you.'
+  art: >-
+    A spring of impossibly clear water welling up through white marble
+    flagstones, gold light and cold cyan light braiding in the rising
+    column, ivory and turquoise palette, high fantasy oil painting
+  flavor: >-
+    Drink and you will know a true thing. The Concord has never been able
+    to predict which one, and the Legion has stopped asking.
+
+- id: rtg-well-wb
+  name: Graven Wellspring
+  cost: ''
+  type: Land
+  subtype: Land
+  rarity: rare
+  text: '{T}: Add {W} or {B}. Graven Wellspring deals 1 damage to you.'
+  art: >-
+    A pale marble grave-slab cracked open with black water welling up
+    through the fracture, red cords floating on the surface, dawn light
+    and fog, ivory and sick green charcoal palette, high fantasy painting
+  flavor: >-
+    Every oath sworn over it is kept. Every one of them costs more than
+    the swearer expected, and all of them know that going in.
+
+- id: rtg-well-wr
+  name: Cinderlight Wellspring
+  cost: ''
+  type: Land
+  subtype: Land
+  rarity: rare
+  text: '{T}: Add {W} or {R}. Cinderlight Wellspring deals 1 damage to you.'
+  art: >-
+    A spring of molten gold light bubbling up through scorched white stone,
+    embers rising into a dawn sky, heat shimmer above it, ivory gold and
+    hot ember palette, high fantasy oil painting
+  flavor: >-
+    The Legion calls it a beacon. The Clans call it a hearth. It burns
+    whoever draws from it either way, and neither has complained.
+
+- id: rtg-well-wg
+  name: Greenwood Wellspring
+  cost: ''
+  type: Land
+  subtype: Land
+  rarity: rare
+  text: '{T}: Add {W} or {G}. Greenwood Wellspring deals 1 damage to you.'
+  art: >-
+    A clear spring rising between colossal roots into a white stone basin
+    ringed with ferns, sun shafts through canopy hitting the water, warm
+    gold and deep emerald palette, high fantasy oil painting
+  flavor: >-
+    The basin was placed by the Legion. The spring was there first, and
+    is unhurried about making the point.
+
+- id: rtg-well-ub
+  name: Blackwater Wellspring
+  cost: ''
+  type: Land
+  subtype: Land
+  rarity: rare
+  text: '{T}: Add {U} or {B}. Blackwater Wellspring deals 1 damage to you.'
+  art: >-
+    A deep still pool inside a drowned stone rotunda where black fen water
+    and cold blue current spiral together without mixing, witchlight
+    below, teal and sick green palette, high fantasy oil painting
+  flavor: >-
+    Two waters that refuse to become one water. The Concord has studied
+    the seam for a century and the Covens have simply enjoyed watching.
+
+- id: rtg-well-ur
+  name: Steamvent Wellspring
+  cost: ''
+  type: Land
+  subtype: Land
+  rarity: rare
+  text: '{T}: Add {U} or {R}. Steamvent Wellspring deals 1 damage to you.'
+  art: >-
+    A fissure in black rock venting a roaring column of superheated steam
+    with seawater pouring in at its lip, spray and glare, cyan white and
+    ember palette, high fantasy oil painting, violent energy
+  flavor: >-
+    It has been erupting on a nine-minute cycle for two hundred years.
+    The Accord sets its meetings by it and never arrives late.
+
+- id: rtg-well-ug
+  name: Springtide Wellspring
+  cost: ''
+  type: Land
+  subtype: Land
+  rarity: rare
+  text: '{T}: Add {U} or {G}. Springtide Wellspring deals 1 damage to you.'
+  art: >-
+    A freshwater spring surging up through a kelp-and-root delta floor,
+    glowing spores caught in the upwelling, clear water over green,
+    turquoise and deep emerald palette, high fantasy oil painting
+  flavor: >-
+    The delta grows fastest here. The Concord has three competing papers
+    about why, and the Wardens have never read any of them.
+
+- id: rtg-well-br
+  name: Emberash Wellspring
+  cost: ''
+  type: Land
+  subtype: Land
+  rarity: rare
+  text: '{T}: Add {B} or {R}. Emberash Wellspring deals 1 damage to you.'
+  art: >-
+    Black fen water boiling around a submerged vent of glowing magma,
+    steam and witchlight rising together, dead cypress silhouetted,
+    charcoal rust and sick green palette, high fantasy oil painting
+  flavor: >-
+    Owed and burning at the same time, in the same place, forever. The
+    Ashcord regards it as a statement of principle.
+
+- id: rtg-well-bg
+  name: Rotroot Wellspring
+  cost: ''
+  type: Land
+  subtype: Land
+  rarity: rare
+  text: '{T}: Add {B} or {G}. Rotroot Wellspring deals 1 damage to you.'
+  art: >-
+    A spring welling up through a knot of colossal pale roots in black
+    water, moss and witchlight competing on the same bark, bone fragments
+    in the silt, emerald and charcoal palette, high fantasy oil painting
+  flavor: >-
+    Everything that falls here comes back up eventually, in some form,
+    with interest, and usually taller.
+
+- id: rtg-well-rg
+  name: Scorchwood Wellspring
+  cost: ''
+  type: Land
+  subtype: Land
+  rarity: rare
+  text: '{T}: Add {R} or {G}. Scorchwood Wellspring deals 1 damage to you.'
+  art: >-
+    A hot spring steaming in a fresh black burn scar with green shoots
+    already ringing its edge, embers glowing in the soil beneath the
+    water, ember and emerald palette, high fantasy oil painting
+  flavor: >-
+    The water runs hot the season after a burn and cool the season after
+    that. The Wardens plant by it. The Clans light by it.

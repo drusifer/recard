@@ -1478,3 +1478,36 @@ logic), no multi-phase data/UI split needed.
 - [x] Full regression: `npm test` 408/408, lint baseline unchanged (7
       pre-existing `cognitive-complexity`, 3 pre-existing
       `lint:design`).
+
+## Sprint — Recard the Gathering (US-75..US-83)
+
+Design brief: `docs/RTG_DESIGN.md`. Framing: table simulator (players
+enforce rules), offline YAML->JSON->SVG content pipeline, balance
+enforced as a lint check.
+
+- [x] **Phase 87** — card schema + YAML->JSON compiler (`make cards`)
+- [x] **Phase 88** — deck balance linter (`make lint-decks`)
+- [x] **Phase 89** — 5 mono-colour pools + 5 balanced decks
+- [x] **Phase 90** — guild gold cards, 2 dual-land cycles, 10 guild decks
+- [x] **Phase 91** — procedural card-art SVG generator (`make art`)
+- [x] **Phase 92** — CARD_FACES registry + RtG card face + inspect overlay (Smith C1)
+- [x] **Phase 93** — `rtg` deck type + additive `deckList` param
+- [x] **Phase 94** — battlefield/exile/stack pile kinds + UNTAP_ALL (Smith C2)
+- [x] **Phase 95** — RtG preset, 15 decks + MTG zones, layout (Smith C3 flagged)
+- [x] **Phase 96** — reserved bug-fix: consumed by in-phase fixes (see below)
+
+Content shipped: 132 unique cards (61 creatures, 23 sorceries, 20
+instants, 25 lands, 3 enchantments), 15 balanced decks, 132 art SVGs.
+
+Phase 96 was not needed as a separate pass — every defect found was
+fixed inside its own phase, each caught by measurement rather than
+review:
+- `button.card` specificity beat `.card-rtg` (a trap this CSS file
+  already documents from a prior incident) — cards never resized.
+- A long card name stretched the flex item past its width floor.
+- P/T box overlapped the name strip.
+- Preset preview rendered "1 deck + 1 deck + ..." 14 times.
+- Deck panels at 96px ran their titles together and overlapped the
+  Table Zone.
+- `buildPiles` derived ids from `kind`, collapsing 14 deck piles onto
+  one id.

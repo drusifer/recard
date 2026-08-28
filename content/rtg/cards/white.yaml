@@ -1,0 +1,174 @@
+# Recard the Gathering — White: the Dawnbreak Legion (US-77).
+#
+# Oath-bound, sun-sworn, relentless. Mechanically an AGGRO deck: a wide,
+# cheap board of Soldiers plus anthem effects that reward going wide.
+# The Legion's flavour throughline is that an oath is a debt you pay
+# forward, which is the deliberate mirror of Black's Covens, where a
+# debt is a hook.
+#
+# Curve (10 cards x4 = 40 spells, 20 lands):
+#   cmc1 x2  cmc2 x3  cmc3 x3  cmc4 x1  cmc5 x1
+
+- id: rtg-w-001
+  name: Dawnbreak Recruit
+  cost: '{W}'
+  type: Creature
+  subtype: Human Soldier
+  rarity: common
+  power: 2
+  toughness: 1
+  text: ''
+  art: >-
+    A young human soldier in oversized white-and-gold plate charging into
+    dawn light, chin-strap loose, banner too large for them, warm ivory and
+    honey palette, high fantasy oil painting, low heroic angle
+  flavor: >-
+    They hand you the oath before they hand you the armour. Most recruits
+    find the oath is the heavier of the two.
+
+- id: rtg-w-002
+  name: Oathlight Acolyte
+  cost: '{W}'
+  type: Creature
+  subtype: Human Cleric
+  rarity: common
+  power: 1
+  toughness: 2
+  text: 'Vigilance'
+  art: >-
+    A robed cleric holding a small lantern of captured sunlight aloft in
+    both hands, eyes closed, dawn rays fanning behind, ivory and pale gold
+    palette, high fantasy oil painting, centered devotional composition
+  flavor: >-
+    The lantern holds one hour of true dawn. She has carried it unlit for
+    nine years, waiting for a night that deserves it.
+
+- id: rtg-w-003
+  name: Shieldwall Sergeant
+  cost: '{1}{W}'
+  type: Creature
+  subtype: Human Soldier
+  rarity: common
+  power: 2
+  toughness: 3
+  text: 'Vigilance'
+  art: >-
+    A weathered sergeant anchoring the centre of an interlocked shield
+    line, shouting orders sideways, dust and spear-shafts around her, warm
+    ivory and steel palette, high fantasy oil painting, tight action shot
+  flavor: >-
+    "A wall is not stone. A wall is everyone deciding, at once, not to
+    step back."
+
+- id: rtg-w-004
+  name: Sunsteel Duelist
+  cost: '{1}{W}'
+  type: Creature
+  subtype: Human Knight
+  rarity: uncommon
+  power: 3
+  toughness: 1
+  text: 'First strike'
+  art: >-
+    A lean duellist mid-lunge with a slender mirror-bright blade catching
+    the sun into a blinding flare, cloak snapping, white-gold and hot
+    highlight palette, high fantasy oil painting, dynamic diagonal
+  flavor: >-
+    The Legion teaches the shieldwall to everyone. It teaches the lunge to
+    the few who have already learned to stand still.
+
+- id: rtg-w-005
+  name: Rite of the Rising Sun
+  cost: '{1}{W}'
+  type: Instant
+  rarity: common
+  text: 'Target creature gets +2/+2 and gains vigilance until end of turn.'
+  art: >-
+    A kneeling soldier wreathed in a sudden vertical column of golden dawn
+    light, dust motes and feathers lifting around them, radiant ivory and
+    amber palette, high fantasy oil painting, dramatic upward light
+  flavor: >-
+    Dawn is not a reward for surviving the night. Dawn is the reason you
+    were told to survive it.
+
+- id: rtg-w-006
+  name: Banner of the Legion
+  cost: '{2}{W}'
+  type: Enchantment
+  rarity: uncommon
+  text: 'Soldiers you control get +1/+1.'
+  art: >-
+    An enormous sun-emblem war banner planted in churned earth, its cloth
+    snapping taut in wind, ranks blurred behind it, ivory gold and deep
+    shadow palette, high fantasy oil painting, low upward hero angle
+  flavor: >-
+    Every name of every soldier who carried it is stitched inside the
+    hem, where only the wind can read them.
+
+- id: rtg-w-007
+  name: Ser Calla, Dawnbreak Captain
+  cost: '{2}{W}'
+  type: Creature
+  subtype: Legendary Human Knight
+  rarity: rare
+  power: 3
+  toughness: 3
+  text: 'Vigilance. Other Soldiers you control get +1/+0.'
+  art: >-
+    A scarred woman captain in white-gold plate, helm under one arm, one
+    hand raised to halt an unseen line, sunrise behind her, ivory honey and
+    steel palette, high fantasy oil painting, three-quarter portrait
+  flavor: >-
+    "I have never ordered a charge I would not lead. That is the whole of
+    my strategy, and it has never once failed me."
+
+- id: rtg-w-008
+  name: Oathbound Cavalry
+  cost: '{2}{W}'
+  type: Creature
+  subtype: Human Knight
+  rarity: common
+  power: 4
+  toughness: 2
+  text: ''
+  art: >-
+    Armoured riders cresting a low rise at full gallop, lances levelled,
+    long dawn shadows thrown ahead of them across grass, warm gold and
+    white palette, high fantasy oil painting, wide sweeping motion
+  flavor: >-
+    They ride at dawn because the oath is sworn at dawn, and they would
+    rather not spend a whole day owing it.
+
+- id: rtg-w-009
+  name: Sunspire Vindicator
+  cost: '{3}{W}'
+  type: Creature
+  subtype: Human Knight
+  rarity: uncommon
+  power: 4
+  toughness: 4
+  text: 'Vigilance, lifelink'
+  art: >-
+    A towering knight in radiant filigreed plate standing before a white
+    marble spire, greatsword point-down, light pooling at their feet,
+    ivory and molten gold palette, high fantasy oil painting, symmetrical
+  flavor: >-
+    The spire does not defend the city. The spire reminds the city what it
+    promised to defend.
+
+- id: rtg-w-010
+  name: Herald of the Unsetting Sun
+  cost: '{4}{W}'
+  type: Creature
+  subtype: Angel
+  rarity: rare
+  power: 5
+  toughness: 5
+  text: 'Flying, vigilance'
+  art: >-
+    A vast winged herald hovering with six sunlit wings and a horn of white
+    gold, clouds parted into a radiating corona behind, ivory amber and
+    blinding highlight palette, high fantasy oil painting, awe scale
+  flavor: >-
+    The Legion swore its oath to a sun that sets. She is what they were
+    actually promised.

@@ -1,0 +1,148 @@
+# Recard the Gathering — Blue: the Tidewatch Concord (US-77).
+#
+# Scholars who drowned their own city rather than let what they had
+# learned leave it. Mechanically a CONTROL deck: cheap interaction,
+# card draw, and a late finisher. The Concord's throughline is knowledge
+# as something you take custody of rather than something you own.
+#
+# Curve (8 cards x4 + 1 x2 = 34 spells, 26 lands):
+#   cmc1 x1  cmc2 x3  cmc3 x2  cmc4 x2  cmc5 x1 (as a 2-of)
+
+- id: rtg-u-001
+  name: Tidewatch Apprentice
+  cost: '{U}'
+  type: Creature
+  subtype: Merfolk Wizard
+  rarity: common
+  power: 1
+  toughness: 2
+  text: ''
+  art: >-
+    A young merfolk scribe underwater copying glyphs from a drowned stone
+    wall onto a slate, hair drifting, shafts of pale light above, cool
+    turquoise and silver palette, high fantasy oil painting
+  flavor: >-
+    First lesson: the water does not want to teach you. Second lesson:
+    neither do we. Third lesson is yours to find.
+
+- id: rtg-u-002
+  name: Withdraw the Tide
+  cost: '{U}'
+  type: Instant
+  rarity: common
+  text: 'Return target creature to its owner''s hand.'
+  art: >-
+    A wave caught mid-retreat pulling a struggling armoured figure
+    backwards off a stone quay, spray frozen in arcs, cold cyan and pale
+    grey palette, high fantasy oil painting, kinetic diagonal composition
+  flavor: >-
+    The Concord rarely destroys anything. It simply decides where a thing
+    ought to have been all along, and corrects the error.
+
+- id: rtg-u-003
+  name: Archive Diver
+  cost: '{1}{U}'
+  type: Creature
+  subtype: Merfolk Scout
+  rarity: common
+  power: 2
+  toughness: 1
+  text: 'When Archive Diver enters the battlefield, draw a card, then discard a card.'
+  art: >-
+    A merfolk diver swimming down a flooded library corridor between
+    shelves of sealed brass cylinders, one held to their chest, deep blue
+    and verdigris palette, high fantasy oil painting, receding perspective
+  flavor: >-
+    You may bring up one cylinder per dive. Choosing is the examination.
+
+- id: rtg-u-004
+  name: Concord Interdict
+  cost: '{1}{U}'
+  type: Instant
+  rarity: uncommon
+  text: 'Counter target spell unless its controller pays {2}.'
+  art: >-
+    A robed figure pressing an open palm against a wall of upright water
+    that halts a bolt of fire mid-flight, steam curling, cyan and quenched
+    orange palette, high fantasy oil painting, tense frozen moment
+  flavor: >-
+    "Not forbidden," the Interdictor said pleasantly. "Merely more
+    expensive than you had budgeted for."
+
+- id: rtg-u-005
+  name: Study the Depths
+  cost: '{1}{U}'
+  type: Sorcery
+  rarity: common
+  text: 'Draw two cards.'
+  art: >-
+    A scholar leaning over the rail of a small boat lowering a lantern on
+    a chain into black water, faint drowned architecture glowing far below,
+    deep blue and warm lantern palette, high fantasy oil painting
+  flavor: >-
+    Everything the Concord knows, it learned by lowering a light into
+    somewhere it was told not to look.
+
+- id: rtg-u-006
+  name: Drowned Archivist
+  cost: '{2}{U}'
+  type: Creature
+  subtype: Merfolk Wizard
+  rarity: uncommon
+  power: 2
+  toughness: 3
+  text: 'Whenever Drowned Archivist deals combat damage to a player, draw a card.'
+  art: >-
+    An ancient merfolk in barnacled robes seated in a flooded reading room,
+    open books floating upright around them, pale light from above, deep
+    teal and bone palette, high fantasy oil painting, still composition
+  flavor: >-
+    He has not left the archive since the flooding. He does not consider
+    this a hardship. He considers it tenure.
+
+- id: rtg-u-007
+  name: Sunken Recollection
+  cost: '{2}{U}'
+  type: Instant
+  rarity: common
+  text: 'Draw a card. Return target creature to its owner''s hand.'
+  art: >-
+    A wave of translucent memory-images washing over a startled soldier who
+    is dissolving into seafoam, glyphs suspended in the water, cool cyan
+    and silver palette, high fantasy oil painting, swirling motion
+  flavor: >-
+    Being forgotten by the Concord is not an insult. It is a procedure.
+
+- id: rtg-u-008
+  name: Warden of the Archways
+  cost: '{3}{U}'
+  type: Creature
+  subtype: Merfolk Wizard
+  rarity: rare
+  power: 3
+  toughness: 4
+  text: 'Flash. When Warden of the Archways enters the battlefield, return target creature to its owner''s hand.'
+  art: >-
+    A stern merfolk warden standing within a half-sunken stone archway
+    trailing kelp, one hand on the keystone, current bending around them,
+    deep blue and verdigris palette, high fantasy oil painting
+  flavor: >-
+    The archways were never doors. They were the question asked of anyone
+    who thought they were.
+
+- id: rtg-u-009
+  name: Leviathan of the Drowned Hall
+  cost: '{4}{U}'
+  type: Creature
+  subtype: Leviathan
+  rarity: rare
+  power: 6
+  toughness: 6
+  text: 'Leviathan of the Drowned Hall can''t be blocked by creatures with power 2 or less.'
+  art: >-
+    An immense pale leviathan coiled through the flooded nave of a drowned
+    cathedral, its eye level with a tiny swimming figure, columns receding,
+    abyssal blue and bone palette, high fantasy oil painting, vast scale
+  flavor: >-
+    The Concord did not sink the city to hide their knowledge. They sank
+    it to keep something fed, and quiet, and home.

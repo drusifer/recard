@@ -1,3 +1,4 @@
+import { deckLists } from './decks/rtgDeck.js';
 /**
  * Static, client-side game presets (US-15, ARCHITECTURE.md D10). Purely
  * a convenience lookup that prefills the existing deck-config (US-3) and
@@ -83,6 +84,25 @@ const SIMPLE_LAYOUT = {
   'table-zone': { x: 110, y: 290, w: 650, h: 160 },
   score: { x: 780, y: 290, w: 180, h: 160 },
 };
+
+
+/**
+ * The fourteen Recard the Gathering decks that sit on the table
+ * alongside the main deck pile (US-83). Derived from the compiled
+ * catalog rather than hand-listed, so adding a deck to
+ * `content/rtg/decks/` puts it on the table automatically instead of
+ * silently going missing.
+ */
+const RTG_TABLE_DECKS = deckLists()
+  .filter((deck) => deck.id !== 'rtg-mono-white')
+  .map((deck) => ({ kind: 'deck', ownerId: null, count: 1, deckList: deck.id, name: deck.name, id: deck.id }));
+
+// Only the FOURTEEN table-side decks are positioned here. The main deck
+// pile keeps the fixed id `deck` and lives inside the Table Zone
+// (`makeDeckPile` binds it to TABLE_ZONE_ID), so it has no standalone
+// panel of its own to place - including it in this grid just left a gap.
+// Verified by looking at the real rendered table, not assumed.
+const RTG_DECK_IDS = RTG_TABLE_DECKS.map((deck) => deck.id);
 
 export const PRESETS = [
   {
@@ -208,6 +228,60 @@ export const PRESETS = [
       ...row(['rankAdjacent-1', 'rankAdjacent-2'], { x: 380, y: 260, w: 150, h: 220, gap: 30 }),
       'table-zone': { x: 60, y: 60, w: 280, h: 150 },
       score: { x: 900, y: 60, w: 160, h: 120 },
+    },
+  },
+  {
+    // Recard the Gathering (US-83, D81). The capability-exercise preset:
+    // a fictitious Magic-like game that pushes the Pile/Zone/Deck/Action
+    // model into new territory without the table simulation changing.
+    //
+    // TABLE SIMULATOR, NOT A RULES ENGINE (the sprint's framing call):
+    // the engine models zones, tapping (`rotate`), life (`ScoreZone`)
+    // and card movement. Players enforce mana costs, the stack, combat
+    // and timing - exactly as the Solitaire preset is "not a full
+    // solitaire engine".
+    //
+    // `cardsPerPlayer: 7` is a real opening hand. Life totals start at
+    // 20 by convention; the Score panel's own +/-1/+/-10 controls (which
+    // already exist) are what track them, so no new mechanism is needed.
+    name: 'Recard the Gathering',
+    type: 'rtg',
+    deckList: 'rtg-mono-white',
+    numDecks: 1,
+    jokers: 0,
+    cardsPerPlayer: 7,
+    piles: [
+      // The other fourteen decks, pre-stocked and face-down on the
+      // table, so players can pick a deck by drawing from it. The main
+      // `deck` pile is the fifteenth (Dawnbreak Legion, above) - listing
+      // it here as well would put a duplicate sixteenth deck on the
+      // table.
+      ...RTG_TABLE_DECKS,
+      // The standard MTG zones each player owns. `hand` already exists
+      // for every player; library is the shared deck piles above.
+      { kind: 'battlefield', ownerId: 'perPlayer', count: 1 },
+      { kind: 'discard', ownerId: 'perPlayer', count: 1 },
+      { kind: 'exile', ownerId: 'perPlayer', count: 1 },
+      // One shared stack - spells wait here to resolve, LIFO.
+      { kind: 'stack', ownerId: null, count: 1 },
+    ],
+    // NOTE (flagged, not solved): fifteen deck piles plus two players'
+    // zones is a LOT of panels - Smith raised exactly this as Gate-1
+    // condition C3. The decks are laid out in two tidy rows along the
+    // top here, well clear of the seat ring, but this is the most
+    // crowded table any preset produces and is worth a real UX pass.
+    // 14 decks as a 5-wide grid down the left, the shared panels in a
+    // column on the right. Panel width is 150px because a deck's NAME is
+    // its title ("Thornwild Wardens", "The Tidegrowth") - the first cut
+    // at 96px ran the titles into each other, which only showed up on a
+    // real screenshot.
+    layout: {
+      ...row(RTG_DECK_IDS.slice(0, 5), { x: 30, y: 16, w: 150, h: 120, gap: 8 }),
+      ...row(RTG_DECK_IDS.slice(5, 10), { x: 30, y: 144, w: 150, h: 120, gap: 8 }),
+      ...row(RTG_DECK_IDS.slice(10), { x: 30, y: 272, w: 150, h: 120, gap: 8 }),
+      'table-zone': { x: 850, y: 16, w: 250, h: 160 },
+      stack: { x: 850, y: 186, w: 250, h: 130 },
+      score: { x: 850, y: 326, w: 250, h: 120 },
     },
   },
 ];
