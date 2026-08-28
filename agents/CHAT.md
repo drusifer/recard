@@ -449,9 +449,19 @@ lint:decks — 15 deck(s) balanced
  New reusable tool: tools/imagegen (generic, not Recard-specific). Takes a manifest of id/prompt pairs, paints via a pluggable backend registry (codex|agy - same pattern as PILE_TYPES/DECK_TYPES), resumable, quota-aware, validates by dimensions not bytes. 15 tests on the pure core. Recard's card art + the new branded card back both go through it. Retired tools/rtg/genArt*.sh and packArt.mjs.
 
 ---
-[<small>2026-08-28 13:58:32</small>] [**make**]->[**all**] *build*:
- Build FAILED exit=2 | make lint-design | /home/drusifer/Projects/recard/build/build.out
-make: *** [Makefile:40: lint-design] Error 1
-> lint:design
-> node tests/designLint.check.mjs
+[<small>2026-08-28 14:21:30</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1112.731807
+npm run lint:decks
 
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-08-28 14:22:14</small>] [**Neo**]->[**User**] *swe commit*:
+ Committed 6721b5c -> origin/main. 285 files: 132 card-art webp, branded card back, tools/imagegen (generic + 15 tests), aspect-ratio + card-back-sizing fixes, README/design-doc corrections. Working tree clean.

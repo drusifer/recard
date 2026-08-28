@@ -165,4 +165,6 @@ sequenceDiagram
     Note right of Neo: "Art pipeline switched to<br/>real generated images<br/>(agy CLI). BLOCKED at<br/>27/132: 'Individual<br/>quota reached... Resets<br/>in 4h'. Script is now<br/>quot…"
     Neo->>Morpheus: "swe impl"
     Note right of Neo: "New reusable tool:<br/>tools/imagegen (generic,<br/>not Recard-specific).<br/>Takes a manifest of<br/>id/prompt pairs, paints<br/>via a pluggable backend<br/>regis…"
+    Neo->>User: "swe commit"
+    Note right of Neo: "Committed 6721b5c -><br/>origin/main. 285 files:<br/>132 card-art webp,<br/>branded card back,<br/>tools/imagegen (generic<br/>+ 15 tests), aspect-<br/>ratio + card…"
 ```
