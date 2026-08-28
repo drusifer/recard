@@ -23,3 +23,15 @@ export const PILE_TYPES = {
   cascade: CascadePile,
   rankAdjacent: RankAdjacentPile,
 };
+
+/**
+ * D71 (US-74): `changePileType`'s eligible kinds, in cycle order - the
+ * single source of truth for both `state.js`'s `CHANGE_PILE_TYPE`
+ * eligibility check and `main.js`'s "advance to the next kind"
+ * cycling, so the two can never drift apart. `deck`/`hand` excluded -
+ * structural reasons (fixed-id lookup; per-player exactly-one
+ * invariant) unrelated to card content, so they stay excluded
+ * regardless of the pile being empty. Registry-declaration order
+ * (Smith Gate 1 - no strong reason to prefer another).
+ */
+export const CHANGE_PILE_TYPE_CYCLE = ['zone', 'discard', 'foundation', 'cascade', 'rankAdjacent'];

@@ -53,9 +53,9 @@ export class HandPile extends Pile {
     return pile.ownerId === viewerId ? ['play'] : [];
   }
 
-  /** Sorting or passing on someone else's behalf has never been
-   * possible and isn't now either. */
+  /** Sorting on someone else's behalf has never been possible and
+   * isn't now either. */
   static pileActions({ isOwner } = {}) {
-    return isOwner ? ['sortRank', 'sortSuit', 'pass'] : [];
+    return isOwner ? ['sortRank', 'sortSuit'] : [];
   }
 }

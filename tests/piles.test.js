@@ -174,14 +174,16 @@ test('deck pileActions: draw open to everyone, deal/reshuffleDeal/shuffle/split 
   assert.deepEqual(DeckPile.pileActions({ isHost: false }), ['draw']);
 });
 
-test('hand pileActions: sort/pass, owner only', () => {
-  assert.deepEqual(HandPile.pileActions({ isOwner: true }), ['sortRank', 'sortSuit', 'pass']);
+test('hand pileActions: sort, owner only - pass removed (direct user request, not a requirement)', () => {
+  assert.deepEqual(HandPile.pileActions({ isOwner: true }), ['sortRank', 'sortSuit']);
   assert.deepEqual(HandPile.pileActions({ isOwner: false }), []);
 });
 
-test('cascade/rankAdjacent pileActions: none - no pile-level action has ever targeted either', () => {
+test('cascade/rankAdjacent pileActions: none of the multi-card-sequence actions target either - D71 (US-74) adds changePileType as the one exception', () => {
   assert.deepEqual(CascadePile.pileActions({}), []);
   assert.deepEqual(RankAdjacentPile.pileActions({}), []);
+  assert.deepEqual(CascadePile.pileActions({ isShared: true }), ['changePileType']);
+  assert.deepEqual(RankAdjacentPile.pileActions({ isShared: true }), ['changePileType']);
 });
 
 // --- Write-side (D43): canRemoveCard/removeCard/insertCard ---
@@ -296,12 +298,17 @@ test('foundation canAccept: same suit, exactly rank+1 (RunPile\'s rule, inherite
   assert.equal(FoundationPile.canAccept(pile, { rank: '5', suit: 'clubs' }), false, 'same rank, not ascending');
 });
 
-test('foundation: append-only, never removable, offers no actions (silent-lock UX per Smith Gate 2) - all inherited from MeldPile', () => {
+test('foundation: append-only, never removable, offers no CARD actions (silent-lock UX per Smith Gate 2) - all inherited from MeldPile', () => {
   assert.equal(FoundationPile.canRemoveCard(), false);
   assert.deepEqual(FoundationPile.cardActions(), []);
   const pile = { cards: [{ id: 'a' }] };
   const inserted = FoundationPile.insertCard(pile, { id: 'b' });
   assert.deepEqual(inserted.cards.map((c) => c.id), ['a', 'b']);
+});
+
+test('foundation: changePileType is the one PILE-level action offered, inherited from MeldPile (D71/US-74)', () => {
+  assert.deepEqual(FoundationPile.pileActions({}), []);
+  assert.deepEqual(FoundationPile.pileActions({ isShared: true }), ['changePileType']);
 });
 
 test('foundation: tableSide true (inherited from Pile), resolveDropTarget always empty (no halo geometry, from MeldPile)', () => {

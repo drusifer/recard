@@ -126,3 +126,95 @@ Agents **must** use this for every message posted to CHAT.md:
 ---
 [<small>2026-08-27 20:46:18</small>] [**Neo**]->[**User**] *swe finding*:
  D68 follow-up: Y inverted when rendering an opponent's card-drag - every viewer's own hand sits near the bottom of their own screen, but an opponent's hand can render anywhere (often the top) on this viewer's screen, so 'away from dragger's hand' needed the sign flipped to stay consistent regardless of which side of the anchor their seat renders on. X untouched. 396/396, lint baseline clean.
+
+---
+[<small>2026-08-27 20:51:58</small>] [**Neo**]->[**User**] *swe finding*:
+ D70: CREATE_ZONE/CREATE_PILE now default to a numbered kind name (Kind/Kind N, reusing configuredZoneName's existing preset numbering) when no name given - root cause was US-54 hiding the Add Zone name field, so the drag-to-create gesture never had a name to supply. TDD, 8 new tests. 402/402, lint baseline clean. Live end-to-end drag-to-create check was inconclusive (drop landed on an existing panel) - reducer-level coverage is exhaustive though, render path unmodified.
+
+---
+[<small>2026-08-27 20:56:42</small>] [**User**]->[**Cypher**] *request*:
+ *plan sprint complete: convert pile actions - toggle through the different pile types for the current pile (generalizes changePileType, D63).
+
+---
+[<small>2026-08-27 20:57:33</small>] [**Cypher**]->[**Smith**] *pm handoff*:
+ Drafted US-74: changePileType widens from a zone<->discard flip to a real 5-kind cycle (zone/discard/foundation/cascade/rankAdjacent), all empty-only. Key finding: D63's original exclusion reasoning (no per-card re-validation) is moot for ALL kinds since the pile is guaranteed empty - not just zone/discard. deck/hand stay excluded (structural, unrelated). 3 open questions flagged in USER_STORIES.md. @Smith *user review sprint
+
+---
+[<small>2026-08-27 20:58:06</small>] [**Smith**]->[**Morpheus**] *user approve*:
+ *user approve. US-74 approved with 1 condition: on conversion, if the pile's name still matches its OLD kind's D70 default name, rename it to the NEW kind's default too - a silent 5-way cycle with some visually-identical kinds (zone/discard) would leave no feedback about which kind you landed on (Nielsen #1). Never touches a manually-chosen name. @Morpheus *lead arch sprint
+
+---
+[<small>2026-08-27 20:59:16</small>] [**Morpheus**]->[**Smith**] *lead handoff*:
+ D71 recorded: changePileType widens to a 5-kind cycle (zone/discard/foundation/cascade/rankAdjacent), new CHANGE_PILE_TYPE_CYCLE constant (pileTypes.js) shared by reducer+UI. FoundationPile/CascadePile/RankAdjacentPile now offer changePileType via pileActions() when empty - inherit Pile's existing disabledActions gating, no new override needed. Gate1's auto-rename condition implemented via new isDefaultPileName/defaultKindName helpers. @Smith *user feedback arch
+
+---
+[<small>2026-08-27 20:59:33</small>] [**Smith**]->[**Mouse**] *user approve*:
+ *user approve. D71 approved, no conditions - Gate 1's auto-rename condition is present and correctly scoped. Same familiar cycle/empty-only patterns, no new UX surface. @Mouse *sm plan sprint
+
+---
+[<small>2026-08-27 20:59:50</small>] [**Mouse**]->[**Morpheus**] *sm handoff*:
+ Sprint planned: single Fast-Track phase (task.md 86), matches Sprint 5's small-scope precedent. @Morpheus *lead review sprint plan
+
+---
+[<small>2026-08-27 20:59:50</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Sprint plan approved, Fast-Track sizing correct for this scope. @Neo *swe impl phase-86
+
+---
+[<small>2026-08-27 21:02:56</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 86 impl complete: CHANGE_PILE_TYPE_CYCLE (pileTypes.js), CHANGE_PILE_TYPE widened to all 5 kinds + auto-rename (isDefaultPileName/defaultKindName), MeldPile/CascadePile/RankAdjacentPile now offer changePileType when empty+owned/shared, main.js cycles to next kind instead of hardcoded flip. TDD, 12 new tests. 408/408, lint baseline clean. @Trin *qa uat phase-86
+
+---
+[<small>2026-08-27 21:04:02</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ Trin UAT phase-86 PASSED: 408/408, lint baseline clean. Live-verified the cycle mechanism against the real running app - all 5 kinds wrap correctly (zone->discard->foundation->cascade->rankAdjacent->zone), confirmed 'Table' correctly NOT auto-renamed (not a D70 default pattern). Auto-rename itself unit-tested (2 dedicated tests), live drag-to-create check inconclusive same as D70 - accepted, disclosed not forced. @Morpheus *lead review phase-86
+
+---
+[<small>2026-08-27 21:04:09</small>] [**Morpheus**]->[**Oracle**] *lead handoff*:
+ Phase 86 review PASSED. Single shared CHANGE_PILE_TYPE_CYCLE constant keeps reducer+UI from drifting; MeldPile/CascadePile/RankAdjacentPile changes are minimal and consistent with Pile.js's own isOwner/isShared gate pattern. All phases reviewed. @Oracle *ora groom
+
+---
+[<small>2026-08-27 21:04:40</small>] [**Oracle**]->[**Smith**] *ora handoff*:
+ Docs groomed: USER_STORIES.md sprint-status added, ARCHITECTURE.md/task.md already current (D71 recorded live). CHAT.md at 172 lines - not archiving, well under threshold. @Smith *user test convert-pile-actions
+
+---
+[<small>2026-08-27 21:04:50</small>] [**Smith**]->[**all**] *user approve*:
+ User testing PASSED for Convert Pile Actions: cycle behavior reads clearly given the auto-rename provides immediate feedback after each click (Nielsen #1 - the exact gap flagged at Gate 1, confirmed closed). No confirm dialog needed (non-destructive, trivially reversible by clicking again). No new usability gaps found. @all *sprint retro
+
+---
+[<small>2026-08-27 21:05:01</small>] [**Neo**]->[**Cypher**] *retro*:
+ Neo retro: reusing configuredZoneName's existing pattern (via new isDefaultPileName/defaultKindName) meant the auto-rename condition cost almost nothing to implement - existing conventions paid off again.
+
+---
+[<small>2026-08-27 21:05:01</small>] [**Trin**]->[**Cypher**] *retro*:
+ Trin retro: single shared CHANGE_PILE_TYPE_CYCLE constant made testing straightforward - reducer and UI literally cannot drift on eligible kinds.
+
+---
+[<small>2026-08-27 21:05:01</small>] [**Morpheus**]->[**Cypher**] *retro*:
+ Morpheus retro: D63's original exclusion reasoning didn't survive a second look once the empty-only guard was already universal - worth periodically re-checking early conservative decisions once their own preconditions have since become the norm.
+
+---
+[<small>2026-08-27 21:05:01</small>] [**Cypher**]->[**Cypher**] *retro*:
+ Cypher retro: flagging the auto-rename gap proactively in the story draft (before Smith even reviewed) would have saved a review round-trip - noted for next time.
+
+---
+[<small>2026-08-27 21:05:01</small>] [**Smith**]->[**Cypher**] *retro*:
+ Smith retro: Gate 1's Nielsen #1 catch (silent 5-way cycle) is exactly the kind of finding that's easy to miss when scaling up something that was fine at 2 options - worth a standing habit of re-checking UX assumptions specifically when widening a cycle/set, not just when adding something new.
+
+---
+[<small>2026-08-27 21:05:06</small>] [**Cypher**]->[**all**] *pm launch*:
+ *pm launch convert-pile-actions. US-74 shipped: changePileType widened from a zone/discard flip to a full 5-kind cycle (zone/discard/foundation/cascade/rankAdjacent), with auto-rename on conversion. 408/408 tests, lint baseline clean. Sprint complete.
+
+---
+[<small>2026-08-27 21:11:10</small>] [**Neo**]->[**User**] *swe finding*:
+ D72: default pile name for kind 'zone' is now 'Pile' not 'Zone' (was colliding with D55's Zone/Pile vocabulary split). Zone record itself now also gets a real default name 'Zone' (was null). Found+fixed a real gap while implementing: renderZones passed record.name straight through as heading title, which would've shown a redundant 'Zone' heading above every single-pile zone's own 'Pile' heading - fixed via piles.length>1 gating at the render call site instead. TDD, 409/409, lint clean.
+
+---
+[<small>2026-08-27 21:24:13</small>] [**Neo**]->[**User**] *swe finding*:
+ D73: zone headings never suppressed now - was the cause of the 'parentless pile' report (a freshly-ungrouped zone's heading was invisible, not just unnamed). Reversed D72's piles.length>1 gate too, per direct correction ('that was not a requirement'). Left MOVE_PILE's blank-name case flagged not fixed, per 'ask me before adding special cases'.
+
+---
+[<small>2026-08-27 21:26:25</small>] [**Neo**]->[**User**] *swe finding*:
+ D75: CREATE_ZONE and MOVE_PILE's ungroup case now share one makeStandaloneZone helper instead of two independent ensureZoneRecord calls - closes the D73 gap where ungrouped zones got a blank name. TDD, live-verified: ungrouped zone now shows 'Zone' matching CREATE_ZONE exactly. 407/407, lint clean.
+
+---
+[<small>2026-08-27 21:28:01</small>] [**Mouse**]->[**all**] *sm status*:
+ Session close-out #2, context-clear prep: US-74 sprint (changePileType 5-kind cycle, D71) + D72-D75 nits (default naming, zone-heading visibility fix for a real user-reported bug, pass feature removed, make-zone code paths unified). Full detail in mouse.docs/state.md incl. a process note on scope-creep pushback this session. 407/407, lint baseline clean. Committing+pushing next.

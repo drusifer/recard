@@ -158,7 +158,7 @@ test('D31: hands ARE saved now - D26 stripped them because ids were unstable, an
       { id: 'deck', kind: 'deck', cards: [{ id: 'c1' }] },
       { id: 'hand:key-a', kind: 'hand', ownerId: 'key-a', cards: [{ id: 'ace-spades-0' }] },
     ],
-    scores: {}, passed: {},
+    scores: {},
   };
   const written = JSON.stringify(snapshot(state, 'CODE', 'Alice'));
   // Asserted on the serialized STRING, same as the Sprint 7 test that

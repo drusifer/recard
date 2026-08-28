@@ -33,10 +33,16 @@ export class MeldPile extends Pile {
   }
 
   /**
-  No pile-level action has ever targeted a meld.
-  */
-  static pileActions() {
-    return [];
+   * D71 (US-74): `changePileType` is the first pile-level action ever
+   * offered on a meld - only when empty (the reducer's own guard;
+   * `disabledActions`, inherited from `Pile`, already hides it
+   * otherwise). Same `isOwner`/`isShared` gate `Pile.pileActions()`
+   * uses, for consistency - a meld is normally ownerless/shared
+   * (Solitaire's foundations), same as any other shared pile.
+   */
+  static pileActions({ isOwner, isShared } = {}) {
+    if (!isOwner && !isShared) return [];
+    return ['changePileType'];
   }
 
   /** No before/after halo - a meld has exactly one landing spot

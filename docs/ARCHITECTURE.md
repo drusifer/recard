@@ -3745,3 +3745,258 @@ of which side of their own anchor a given viewer happens to render
 that seat on. `x` is untouched - not requested, and left/right isn't
 mirrored the same way top/bottom is by this app's own seat placement
 convention.
+
+---
+
+### D70. `CREATE_ZONE`/`CREATE_PILE` default to a numbered kind name when no name is given
+
+**Context:** direct user request - "new Zones and Piles need default
+names." Root cause: the "Add Zone" form (a name text input) was hidden
+per US-54; every zone/pile a player creates now comes from the
+permissive drag-to-create-pile gesture instead (D57-era), which has no
+name to supply at all - `action.name` was always `undefined`, and a
+nameless pile's own heading rendered blank until manually renamed.
+
+**Decision:** both actions now default to `configuredZoneName(kind,
+sameKindCount, sameKindCount + 1)` when `action.name` is omitted -
+reusing the SAME "Kind" / "Kind N" numbering already proven for
+preset-declared piles (`buildPiles`), not a new naming scheme.
+`sameKindCount` excludes the built-in default Table pile
+(`DEFAULT_ZONE_ID`, `kind: 'zone'`) - it already has its own fixed
+name and isn't part of the player-created numbering. An explicit
+`action.name`, when given, is never overridden.
+
+**Verified:** TDD, 8 new reducer-level tests (unnumbered first, "Kind
+2" for a second unnamed same-kind pile, an explicit name still wins,
+both actions). Rendering itself needed no change - `zone.name` already
+flows straight into `heading.render(...)` for every other pile.
+Attempted a live end-to-end drag-to-create-pile check (Playwright);
+inconclusive - the drop landed on an existing panel instead of the
+table's genuinely empty background, so no new pile was created to
+inspect. Not chased further given the reducer-level coverage is
+exhaustive and the render path is an unmodified, already-proven
+pass-through.
+
+**Where the full text lives:** this entry; `src/state.js`'s
+`CREATE_ZONE`/`CREATE_PILE`; `tests/state.test.js`'s new tests.
+
+---
+
+### D71. `changePileType` widens from a zone/discard flip to a full 5-kind cycle (US-74)
+
+**Context:** direct user request, full sprint - "convert pile actions
+(toggle through the different pile types for the current pile)."
+D63's original `foundation`/`cascade`/`rankAdjacent` exclusion reasoning
+("no per-card re-validation exists to check that existing cards remain
+legal under the new type") is moot once the empty-only guard (already
+shipped with D63, unconditional for every kind) is in place - an empty
+pile has no cards to violate any target kind's rules with, regardless
+of which two kinds are involved.
+
+**Decision:**
+- New shared constant `CHANGE_PILE_TYPE_CYCLE = ['zone', 'discard',
+  'foundation', 'cascade', 'rankAdjacent']` (`src/piles/pileTypes.js`,
+  single source of truth for both the reducer's eligibility check and
+  the UI's "what's next" computation - registry-declaration order,
+  Smith Gate 1 Q2, no strong reason to prefer another order).
+  `deck`/`hand` excluded - unrelated STRUCTURAL reasons (fixed-id
+  lookup; per-player exactly-one invariant), not card-content risk.
+- `CHANGE_PILE_TYPE` reducer: eligibility check widened from the
+  hardcoded `zone`/`discard` pair to membership in
+  `CHANGE_PILE_TYPE_CYCLE`, both source and target kind. Empty-only
+  guard unchanged.
+- `changePileType` is now offered by `FoundationPile`/`CascadePile`/
+  `RankAdjacentPile`'s own `pileActions()` too (previously `[]`
+  unconditionally on all three) - same `isOwner`/`isShared` gate
+  `Pile.pileActions()` already uses, for consistency. `disabledActions`
+  needed NO new override on any of the three - they already inherit
+  `Pile.disabledActions(count)`, which already returns `['remove',
+  'changePileType']` at `count > 0` (the `'remove'` entry is a
+  harmless no-op for these three since it's never actually offered by
+  their `pileActions()` - only recognized disabled ids affect
+  anything).
+- Smith Gate 1 condition: on a successful conversion, if the pile's
+  current name still matches its OLD kind's own D70 default-name shape
+  (`isDefaultPileName`, new - matches `"Kind"` or `"Kind N"`
+  unconditionally, not tied to current same-kind counts), it's renamed
+  to the unnumbered default for the NEW kind (`defaultKindName`, new -
+  deliberately simpler than D70's numbered `configuredZoneName`: a
+  post-conversion rename doesn't chase perfect same-kind-count
+  deduplication, just gives the user a visible, correct-enough label
+  matching Nielsen #1's actual requirement). A manually-chosen name is
+  never touched.
+
+**Rejected:** re-validating existing cards per-card against the target
+kind's `canAccept` instead of relying on empty-only (would have let
+foundation/cascade/rankAdjacent participate without the emptiness
+restriction) - rejected as unscoped complexity for this sprint, same
+call D63 already made and re-affirmed here rather than revisited.
+
+**Where the full text lives:** this entry; `src/piles/pileTypes.js`'s
+`CHANGE_PILE_TYPE_CYCLE`; `src/state.js`'s `CHANGE_PILE_TYPE`;
+`src/piles/FoundationPile.js`/`CascadePile.js`/`RankAdjacentPile.js`.
+
+---
+
+### D72. D70 follow-up: default pile name is "Pile" not "Zone"; the containing Zone record also gets a real default
+
+**Context:** direct user correction to D70 - "default pile name should
+be 'Pile' not 'Zone' and you need to also add the default 'Zone' name
+to the zone that the panel is in." `kind: 'zone'` is the generic/base
+Pile kind, but "Zone" is already this app's own word for the
+CONTAINING entity (D55's Zone/Pile split, kept genuinely separate
+throughout this codebase) - D70 naming the pile itself "Zone" collided
+with that vocabulary.
+
+**Decision, two parts:**
+1. New `defaultNameWord(kind)` (`state.js`): `'Pile'` for `kind ===
+   'zone'`, `capitalizeKind(kind)` (unchanged) for every other kind.
+   Used by `configuredZoneName` (D70's numbering), `isDefaultPileName`/
+   `defaultKindName` (D71's auto-rename) - one function, so the "what
+   counts as a default name" check and "what the default actually is"
+   can't drift apart.
+2. `CREATE_ZONE` now also gives the ZONE record itself a real default
+   name (`'Zone'`) via `ensureZoneRecord(..., 'Zone')`, instead of the
+   previous `null`. Found a real latent gap while implementing this:
+   `renderZones` (`ui.js`) passes `record.name` straight through as
+   the Zone's own heading `title` - a standalone (1-pile) zone
+   deliberately suppresses that heading today (the lone pile's own
+   title already says the same thing), which depends on `record.name`
+   being falsy. Simply setting a real name would have broken that
+   suppression, showing a redundant "Zone" heading above every
+   single-pile zone's own "Pile" heading. Fixed at the render call
+   site instead: `piles.length > 1 ? record.name : null` - same visual
+   outcome for the common single-pile case, but if a SECOND pile later
+   joins this zone (`MOVE_PILE` reparenting), the heading that then
+   starts rendering shows "Zone", not a blank title (the actual gap
+   the user's request was aiming at).
+
+**Verified:** TDD, 4 new/updated tests (pile default "Pile" not
+"Zone", numbered "Pile 2", the Zone record's own default separately
+from its pile's, the pre-existing "standalone zone" test updated for
+the new non-null default). 409/409, lint baseline unchanged.
+Live-verified no regression on an already-multi-pile zone (Table
+Zone, deck+table co-located by default) - its heading still renders
+correctly; the specific "1-pile zone gains a 2nd pile" transition
+relies on the same `record.name`/`piles.length` values already proven
+correct at the reducer level, not separately live-verified (same
+drag-to-create Playwright flakiness disclosed at D70/D71).
+
+**Where the full text lives:** this entry; `src/state.js`'s
+`defaultNameWord`/`CREATE_ZONE`; `src/ui.js`'s `renderZones`.
+
+---
+
+### D73. Zone headings are never suppressed; D72's `piles.length > 1` gate was a special case, reversed
+
+**Context:** direct user correction, live, while chasing "dropping Pile
+on the table did not create a new table zone - looks like the pile is
+parentless." Root cause: a standalone (1-pile) zone's own heading has
+been conditionally suppressed since 2026-08-26 ("the lone pile's own
+heading already says the same thing") - `MOVE_PILE`'s ungroup case
+(dragging a pile's title onto open table space, D57) mints a fresh
+standalone Zone for it, but with that heading suppressed, there was NO
+visible indication a new Zone now exists at all - indistinguishable
+from the pile never having been reparented into a real Zone in the
+first place.
+
+**Decision:** both suppression points removed outright - `renderZones`
+(`ui.js`) no longer computes `piles.length > 1 ? record.name : null`
+(D72's own addition, same session), and `renderZonePanel`'s `if
+(title) {...}` gate around building the heading at all is gone. Every
+Zone renders its own heading now, unconditionally, consistent
+regardless of pile count or whether it has a name yet.
+
+**Explicitly NOT done, per direct instruction ("that was not a
+requirement" / "if you think we need a special case ask me"):**
+`MOVE_PILE`'s own `ensureZoneRecord` call (the ungroup path) still
+passes no name, so a freshly-ungrouped zone's heading renders with
+blank text (present now, not invisible - a real improvement over
+"parentless"-looking - but not a filled-in default the way
+`CREATE_ZONE`'s D72 fix gives its own new zones). Flagged, not fixed
+unilaterally - a second `ensureZoneRecord` call site getting the same
+default-name treatment as `CREATE_ZONE`'s is a real follow-up
+candidate, but a decision for the user to make, not this fix's own
+scope.
+
+**Verified:** 406/406 (this code has no unit coverage - DOM-only,
+matches this project's standing pattern of live-verifying `ui.js`
+changes instead). Live-verified: the previously-invisible ungrouped
+zone now shows a real heading bar (rename/remove controls included),
+confirming the fix.
+
+**Where the full text lives:** this entry; `src/ui.js`'s
+`renderZones`/`renderZonePanel`.
+
+---
+
+### D74. `pass` (HandPile action, `TOGGLE_PASS`, `state.passed`) removed outright - "not a requirement"
+
+**Context:** direct user request - "what's up with pass action on
+HandPile? Remove that it's not a requirement." Asked the user how far
+the removal should go before touching anything, since `pass` was a
+full feature (D16/US-25), not just a button: `HandPile.pileActions()`
+offered it, `main.js` wired `TOGGLE_PASS`, `state.js` tracked a
+`passed` field (set in `JOIN`, reset in `RESET`, exposed via
+`viewFor`, persisted in `persistence.js`'s `snapshot`), and the roster
+UI showed a "Passed" tag. User confirmed: full removal, not just the
+offered action - matches this project's standing no-dead-code
+convention.
+
+**Decision:** removed everywhere, not deprecated:
+- `HandPile.pileActions()`: `'pass'` dropped from the returned array.
+- `pileActions.js`: `ACTION_SPECS.pass` entry deleted.
+- `main.js`: `togglePass()` function deleted; its `onPileAction`
+  dispatch case deleted; `passed: view.passed` dropped from the
+  roster's own options object.
+- `state.js`: `TOGGLE_PASS` reducer case deleted; `passed` dropped from
+  `createInitialState`'s initial shape, `JOIN`'s per-player init,
+  `RESET`'s per-round rezero, and `viewFor`'s returned view.
+- `persistence.js`: `passed: state.passed` dropped from `snapshot()`.
+  No `SNAPSHOT_VERSION` bump - a restored older snapshot's stray
+  `passed` field is simply carried through as inert extra data by
+  `load()`'s generic spread, same "additive/removed optional field,
+  not a semantic gap" reasoning already established for `gameConfig`.
+- `ui.js`: `renderRoster`'s `passed` param and the `passedTag` display
+  logic deleted.
+
+**Verified:** 7 tests deleted or rewritten (dead `TOGGLE_PASS`/`passed`
+assertions removed; the `RESET` regression test kept its still-valid
+"scores survive a reset" half, minus the pass-marker half).
+`grep`-confirmed no stray reference remains outside removal-note
+comments. 406/406, lint baseline unchanged. Live-verified: no Pass
+button renders on the hand pile's own ActionBar.
+
+**Where the full text lives:** this entry; `src/piles/HandPile.js`;
+`src/state.js`; `src/main.js`; `src/persistence.js`; `src/ui.js`.
+
+---
+
+### D75. `CREATE_ZONE` and `MOVE_PILE`'s ungroup case unified onto one `makeStandaloneZone` helper
+
+**Context:** direct user follow-up to D73's flagged-not-fixed gap -
+"fix separate code paths for make zone... there can be only 1."
+`CREATE_ZONE` and `MOVE_PILE`'s own "drop a pile on open table space"
+ungroup case were two independent `ensureZoneRecord` calls for the
+exact same real operation (spawn a fresh standalone Zone for a pile),
+which is exactly how they'd drifted apart in the first place - one
+passed `'Zone'` as a default name (D72), the other passed nothing
+(the D73 gap).
+
+**Decision:** new `makeStandaloneZone(zones, pileId)` (`state.js`,
+`ensureZoneRecord(zones, pileId, 'Zone')`) - both call sites route
+through it now, so the default can't drift a second time. Scoped
+deliberately to just these two truly-duplicated "a player spawns a
+standalone zone at runtime" call sites - `buildPiles`'s own
+`ensureZoneRecord` call (preset-declared piles with no explicit
+`zoneId`) is a different lifecycle stage (table-creation time, not a
+live user action) and was left alone, not swept in.
+
+**Verified:** TDD - new test asserting `MOVE_PILE`'s ungrouped zone
+gets the identical `'Zone'` default `CREATE_ZONE` already gave.
+407/407, lint baseline unchanged. Live-verified: the ungrouped zone's
+heading now reads "Zone", matching a `CREATE_ZONE`-created one
+exactly - the D73 gap is closed.
+
+**Where the full text lives:** this entry; `src/state.js`'s
+`makeStandaloneZone`, `CREATE_ZONE`, `MOVE_PILE`.

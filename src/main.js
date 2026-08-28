@@ -1,5 +1,6 @@
 import { Session } from './session.js';
 import { createInitialState, reduce, viewFor } from './state.js';
+import { CHANGE_PILE_TYPE_CYCLE } from './piles/pileTypes.js';
 import { makeStateMessage, makeMotionMessage, createMotionThrottler, cardDragPayload } from './protocol.js';
 import { renderShareCode, wireCopyCode } from './qrcode.js';
 import {
@@ -989,7 +990,6 @@ function renderRosterOnly() {
     scores: view.scores,
     onAdjustScore: isSessionEnded ? null : adjustScore,
     myId,
-    passed: view.passed,
   };
   const hostRosterElement = document.querySelector('#host-roster');
   if (hostRosterElement) {
@@ -1087,11 +1087,13 @@ function renderGameFromView(view) {
     // callback regardless of which pile kind offered the action.
     // `pileLevelActions('hand', {isOwner})`'s other two (sortRank/
     // sortSuit) are filtered out before they ever reach here (see
-    // `renderPile`'s own note) - `pass` and every deck action
-    // (`dealFromDeck` already handles draw/deal/reshuffleDeal/shuffle/
-    // split generically) are the two real dispatch tables today.
+    // `renderPile`'s own note) - every deck action (`dealFromDeck`
+    // already handles draw/deal/reshuffleDeal/shuffle/split generically)
+    // is the one real dispatch table today. `pass` was removed outright
+    // (direct user request, "not a requirement") - see its own git
+    // history for the full removal (TOGGLE_PASS, `state.passed`, the
+    // roster's Passed tag).
     onPileAction: isSessionEnded ? null : (pileId, actionId) => {
-      if (actionId === 'pass') return togglePass();
       // Sprint 23: `split` is offered by BOTH the deck (`SPLIT_DECK`,
       // deck-only pile count) and a zone/discard pile (`SPLIT_PILE`,
       // this specific pile in half) - the same action id means a
@@ -1105,10 +1107,17 @@ function renderGameFromView(view) {
       if (actionId === 'hide') return performSetPileOrientation(pileId, false);
       if (actionId === 'show') return performSetPileOrientation(pileId, true);
       if (actionId === 'remove') return performRemovePile(pileId);
-      // US-73: zone<->discard is the only eligible pair (D63) - toggle
-      // to whichever of the two this pile currently ISN'T.
+      // D71 (US-74): advances to the NEXT kind in CHANGE_PILE_TYPE_CYCLE
+      // (wrapping), a real cycle now - not the old zone<->discard-only
+      // flip. `indexOf` returning -1 for a pile whose kind somehow
+      // isn't in the cycle (shouldn't be reachable - this action is
+      // only ever offered by an eligible kind's own pileActions())
+      // falls through to index 0 via `(-1 + 1) % length === 0`, the
+      // same safe "start of the cycle" default a real member would get.
       if (actionId === 'changePileType') {
-        return performChangePileType(pileId, pile?.kind === 'discard' ? 'zone' : 'discard');
+        const currentIndex = CHANGE_PILE_TYPE_CYCLE.indexOf(pile?.kind);
+        const nextKind = CHANGE_PILE_TYPE_CYCLE[(currentIndex + 1) % CHANGE_PILE_TYPE_CYCLE.length];
+        return performChangePileType(pileId, nextKind);
       }
     },
     // *nit (2026-08-26): "allow user to rename zones and piles - any
@@ -1497,13 +1506,6 @@ function showDeckError(message) {
   element.hidden = false;
   clearTimeout(showDeckError.timer);
   showDeckError.timer = setTimeout(() => { element.hidden = true; }, 4000);
-}
-
-// --- Pass marker (US-25): self-toggle only, like US-13's precedent. ---
-function togglePass() {
-  if (isSessionEnded) return;
-  if (role === 'host') dispatch({ type: 'TOGGLE_PASS', playerId: myId });
-  else session.send({ type: 'action', action: { type: 'TOGGLE_PASS' } });
 }
 
 // --- Motion (US-11): best-effort, cosmetic only. See protocol.js/ARCHITECTURE.md D4. ---

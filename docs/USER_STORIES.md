@@ -2626,3 +2626,102 @@ went through TDD + live Playwright verification. 396/396, lint baseline
 unchanged throughout. See `docs/ARCHITECTURE.md` D64-D67 for full
 reasoning, including D67's deliberate, disclosed narrowing of D23's
 deck-privacy guarantee (direct user instruction).
+
+---
+
+## Sprint: Convert Pile Actions (2026-08-27)
+
+Owner: Cypher. Direct user request, full sprint: "convert pile actions
+(toggle through the different pile types for the current pile)."
+
+Researched against current code first (D63's own reasoning,
+`src/piles/pileTypes.js`'s `PILE_TYPES` registry, each subclass's
+`canAccept`/`reparentable`): today `changePileType` (D63) is a single
+zone<->discard FLIP, not a real cycle - the button click hardcodes
+"whichever of the two this pile currently ISN'T"
+(`performChangePileType`, main.js). `foundation`/`cascade`/
+`rankAdjacent` were excluded at D63 time specifically because "no
+per-card re-validation exists to check that [existing cards] remain
+legal under the new type." That reasoning is now moot for ALL kinds,
+not just zone/discard: `changePileType` has been empty-only since D63
+shipped - an empty pile has no cards to violate any target kind's
+rules with, by construction. `deck`/`hand` remain excluded for
+unrelated STRUCTURAL reasons (fixed-id lookup; per-player exactly-one
+invariant) that don't depend on card content at all - those stand
+regardless.
+
+### US-74: changePileType cycles through every eligible empty pile kind
+**As** a player, **I want** clicking "Change type" to advance to the
+NEXT pile kind (wrapping around), **so that** I can reconfigure a pile
+through more than just two shapes without deleting and recreating it.
+**AC:**
+- Eligible kinds widen from `{zone, discard}` to `{zone, discard,
+  foundation, cascade, rankAdjacent}` - all five mutually cyclable,
+  all still empty-only (D63's existing guard, now justified as
+  sufficient for every kind, not just the original two).
+- `deck`/`hand` remain excluded (`MOVE_PILE`/`REMOVE_PILE`'s own
+  established structural reasoning, unchanged).
+- Cycle order is fixed and predictable (not random/state-dependent) -
+  proposed: `zone -> discard -> foundation -> cascade -> rankAdjacent
+  -> zone`, matching `PILE_TYPES` registry declaration order.
+- `changePileType` is now offered by ALL FIVE eligible kinds' own
+  `pileActions()` when empty (today only `zone`/`discard` offer it at
+  all) - an empty `foundation`/`cascade`/`rankAdjacent` pile becomes
+  convertible too, not just a target.
+
+### Flagged open questions for Smith's Gate 1
+1. **Should `foundation`/`cascade`/`rankAdjacent` really be
+   cycle-eligible, given they're normally preset-declared (Solitaire/
+   Spit) rather than player-created?** Proposed: yes, scoped strictly
+   to EMPTY instances (a foundation pile that's been emptied via
+   `TAKE_PILE`, or one nobody's played to yet) - no code anywhere in
+   this codebase currently assumes "there are exactly N foundation
+   piles" as an invariant (checked: no win-condition/rule-completion
+   logic exists at all yet). If wrong, converting one away just means
+   a player made an unusual choice on an otherwise-idle pile.
+2. **Cycle order** - proposed registry-declaration order (see above).
+   No strong reason to prefer another order; flagging in case Smith
+   sees a more intuitive one (e.g. grouping "generic" kinds first:
+   zone/discard, then "structured" kinds).
+3. **UI**: same single "Change type" button, repeated clicks advance
+   the cycle (vs. e.g. a dropdown/menu of all 5 choices at once).
+   Proposed: keep the single-button cycle - matches the existing
+   affordance exactly, no new UI pattern needed, and 5 choices is
+   still small enough that a few clicks isn't a real burden.
+
+**Out of scope**: `deck`/`hand` joining the cycle (structural
+exclusions, unrelated to this sprint's actual finding);
+`MeldPile`/`RunPile`/`SetPile` (unregistered/dead code in
+`PILE_TYPES`, confirmed via prior research this session - not
+reachable regardless).
+
+### Smith Gate 1 review (2026-08-27) — APPROVED WITH AMENDMENTS
+
+Q1/Q2/Q3 resolved as Cypher proposed (foundation/cascade/rankAdjacent
+in scope when empty; registry-declaration cycle order; single-button
+repeated-click cycle, no new UI pattern).
+
+**One real gap found, not present in the story-level review**: with
+only 2 kinds (the status quo), a silent flip was low-stakes and
+roughly self-evident. Widened to 5 kinds - some visually
+indistinguishable (`zone`/`discard` render identically per
+`DiscardPile`'s own doc comment) - a user could click "Change type"
+several times with NO visible feedback about which kind they've
+landed on (Nielsen #1, Visibility of System Status). AC added:
+**on a successful conversion, if the pile's current name still
+matches its OLD kind's own D70 default name (`configuredZoneName`,
+i.e. it was never manually renamed), rename it to the NEW kind's
+default too** - reuses D70's naming outright rather than inventing a
+new UI element, and never touches a name the player chose themselves.
+This is the condition for approval, not optional polish.
+
+**Verdict: APPROVED WITH 1 CONDITION** (auto-rename-when-still-default
+above). @Morpheus *lead arch sprint.
+
+### Sprint status: US-74 COMPLETE (2026-08-27)
+Single Fast-Track phase (task.md 86). `changePileType` cycles through
+all 5 eligible kinds (zone/discard/foundation/cascade/rankAdjacent),
+wrapping around; Gate 1's auto-rename condition implemented and
+unit-tested. TDD, 12 new tests, 408/408 total, lint baseline unchanged.
+Live-verified the cycle mechanism end to end against the real running
+app. See `docs/ARCHITECTURE.md` D71 for full reasoning.

@@ -65,8 +65,8 @@ test('reshuffleDeal is marked destructive and deal is not', () => {
 
 // --- Sprint 12 (US-46, D34/D36) ---------------------------------------
 
-test('D34: the hand offers pile-level actions to its own owner - sort and pass', () => {
-  assert.deepEqual(pileLevelActions('hand', { isHost: false, isOwner: true }), ['sortRank', 'sortSuit', 'pass']);
+test('D34: the hand offers pile-level actions to its own owner - sort only (pass removed, direct user request)', () => {
+  assert.deepEqual(pileLevelActions('hand', { isHost: false, isOwner: true }), ['sortRank', 'sortSuit']);
 });
 
 test('D34: a hand pile offers nothing to a viewer who does not own it', () => {

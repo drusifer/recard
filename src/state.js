@@ -1,5 +1,5 @@
 import { buildDeck, shuffle } from './deck.js';
-import { PILE_TYPES } from './piles/pileTypes.js';
+import { PILE_TYPES, CHANGE_PILE_TYPE_CYCLE } from './piles/pileTypes.js';
 
 const DEFAULT_ZONE_ID = 'table';
 const DECK_PILE_ID = 'deck';
@@ -55,6 +55,21 @@ const TABLE_ZONE_RECORD = { id: TABLE_ZONE_ID, name: 'Table Zone', ownerId: null
 function ensureZoneRecord(zones, id, name = null, ownerId = null, type = 'shared') {
   if (zones.some((z) => z.id === id)) return zones;
   return [...zones, { id, name, ownerId, type }];
+}
+
+/**
+ * D73 follow-up (direct user request, "fix separate code paths for
+ * make zone... there can be only 1"): `CREATE_ZONE` and `MOVE_PILE`'s
+ * own "drop on open table space" ungroup case were two independent
+ * `ensureZoneRecord` calls for the exact same real operation - "spawn
+ * a fresh, standalone Zone for this pile, with the default name a
+ * user-created Zone gets" - that had drifted apart (one passed
+ * `'Zone'`, the other passed nothing, which is how `MOVE_PILE`'s own
+ * ungrouped zones ended up with a blank heading, D73). One function
+ * now, one default, both call sites route through it.
+ */
+function makeStandaloneZone(zones, pileId) {
+  return ensureZoneRecord(zones, pileId, 'Zone');
 }
 
 /**
@@ -137,9 +152,45 @@ function makeDeckPile(deckConfig, rng, zoneId) {
 /** "discard", 1 -> "Discard"; "cascade", 3 of 7 -> "Cascade 3" - only
  * numbered when there's more than one, so Gin Rummy's single discard
  * pile doesn't read as "Discard 1". */
+function capitalizeKind(kind) {
+  return kind.charAt(0).toUpperCase() + kind.slice(1);
+}
+
+/**
+ * *nit (direct user request): "default pile name should be 'Pile' not
+ * 'Zone'" - `kind: 'zone'` is the generic/base Pile kind, but "Zone"
+ * is already this app's own word for the CONTAINING entity (D55's
+ * Zone/Pile split) - naming the pile itself "Zone" collided with that.
+ * Every other kind still just capitalizes (Discard, Foundation, ...).
+ */
+function defaultNameWord(kind) {
+  return kind === 'zone' ? 'Pile' : capitalizeKind(kind);
+}
+
 function configuredZoneName(kind, index, count) {
-  const capitalized = kind.charAt(0).toUpperCase() + kind.slice(1);
-  return count > 1 ? `${capitalized} ${index + 1}` : capitalized;
+  const word = defaultNameWord(kind);
+  return count > 1 ? `${word} ${index + 1}` : word;
+}
+
+/**
+ * D71 (US-74, Smith Gate 1): does `name` still look like a kind's own
+ * D70 default (`configuredZoneName`'s output, numbered or not)? Used
+ * by `CHANGE_PILE_TYPE` to decide whether to auto-rename on
+ * conversion - a manually-chosen name never matches this and is left
+ * alone.
+ */
+function isDefaultPileName(name, kind) {
+  const word = defaultNameWord(kind);
+  return name === word || new RegExp(String.raw`^${word} \d+$`).test(name);
+}
+
+/** D71: the unnumbered default for a kind, used to rename a pile on
+ * conversion (Gate 1) - deliberately simpler than `configuredZoneName`,
+ * which chases exact same-kind-count deduplication for a NEW pile; a
+ * post-conversion rename just needs a correct-enough label (Nielsen #1),
+ * not perfect numbering. */
+function defaultKindName(kind) {
+  return defaultNameWord(kind);
 }
 
 /** UX follow-up (direct user request - *nit "adjust the presets for
@@ -229,7 +280,6 @@ export function createInitialState(deckConfig = {}, rng = Math.random, gameConfi
     ],
     players: [],
     scores: {},
-    passed: {},
     // US-62 (Sprint 23, Phase 69): the ONLY identity SET_PILE_ORIENTATION
     // needs to re-check a shared pile's host-only authorization itself
     // (D43 discipline - reducer, not just the offer layer). Set once, by
@@ -502,7 +552,6 @@ const ACTIONS = {
       // resolves to something real once the hand pile does show up.
       zones: alreadyJoined ? state.zones : ensureZoneRecord(state.zones, playerZoneId(action.playerId), null, action.playerId, 'perPlayer'),
       scores: { [action.playerId]: 0, ...state.scores },
-      passed: { [action.playerId]: false, ...state.passed },
     };
   },
 
@@ -575,11 +624,24 @@ const ACTIONS = {
     if (kind === 'hand' || !PILE_TYPES[kind]?.tableSide) {
       throw new Error(`Cannot create a zone of kind "${kind}"`);
     }
-    const pile = makeTableSidePile(kind, action.name);
+    // *nit (direct user request, "new Zones and Piles need default
+    // names"): the "Add Zone" name field was hidden (US-54) - every
+    // player-created zone now comes from the nameless drag-to-create
+    // gesture. Reuses `configuredZoneName`'s existing "Kind"/"Kind N"
+    // numbering (already proven for preset-declared piles), keyed off
+    // how many piles of the same kind already exist on the table.
+    // `DEFAULT_ZONE_ID` (the built-in "Table" pile, `kind: 'zone'`) is
+    // excluded - it's not part of the player-created numbering, it
+    // already has its own fixed name.
+    const sameKindCount = state.piles.filter((p) => p.kind === kind && p.id !== DEFAULT_ZONE_ID).length;
+    const name = action.name ?? configuredZoneName(kind, sameKindCount, sameKindCount + 1);
+    const pile = makeTableSidePile(kind, name);
     return {
       ...state,
       piles: [...state.piles, pile],
-      zones: ensureZoneRecord(state.zones, pile.zoneId),
+      // D73 follow-up: shared with MOVE_PILE's own ungroup case via
+      // `makeStandaloneZone` - one "spawn a fresh Zone" path, not two.
+      zones: makeStandaloneZone(state.zones, pile.zoneId),
     };
   },
 
@@ -608,7 +670,10 @@ const ACTIONS = {
     if (kind === 'hand' || !PILE_TYPES[kind]?.tableSide) {
       throw new Error(`Cannot create a pile of kind "${kind}"`);
     }
-    const pile = makeTableSidePile(kind, action.name ?? null, null, null, action.zoneId);
+    // *nit: same default-naming as CREATE_ZONE above.
+    const sameKindCount = state.piles.filter((p) => p.kind === kind && p.id !== DEFAULT_ZONE_ID).length;
+    const name = action.name ?? configuredZoneName(kind, sameKindCount, sameKindCount + 1);
+    const pile = makeTableSidePile(kind, name, null, null, action.zoneId);
     const withPile = { ...state, piles: [...state.piles, pile] };
     if (!action.cardId) return withPile;
 
@@ -682,7 +747,11 @@ const ACTIONS = {
       }
     } else {
       targetZoneId = pile.id;
-      zones = ensureZoneRecord(zones, targetZoneId);
+      // D73 follow-up: shared with CREATE_ZONE via `makeStandaloneZone`
+      // - one "spawn a fresh Zone" path, not two (this one had drifted
+      // to pass no default name, leaving the ungrouped zone's heading
+      // blank).
+      zones = makeStandaloneZone(zones, targetZoneId);
     }
 
     return {
@@ -1114,23 +1183,31 @@ const ACTIONS = {
    * and no per-card re-validation exists to check that. Empty-only,
    * same discipline as D62.
    */
+  /**
+   * D71 (US-74): widened from a zone/discard-only flip to the full
+   * `CHANGE_PILE_TYPE_CYCLE` (zone/discard/foundation/cascade/
+   * rankAdjacent) - D63's original per-card-revalidation concern is
+   * moot once the empty-only guard applies to every kind, not just the
+   * original two. Gate 1's auto-rename: if the pile's current name is
+   * still its OLD kind's own D70 default, it's renamed to the NEW
+   * kind's default too - a manually-chosen name is left untouched.
+   */
   CHANGE_PILE_TYPE(state, action) {
     const pile = state.piles.find((p) => p.id === action.pileId);
     if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
-    const isEligible = pile.kind === 'zone' || pile.kind === 'discard';
-    const isTargetEligible = action.kind === 'zone' || action.kind === 'discard';
+    const isEligible = CHANGE_PILE_TYPE_CYCLE.includes(pile.kind);
+    const isTargetEligible = CHANGE_PILE_TYPE_CYCLE.includes(action.kind);
     if (!isEligible || !isTargetEligible) {
       throw new Error(`Cannot change a "${pile.kind}" pile to kind "${action.kind}"`);
     }
     if (pile.cards.length > 0) {
       throw new Error('Pile must be empty before its type can be changed');
     }
-    return { ...state, piles: state.piles.map((p) => (p.id === action.pileId ? { ...p, kind: action.kind } : p)) };
-  },
-
-  TOGGLE_PASS(state, action) {
-    const current = state.passed[action.playerId] ?? false;
-    return { ...state, passed: { ...state.passed, [action.playerId]: !current } };
+    const name = isDefaultPileName(pile.name, pile.kind) ? defaultKindName(action.kind) : pile.name;
+    return {
+      ...state,
+      piles: state.piles.map((p) => (p.id === action.pileId ? { ...p, kind: action.kind, name } : p)),
+    };
   },
 
   RESET_SCORES(state) {
@@ -1168,9 +1245,6 @@ const ACTIONS = {
         // right above it.
         ...zonesOf(state).filter((z) => z.id !== DECK_PILE_ID && z.kind !== 'hand').map((z) => withCards(z, [])),
       ],
-      // Passing is round-scoped (D16, unlike scores) - explicitly
-      // rezeroed here, not left to fall through via `...state`.
-      passed: Object.fromEntries(state.players.map((p) => [p.id, false])),
     };
   },
 };
@@ -1297,7 +1371,7 @@ export function viewFor(state, playerId) {
   }
 
   return {
-    myHand, otherHandCounts, zones, deckCount, players: state.players, scores: state.scores, passed: state.passed,
+    myHand, otherHandCounts, zones, deckCount, players: state.players, scores: state.scores,
     // D55: the real Zone registry (`{id, name, ownerId}`), named
     // `zoneRecords` here specifically to avoid colliding with `zones`
     // above (the per-pile view array) - `ui.js`'s `renderZones` groups

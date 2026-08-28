@@ -58,7 +58,6 @@ export function snapshot(state, code, hostName) {
     piles: state.piles,
     players: state.players,
     scores: state.scores,
-    passed: state.passed,
   };
 }
 

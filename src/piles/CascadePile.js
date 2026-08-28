@@ -33,10 +33,13 @@ export class CascadePile extends Pile {
     return isOppositeColor && RANKS.indexOf(card.rank) === RANKS.indexOf(top.rank) - 1;
   }
 
-  /** US-57 explicitly scopes multi-card sequence moves out - no
-   * pile-level action has ever targeted a cascade. */
-  static pileActions() {
-    return [];
+  /** US-57 explicitly scopes multi-card sequence moves out. D71
+   * (US-74): `changePileType` is the one exception, empty-only (the
+   * reducer's own guard) - same `isOwner`/`isShared` gate `Pile`'s own
+   * `pileActions()` uses. */
+  static pileActions({ isOwner, isShared } = {}) {
+    if (!isOwner && !isShared) return [];
+    return ['changePileType'];
   }
 
   /** Always appends; every card after the first carries `layout:

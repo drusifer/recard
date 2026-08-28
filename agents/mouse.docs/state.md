@@ -310,3 +310,76 @@ None pending after commit. Standing backlog unchanged (e2e rebuild,
 cognitive-complexity pass, builder screen, 2 minor visual overlaps)
 plus this session's new items (SaveAs's `window.prompt()`, Morpheus's
 "check id survival before designing a save-for-reuse feature" note).
+
+---
+## Session close-out #2 — 2026-08-27, same day, context-clear prep
+
+Two more direct-user-request items landed AFTER the previous close-out
+commit (`405e240`) and its D68/D69 follow-up (card-drag seat-relative
+coordinates, committed `e72275d`):
+
+1. **Sprint: Convert Pile Actions (US-74, D71)** - `changePileType`
+   widened from a zone/discard-only flip to a real 5-kind cycle
+   (zone/discard/foundation/cascade/rankAdjacent), all empty-only.
+   Gate 1 caught a real Nielsen #1 gap (silent cycle, no feedback) -
+   fixed via auto-rename on conversion when the pile's name is still
+   its old kind's own default. Full Bloop (Cypher->Smith->Morpheus->
+   Mouse->Neo/Trin/Morpheus->Oracle->Smith->retro->Cypher launch),
+   Fast-Track single phase (86).
+
+2. **Chain of direct *nits, D72-D75** (default naming + zone-heading
+   visibility, triggered by a real user-reported bug):
+   - D72: pile default name is "Pile" not "Zone" (was colliding with
+     the Zone/Pile vocabulary split); the Zone record itself also
+     got a default name.
+   - **User reported a real bug**: "dropping Pile on the table did
+     not create a new table zone - looks like the pile is parentless."
+   - D73: root cause found live - a standalone zone's own heading was
+     UNCONDITIONALLY suppressed (a 2026-08-26 decision, "the lone
+     pile's own heading already says the same thing"), which is what
+     made an ungrouped pile look parentless. User's fix instruction
+     was direct and specific: "don't hide zone headings ever" -
+     removed the suppression entirely, including reverting D72's own
+     `piles.length > 1` gate after the user said "that was not a
+     requirement." Notable process moment: the user twice pushed back
+     on unprompted special-casing mid-fix ("STOP adding special
+     cases", "if you think we need a special case ask me") - both
+     times, backed off to exactly the literal instruction rather than
+     the smarter-seeming version.
+   - Separately, direct user request: **removed the `pass` feature
+     outright** (`HandPile` action, `TOGGLE_PASS`, `state.passed`,
+     roster tag) - "not a requirement." Asked the user how far the
+     removal should go (full feature vs. just the button) before
+     touching anything, given the scope-creep pushback earlier in the
+     same session - user confirmed full removal.
+   - D75: user caught the REAL underlying issue behind D73's flagged-
+     not-fixed gap - two independent `ensureZoneRecord` call sites
+     (`CREATE_ZONE`/`MOVE_PILE`'s ungroup case) doing the same "make a
+     zone" operation with different defaults, which is exactly how
+     they'd drifted in the first place ("fix separate code paths for
+     make zone... there can be only 1"). Unified onto one
+     `makeStandaloneZone` helper.
+
+**Process lesson worth carrying forward**: this session ran hot on
+inferring "the smart fix" during D72/D73 and got corrected twice for
+scope creep. The pattern that worked afterward: implement exactly
+what's asked, and when a related-but-broader fix seems obviously
+right, ASK before doing it (worked cleanly for `pass`'s removal-scope
+question). Default to narrow + literal; expand only on explicit
+confirmation.
+
+**Repo state at close:** branch `touch-targets-and-pile-actions-sprint`,
+2 commits ahead of `origin/touch-targets-and-pile-actions-sprint`/
+`origin/main` (`405e240`, `e72275d` already pushed) - this session's
+remaining diff (US-74 sprint + D72-D75) is uncommitted, staged for the
+close-out commit+push the user just requested. 407/407 unit tests,
+lint baseline unchanged throughout (7 pre-existing
+`cognitive-complexity`, 3 pre-existing `lint:design` overlaps).
+
+### Next Steps
+None pending after commit+push. Standing backlog: e2e rebuild,
+cognitive-complexity pass, builder screen, 2 minor pre-existing visual
+overlaps, SaveAs's `window.prompt()` (Smith, non-blocking), Morpheus's
+"check id survival before designing a save-for-reuse feature" note.
+On cold resume: read `docs/ARCHITECTURE.md`'s tail (D64-D75) and this
+entry before trusting anything older in this file.

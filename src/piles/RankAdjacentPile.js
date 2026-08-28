@@ -37,8 +37,12 @@ export class RankAdjacentPile extends Pile {
     return diff === 1 || diff === RANKS.length - 1; // the wrap: A (0) <-> K (12)
   }
 
-  static pileActions() {
-    return [];
+  /** D71 (US-74): `changePileType` is the one pile-level action
+   * offered here, empty-only (the reducer's own guard) - same
+   * `isOwner`/`isShared` gate `Pile`'s own `pileActions()` uses. */
+  static pileActions({ isOwner, isShared } = {}) {
+    if (!isOwner && !isShared) return [];
+    return ['changePileType'];
   }
 
   /** Every drop lands on top, unconditionally - same STACK shape as

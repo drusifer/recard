@@ -631,3 +631,20 @@ name field) rather than reworked under sprint pressure.
 ## Next Steps
 Post Smith's own retro item (the `window.prompt()` finding, filed to
 backlog) during `*sprint retro`.
+
+## Gate 2 — Convert Pile Actions (D71) (2026-08-27)
+
+Reviewed D71 against Gate 1's condition (auto-rename on conversion
+when the pile's name is still a D70 default) - present, correctly
+scoped to unnumbered defaults, never touches a manual name. No new UX
+concerns: the same single-button cycle affordance, same empty-only
+gating users already learned from US-71/72/73, no new confirm/dialog
+pattern introduced.
+
+**Verdict: APPROVED, no conditions.** @Mouse *sm plan sprint.
+
+## Current Task
+**Status:** Gate 2 complete, handed to Mouse.
+## Next Steps
+Ready for `*user test` once Phase 86 lands - specifically confirm the
+auto-rename is visible/correct live, not just in the reducer.

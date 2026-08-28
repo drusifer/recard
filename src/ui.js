@@ -1031,39 +1031,38 @@ export function renderZonePanel(zoneElement, id, title, piles, allZones, options
   // hold several piles and so has no single pile id of its own.
   zoneElement.dataset.groupId = id;
 
-  // *nit (2026-08-26): restored - see `wirePanelLayout`'s own comment
-  // for the full "zones need free positioning, piles need discrete
-  // native drag" reasoning. A Zone's own separate heading (this `title`
-  // block - the only case that renders one at all; a standalone 1-pile
-  // Zone has no separate heading, its lone pile's own title covers
-  // reparent/reorder there instead) is the pointer-drag handle.
-  let dragHandle;
-  if (title) {
-    const heading = document.createElement('header-actions');
-    zoneElement.append(heading);
-    // US-71 (D62): `remove` offered on every Zone with its own heading
-    // EXCEPT the Table Zone - the one exemption checkable here without
-    // new plumbing (a fixed, known id); everything else the reducer
-    // itself is the real gate for (preset-declared, non-empty), same
-    // "offer generically, reducer authorizes" discipline every other
-    // action in this table already follows (D43).
-    const zoneActionIds = id === 'table-zone' ? [] : ['remove'];
-    heading.render(title, zoneActionIds, {
-      headingClass: 'panel-title',
-      // *nit (2026-08-26): rename affordance, any player.
-      rawName: title,
-      onRename: options.onRenameZone ? (name) => options.onRenameZone(id, name) : undefined,
-      onAction: (actionId) => { if (actionId === 'remove') options.onRemoveZone?.(id); },
-      // *nit (direct user request, "don't enable X unless empty"): same
-      // Nielsen #5 reasoning as the pile-level `remove`/`changePileType`
-      // disabling (`Pile.disabledActions`) - REMOVE_ZONE is empty-only
-      // at the reducer (D62) too; a Zone is "empty" when it has no
-      // piles left in it, `piles` (this function's own param) already
-      // says exactly that.
-      disabled: piles.length > 0 ? ['remove'] : [],
-    });
-    dragHandle = heading;
-  }
+  // *nit fix (direct user request, "don't hide zone headings ever"):
+  // previously conditional on `title` being truthy - a standalone
+  // 1-pile zone's heading was suppressed on the reasoning that the
+  // lone pile's own title already said the same thing. Reversed: every
+  // Zone renders its own heading now, unconditionally, consistent
+  // regardless of pile count or whether it has a name yet - this is
+  // also the pointer-drag handle (`wirePanelLayout`'s own comment has
+  // the full "zones need free positioning" reasoning).
+  const heading = document.createElement('header-actions');
+  zoneElement.append(heading);
+  // US-71 (D62): `remove` offered on every Zone with its own heading
+  // EXCEPT the Table Zone - the one exemption checkable here without
+  // new plumbing (a fixed, known id); everything else the reducer
+  // itself is the real gate for (preset-declared, non-empty), same
+  // "offer generically, reducer authorizes" discipline every other
+  // action in this table already follows (D43).
+  const zoneActionIds = id === 'table-zone' ? [] : ['remove'];
+  heading.render(title, zoneActionIds, {
+    headingClass: 'panel-title',
+    // *nit (2026-08-26): rename affordance, any player.
+    rawName: title,
+    onRename: options.onRenameZone ? (name) => options.onRenameZone(id, name) : undefined,
+    onAction: (actionId) => { if (actionId === 'remove') options.onRemoveZone?.(id); },
+    // *nit (direct user request, "don't enable X unless empty"): same
+    // Nielsen #5 reasoning as the pile-level `remove`/`changePileType`
+    // disabling (`Pile.disabledActions`) - REMOVE_ZONE is empty-only
+    // at the reducer (D62) too; a Zone is "empty" when it has no
+    // piles left in it, `piles` (this function's own param) already
+    // says exactly that.
+    disabled: piles.length > 0 ? ['remove'] : [],
+  });
+  const dragHandle = heading;
 
   const body = document.createElement('div');
   body.className = 'zone-body';
@@ -1225,10 +1224,15 @@ export function renderZones(container, zones, seatedPlayers, zoneRecords, option
         }
       }
     } else {
-      // `record.name` is `'Table Zone'` for the Table Zone group, and
-      // `null` for a standalone zone - the lone pile's own heading
-      // already says the same thing a redundant second title would
-      // (`renderZonePanel`'s own `title: null` handling, unchanged).
+      // *nit fix (direct user request, "don't hide zone headings
+      // ever"): previously suppressed for a single-pile zone (the
+      // reasoning being "the lone pile's own heading already says the
+      // same thing") - reversed. The suppression is exactly what made
+      // an ungrouped pile (`MOVE_PILE`'s own "drop on open table space"
+      // case, `zoneId` freshly minted to the pile's own id) look
+      // parentless: no visible Zone heading at all, only the pile's -
+      // indistinguishable from a pile that was never grouped into a
+      // real Zone at all. Always render it now, `record.name` as-is.
       zoneElement.render(record.id, record.name, piles, zones, options);
     }
   }
@@ -1566,7 +1570,7 @@ function renderMiniHand(container, count) {
  * viewer's own seat (Smith Gate 1: position alone is ambiguous).
  * `players` must already be in seat order (viewer first) when seated.
  */
-export function renderRoster(container, players, { movingIds, scores, onAdjustScore, myId, passed, seated, hideId } = {}) {
+export function renderRoster(container, players, { movingIds, scores, onAdjustScore, myId, seated, hideId } = {}) {
   container.replaceChildren();
   for (const [index, p] of players.entries()) {
     // UX follow-up: the viewer's own seat now lives in the merged
@@ -1586,8 +1590,6 @@ export function renderRoster(container, players, { movingIds, scores, onAdjustSc
     }
     const count = typeof p.handCount === 'number' ? ` (${p.handCount} cards)` : '';
     const moving = movingIds?.has(p.id) ? ' \u{270B} organizing hand' : '';
-    // eslint-disable-next-line unicorn/no-computed-property-existence-check -- this reads a boolean VALUE (state.passed[id] is false, not absent, until toggled - see state.js JOIN/TOGGLE_PASS), not a key-existence check; Object.hasOwn would be wrong here.
-    const passedTag = passed?.[p.id] ? ' \u{1F645} Passed' : '';
     const youTag = seated && p.id === myId ? ' \u{1F9D1} You' : '';
 
     // A seat is one horizontal row: [-] [who they are + score] [+].
@@ -1598,7 +1600,7 @@ export function renderRoster(container, players, { movingIds, scores, onAdjustSc
     // which is what the table has room for.
     const info = document.createElement('span');
     info.className = 'seat-info';
-    info.append(`${p.name} - ${p.connection}${count}${moving}${passedTag}${youTag}`);
+    info.append(`${p.name} - ${p.connection}${count}${moving}${youTag}`);
 
     if (p.id !== myId && typeof p.handCount === 'number') {
       const miniHandElement = document.createElement('div');

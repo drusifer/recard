@@ -403,6 +403,57 @@ test('CREATE_ZONE: adds a new empty zone by name, alongside the default', () => 
   assert.notEqual(created.id, tableOf(state).id);
 });
 
+// *nit (direct user request, "new Zones and Piles need default
+// names"): the "Add Zone" form (a name text field) was hidden per
+// US-54 - every zone/pile a player creates now comes from the
+// permissive drag-to-create-pile gesture instead, which has no name to
+// give at all. A nameless pile's own heading previously rendered
+// blank until manually renamed. Reuses `configuredZoneName`'s existing
+// "Kind"/"Kind N" numbering (already proven for preset-declared
+// piles), keyed off how many piles of the same kind already exist.
+
+// *nit (direct user request): "default pile name should be 'Pile' not
+// 'Zone'" - "Zone" is already this app's own word for the CONTAINING
+// entity (D55's Zone/Pile split); naming a `kind: 'zone'` PILE "Zone"
+// collided with that. Every other kind still just capitalizes.
+
+test('CREATE_ZONE: no name given, kind "zone" - defaults to "Pile" (not "Zone"), unnumbered for the first one', () => {
+  const state = reduce(createInitialState({}, () => 0.5), { type: 'CREATE_ZONE' });
+  const created = zonesOf(state).find((z) => z.id !== 'table' && z.id !== 'deck');
+  assert.equal(created.name, 'Pile');
+});
+
+test('CREATE_ZONE: no name given, a second unnamed zone-kind pile - numbered "Pile 2"', () => {
+  let state = reduce(createInitialState({}, () => 0.5), { type: 'CREATE_ZONE' });
+  state = reduce(state, { type: 'CREATE_ZONE' });
+  const created = zonesOf(state).filter((z) => z.id !== 'table' && z.id !== 'deck');
+  assert.deepEqual(created.map((z) => z.name).toSorted(), ['Pile', 'Pile 2']);
+});
+
+// *nit (direct user request): "add the default 'Zone' name to the
+// zone that the panel is in" - the ZONE record itself (distinct from
+// its pile) also gets a real default now, not `null` - so if a SECOND
+// pile later joins it, the Zone's own heading (which only renders for
+// multi-pile zones, `ui.js`'s `renderZones`) isn't blank.
+
+test('CREATE_ZONE: the ZONE record itself also gets a default name ("Zone"), distinct from its pile\'s own name', () => {
+  const state = reduce(createInitialState({}, () => 0.5), { type: 'CREATE_ZONE' });
+  const pile = zonesOf(state).find((z) => z.id !== 'table' && z.id !== 'deck');
+  const zoneRecord = state.zones.find((z) => z.id === pile.zoneId);
+  assert.equal(zoneRecord.name, 'Zone');
+  assert.equal(pile.name, 'Pile', 'the pile\'s own name is independent, still the kind-based default');
+});
+
+test('CREATE_ZONE: no name given, kind: "discard" - defaults to "Discard"', () => {
+  const state = reduce(createInitialState({}, () => 0.5), { type: 'CREATE_ZONE', kind: 'discard' });
+  assert.equal(zonesOf(state).find((z) => z.kind === 'discard').name, 'Discard');
+});
+
+test('CREATE_ZONE: an explicit name is never overridden by the default', () => {
+  const state = reduce(createInitialState({}, () => 0.5), { type: 'CREATE_ZONE', name: 'Melds' });
+  assert.equal(zonesOf(state).some((z) => z.name === 'Melds'), true);
+});
+
 // --- D45 (Sprint 15): CREATE_ZONE's `kind` param, and a real Discard
 // pile exercised end-to-end through the reducer (not just its own
 // module's unit tests in tests/piles.test.js).
@@ -591,7 +642,7 @@ test('JOIN: adds nothing to zonesOf by itself - no personal zone any more', () =
   assert.equal(zonesOf(state).length, 2, 'just deck + default table');
 });
 
-test('JOIN: re-joining with the same playerId does not duplicate the player entry or reset scores/passed', () => {
+test('JOIN: re-joining with the same playerId does not duplicate the player entry or reset scores', () => {
   let state = createInitialState({}, () => 0.5);
   state = reduce(state, { type: 'JOIN', playerId: 'p1', name: 'Alice' });
   state = reduce(state, { type: 'ADJUST_SCORE', targetPlayerId: 'p1', delta: 1 });
@@ -864,44 +915,19 @@ test('DEAL_MORE: throws if there are not enough cards left', () => {
   assert.throws(() => reduce(state, { type: 'DEAL_MORE', cardsPerPlayer: 5 }));
 });
 
-// --- Pass marker (D16, US-25) ---
+// Pass marker (D16, US-25) removed outright (direct user request, "not
+// a requirement") - TOGGLE_PASS, `state.passed`, and the roster's
+// Passed tag are all gone, not deprecated. `RESET` regression coverage
+// for scores surviving a reset is kept below, minus the pass-marker
+// half of what it used to also check.
 
-test('JOIN: initializes a new player as not passed', () => {
-  const state = reduce(createInitialState({}, () => 0.5), {
-    type: 'JOIN',
-    playerId: 'p1',
-    name: 'Alice',
-  });
-  assert.equal(state.passed.p1, false);
-});
-
-test('TOGGLE_PASS: flips the acting player\'s own passed flag', () => {
-  let state = withPlayers(createInitialState({}, () => 0.5), ['p1', 'p2']);
-  state = reduce(state, { type: 'TOGGLE_PASS', playerId: 'p1' });
-  assert.equal(state.passed.p1, true);
-  assert.equal(state.passed.p2, false);
-
-  state = reduce(state, { type: 'TOGGLE_PASS', playerId: 'p1' });
-  assert.equal(state.passed.p1, false);
-});
-
-test('RESET clears pass markers but (regression) leaves scores untouched', () => {
+test('RESET leaves scores untouched (regression)', () => {
   let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
-  state = reduce(state, { type: 'TOGGLE_PASS', playerId: 'p1' });
   state = reduce(state, { type: 'ADJUST_SCORE', targetPlayerId: 'p1', delta: 1 });
 
   state = reduce(state, { type: 'RESET' });
 
-  assert.equal(state.passed.p1, false);
   assert.equal(state.scores.p1, 1);
-});
-
-test('viewFor: passed markers are public to every viewer', () => {
-  let state = withPlayers(createInitialState({}, () => 0.5), ['p1', 'p2']);
-  state = reduce(state, { type: 'TOGGLE_PASS', playerId: 'p1' });
-
-  const view = viewFor(state, 'p2');
-  assert.equal(view.passed.p1, true);
 });
 
 test('solo play: a single player can deal, play, draw, and reset a full round alone', () => {
@@ -1289,7 +1315,6 @@ test('SHUFFLE_DECK reorders the deck without touching anything else', () => {
   state = reduce(state, { type: 'DEAL', cardsPerPlayer: 3 });
   state = reduce(state, { type: 'PLAY', playerId: 'p1', cardId: handOf(state, 'p1')[0].id });
   state = reduce(state, { type: 'ADJUST_SCORE', targetPlayerId: 'p1', delta: 1 });
-  state = reduce(state, { type: 'TOGGLE_PASS', playerId: 'p1' });
 
   const deckBefore = deckOf(state).map((c) => c.id);
   const handBefore = handOf(state, 'p1').map((c) => c.id);
@@ -1305,7 +1330,6 @@ test('SHUFFLE_DECK reorders the deck without touching anything else', () => {
   assert.deepEqual(handOf(next, 'p1').map((c) => c.id), handBefore, 'hands untouched');
   assert.deepEqual(tableOf(next).cards.map((c) => c.id), tableBefore, 'zone cards untouched');
   assert.equal(next.scores.p1, 1, 'scores untouched');
-  assert.equal(next.passed.p1, true, 'pass markers untouched - unlike RESET');
 });
 
 test('SPLIT_DECK deals the whole deck round-robin into N new face-down piles', () => {
@@ -1415,7 +1439,11 @@ test('CREATE_ZONE: a live user action, not a declaration - every kind (including
   state = reduce(state, { type: 'CREATE_ZONE', name: 'Solo Zone' });
   const solo = zonesOf(state).find((z) => z.name === 'Solo Zone');
   assert.equal(solo.zoneId, solo.id, 'a plain zone is alone in its own Zone, keyed by its own pile id');
-  assert.ok(state.zones.some((z) => z.id === solo.id && z.name === null && z.ownerId === null));
+  // *nit (direct user request): the Zone record now gets a real
+  // default name ("Zone") too, not `null` - see the dedicated D70/D71
+  // tests above for the full reasoning (a later-joining second pile
+  // shouldn't inherit a blank heading).
+  assert.ok(state.zones.some((z) => z.id === solo.id && z.name === 'Zone' && z.ownerId === null));
 });
 
 test('GameConfig.piles: an entry\'s own zoneId groups it into an existing Zone, declared - not inferred from kind (D55)', () => {
@@ -1538,6 +1566,20 @@ test('MOVE_PILE: no target ungroups - a fresh standalone Zone of the pile\'s own
   assert.ok(state.zones.some((z) => z.id === discard.id));
 });
 
+// D73 follow-up (direct user request, "fix separate code paths for
+// make zone - there can be only 1"): CREATE_ZONE and MOVE_PILE's own
+// ungroup case now share ONE "spawn a fresh standalone Zone"
+// implementation (`makeStandaloneZone`) - both must give the same
+// default name, not just the pile itself.
+test('MOVE_PILE: an ungrouped Zone gets the same default name ("Zone") as one created via CREATE_ZONE', () => {
+  let state = reduce(createInitialState({}, () => 0.5), { type: 'CREATE_ZONE', name: 'Discard', kind: 'discard' });
+  const discard = zonesOf(state).find((z) => z.name === 'Discard');
+  state = reduce(state, { type: 'MOVE_PILE', pileId: discard.id, targetZoneId: 'table-zone' });
+  state = reduce(state, { type: 'MOVE_PILE', pileId: discard.id, targetZoneId: null });
+  const zoneRecord = state.zones.find((z) => z.id === discard.id);
+  assert.equal(zoneRecord.name, 'Zone');
+});
+
 test('MOVE_PILE: throws for an unknown pile id', () => {
   const state = createInitialState({}, () => 0.5);
   assert.throws(() => reduce(state, { type: 'MOVE_PILE', pileId: 'nope', targetZoneId: 'table-zone' }), /does not exist/);
@@ -1558,6 +1600,20 @@ test('CREATE_PILE: joins an EXISTING zone - never mints a new one, unlike CREATE
   const created = zonesOf(state).find((z) => z.zoneId === 'table-zone' && z.id !== 'deck' && z.id !== 'table' && z.id !== 'discard');
   assert.ok(created, 'a new pile exists, grouped into the Table Zone');
   assert.equal(state.zones.length, zoneCountBefore, 'no new Zone record was created');
+});
+
+// *nit (direct user request, "new Zones and Piles need default
+// names"): same reasoning/numbering as CREATE_ZONE's own default-name
+// tests above.
+test('CREATE_PILE: no name given, kind "zone" - defaults to "Pile" (not "Zone")', () => {
+  const state = reduce(createInitialState({}, () => 0.5), { type: 'CREATE_PILE', zoneId: 'table-zone' });
+  const created = zonesOf(state).find((z) => z.zoneId === 'table-zone' && z.id !== 'deck' && z.id !== 'table');
+  assert.equal(created.name, 'Pile');
+});
+
+test('CREATE_PILE: an explicit name is never overridden by the default', () => {
+  const state = reduce(createInitialState({}, () => 0.5), { type: 'CREATE_PILE', zoneId: 'table-zone', name: 'Loot' });
+  assert.equal(zonesOf(state).some((z) => z.name === 'Loot'), true);
 });
 
 test('CREATE_PILE: rejects an unknown zone id', () => {
@@ -2054,14 +2110,68 @@ test('CHANGE_PILE_TYPE: rejects an unknown pile id', () => {
   );
 });
 
-test('CHANGE_PILE_TYPE: rejects a target kind outside zone/discard', () => {
+// D71 (US-74): widened from zone/discard to the full 5-kind cycle
+// (zone/discard/foundation/cascade/rankAdjacent) - D63's "no per-card
+// re-validation" exclusion reasoning is moot once the pile is
+// guaranteed empty, for every kind, not just the original two.
+
+test('CHANGE_PILE_TYPE: rejects a target kind outside the cycle (hand)', () => {
   let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
   state = reduce(state, { type: 'CREATE_ZONE', name: 'Melds' });
   const pile = state.piles.find((p) => p.name === 'Melds');
   assert.throws(
-    () => reduce(state, { type: 'CHANGE_PILE_TYPE', pileId: pile.id, kind: 'foundation', playerId: 'p1' }),
+    () => reduce(state, { type: 'CHANGE_PILE_TYPE', pileId: pile.id, kind: 'hand', playerId: 'p1' }),
     /Cannot change/,
   );
+});
+
+test('CHANGE_PILE_TYPE: an empty zone pile can convert to foundation/cascade/rankAdjacent', () => {
+  for (const kind of ['foundation', 'cascade', 'rankAdjacent']) {
+    let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+    state = reduce(state, { type: 'CREATE_ZONE', name: `Test-${kind}` });
+    const pile = state.piles.find((p) => p.name === `Test-${kind}`);
+    state = reduce(state, { type: 'CHANGE_PILE_TYPE', pileId: pile.id, kind, playerId: 'p1' });
+    assert.equal(state.piles.find((p) => p.id === pile.id).kind, kind, `${kind} must be a legal target`);
+  }
+});
+
+test('CHANGE_PILE_TYPE: an empty foundation/cascade/rankAdjacent pile can itself convert away (source-side eligibility)', () => {
+  for (const kind of ['foundation', 'cascade', 'rankAdjacent']) {
+    let state = withPlayers(createInitialState({}, () => 0.5, {
+      piles: [{ kind, ownerId: null, count: 1 }],
+    }), ['p1']);
+    const pile = zonesOf(state).find((z) => z.kind === kind);
+    state = reduce(state, { type: 'CHANGE_PILE_TYPE', pileId: pile.id, kind: 'zone', playerId: 'p1' });
+    assert.equal(state.piles.find((p) => p.id === pile.id).kind, 'zone', `${kind} must be a legal source`);
+  }
+});
+
+// Gate 1's auto-rename condition: converting a pile whose name is
+// still its OLD kind's own D70 default renames it to the NEW kind's
+// default too - a manually-chosen name is left untouched.
+
+test('CHANGE_PILE_TYPE: auto-renames when the pile still has its old kind\'s default name', () => {
+  let state = reduce(createInitialState({}, () => 0.5), { type: 'CREATE_ZONE' }); // default name "Pile"
+  const pile = zonesOf(state).find((z) => z.id !== 'table' && z.id !== 'deck');
+  assert.equal(pile.name, 'Pile');
+  state = reduce(state, { type: 'CHANGE_PILE_TYPE', pileId: pile.id, kind: 'discard', playerId: 'p1' });
+  assert.equal(state.piles.find((p) => p.id === pile.id).name, 'Discard');
+});
+
+test('CHANGE_PILE_TYPE: auto-renames a NUMBERED default too (e.g. "Pile 2" -> "Discard")', () => {
+  let state = reduce(createInitialState({}, () => 0.5), { type: 'CREATE_ZONE' });
+  state = reduce(state, { type: 'CREATE_ZONE' }); // "Pile 2"
+  const pile = zonesOf(state).find((z) => z.name === 'Pile 2');
+  state = reduce(state, { type: 'CHANGE_PILE_TYPE', pileId: pile.id, kind: 'discard', playerId: 'p1' });
+  assert.equal(state.piles.find((p) => p.id === pile.id).name, 'Discard', 'unnumbered - not chasing exact dedup count on conversion');
+});
+
+test('CHANGE_PILE_TYPE: a manually-chosen name is never touched', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Melds' });
+  const pile = state.piles.find((p) => p.name === 'Melds');
+  state = reduce(state, { type: 'CHANGE_PILE_TYPE', pileId: pile.id, kind: 'discard', playerId: 'p1' });
+  assert.equal(state.piles.find((p) => p.id === pile.id).name, 'Melds');
 });
 
 test('CHANGE_PILE_TYPE: rejects changing the deck', () => {

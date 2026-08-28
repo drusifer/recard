@@ -1445,3 +1445,36 @@ bug-fix, carried forward per standing convention.
       design/js) baseline unchanged throughout every change (7
       pre-existing `cognitive-complexity` findings, 3 pre-existing
       `lint:design` overlaps).
+
+---
+
+## Sprint: Convert Pile Actions (US-74, D71)
+
+Single Fast-Track phase (Phase 86) - matches Sprint 5's precedent:
+small, well-scoped, one file family of changes (pileTypes.js constant +
+state.js reducer + 3 pile-class pileActions overrides + main.js cycle
+logic), no multi-phase data/UI split needed.
+
+### Phase 86 — changePileType 5-kind cycle (US-74, D71) ✅ DONE
+- [x] `CHANGE_PILE_TYPE_CYCLE` constant (`pileTypes.js`), single source
+      of truth for reducer + UI.
+- [x] `CHANGE_PILE_TYPE` reducer widened to cycle membership (both
+      source/target); `isDefaultPileName`/`defaultKindName` helpers;
+      auto-rename on conversion per Gate 1.
+- [x] `MeldPile` (covers `FoundationPile`)/`CascadePile`/
+      `RankAdjacentPile.pileActions()`: add `changePileType`, same
+      `isOwner`/`isShared` gate as `Pile`'s own.
+- [x] `main.js`'s `performChangePileType` dispatch: advances to the
+      NEXT kind in `CHANGE_PILE_TYPE_CYCLE` (wrapping), not the old
+      hardcoded 2-way flip.
+- [x] TDD, 12 new tests. Live-verified (Playwright): cycling through
+      all 5 kinds wraps correctly against the real running app;
+      confirmed the built-in "Table" pile is correctly NOT
+      auto-renamed (not a D70 default pattern). Auto-rename itself
+      covered by 2 dedicated unit tests (unnumbered + numbered
+      default); a live drag-to-create-then-convert check was
+      inconclusive (same Playwright drop-target flakiness noted at
+      D70) - disclosed, not forced.
+- [x] Full regression: `npm test` 408/408, lint baseline unchanged (7
+      pre-existing `cognitive-complexity`, 3 pre-existing
+      `lint:design`).

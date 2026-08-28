@@ -113,7 +113,6 @@ export const ACTION_SPECS = {
   // (target: null) already works above.
   sortRank: { label: 'Sort by rank', destructive: false, hint: 'Sort your hand by rank.', icon: '#' },
   sortSuit: { label: 'Sort by suit', destructive: false, hint: 'Sort your hand by suit.', icon: '♠' },
-  pass: { label: 'Pass', destructive: false, hint: 'Toggle your own passed marker.', icon: '⏭' },
   // Phase 56 (Sprint 12, T56.1): shuffle/split move onto the deck's own
   // pile anchor alongside deal/reshuffleDeal/draw, joining a table they
   // were never part of before (US-35/36 shipped as a standalone button
