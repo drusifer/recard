@@ -418,3 +418,40 @@ lint:decks — 15 deck(s) balanced
 ---
 [<small>2026-08-28 08:23:21</small>] [**Neo**]->[**User**] *swe commit*:
  Sprint committed and pushed: acf96e6 -> origin/main (fast-forward from 05aa3f6). 193 files, +9450/-95. Working tree clean apart from this chat log.
+
+---
+[<small>2026-08-28 11:31:53</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make lint-design | /home/drusifer/Projects/recard/build/build.out
+
+See ARCHITECTURE.md UI Conventions (44px floor) and D24 (zone overlap) for the invariants being checked.
+make: *** [Makefile:40: lint-design] Error 1
+
+---
+[<small>2026-08-28 11:32:00</small>] [**Neo**]->[**User**] *swe status*:
+ Art pipeline switched to real generated images (agy CLI). BLOCKED at 27/132: 'Individual quota reached... Resets in 4h'. Script is now quota-aware (detects, stops, resumable - skips existing). Procedural SVG generator pruned. Added colour-keyed fallback so the 105 art-less cards render cleanly instead of broken images. 475 tests, lint baselines held. Awaiting quota reset to finish.
+
+---
+[<small>2026-08-28 13:31:10</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1270.369057
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-08-28 13:31:10</small>] [**Neo**]->[**Morpheus**] *swe impl*:
+ New reusable tool: tools/imagegen (generic, not Recard-specific). Takes a manifest of id/prompt pairs, paints via a pluggable backend registry (codex|agy - same pattern as PILE_TYPES/DECK_TYPES), resumable, quota-aware, validates by dimensions not bytes. 15 tests on the pure core. Recard's card art + the new branded card back both go through it. Retired tools/rtg/genArt*.sh and packArt.mjs.
+
+---
+[<small>2026-08-28 13:58:32</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make lint-design | /home/drusifer/Projects/recard/build/build.out
+make: *** [Makefile:40: lint-design] Error 1
+> lint:design
+> node tests/designLint.check.mjs
+

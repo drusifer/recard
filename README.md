@@ -49,11 +49,71 @@ npm run lint:design   # design-lint only - renders the real app and checks
 npm run lint:js       # eslint (unicorn + sonarjs)
 ```
 
-**`lint:design` currently reports 5 known violations** — desktop-width
+Builds run through `make`, which fronts the npm scripts and captures
+output rather than flooding the terminal:
+
+```
+make check          # the gate: compile card content + unit tests + deck balance
+make test           # unit tests only
+make lint           # style + design + js (see the known-baseline note below)
+make lint-decks     # Recard the Gathering deck balance
+make cards          # compile content/rtg/*.yaml -> src/decks/rtg/catalog.js
+make art-gen        # paint card art (slow, quota-limited, resumable)
+make art            # pack generated art -> assets/cards/rtg/*.webp
+make help           # list every target
+```
+
+`make check` deliberately excludes `lint`, which carries a known
+non-zero baseline (below) and so can never exit 0; run it separately and
+compare against that baseline.
+
+### Card content and art (Recard the Gathering)
+
+Card data is authored as YAML and compiled; there is no in-app deck
+builder.
+
+```
+content/rtg/**.yaml  ->  make cards  ->  src/decks/rtg/catalog.js
+                     ->  make art-gen ->  build/rtg-art-raw/*.png   (gitignored masters)
+                     ->  make art     ->  assets/cards/rtg/*.webp   (committed, ~50 KB each)
+```
+
+Run `make cards` before `make lint-decks` — the balance linter reads the
+compiled catalog, not the YAML, so it always measures what the app will
+actually load.
+
+**Art generation is quota-limited and resumable.** `make art-gen` skips
+any image already present, so if the backend's quota runs out mid-run,
+re-running the same command after it resets picks up exactly where it
+stopped. A card with no art yet renders a colour-keyed fallback panel
+rather than a broken image, so a partial set is still fully playable.
+
+### `tools/imagegen` — generating image sets from prompts
+
+The art pipeline is a general tool, not a Recard one. Give it a manifest
+of `<id>` + `<prompt>` pairs and it paints each one:
+
+```
+node tools/imagegen/cli.mjs gen  --manifest jobs.tsv --out build/raw \
+     --backend codex --parallel 4 --style "oil painting, no text"
+node tools/imagegen/cli.mjs pack --in build/raw --out assets/img --size 512
+```
+
+Backends live in a registry (`tools/imagegen/backends.mjs`) — `codex`
+and `agy` today, one entry each. It is resumable, treats quota
+exhaustion as terminal rather than retrying it, and validates output by
+image dimensions rather than byte size.
+
+**`lint:design` currently reports 3 known violations** — desktop-width
 zone-overlap cases, disclosed and tracked rather than silently accepted;
 see `docs/ARCHITECTURE.md` D24 and `docs/USER_STORIES.md` Backlog. Wired
 in as blocking rather than left silent so the count can't quietly grow
 while it's unfixed.
+
+**`lint:js` likewise reports 7 known `sonarjs/cognitive-complexity`
+findings**, all pre-existing and backlogged. Both baselines are the
+reason `make check` excludes `lint`: a gate that can never go green
+stops being a gate.
 
 `npm run lint:design` needs a Chromium build Playwright can launch —
 either run `npx playwright install chromium` once, or have a system

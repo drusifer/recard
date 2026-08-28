@@ -26,13 +26,29 @@ const PIP_CLASS = {
 };
 
 /**
- * The card's art, written by `make art` to `assets/cards/rtg/<id>.svg`.
+ * The card's art, written by `make art` to `assets/cards/rtg/<id>.webp`.
+ *
+ * Real generated illustration, not the procedural placeholder this
+ * started as (US-79) - each card's `art:` prompt is painted by the `agy`
+ * CLI and downscaled to 512px WebP. That swap is exactly what D77's
+ * prompt-per-card design existed to allow, and it needed no change to
+ * the card pool at all.
  */
 function artUrl(card) {
   // `cardId` is the PRINTED id; `id` is this physical copy's instance id
   // (D80 - four copies of one card need four distinct ids). Art is per
   // printed card, so it must key off `cardId` or all four copies 404.
-  return `assets/cards/rtg/${card.cardId ?? card.id}.svg`;
+  return `assets/cards/rtg/${card.cardId ?? card.id}.webp`;
+}
+
+/** Colour classes for a card with no art yet, so the fallback panel
+ * still reads as the right colour. A land is keyed off the mana it
+ * produces, matching how the rest of the set treats colourless lands. */
+function colorClasses(card) {
+  const colors = card.colors?.length > 0
+    ? card.colors
+    : ['W', 'U', 'B', 'R', 'G'].filter((c) => (card.text ?? '').includes(`{${c}}`));
+  return colors.length > 0 ? colors.map((c) => `rtg-c-${c.toLowerCase()}`) : ['rtg-c-c'];
 }
 
 function manaPips(symbols) {
@@ -156,6 +172,14 @@ export const RtgCardFace = {
     art.className = 'rtg-art';
     art.src = artUrl(card);
     art.alt = '';
+    // Art generation is quota-limited and runs as a separate build step,
+    // so a card may legitimately have no image yet. Degrade to a
+    // colour-keyed panel rather than showing a broken-image icon - the
+    // card is still fully playable without its illustration.
+    art.addEventListener('error', () => {
+      art.remove();
+      element.classList.add('rtg-art-missing', ...colorClasses(card));
+    });
     // Art is decorative here; the accessible name is the card's own.
     element.setAttribute('aria-label', card.name ?? card.id);
     element.title = card.name ?? card.id;

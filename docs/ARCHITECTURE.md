@@ -4037,9 +4037,28 @@ printed cost and its curve position drift apart. Output lands in `src/`
 and `assets/`, never `build/` (gitignored).
 
 Every card carries an `art:` string written as a real image-generation
-prompt. The SVG generator does not read it; it draws deterministic
-heraldic art from the card's own attributes. The prompt is the interface
-to real illustration later, so the pool needs no re-authoring then.
+prompt. That field is the whole point of the design, and it paid off
+immediately, twice: the first cut shipped a procedural SVG generator
+that drew heraldic art from each card's attributes; it was then replaced
+with real generated illustration via the `agy` CLI, and then again with
+Codex's `image_gen` when `agy`'s individual quota proved too small for a
+132-card set. Neither swap required **any change to the card pool** —
+only a new generator behind the same `make art-gen` target.
+
+Generator options were checked rather than assumed: `claude` cannot
+generate images at all (text/vision in, text out); `gemini` is retired
+(`IneligibleTierError`, folded into Antigravity); local diffusion is out
+(no torch/diffusers, and the host is a Raspberry Pi 5). Codex also takes
+an absolute output path per card, so parallel runs cannot collide — the
+`agy` route shared one scratch directory.
+
+Art is generated in two steps because the costs are wildly different:
+`make art-gen` paints 1024x1024 PNG masters (~35 min for the set, so it
+is resumable and skips anything already generated), and `make art` packs
+those masters into 512px WebP. Only the WebP ships — 132 full-size PNGs
+would add ~230 MB to the repo for images that render at 70px on the
+table. The masters stay outside the repo; re-packing is cheap,
+re-generating is not.
 
 **One compiled artifact**, an ES module rather than JSON: the browser
 imports it directly (no fetch, no import assertion) and so does every

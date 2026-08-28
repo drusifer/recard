@@ -417,18 +417,29 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    face-up card (border, radius, shadow) with a woven two-tone pattern,
    so a face-down card reads as a *card* at a glance instead of an empty
    slot. */
+/* Recard-branded card back (direct user request). The woven two-tone
+   CSS gradient this replaced read as "a placeholder for a card back";
+   the branded art reads as an actual deck. Shared by EVERY preset, not
+   just Recard the Gathering - the mark belongs to the app, not one game.
+
+   `background-size: cover` on a portrait image, so the same asset works
+   at both card sizes (43x59 standard, 70x98 RtG) without distortion.
+   The gradient fallback stays underneath: if the asset is ever missing,
+   a face-down card still reads as a card rather than a blank hole. */
 .card-back {
   display: flex;
   align-items: center;
   justify-content: center;
   color: transparent;
   font-size: 0;
-  background-color: #2b4a7d;
+  background-color: #16341f;
   background-image:
-    repeating-linear-gradient(45deg, rgba(255,255,255,0.16) 0 2px, transparent 2px 6px),
-    repeating-linear-gradient(-45deg, rgba(0,0,0,0.22) 0 2px, transparent 2px 6px);
-  border: 1px solid #12233f;
-  box-shadow: inset 0 0 0 2px var(--card-bg), 0 2px 5px rgba(0, 0, 0, 0.35);
+    image-set(url("assets/brand/card-back.webp") type("image/webp")),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0 2px, transparent 2px 6px);
+  background-size: cover;
+  background-position: center;
+  border: 1px solid #0c1d12;
+  box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.35), 0 2px 5px rgba(0, 0, 0, 0.35);
   opacity: 1;
 }
 
@@ -1960,13 +1971,16 @@ body.panel-resize-active {
    deliberately NOT touched: an MTG card needs more room than a pip
    card, but changing the shared tokens would resize every other
    preset's table, which the RtG brief explicitly ruled out. */
-/* `button.card-rtg`, not `.card-rtg` - `button.card` (line ~296) sets
-   min-width/min-height/display with element+class specificity, which
-   outranks a plain class selector. That exact trap already caused a real
-   "tiny cards" bug once (see the comment above `button.card`), so this
-   matches its specificity deliberately rather than relying on source
-   order alone. Verified live in a browser, not assumed. */
-button.card-rtg {
+/* `.card.card-rtg`, not `.card-rtg` and not `button.card-rtg`:
+   - a plain `.card-rtg` (0,1,0) loses to `button.card` (0,1,1), which
+     sets min-width/min-height/display. That exact trap already caused a
+     real "tiny cards" bug once (see the comment above `button.card`).
+   - `button.card-rtg` fixes that but only matches BUTTONS, and a
+     face-down card is a `div` (`cardBackElement`), so RtG card backs
+     rendered at standard size next to full-size faces.
+   Two classes (0,2,0) outrank one element + one class (0,1,1) and match
+   either tag. Both problems were caught by measuring in a browser. */
+.card.card-rtg {
   --card-rtg-w: 4.4rem;
   --card-rtg-h: 6.1rem;
 
@@ -2148,3 +2162,33 @@ button.card-rtg {
   overflow-y: auto;
   align-content: flex-start;
 }
+
+/* ---- RtG art fallback (US-79) ---------------------------------------
+   Art generation is quota-limited and runs as a separate build step, so
+   a card may have no image yet. Rather than a broken-image icon, the
+   card paints a colour-keyed panel: still readable, still playable, and
+   obviously "art pending" rather than "broken". Multiple colour classes
+   stack for gold cards, which is why each sets only one gradient stop. */
+button.card-rtg.rtg-art-missing {
+  background:
+    linear-gradient(160deg, var(--rtg-fallback-a, #4a4a4a), var(--rtg-fallback-b, #1d1d1d));
+}
+
+.rtg-c-w { --rtg-fallback-a: #d9c98f; }
+.rtg-c-u { --rtg-fallback-a: #5b93b0; }
+.rtg-c-b { --rtg-fallback-a: #4d5648; }
+.rtg-c-r { --rtg-fallback-a: #b1552f; }
+.rtg-c-g { --rtg-fallback-a: #4f8f43; }
+.rtg-c-c { --rtg-fallback-a: #6f7a80; }
+
+/* The second colour of a gold card supplies the gradient's far stop. */
+.rtg-c-u.rtg-c-w { --rtg-fallback-b: #24455a; }
+.rtg-c-b.rtg-c-w,
+.rtg-c-b.rtg-c-u { --rtg-fallback-b: #232a20; }
+.rtg-c-r.rtg-c-w,
+.rtg-c-r.rtg-c-u,
+.rtg-c-r.rtg-c-b { --rtg-fallback-b: #5a2711; }
+.rtg-c-g.rtg-c-w,
+.rtg-c-g.rtg-c-u,
+.rtg-c-g.rtg-c-b,
+.rtg-c-g.rtg-c-r { --rtg-fallback-b: #20401d; }

@@ -7,7 +7,7 @@
 #
 # Adding a task: add the npm script first, then a one-line target here.
 
-.PHONY: help test lint lint-js lint-style lint-design lint-decks lint-fix cards art check dev
+.PHONY: help test lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev
 
 help:
 	@echo "Recard targets (all front npm scripts):"
@@ -19,7 +19,8 @@ help:
 	@echo "  lint-decks   RtG deck balance (size/copies/lands/curve/colour)"
 	@echo "  lint-fix     autofix style + js"
 	@echo "  cards        compile content/rtg YAML -> src/decks/rtg/cards.json"
-	@echo "  art          generate assets/cards/rtg/*.svg from the compiled pool"
+	@echo "  art-gen      paint card art via the codex CLI (~50 min, resumable)"
+	@echo "  art          pack generated art into assets/cards/rtg/*.webp"
 	@echo "  check        cards + test + lint  (full gate)"
 	@echo "  dev          dev server"
 
@@ -46,6 +47,21 @@ lint-fix:
 
 cards:
 	npm run cards:build
+
+# Two steps, because generating the art is expensive (~50 min for the
+# full set, and quota-limited) while packing it is cheap and repeatable.
+# Both run through the generic `imagegen` tool (tools/imagegen), which is
+# not Recard-specific - it takes any manifest of id/prompt pairs.
+#   make art-gen  paint every card via the `codex` CLI -> build/rtg-art-raw
+#   make art      downscale those masters into assets/cards/rtg/*.webp
+# The masters stay out of the repo; only the 512px WebP ships.
+art-gen:
+	npm run cards:jobs > /tmp/rtg-art-jobs.tsv
+	node tools/imagegen/cli.mjs gen \
+	  --manifest /tmp/rtg-art-jobs.tsv \
+	  --out build/rtg-art-raw \
+	  --backend codex --parallel 4 \
+	  --style "high fantasy oil painting, Magic-the-Gathering card art, no text, no borders, no watermark"
 
 art:
 	npm run cards:art
