@@ -27,9 +27,20 @@ export function makeMotionMessage(kind, data) {
  * third case where some receiver could legitimately see a card the
  * dragger cannot. When `cardId` is omitted, every receiver renders a
  * generic anonymous back at the broadcast position instead.
+ *
+ * *nit (D68, direct user request): `dx`/`dy` - NOT an absolute screen
+ * fraction any more. Every player's `panelLayout.js` arrangement is
+ * genuinely local/per-browser (deliberately, D-numbered decision) - an
+ * absolute fraction of the DRAGGER's own screen has no correct meaning
+ * on a receiver's differently-arranged screen. `dx`/`dy` are instead an
+ * offset from the DRAGGING PLAYER's own hand-panel center (a stable
+ * reference point every viewer renders somewhere), as a fraction of the
+ * screen's own size - see `main.js`'s `broadcastCardDrag`/
+ * `applyIncomingMotion` for where the offset is computed and re-anchored
+ * against each receiver's own rendering of that same player's seat.
  */
-export function cardDragPayload(card, x, y) {
-  return { cardId: card.faceUp === true ? card.id : null, x, y };
+export function cardDragPayload(card, dx, dy) {
+  return { cardId: card.faceUp === true ? card.id : null, dx, dy };
 }
 
 /**

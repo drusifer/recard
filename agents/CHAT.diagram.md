@@ -52,4 +52,8 @@ sequenceDiagram
     Note right of Neo: "*nit done: widened deal-<br/>count input + badge<br/>styling (matches deck-<br/>count-badge pill).<br/>Found+fixed a real<br/>layout bug while<br/>verifying: .deck-s…"
     Mouse->>All: "sm status"
     Note right of Mouse: "Mouse: session close-<br/>out. Phase 85 (task.md)<br/>filled by D64-D67 *nits<br/>post-launch - deck drag-<br/>and-drop took 4 rounds<br/>to get right (reparenti…"
+    Neo->>User: "swe finding"
+    Note right of Neo: "D68: card-drag broadcast<br/>now relative to the<br/>dragging player's own<br/>hand-panel position, not<br/>an absolute screen<br/>fraction (each viewer's<br/>pane…"
+    Neo->>User: "swe finding"
+    Note right of Neo: "D68 follow-up: Y<br/>inverted when rendering<br/>an opponent's card-drag<br/>- every viewer's own<br/>hand sits near the<br/>bottom of their own<br/>screen, but an…"
 ```

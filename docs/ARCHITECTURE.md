@@ -3664,3 +3664,84 @@ unaffected by any of this).
 **Where the full text lives:** this entry; `src/state.js`'s `viewFor`
 (hidden-pile case); `src/ui.js`'s `renderDeckStack`;
 `tests/state.test.js`'s D67-labeled tests.
+
+---
+
+### D68. Live card-drag broadcast is now relative to the dragging player's own seat, not an absolute screen fraction
+
+**Context:** direct user request - "when replicating card movements
+from other players always use a 'relative to Player' coordinate so my
+card movements from my screen show up as otherPlayer movements on
+other screen. just remap the coordinate relative to the player
+position at the table."
+
+**Root problem:** `broadcastCardDrag` (US-29/D19) sent `x`/`y` as a
+raw fraction of the DRAGGER's OWN `gameScreenElement` bounding box,
+and `applyIncomingMotion`/`updateCardDragGhost` applied that SAME
+fraction directly onto the RECEIVER's own `gameScreenElement`. That
+has no correct cross-client meaning: every viewer's panel arrangement
+is genuinely local/per-browser (`panelLayout.js`'s own standing
+design intent - each browser's own drag/resize history, never
+replicated or shared). The same fractional point can land over a
+completely different zone on two different viewers' screens.
+
+**Decision:** `cardDragPayload`'s `x`/`y` fields are renamed `dx`/`dy`
+and now mean an offset from the DRAGGING PLAYER's own hand-panel
+CENTER (`data-zone-id="hand:<playerId>"`, a stable reference every
+viewer renders somewhere), as a fraction of screen size - not an
+absolute position. `playerAnchorRect(playerId)` (new, `main.js`) finds
+that panel's current on-screen position, on WHICHEVER browser calls
+it. The sender computes the offset from ITS OWN rendering of the
+dragger's hand panel; the receiver re-anchors that same offset against
+ITS OWN rendering of the SAME player's hand panel, which may sit
+somewhere completely different on their screen - the ghost still
+starts near the correct player's seat on every viewer, moving in a
+consistent relative direction, regardless of how differently each
+browser has arranged its own panels. Clamping to the visible viewport
+moved from the sender (where it would have discarded real offset
+information before broadcast) to the receiver (once, at render time,
+after re-anchoring).
+
+**Scope:** only `card-drag` motion (US-29). Cursor motion
+(`updateRemoteCursor`) was NOT touched - out of scope, not requested,
+and a mouse pointer position doesn't carry the same "this specific
+card started at this specific player's seat" semantic a card-drag
+ghost does.
+
+**Verified:** `cardDragPayload`'s renamed fields covered by
+`tests/protocol.test.js` (unit-level, unchanged assertions structure).
+The DOM-anchoring logic itself (`playerAnchorRect`,
+`broadcastCardDrag`, the receiver-side re-anchoring in
+`applyIncomingMotion`) has no unit-test coverage - `main.js` has none
+in this codebase (all its logic is thin glue delegating to
+`state.js`/`ui.js`/`protocol.js`, which carry the real test coverage).
+Live-verified the SENDER path only (Playwright, single browser, a
+multi-step mouse drag with real intermediate `drag` events - no
+exceptions). **Not verified**: true two-peer cross-client rendering -
+attempted, blocked on getting Playwright's join-flow selectors right
+against real PeerJS signaling within a reasonable time budget,
+disclosed rather than faked. The math mirrors this codebase's own
+already-proven `updateRemoteCursor` convention (a fraction rendered as
+`left/top: N%` on the receiver's own container) - same rendering
+contract, just a differently-computed fraction feeding it.
+
+**Where the full text lives:** this entry; `src/protocol.js`'s
+`cardDragPayload`; `src/main.js`'s `playerAnchorRect`/
+`broadcastCardDrag`/`applyIncomingMotion`.
+
+**D68 follow-up, same day - Y inverted on receive:** direct user
+correction - "invert y axis movement when translating opponent's drag
+coords." Every viewer's OWN hand renders near the bottom of their own
+screen; an opponent's hand can render anywhere else (often the top) on
+THIS viewer's screen. "Away from the dragger's own hand, toward the
+table" is `dy < 0` on the sender's own screen (their hand sits below
+their drag). Applied as-is on a receiver where that SAME player's hand
+happens to render ABOVE its anchor point instead, the ghost would
+visually move toward their hand rather than away from it - the wrong
+direction relative to their seat. `applyIncomingMotion`'s `card-drag`
+case now computes `y` as `anchorFracY - message.data.dy` (sign
+flipped), keeping "away from the dragger's seat" consistent regardless
+of which side of their own anchor a given viewer happens to render
+that seat on. `x` is untouched - not requested, and left/right isn't
+mirrored the same way top/bottom is by this app's own seat placement
+convention.

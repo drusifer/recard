@@ -118,3 +118,11 @@ Agents **must** use this for every message posted to CHAT.md:
 ---
 [<small>2026-08-27 18:37:42</small>] [**Mouse**]->[**all**] *sm status*:
  Mouse: session close-out. Phase 85 (task.md) filled by D64-D67 *nits post-launch - deck drag-and-drop took 4 rounds to get right (reparenting, a real bug fix, then two iterations to make pickup/drop genuinely generic per-card instead of a fixed-destination action). All TDD + live-verified. 396/396, lint baseline clean throughout. Committing next.
+
+---
+[<small>2026-08-27 18:47:11</small>] [**Neo**]->[**User**] *swe finding*:
+ D68: card-drag broadcast now relative to the dragging player's own hand-panel position, not an absolute screen fraction (each viewer's panelLayout is genuinely local). cardDragPayload's x/y renamed dx/dy; new playerAnchorRect anchors sender+receiver to their own rendering of the same player's hand panel. 396/396, lint clean. Sender path live-verified; true 2-peer cross-client render NOT verified - disclosed, not faked.
+
+---
+[<small>2026-08-27 20:46:18</small>] [**Neo**]->[**User**] *swe finding*:
+ D68 follow-up: Y inverted when rendering an opponent's card-drag - every viewer's own hand sits near the bottom of their own screen, but an opponent's hand can render anywhere (often the top) on this viewer's screen, so 'away from dragger's hand' needed the sign flipped to stay consistent regardless of which side of the anchor their seat renders on. X untouched. 396/396, lint baseline clean.

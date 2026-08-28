@@ -1566,15 +1566,35 @@ function markCardDragStale(playerId) {
 // which now cover the hand's cards too) - sent as `active: false` so
 // receivers clear the ghost
 // promptly instead of waiting out the full TTL after a normal drop.
+// *nit (D68, direct user request): "always use a coordinate relative
+// to Player, remap relative to the player's position at the table" -
+// every viewer renders every player's own hand pile somewhere
+// (`data-zone-id="hand:<playerId>"`, `renderPileShell`), so it's a
+// stable, always-present anchor - unlike an absolute screen fraction,
+// which has no correct meaning across two viewers' genuinely
+// independent, local `panelLayout.js` arrangements (D-numbered
+// decision - each browser's own drag/resize history, never shared).
+function playerAnchorRect(playerId) {
+  const panel = gameScreenElement.querySelector(`[data-zone-id="hand:${CSS.escape(playerId)}"]`);
+  return panel ? panel.getBoundingClientRect() : gameScreenElement.getBoundingClientRect();
+}
+
 function broadcastCardDrag(card, clientX, clientY) {
   if (!card) {
-    motionThrottler.schedule('card-drag', { cardId: null, x: 0, y: 0, active: false });
+    motionThrottler.schedule('card-drag', { cardId: null, dx: 0, dy: 0, active: false });
     return;
   }
   const rect = gameScreenElement.getBoundingClientRect();
-  const x = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-  const y = Math.min(1, Math.max(0, (clientY - rect.top) / rect.height));
-  motionThrottler.schedule('card-drag', { ...cardDragPayload(card, x, y), active: true });
+  const anchor = playerAnchorRect(myId);
+  const originX = anchor.left + anchor.width / 2;
+  const originY = anchor.top + anchor.height / 2;
+  // Deliberately unclamped here - this is a pure offset from MY OWN
+  // hand panel, not yet a renderable screen position. Clamping happens
+  // once, on each receiver's own side, after re-anchoring against
+  // THEIR rendering of my hand panel (`applyIncomingMotion` below).
+  const dx = (clientX - originX) / rect.width;
+  const dy = (clientY - originY) / rect.height;
+  motionThrottler.schedule('card-drag', { ...cardDragPayload(card, dx, dy), active: true });
 }
 
 function applyIncomingMotion(playerId, message) {
@@ -1605,7 +1625,31 @@ function applyIncomingMotion(playerId, message) {
       return;
     }
     const card = message.data.cardId ? resolveVisibleCard(message.data.cardId) : null;
-    updateCardDragGhost(gameScreenElement, playerId, card, message.data.x, message.data.y);
+    // D68: `message.data.dx/dy` is an offset from the SENDER's own
+    // hand-panel center, as they saw it on their own screen - re-anchor
+    // it against MY OWN rendering of that same player's hand panel
+    // (`playerAnchorRect`, wherever I've arranged it), not a shared
+    // absolute position. Clamped here (once, at render time) so the
+    // ghost stays on-screen even if the two viewers' layouts differ
+    // enough to push the raw math past an edge.
+    const rect = gameScreenElement.getBoundingClientRect();
+    const anchor = playerAnchorRect(playerId);
+    const anchorFracX = (anchor.left + anchor.width / 2 - rect.left) / rect.width;
+    const anchorFracY = (anchor.top + anchor.height / 2 - rect.top) / rect.height;
+    // *nit (direct user request): Y is inverted here - every viewer's
+    // OWN hand renders near the bottom of their OWN screen, but an
+    // OPPONENT's hand can render anywhere else on MY screen (often the
+    // top). "Away from my own hand, toward the table" is `dy < 0` on
+    // the sender's screen (their hand sits below); rendered as-is on a
+    // viewer where that same player's hand sits ABOVE the anchor
+    // instead, the ghost would move the wrong way relative to their
+    // seat. Flipping the sign keeps "away from the dragger's own hand"
+    // consistent regardless of which side of it their hand happens to
+    // render on for this particular viewer. X is untouched - not
+    // requested, and left/right isn't mirrored the same way seats are.
+    const x = Math.min(1, Math.max(0, anchorFracX + message.data.dx));
+    const y = Math.min(1, Math.max(0, anchorFracY - message.data.dy));
+    updateCardDragGhost(gameScreenElement, playerId, card, x, y);
     markCardDragStale(playerId);
   
   break;

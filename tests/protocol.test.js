@@ -53,8 +53,8 @@ test('cardDragPayload: a face-up (public) card includes its real id', () => {
   const card = { id: 'card-1', faceUp: true, owner: null };
   const payload = cardDragPayload(card, 0.4, 0.6);
   assert.equal(payload.cardId, 'card-1');
-  assert.equal(payload.x, 0.4);
-  assert.equal(payload.y, 0.6);
+  assert.equal(payload.dx, 0.4);
+  assert.equal(payload.dy, 0.6);
 });
 
 test('cardDragPayload: a still-hidden private card (own hand or own private zone card) omits the id', () => {
@@ -81,5 +81,5 @@ test('cardDragPayload: a hand card (no faceUp/owner fields at all) omits the id'
 test('cardDragPayload: never leaks rank/suit even for a face-up card - only the id crosses the wire', () => {
   const card = { id: 'card-5', rank: 'K', suit: 'hearts', faceUp: true, owner: null };
   const payload = cardDragPayload(card, 0.2, 0.8);
-  assert.deepEqual(Object.keys(payload).toSorted(), ['cardId', 'x', 'y']);
+  assert.deepEqual(Object.keys(payload).toSorted(), ['cardId', 'dx', 'dy']);
 });
