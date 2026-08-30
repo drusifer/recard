@@ -1,6 +1,5 @@
 import { Session } from './session.js';
 import { createInitialState, reduce, viewFor } from './state.js';
-import { CHANGE_PILE_TYPE_CYCLE } from './piles/pileTypes.js';
 import { makeStateMessage, makeMotionMessage, createMotionThrottler, cardDragPayload } from './protocol.js';
 import { renderShareCode, wireCopyCode } from './qrcode.js';
 import {
@@ -80,7 +79,7 @@ const SCORE_PANEL_ID = 'score';
 // Every id `deckPile.pileActions` can ever offer - `zoneOpts.onPileAction`
 // (below) uses this to route a click to `dealFromDeck` instead of the
 // hand's `pass`, without needing to know which pile kind is asking.
-const DECK_ACTION_IDS = new Set(['draw', 'deal', 'reshuffleDeal', 'shuffle', 'split']);
+const DECK_ACTION_IDS = new Set(['draw', 'deal', 'reshuffleDeal', 'shuffle']);
 let role = null; // 'host' | 'join'
 let session = null;
 let myId = null;
@@ -145,7 +144,6 @@ for (const preset of PRESETS) {
   presetSelect.append(opt);
 }
 const layoutSelect = document.querySelector('#host-layout');
-const layoutRow = document.querySelector('#host-layout-row');
 
 // US-70 (D61): repopulate the Layout picker with every saved override
 // recorded against THIS preset's name - `overridesForPreset` already
@@ -166,34 +164,25 @@ function refreshLayoutOptions(presetName) {
   layoutSelect.value = '';
 }
 
-presetSelect.addEventListener('change', () => {
+// Direct user request: "every game should ONLY be based on preset" - the
+// dropdown always names a real preset now (no "Custom" option), so this
+// runs both on every host change AND once at load to seed the read-only
+// preview for whichever preset is selected first.
+function onPresetSelected() {
   const preset = PRESETS.find((p) => p.name === presetSelect.value);
+  selectedPreset = preset;
+  refreshLayoutOptions(preset.name);
   const previewElement = document.querySelector('#host-preset-preview');
-  selectedPreset = preset ?? null;
-  layoutRow.hidden = !preset;
-  if (preset) refreshLayoutOptions(preset.name);
-  if (!preset) {
-    previewElement.hidden = true;
-    return;
-  }
-  // D49: `type` is optional on a preset ('standard' by omission, same
-  // default createInitialState/buildDeck already use) - most presets
-  // never set it, so this must not clobber a host's own manual
-  // deck-type choice with 'standard' every time they merely preview a
-  // preset that doesn't care.
-  if (preset.type) document.querySelector('#host-deck-type').value = preset.type;
-  document.querySelector('#host-num-decks').value = String(preset.numDecks);
-  document.querySelector('#host-jokers').value = String(preset.jokers);
   const cardsWord = preset.cardsPerPlayer === 1 ? 'card' : 'cards';
   // D53 (Smith Gate 2): a preset that declares a starting table layout
-  // says so in the preview too, same "prefill on select" spirit as the
-  // deck/deal fields above - the host sees what they're getting before
-  // clicking Create Table, not only after.
+  // says so in the preview too - the host sees what they're getting
+  // before clicking Create Table, not only after.
   const zonesText = describeConfiguredZones(preset.piles);
   previewElement.textContent = `${describeDeckConfig(preset)}, ${preset.cardsPerPlayer} ${cardsWord}/player`
     + (zonesText ? ` — table: ${zonesText}` : '');
-  previewElement.hidden = false;
-});
+}
+presetSelect.addEventListener('change', onPresetSelected);
+onPresetSelected();
 
 const motionThrottler = createMotionThrottler();
 const movingIds = new Set();
@@ -619,29 +608,32 @@ document.querySelector('#create-table').addEventListener('click', async () => {
   role = 'host';
   myName = document.querySelector('#host-name').value.trim() || 'Host';
   expectedPlayers = Number(document.querySelector('#host-expected-players').value) || 0;
-  // D81 (US-83): a preset MAY name which catalogued deck list its main
-  // deck pile builds (`rtg` is the first deck type with lists). Read off
-  // the selected preset rather than a new host control - there is no
-  // deck-list UI this sprint, same call D53 made for `piles`.
-  const selectedPreset = PRESETS.find((p) => p.name === presetSelect.value);
+  // Direct user request: "every game should ONLY be based on preset" -
+  // `deckConfig` is read entirely off the selected preset now (the
+  // module-level `selectedPreset`, kept in sync by `onPresetSelected`),
+  // never from a manual host control. This is also the fix for a real
+  // bug that hiding-the-numDecks-control only papered over: `gameConfig`
+  // below never actually forwarded a preset's own `tableZone` at all -
+  // RTG's `tableZone: false` (state.js) was silently ignored at table
+  // creation, so a real RTG table still got the default Deck/Table Zone
+  // panels this whole thread exists to remove.
   const deckConfig = {
-    type: document.querySelector('#host-deck-type').value,
-    numDecks: Number(document.querySelector('#host-num-decks').value),
-    jokers: Number(document.querySelector('#host-jokers').value),
-    ...(selectedPreset?.deckList && { deckList: selectedPreset.deckList }),
+    type: selectedPreset.type ?? 'standard',
+    numDecks: selectedPreset.numDecks,
+    jokers: selectedPreset.jokers,
+    ...(selectedPreset.deckList && { deckList: selectedPreset.deckList }),
   };
   // D46: GameConfig's first real field. D53: `piles` (renamed from
   // `zones` - D55, that name now belongs to the real Zone-entity list)
-  // comes from the selected preset (if any) - no manual host UI for it
-  // this sprint, matching the AC ("a preset MAY declare a starting
-  // layout"). `zones` carries any Zone entities the preset itself
-  // declares (e.g. none today reach beyond the always-present Table
-  // Zone - Gin Rummy's discard only ever references it, never declares
-  // a new one).
+  // comes from the selected preset. `zones` carries any Zone entities
+  // the preset itself declares (e.g. none today reach beyond the
+  // always-present Table Zone - Gin Rummy's discard only ever references
+  // it, never declares a new one).
   const gameConfig = {
     allowsPlayerZones: document.querySelector('#host-allow-player-zones').checked,
-    piles: selectedPreset?.piles ?? [],
-    zones: selectedPreset?.zones ?? [],
+    tableZone: selectedPreset.tableZone ?? true,
+    piles: selectedPreset.piles ?? [],
+    zones: selectedPreset.zones ?? [],
   };
 
   session = Session.host({ name: myName });
@@ -973,14 +965,14 @@ function endSessionForGood(message, { retryable = false } = {}) {
       resolveOwnerName: (ownerId) => nameById.get(ownerId) ?? ownerId,
     };
     // UX follow-up (direct user request): "a Deck is a specific kind of
-    // Pile" - the deck is a real pile in `latestView.zones` now, so this
+    // Pile" - the deck is a real pile in `latestView.piles` now, so this
     // one `renderZones` call renders it too (grouped into the Table
     // Zone, inert - `frozenOpts` has no `isHost`/`onPileAction`, so
     // `pileLevelActions('deck', {isHost: false})` offers only `draw`,
     // and even that has nothing to dispatch to), matching every other
     // control in this frozen re-render. No separate `<deck-zone>`
     // element to build here any more.
-    renderZones(zonesElement, latestView.zones, seatedOrder(latestView.players, myId), latestView.zoneRecords, frozenOptions);
+    renderZones(zonesElement, latestView.piles, seatedOrder(latestView.players, myId), latestView.zones, frozenOptions);
     // Same inert Score panel the live render builds (every seated
     // player with a score, one consolidated panel), just no
     // adjust/set wiring - the session is over.
@@ -1075,7 +1067,7 @@ function renderGameFromView(view) {
   // UX follow-up (direct user request): "get rid of seat panel and
   // replace with a reg zone with a handpile" - the hand is a real
   // `hand`-kind pile now (`state.js`), rendered through the exact same
-  // generic `renderZoneCards`/`actionMenuEl` machinery as any other
+  // generic `renderPileCards`/`actionMenuEl` machinery as any other
   // pile's cards (as a `<pile-panel>` grouped into the owner's own
   // `<zone-panel>`, `src/components/PilePanel.js`/`ZonePanel.js`). No
   // separate `handOpts`/`own` object, no bespoke fan/reorder/motion/
@@ -1095,9 +1087,9 @@ function renderGameFromView(view) {
     onReveal: (cardId) => revealCard(cardId),
     onRotate: (cardId) => rotateCard(cardId),
     onPickup: (cardId) => pickupCard(cardId),
-    onMoveCard: (cardId, toZoneId) => moveCard(cardId, toZoneId),
+    onMoveCard: (cardId, toPileId) => moveCard(cardId, toPileId),
     onCardLift: (cardId, active) => motionThrottler.schedule('card-lift', { cardId, active }),
-    onDropCard: (cardId, toZoneId, placement) => dropCardOnZone(cardId, toZoneId, placement),
+    onDropCard: (cardId, toPileId, placement) => dropCardOnPile(cardId, toPileId, placement),
     // UX follow-up (direct user request): "like zones, Piles are
     // Actionable and should have a title bar with action buttons for
     // that pile type" - every pile's heading is a real action header now
@@ -1106,38 +1098,26 @@ function renderGameFromView(view) {
     // `pileLevelActions('hand', {isOwner})`'s other two (sortRank/
     // sortSuit) are filtered out before they ever reach here (see
     // `renderPile`'s own note) - every deck action (`dealFromDeck`
-    // already handles draw/deal/reshuffleDeal/shuffle/split generically)
-    // is the one real dispatch table today. `pass` was removed outright
+    // already handles draw/deal/reshuffleDeal/shuffle generically) is
+    // the one real dispatch table today. `pass` was removed outright
     // (direct user request, "not a requirement") - see its own git
     // history for the full removal (TOGGLE_PASS, `state.passed`, the
     // roster's Passed tag).
-    onPileAction: isSessionEnded ? null : (pileId, actionId) => {
-      // Sprint 23: `split` is offered by BOTH the deck (`SPLIT_DECK`,
-      // deck-only pile count) and a zone/discard pile (`SPLIT_PILE`,
-      // this specific pile in half) - the same action id means a
-      // different reducer action depending on WHICH pile's own header
-      // it was clicked in, so that's resolved by the acted-upon pile's
-      // own kind, not the id alone.
-      const pile = view.zones.find((z) => z.id === pileId);
+    onPileAction: isSessionEnded ? null : (pileId, actionId, value) => {
+      const pile = view.piles.find((p) => p.id === pileId);
       if (pile?.kind === 'deck' && DECK_ACTION_IDS.has(actionId)) return dealFromDeck(actionId, lastDealCount);
-      if (actionId === 'split') return performSplitPile(pileId);
       if (actionId === 'take') return performTakePile(pileId);
       if (actionId === 'hide') return performSetPileOrientation(pileId, false);
       if (actionId === 'show') return performSetPileOrientation(pileId, true);
       if (actionId === 'remove') return performRemovePile(pileId);
       if (actionId === 'untapAll') return performUntapAll(pileId);
-      // D71 (US-74): advances to the NEXT kind in CHANGE_PILE_TYPE_CYCLE
-      // (wrapping), a real cycle now - not the old zone<->discard-only
-      // flip. `indexOf` returning -1 for a pile whose kind somehow
-      // isn't in the cycle (shouldn't be reachable - this action is
-      // only ever offered by an eligible kind's own pileActions())
-      // falls through to index 0 via `(-1 + 1) % length === 0`, the
-      // same safe "start of the cycle" default a real member would get.
-      if (actionId === 'changePileType') {
-        const currentIndex = CHANGE_PILE_TYPE_CYCLE.indexOf(pile?.kind);
-        const nextKind = CHANGE_PILE_TYPE_CYCLE[(currentIndex + 1) % CHANGE_PILE_TYPE_CYCLE.length];
-        return performChangePileType(pileId, nextKind);
-      }
+      // *nit (direct user request): a real menu now (`ui.js`'s
+      // `buildEnumActionMenu`) picks the target kind directly - `value`
+      // is that choice, forwarded straight through. Replaces the old
+      // "advance to the next kind in CHANGE_PILE_TYPE_CYCLE" cycling
+      // math (D71/US-74) entirely; a menu makes "which kind is next"
+      // moot; a viewer picks the one they want.
+      if (actionId === 'changePileType') return performChangePileType(pileId, value);
     },
     // *nit (2026-08-26): "allow user to rename zones and piles - any
     // user can edit - persisted by host." Same `sessionEnded` gate
@@ -1183,14 +1163,14 @@ function renderGameFromView(view) {
   // child of `#zones`, no separate shared-vs-personal container split.
   // UX follow-up (direct user request): "a Deck is a specific kind of
   // Pile... it is not a Zone at all" - the deck is a real pile in
-  // `view.zones` now (`state.js`'s `viewFor`), so this ONE call also
+  // `view.piles` now (`state.js`'s `viewFor`), so this ONE call also
   // builds and groups it into the Table Zone, exactly like Table/
   // Discard - no separate `<deck-zone>` element/property wiring needed
   // here any more (`<deck-stack>`, `src/components/DeckStack.js`, is
   // what `renderPile` uses for its row instead - see `zoneOpts.
   // dealCount`/`onDealCountChange` above for the one piece of deck-
   // specific state this file still owns: the Deal count input's value).
-  renderZones(zonesElement, view.zones, seatedOrder(view.players, myId), view.zoneRecords, zoneOptions);
+  renderZones(zonesElement, view.piles, seatedOrder(view.players, myId), view.zones, zoneOptions);
   // *nit (2026-08-27), direct user request: "save space" - ONE
   // consolidated `<score-zone>` listing every seated player, instead of
   // one whole panel per player. No per-seat default position needed any
@@ -1208,11 +1188,11 @@ function renderGameFromView(view) {
   renderRosterOnly();
 }
 
-function playCard(cardId, visibility, zoneId, placement = {}) {
+function playCard(cardId, visibility, pileId, placement = {}) {
   if (isSessionEnded) return;
   const { targetCardId, side, layout } = placement;
-  if (role === 'host') dispatch({ type: 'PLAY', playerId: myId, cardId, visibility, zoneId, targetCardId, side, layout });
-  else session.send({ type: 'action', action: { type: 'PLAY', cardId, visibility, zoneId, targetCardId, side, layout } });
+  if (role === 'host') dispatch({ type: 'PLAY', playerId: myId, cardId, visibility, pileId, targetCardId, side, layout });
+  else session.send({ type: 'action', action: { type: 'PLAY', cardId, visibility, pileId, targetCardId, side, layout } });
 }
 
 function revealCard(cardId) {
@@ -1255,11 +1235,11 @@ function pickupCard(cardId) {
   else session.send({ type: 'action', action: { type: 'PICKUP', cardId } });
 }
 
-function moveCard(cardId, toZoneId, placement = {}) {
+function moveCard(cardId, toPileId, placement = {}) {
   if (isSessionEnded) return;
   const { targetCardId, side, layout } = placement;
-  if (role === 'host') dispatch({ type: 'MOVE_CARD', playerId: myId, cardId, toZoneId, targetCardId, side, layout });
-  else session.send({ type: 'action', action: { type: 'MOVE_CARD', cardId, toZoneId, targetCardId, side, layout } });
+  if (role === 'host') dispatch({ type: 'MOVE_CARD', playerId: myId, cardId, toPileId, targetCardId, side, layout });
+  else session.send({ type: 'action', action: { type: 'MOVE_CARD', cardId, toPileId, targetCardId, side, layout } });
 }
 
 // US-28: dropping a dragged card on a zone plays it (if it came from
@@ -1271,7 +1251,16 @@ function moveCard(cardId, toZoneId, placement = {}) {
 // US-32/33: `placement` (from ui.js's drop-region hit test) carries the
 // stack/overlap intent through unchanged - this function still doesn't
 // need to know which mode was chosen, only to forward it.
-function dropCardOnZone(cardId, targetZoneId, placement = {}) {
+//
+// A card dragged FROM hand is ALWAYS dispatched as PLAY, even when it's
+// dropped back onto that same hand (a reorder) - `HandPile.cardActions`
+// (`HandPile.js`) only ever offers `'play'` as a way to remove a card
+// from hand, never `'move'`/`'pickup'`, so PLAY is the only authorized
+// dispatch for ANY hand-sourced drag. A same-pile "play" not being a
+// real play (no visibility change, no genuine card-leaves-hand game
+// event) is PLAY's own concern to recognize, not this function's - see
+// its `state.js` doc comment.
+function dropCardOnPile(cardId, targetPileId, placement = {}) {
   if (isSessionEnded) return;
   const view = currentView();
   if (!view) return;
@@ -1280,21 +1269,21 @@ function dropCardOnZone(cardId, targetZoneId, placement = {}) {
     // drag always plays public, same as a plain tap. "Play hidden" is
     // its own explicit action (the hand card's hover row), never
     // reachable by dragging.
-    playCard(cardId, 'public', targetZoneId, placement);
+    playCard(cardId, 'public', targetPileId, placement);
     return;
   }
   // UX follow-up (direct user request): the hand pile is a real,
-  // addressable zone now (`view.zones`), so a table card dropped onto
+  // addressable pile now (`view.piles`), so a table card dropped onto
   // it needs PICKUP's own semantics (strips owner/faceUp/layout), not a
   // generic MOVE_CARD - dropping this into the plain `moveCard` branch
   // would leave those table-only fields sitting on a card that's
   // supposed to be a plain hand card.
-  const targetZone = view.zones.find((z) => z.id === targetZoneId);
-  if (targetZone?.kind === 'hand' && targetZone.ownerId === myId) {
+  const targetPile = view.piles.find((p) => p.id === targetPileId);
+  if (targetPile?.kind === 'hand' && targetPile.ownerId === myId) {
     pickupCard(cardId);
     return;
   }
-  moveCard(cardId, targetZoneId, placement);
+  moveCard(cardId, targetPileId, placement);
 }
 
 // UX follow-up (direct user request): the Add Zone control (name input,
@@ -1303,25 +1292,20 @@ function dropCardOnZone(cardId, targetZoneId, placement = {}) {
 // fully-tested reducer action - only this manual UI entry point is gone.
 
 // Sprint 12 (T56.1): named so the deck's pile anchor calls the same
-// implementation the legacy shuffle/split buttons did.
+// implementation the legacy shuffle button did.
 function performShuffle() {
   if (isSessionEnded) return;
   dispatch({ type: 'SHUFFLE_DECK' });
 }
-// UX follow-up (direct user request): "just make the split action
-// always split in half. One split should result in 2 piles." No count
-// to choose any more - always exactly 2.
-const SPLIT_PILE_COUNT = 2;
-function performSplit() {
-  if (isSessionEnded) return;
-  try {
-    dispatch({ type: 'SPLIT_DECK', pileCount: SPLIT_PILE_COUNT });
-  } catch (error) {
-    // Nielsen #9: say what went wrong and what would work, in the same
-    // place the action was taken - not a silent no-op.
-    globalThis.alert(error.message);
-  }
-}
+// *nit (direct user request): the old always-in-half `performSplit`/
+// `SPLIT_PILE_COUNT` (deck-only, `SPLIT_DECK`) and `performSplitPile`
+// (zone/discard-only, no index, `SPLIT_PILE`) are both retired -
+// `state.js`'s `SPLIT_PILE`/`PICKUP_SPLIT` now take a real `index` and
+// apply to any splittable pile, deck included. Their own dispatch
+// functions land with the picker UI that supplies that index (a
+// follow-up phase); this comment marks where they'll go, next to
+// `performDraw` below, same "deck's own actions" grouping.
+
 // Sprint 12 (D34/D35/D36, T54.1): named so the deck's pile anchor - both
 // its click/tap shortcut and its drag-onto-hand drop - calls the same
 // implementation the legacy button did, rather than a second one.
@@ -1329,23 +1313,6 @@ function performDraw() {
   if (isSessionEnded) return;
   if (role === 'host') dispatch({ type: 'DRAW', playerId: myId });
   else session.send({ type: 'action', action: { type: 'DRAW' } });
-}
-
-// Sprint 23 (US-60/61/62, Phase 70): unlike `performSplit`/`performDraw`
-// above (the DECK's own actions), these act on a `zone`/`discard` pile
-// named by `pileId`, open to any player (owner or a shared pile) - so
-// they need the same host-local/guest-relay branch `performDraw`/
-// `togglePass` already use, not `performSplit`'s bare host-only
-// `dispatch` (a zone/discard action can come from a GUEST). Wrapped in
-// try/catch + `window.alert` on the host-local path, same Nielsen #9
-// precedent as `performSplit` - the reducer's authorization/eligibility
-// throws would otherwise run silently off the click handler.
-function performSplitPile(pileId) {
-  if (isSessionEnded) return;
-  if (role === 'host') {
-    try { dispatch({ type: 'SPLIT_PILE', playerId: myId, pileId }); }
-    catch (error) { globalThis.alert(error.message); }
-  } else session.send({ type: 'action', action: { type: 'SPLIT_PILE', pileId } });
 }
 
 function performTakePile(pileId) {
@@ -1366,9 +1333,9 @@ function performSetPileOrientation(pileId, faceUp) {
 
 // *nit (2026-08-26): rename, any player - same dispatch shape as every
 // other pile-affecting action above. `window.alert` on failure matches
-// `performSplitPile`/`performTakePile`'s own precedent for a reducer
-// throw the UI itself can't prevent in advance (here: a concurrent
-// delete of the pile/zone between the dblclick and the commit).
+// `performTakePile`'s own precedent for a reducer throw the UI itself
+// can't prevent in advance (here: a concurrent delete of the pile/zone
+// between the dblclick and the commit).
 function performRenamePile(pileId, name) {
   if (isSessionEnded) return;
   if (role === 'host') {
@@ -1457,14 +1424,14 @@ function performCreatePileWithCard(cardId, zoneId) {
   if (isSessionEnded) return;
   const view = currentView();
   if (!view) return;
-  // Same hand-vs-table source distinction `dropCardOnZone` already
+  // Same hand-vs-table source distinction `dropCardOnPile` already
   // makes - `state.js`'s own `CREATE_PILE` case re-derives it too
   // (never trusts the client alone for the PLAY-vs-MOVE authorization
   // shape), this just needs to know which existing pile to remove the
   // card FROM.
   const fromPileId = view.myHand.some((c) => c.id === cardId)
-    ? view.zones.find((z) => z.kind === 'hand' && z.ownerId === myId)?.id
-    : view.zones.find((z) => z.cards.some((c) => c.id === cardId))?.id;
+    ? view.piles.find((p) => p.kind === 'hand' && p.ownerId === myId)?.id
+    : view.piles.find((p) => p.cards.some((c) => c.id === cardId))?.id;
   if (!fromPileId) return;
   if (role === 'host') {
     try { dispatch({ type: 'CREATE_PILE', playerId: myId, zoneId, fromPileId, cardId }); }
@@ -1474,7 +1441,7 @@ function performCreatePileWithCard(cardId, zoneId) {
 
 // D51/D67: a dragged table card (or, since D67, the deck's own exposed
 // top card - same mechanism, no special case) landing on the hand pile
-// is `dropCardOnZone`'s own kind==='hand' check - generic, handled by
+// is `dropCardOnPile`'s own kind==='hand' check - generic, handled by
 // whichever zone-panel the drop actually lands on, not a bespoke
 // listener on a dedicated hand element any more.
 
@@ -1491,23 +1458,20 @@ function performCreatePileWithCard(cardId, zoneId) {
 // Start" so a mid-game host can't mis-tap into a reset (Smith Gate 1). ---
 /** Remembers the host's last deal count so a re-render doesn't reset an
  *  input the host already typed into - `renderZones`/`<deck-stack>`
- *  rebuild the deck pile wholesale on every state broadcast. Split has
- *  no count of its own any more (`SPLIT_PILE_COUNT`, always 2). */
+ *  rebuild the deck pile wholesale on every state broadcast. */
 let lastDealCount = 1;
 
 /**
  * US-41/D29, Phase 56 (T56.1): every deck pile-level action - the deck's
  * pile anchor is the ONE thing that calls this now, having absorbed
- * both the legacy strip's deal/reshuffleDeal and the legacy shuffle/
- * split row. "Reshuffle & deal" is RESET then DEAL - two existing
- * dispatches rather than a third code path that could drift from
- * either.
+ * both the legacy strip's deal/reshuffleDeal and the legacy shuffle
+ * row. "Reshuffle & deal" is RESET then DEAL - two existing dispatches
+ * rather than a third code path that could drift from either.
  */
 function dealFromDeck(action, count) {
   if (isSessionEnded) return;
   if (action === 'draw') return performDraw();
   if (action === 'shuffle') return performShuffle();
-  if (action === 'split') return performSplit();
   lastDealCount = count;
   try {
     if (action === 'reshuffleDeal') {
@@ -1570,14 +1534,15 @@ function markCursorStale(playerId) {
 
 // D19: finds a card's full data among whatever's currently visible to
 // THIS viewer (own hand excluded - a dragged card broadcasts identity
-// only when public, and a public card always lives in a zone, never a
-// hand). Redacted placeholders (`card.faceDown: true`) have no rank/
-// suit and are skipped - only a real, renderable card is ever returned.
+// only when public, and a public card always lives in a table-side
+// pile, never a hand). Redacted placeholders (`card.faceDown: true`)
+// have no rank/suit and are skipped - only a real, renderable card is
+// ever returned.
 function resolveVisibleCard(cardId) {
   const view = currentView();
   if (!view) return null;
-  for (const zone of view.zones) {
-    const card = zone.cards.find((c) => c.id === cardId);
+  for (const pile of view.piles) {
+    const card = pile.cards.find((c) => c.id === cardId);
     if (card && !card.faceDown) return card;
   }
   return null;
@@ -1593,20 +1558,20 @@ function markCardDragStale(playerId) {
 
 // US-29/D19: broadcasts live position while dragging, extending D13's
 // existing throttled channel with one new kind. `card: null` is the
-// dragend "stopped" signal (see renderZoneCards' dragend handlers,
+// dragend "stopped" signal (see renderPileCards' dragend handlers,
 // which now cover the hand's cards too) - sent as `active: false` so
 // receivers clear the ghost
 // promptly instead of waiting out the full TTL after a normal drop.
 // *nit (D68, direct user request): "always use a coordinate relative
 // to Player, remap relative to the player's position at the table" -
 // every viewer renders every player's own hand pile somewhere
-// (`data-zone-id="hand:<playerId>"`, `renderPileShell`), so it's a
+// (`data-pile-id="hand:<playerId>"`, `renderPileShell`), so it's a
 // stable, always-present anchor - unlike an absolute screen fraction,
 // which has no correct meaning across two viewers' genuinely
 // independent, local `panelLayout.js` arrangements (D-numbered
 // decision - each browser's own drag/resize history, never shared).
 function playerAnchorRect(playerId) {
-  const panel = gameScreenElement.querySelector(`[data-zone-id="hand:${CSS.escape(playerId)}"]`);
+  const panel = gameScreenElement.querySelector(`[data-pile-id="hand:${CSS.escape(playerId)}"]`);
   return panel ? panel.getBoundingClientRect() : gameScreenElement.getBoundingClientRect();
 }
 

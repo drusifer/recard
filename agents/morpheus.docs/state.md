@@ -1049,3 +1049,73 @@ watching for.
 ### Next Steps
 @Neo: `*swe impl phase-79` (REMOVE_ZONE/REMOVE_PILE reducer actions,
 TDD). @Trin picks up UAT after.
+
+## *fix: D86 CHANGE_PILE_TYPE look-and-feel review (2026-08-29) - APPROVED
+
+User correction, direct: my own D63/D71 design ("cycle through zone/
+discard/foundation/cascade/rankAdjacent/battlefield/exile/stack") never
+noticed that all 8 of those kinds share `component: 'pile-panel'` - the
+picker changed `canAccept`/label but never the actual visual, contrary
+to what "change pile TYPE" implies to a user who already sees `deck`/
+`hand` render distinctly elsewhere in this same app. This is my own
+design gap from D63, not an implementation slip - reviewed accordingly.
+
+**The fix (Neo, TDD, Trin mutation-verified PASS):**
+- `CHANGE_PILE_TYPE_TARGETS = [...CHANGE_PILE_TYPE_CYCLE, 'deck', 'hand']`
+  - deck/hand join as TARGETS only. `CHANGE_PILE_TYPE_CYCLE` (source
+    eligibility) is UNCHANGED - a deck/hand pile can never convert away.
+  **Agree with the asymmetry, for the reason given**: `DECK_PILE_ID`/
+  `ensureHandPile`'s kind+owner scan both assume a hand/deck pile's
+  identity is stable once it exists; a reversible conversion would let
+  a fresh canonical hand/deck get created alongside an old one still
+  carrying that kind, racing for meaning. Matches this project's
+  existing "additive, not reversible where reversal breaks an
+  invariant" pattern (e.g. D62's deck/hand exemption from `REMOVE_PILE`).
+- Hand-target requires `pile.ownerId` - correctly modeled as
+  STRUCTURAL (a hand fundamentally belongs to one player), not folded
+  into the Core invariant's authorization permissiveness (D82-85) -
+  right call, those are different axes and D85's own record already
+  drew that line for `SET_PILE_ORIENTATION`'s kind-check.
+- **Real bug caught and fixed in the same pass**: `resolveHandPileId`
+  replacing 5 reducers' hardcoded `` `hand:${playerId}` `` lookups.
+  Genuinely necessary, not defensive extra work - without it, a
+  converted (non-canonical-id) hand pile would silently swallow cards
+  the instant `ensureHandPile`'s kind+owner check said "already
+  exists" while the 5 write paths kept looking at the wrong id. Good
+  catch that this was reachable via the NEW feature even though the
+  underlying id-vs-kind mismatch predates it.
+
+**One disclosed, non-blocking caveat, not a re-open**: existing cards
+in a pile converting to `hand` are not re-stamped (`toHandCard`) to
+the new owner - same "no revalidation on conversion" risk D63/D71
+already accepted for foundation/cascade/rankAdjacent, correctly
+extended here rather than special-cased. Traced the actual blast
+radius myself rather than taking it on faith: real access/visibility
+for a hand pile is gated by `pile.ownerId` everywhere it matters
+(`HandPile.cardActions`, `viewFor`'s `in-hand` routing) - NOT by
+per-card `card.owner`, so this is cosmetic only (a stale owner tag on
+the card face, `ui.js:735`; a stale `isMine` confirm-dialog condition
+on REVEAL, `ui.js:567`), never a privacy or authorization leak.
+
+**Second disclosed caveat, also non-blocking**: nothing stops a player
+who already has a canonical hand from converting a SECOND owned pile
+to `hand` too. `resolveHandPileId` then always resolves to whichever
+one array-order finds first for DEAL/DRAW/PICKUP/TAKE_PILE/PICKUP_SPLIT
+(the "no specific pile named" actions) - the second one is still fully
+usable via direct drag/PLAY (those dispatch against the exact pile id
+the UI click already knows), just never the implicit target. Not worth
+a new guard for a self-inflicted, purely-cosmetic-consequence edge
+case; noting it here so it isn't rediscovered as a surprise.
+
+**Verdict: APPROVED.** No architecture concerns block this. UI surface
+changed (menu now offers 2 more choices) but the interaction MODEL
+(click pile -> menu -> pick kind) is identical to what D71 already
+shipped and Smith already gated - not a new interaction pattern, so no
+fresh Smith UX gate required for this `*fix` loop (matches the
+zone-drop-gutter `*fix`'s own precedent above).
+
+### Next Steps
+Loop complete. If the user wants a live visual confirmation of the
+actual fan/stack look on a freshly-converted pile (Trin flagged this
+as still open, deliberately not fabricated as e2e coverage), that's a
+quick follow-up `*nit`, not a re-open of this decision.

@@ -5,10 +5,10 @@ import { ACTION_SPECS, actionsForCard, targetsForAction, resolveDropTargetFor } 
 const deck = { id: 'deck', kind: 'deck', ownerId: null };
 const myHand = { id: 'hand:me', kind: 'hand', ownerId: 'me' };
 const theirHand = { id: 'hand:you', kind: 'hand', ownerId: 'you' };
-const table = { id: 'table', kind: 'zone', ownerId: null };
-const myZone = { id: 'z:me', kind: 'zone', ownerId: 'me' };
+const table = { id: 'table', kind: 'plain', ownerId: null };
+const myPlainPile = { id: 'z:me', kind: 'plain', ownerId: 'me' };
 const discard = { id: 'discard', kind: 'discard', ownerId: null };
-const ALL = [deck, myHand, theirHand, table, myZone, discard];
+const ALL = [deck, myHand, theirHand, table, myPlainPile, discard];
 const foundation = { id: 'f:hearts', kind: 'foundation', ownerId: null };
 const cascade = { id: 'c:1', kind: 'cascade', ownerId: null };
 
@@ -30,7 +30,7 @@ test('each pile type declares its own actions (D25/D34/D42)', () => {
 test('every action (card-level and pile-level, ACTION_SPECS - D51) names a destination kind or explicitly none', () => {
   for (const [id, spec] of Object.entries(ACTION_SPECS)) {
     assert.ok(spec.label, `${id} needs a label`);
-    assert.ok(spec.target === null || spec.target === undefined || ['hand', 'zone'].includes(spec.target), `${id} target`);
+    assert.ok(spec.target === null || spec.target === undefined || ['hand', 'table'].includes(spec.target), `${id} target`);
   }
 });
 
@@ -40,29 +40,38 @@ test('every action has an icon (UX follow-up: buttons are icon-only now, label/h
   }
 });
 
-test('a hand offers actions only to its own owner', () => {
+// *nit (direct user request, D83, "fully permissive drag and drop...
+// including hand"): a non-owner used to get nothing on someone else's
+// hand card - now gets 'move' (MOVE_CARD finds a card in any pile by
+// id, so this genuinely works). The owner still gets 'play', not
+// 'move' - a naming necessity (PLAY's own authorization needs the
+// literal string 'play'), not a remaining restriction.
+test('a hand offers play to its own owner, move to anyone else', () => {
   assert.deepEqual(actionsForCard(myHand, { id: 'c' }, 'me'), ['play']);
-  assert.deepEqual(actionsForCard(theirHand, { id: 'c' }, 'me'), [],
-    "another player's hand offers you nothing");
+  assert.deepEqual(actionsForCard(theirHand, { id: 'c' }, 'me'), ['move'],
+    "another player's hand card can still be dragged away, just not 'played'");
 });
 
 test('a face-up zone card can be picked up or moved, but not turned over', () => {
   assert.deepEqual(actionsForCard(table, { faceUp: true, owner: null }, 'me'), ['pickup', 'move', 'rotate']);
 });
 
-test('a shared face-down card: anyone may turn it over or move it, nobody may pick it up', () => {
-  const card = { faceDown: true, owner: null };
-  assert.deepEqual(actionsForCard(table, card, 'me'), ['reveal', 'move', 'rotate']);
-  assert.deepEqual(actionsForCard(table, card, 'someone-else'), ['reveal', 'move', 'rotate'],
+test('a shared face-down card: anyone may turn it over, pick it up, or move it - no ownership to exclude anyone', () => {
+  const card = { faceUp: false, owner: null };
+  assert.deepEqual(actionsForCard(table, card, 'me'), ['reveal', 'pickup', 'move', 'rotate']);
+  assert.deepEqual(actionsForCard(table, card, 'someone-else'), ['reveal', 'pickup', 'move', 'rotate'],
     '"put or take is open to all" (US-19) applies to unowned face-down cards');
 });
 
-test("someone else's still-hidden private card offers nothing (matches the reducer)", () => {
-  const card = { faceDown: true, owner: 'you' };
-  assert.deepEqual(actionsForCard(table, card, 'me'), [],
-    'a non-owner can neither reveal nor move it - offering either would be a lie');
-  assert.deepEqual(actionsForCard(table, card, 'you'), ['reveal', 'move', 'rotate'],
-    'but its owner can do both');
+// *nit (direct user request, D83): someone else's still-hidden PRIVATE
+// card used to offer nothing to a non-owner - no ownership check is
+// left in cardActions at all now, so this is identical to the shared
+// (unowned) case above.
+test("someone else's still-hidden private card is fully actionable now, same as a shared one", () => {
+  const card = { faceUp: false, owner: 'you' };
+  assert.deepEqual(actionsForCard(table, card, 'me'), ['reveal', 'pickup', 'move', 'rotate']);
+  assert.deepEqual(actionsForCard(table, card, 'you'), ['reveal', 'pickup', 'move', 'rotate'],
+    'and its owner, same as ever');
 });
 
 test('targets: play and move light up every table-side pile (zones, discard AND deck - D45/UX follow-up), pickup lights up your own hand', () => {
@@ -106,6 +115,6 @@ test('resolveDropTargetFor (D53): delegates to the pile module\'s own resolveDro
   assert.deepEqual(resolveDropTargetFor('deck', boxes, point), {});
   assert.deepEqual(resolveDropTargetFor('discard', boxes, point), {});
   assert.deepEqual(resolveDropTargetFor('nonsense', boxes, point), {});
-  assert.deepEqual(resolveDropTargetFor('zone', boxes, point),
+  assert.deepEqual(resolveDropTargetFor('plain', boxes, point),
     { targetCardId: 'a', side: 'after', layout: 'stack' });
 });

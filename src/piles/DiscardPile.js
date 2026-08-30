@@ -1,10 +1,16 @@
 /**
  * The Discard pile type (D56 - real subclass, was `discardPile.js`'s
- * flat module). "Stack, drop-only": cards land on top with no
- * positional choice, and the pile offers no card-level action at all -
- * once a card is discarded it stays. Everything else (redaction,
- * pileActions, canAccept, resolveDropTarget) is identical to the base
- * `Pile` and is inherited rather than duplicated.
+ * flat module). "Stack": cards land on top with no positional choice.
+ *
+ * *nit (direct user request, reversing D45): "discard pile is just a
+ * deck (face up or down)" - the original "drop-only, no card-level
+ * action at all" rule is gone. A discard pile now offers full per-card
+ * access (reveal/pickup/move/rotate), identical to the base `Pile` -
+ * `cardActions` is inherited, not overridden, same as `canAccept`/
+ * `redactCard`/`pileActions`. `resolveDropTarget`/`insertCard` below
+ * are the only real difference left from a plain zone: cards always
+ * stack on top (a deck's own convention - hence "just a deck"), never
+ * splice into a before/after halo position.
  */
 import { Pile } from './Pile.js';
 
@@ -13,13 +19,6 @@ export class DiscardPile extends Pile {
    * spot (on top). */
   static resolveDropTarget() {
     return {};
-  }
-
-  /** Drop-only: nothing is ever offered on a card once it's discarded.
-   * `canRemoveCard` (inherited) reuses this, so it falls out to always
-   * `false` for free. */
-  static cardActions() {
-    return [];
   }
 
   /** STACK means every drop lands on top, unconditionally - no

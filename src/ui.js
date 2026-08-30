@@ -6,6 +6,7 @@ import {
 import { seatPosition } from './seating.js';
 import { ZONE_TYPES } from './zones/zoneTypes.js';
 import { faceFor } from './cards/cardFaces.js';
+import { CHANGE_PILE_TYPE_KINDS, pileKindLabel } from './piles/pileTypes.js';
 
 /**
  * The card SHELL, shared by every card face (D76). The `<button>`, its
@@ -34,11 +35,23 @@ function cardElement(card, { onClick, disabled } = {}) {
   return element;
 }
 
-function cardBackElement(cardId) {
+/**
+ * *nit (direct user request): a card back is sized off the same `face`
+ * dispatch `cardElement`'s face-up shell uses (`faceFor`, `cardFaces.js`)
+ * - previously always the plain `'card card-back'` classes regardless of
+ * which game's card this is, so an RTG card back rendered at the
+ * standard size next to its full-size, face-up siblings. `card` may be
+ * the redacted `{id, face, faceDown}` shape (`Pile`/`HandPile`
+ * `redactCard`) or `null` (a still-hidden card this viewer has no
+ * information about at all, e.g. `updateCardDragGhost`'s drag ghost) -
+ * `faceFor` already defaults an absent/unknown `face` to `standard`.
+ */
+function cardBackElement(card) {
   const element = document.createElement('div');
-  element.className = 'card card-back';
+  const extraClass = faceFor(card).className?.(card ?? {}) ?? '';
+  element.className = 'card card-back' + (extraClass ? ` ${extraClass}` : '');
   element.textContent = '🂠';
-  if (cardId) element.dataset.cardId = cardId;
+  if (card?.id) element.dataset.cardId = card.id;
   return element;
 }
 
@@ -70,10 +83,10 @@ function touchTargetAt(x, y) {
   // UX follow-up (direct user request): the hand's own local reorder
   // (`performHandReorder`, the old `.hand-card`-specific 'hand' target
   // kind) is gone along with `renderHand`/`#hand-area` - the hand pile
-  // is a plain `.pile-section[data-zone-id]` now, same as any other
+  // is a plain `.pile-section[data-pile-id]` now, same as any other
   // pile, so the generic branch below already finds it.
-  const zone = element.closest('.pile-section[data-zone-id]');
-  if (zone) return { kind: 'zone', el: zone, row: zone.querySelector('.card-row') };
+  const pile = element.closest('.pile-section[data-pile-id]');
+  if (pile) return { kind: 'pile', el: pile, row: pile.querySelector('.card-row') };
   return null;
 }
 
@@ -114,7 +127,7 @@ function moveDragGhost(ghost, x, y) {
  * Touch drag for one card (US-40, D28). The recognizer in `touchDrag.js`
  * decides *when* a drag exists; everything DOM-shaped — capture,
  * hit-testing, the ghost — lives here. Crucially, the drop itself is
- * `performHandReorder` / `performZoneDrop`, the same functions the
+ * `performHandReorder` / `performPileDrop`, the same functions the
  * native `drop` listeners call: there is one implementation of what a
  * drop means, so touch and mouse cannot drift apart.
  *
@@ -173,10 +186,10 @@ function wireTouchDragEvents(sourceElement, feed, isDragging) {
 function attachTouchDrag(sourceElement, card, context) {
   let state = null;
   let ghost = null;
-  let hinted = null; // the zone currently showing drop feedback
+  let hinted = null; // the pile currently showing drop feedback
 
   const clearHint = () => {
-    if (hinted) clearZoneDragOver(hinted.el, hinted.row);
+    if (hinted) clearPileDragOver(hinted.el, hinted.row);
     hinted = null;
   };
 
@@ -218,9 +231,9 @@ function attachTouchDrag(sourceElement, card, context) {
       moveDragGhost(ghost, event.x, event.y);
       context.onCardDrag?.(card, event.x, event.y);
       const target = touchTargetAt(event.x, event.y);
-      if (hinted && (target?.kind !== 'zone' || target.el !== hinted.el)) clearHint();
-      if (target?.kind === 'zone') {
-        showZoneDragOver(target.el, target.row, { x: event.x, y: event.y }, target.el.dataset.kind);
+      if (hinted && (target?.kind !== 'pile' || target.el !== hinted.el)) clearHint();
+      if (target?.kind === 'pile') {
+        showPileDragOver(target.el, target.row, { x: event.x, y: event.y }, target.el.dataset.kind);
         hinted = target;
       }
     },
@@ -233,7 +246,7 @@ function attachTouchDrag(sourceElement, card, context) {
       context.onCardDrag?.(null, 0, 0);
       if (!target) return; // dropped in dead space: a no-op, same as mouse
       if (context.onDropCard) {
-        performZoneDrop(target.el, target.row, target.el.dataset.zoneId, card.id,
+        performPileDrop(target.el, target.row, target.el.dataset.pileId, card.id,
           { x: event.x, y: event.y }, context.onDropCard, target.el.dataset.kind);
       }
     },
@@ -260,7 +273,7 @@ function attachTouchDrag(sourceElement, card, context) {
 // NOTE (flagged, not yet done): `renderHand`/`performHandReorder` (the
 // fanned, drag-reorderable own-hand rendering) are retired along with
 // the merged own-zone panel - a hand pile's cards render through the
-// exact same generic `renderZoneCards` every other pile's do now (`<seat-
+// exact same generic `renderPileCards` every other pile's do now (`<seat-
 // zone>`, `src/components/SeatZone.js`). Direct instruction was to get
 // that working first; the fan/reorder/sort/pass polish this drops is a
 // deliberate, temporary gap, not an oversight.
@@ -294,7 +307,7 @@ export function clearPileTargets() {
  * id, never the Zone it lives in (a Zone can hold several piles, so it
  * has no single pile id of its own to be found by). */
 function pileElement(pileId) {
-  return document.querySelector(`.pile-section[data-zone-id="${CSS.escape(pileId)}"]`);
+  return document.querySelector(`.pile-section[data-pile-id="${CSS.escape(pileId)}"]`);
 }
 
 /**
@@ -347,7 +360,7 @@ function applyIconButton(button, spec, labelOverride) {
  *
  * UX follow-up (continuing the Web Components pass): takes `container`
  * instead of creating its own `<div>`, same shape as `renderDeck`/
- * `renderZoneCards` - so `<header-actions>` (`src/components/
+ * `renderPileCards` - so `<header-actions>` (`src/components/
  * HeaderActions.js`) can call this against `this`, the same "thin
  * adapter around proven logic" every other component in this pass uses.
  *
@@ -355,9 +368,13 @@ function applyIconButton(button, spec, labelOverride) {
  * @param {string} titleText e.g. "Hand (7)"
  * @param {string[]} actionIds
  * @param {{labels?: Record<string,string>, disabled?: string[],
- *   onAction: (actionId: string) => void, draggable?: boolean,
+ *   onAction: (actionId: string, value?: string) => void, draggable?: boolean,
  *   headingId?: string, headingClass?: string, rawName?: string,
- *   onRename?: (name: string) => void}} opts
+ *   onRename?: (name: string) => void,
+ *   enumOptions?: Record<string, {value: string, choices: {value: string, label: string}[]}>}} opts
+ *   `enumOptions[id]` supplies an EnumAction id's current value and full
+ *   choice list (`buildEnumActionMenu`) - `onAction`'s second arg is only
+ *   ever populated for one of those ids.
  */
 export function renderActionHeader(container, titleText, actionIds, options = {}) {
   container.replaceChildren();
@@ -434,6 +451,15 @@ export function renderActionHeader(container, titleText, actionIds, options = {}
   for (const id of actionIds) {
     if (options.disabled?.includes(id)) continue;
     const spec = ACTION_SPECS[id];
+    // *nit (direct user request): an EnumAction (`spec.enum`, e.g.
+    // `changePileType`) renders as a menu button showing the CURRENT
+    // value, not a plain single-click icon - see `buildEnumActionMenu`'s
+    // own doc comment.
+    const enumInfo = spec.enum ? options.enumOptions?.[id] : undefined;
+    if (enumInfo) {
+      container.append(buildEnumActionMenu(id, spec, enumInfo, options));
+      continue;
+    }
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'pile-action-btn' + (spec.destructive ? ' btn-danger' : '');
@@ -472,6 +498,62 @@ export function renderActionHeader(container, titleText, actionIds, options = {}
 }
 
 /**
+ * *nit (direct user request): "a menu for the change pile action and
+ * give me an indication of the currently selected pile type." Builds an
+ * EnumAction's header control: a native `<details>/<summary>` disclosure
+ * (open/close, keyboard, click-outside-to-close all free from the
+ * browser - no bespoke show/hide state to get wrong, same "reach for the
+ * platform first" instinct as this file's native HTML5 drag) rather than
+ * a plain `pile-action-btn`. The summary itself IS the indicator - it
+ * shows the CURRENT choice's label, not just a generic icon, so a
+ * glance at the header says what this pile is right now, not only what
+ * it could become. Not a `<button>`, so it's naturally outside the
+ * design-lint 44px-floor check's selector (same as `.pile-action-btn`
+ * is deliberately exempted) - the small habitual header-control sizing
+ * this whole row already uses, not a new exemption to add. The MENU
+ * ITEMS below it, though, are real `<button>`s a viewer taps to commit
+ * to - sized to the 44px floor on purpose (`style.css`'s
+ * `.pile-action-menu-item`), unlike the compact toggle, since these ARE
+ * the primary target once the menu is open.
+ *
+ * @param {string} id the action id (e.g. `'changePileType'`)
+ * @param {{label: string, icon: string}} spec
+ * @param {{value: string, choices: {value: string, label: string}[]}} enumInfo
+ * @param {{onAction: (id: string, value: string) => void}} options
+ */
+function buildEnumActionMenu(id, spec, { value, choices }, options) {
+  const details = document.createElement('details');
+  details.className = 'pile-action-enum';
+
+  const current = choices.find((c) => c.value === value);
+  const summary = document.createElement('summary');
+  summary.className = 'pile-action-enum-btn';
+  summary.textContent = `${spec.icon} ${current?.label ?? value}`;
+  summary.title = spec.label;
+  summary.setAttribute('aria-label', `${spec.label}: ${current?.label ?? value}`);
+  details.append(summary);
+
+  const menu = document.createElement('div');
+  menu.className = 'pile-action-menu';
+  for (const choice of choices) {
+    const item = document.createElement('button');
+    item.type = 'button';
+    const isCurrent = choice.value === value;
+    item.className = 'pile-action-menu-item' + (isCurrent ? ' pile-action-menu-item-current' : '');
+    item.textContent = choice.label;
+    if (isCurrent) item.setAttribute('aria-current', 'true');
+    item.addEventListener('click', (event) => {
+      event.stopPropagation();
+      details.open = false;
+      if (!isCurrent) options.onAction(id, choice.value);
+    });
+    menu.append(item);
+  }
+  details.append(menu);
+  return details;
+}
+
+/**
  * Reveal a still-hidden card (Sprint 12, Phase 55, T55.1): a direct tap
  * on the card itself, joining tap-to-play's existing vocabulary, rather
  * than a separate hover-revealed button. The confirm gate is unchanged
@@ -487,15 +569,15 @@ function performReveal(card, viewerId, onReveal) {
   onReveal?.(card.id);
 }
 
-export function renderZoneCards(container, zone, allZones, options = {}) {
+export function renderPileCards(container, pileView, allPiles, options = {}) {
   const { resolveOwnerName, onMoveCard, onCardLift, onCardDrag } = options;
   container.replaceChildren();
-  // D45: was hardcoded `kind: 'zone'` below - harmless while zone was
+  // D45: was hardcoded `kind: 'plain'` below - harmless while plain was
   // the only 'mixed'-visibility pile type, a real bug the moment a
   // second one (discard) exists: every card-level authorization check
-  // in this function would have been evaluated against ZONE's rules
-  // even for a discard pile's own cards.
-  const pile = { id: zone.id, kind: zone.kind, ownerId: zone.ownerId ?? null };
+  // in this function would have been evaluated against the plain kind's
+  // rules even for a discard pile's own cards.
+  const pile = { id: pileView.id, kind: pileView.kind, ownerId: pileView.ownerId ?? null };
   // UX follow-up (direct user request): "create WebComponents for the
   // different pile types... fix the fan layout issue by implementing
   // FanPile." `opts.fan` (set by `<fan-pile>`, `src/components/
@@ -505,7 +587,7 @@ export function renderZoneCards(container, zone, allZones, options = {}) {
   // The fan math (rotate + arc, pivoting from the bottom like cards
   // actually held in a hand) is exactly `renderHand`'s old formula,
   // just applied generically by index instead of being hand-specific.
-  for (const [index, card] of zone.cards.entries()) {
+  for (const [index, card] of pileView.cards.entries()) {
     const wrapper = document.createElement('div');
     // *nit (2026-08-26): `pile-hover-host` used to arrive via the now-
     // deleted `attachActionRow` (the popup mechanism) as a side effect
@@ -534,7 +616,7 @@ export function renderZoneCards(container, zone, allZones, options = {}) {
       // padding (style.css) is sized to this exact formula's max droop,
       // not just eyeballed - see that rule's own comment if this changes
       // again.
-      const center = (zone.cards.length - 1) / 2;
+      const center = (pileView.cards.length - 1) / 2;
       const offset = index - center;
       wrapper.style.setProperty('--raise-base', `rotate(${offset * 5}deg) translateY(${offset * offset * 0.08}rem)`);
     }
@@ -583,22 +665,22 @@ export function renderZoneCards(container, zone, allZones, options = {}) {
     if (onMoveCard && cardActions.length > 0) {
       wrapper.draggable = true;
       // UX follow-up (direct user request): a hand pile is a real,
-      // addressable entry in `allZones` now - no more synthetic
+      // addressable entry in `allPiles` now - no more synthetic
       // `HAND_PILE_ID` stand-in needed.
-      const piles = allZones.map((z) => ({ id: z.id, kind: z.kind, ownerId: z.ownerId ?? null }));
+      const piles = allPiles.map((p) => ({ id: p.id, kind: p.kind, ownerId: p.ownerId ?? null }));
       wrapper.addEventListener('dragstart', (event) => {
         event.dataTransfer.setData('text/plain', card.id);
-        // D51: every zone (and the hand, if this card is pickup-eligible)
+        // D51: every pile (and the hand, if this card is pickup-eligible)
         // that could legally receive this SPECIFIC card lights up for the
         // whole drag - not just whichever one the pointer happens to be
-        // over mid-drag (`showZoneDragOver`'s existing per-hover cue,
+        // over mid-drag (`showPileDragOver`'s existing per-hover cue,
         // unchanged, still layers on top of this once you're over one).
         // UX follow-up: 'play' joins 'move'/'pickup' here now that a
         // hand pile's own cards flow through this same generic path.
         highlightDragTargets(
           cardActions.filter((a) => ['move', 'pickup', 'play'].includes(a)),
           piles,
-          { viewerId: options.viewerId, fromPileId: zone.id },
+          { viewerId: options.viewerId, fromPileId: pileView.id },
         );
       });
       wrapper.addEventListener('dragend', clearPileTargets);
@@ -619,13 +701,7 @@ export function renderZoneCards(container, zone, allZones, options = {}) {
     // "may this card do this" condition inline.
     // Phase 55 (T55.1): tap the card itself to reveal it - joining
     // tap-to-play's vocabulary instead of a separate hover button. Same
-    // authorization `actionMenuEl` already used (`actionsForCard`), and
-    // computed once here since it applies to TWO different elements
-    // below depending on who's looking: `redactMiddleCard` (state.js
-    // D7) sends the OWNER their card's real face (`card.faceDown` is
-    // never set on it - only `card.faceUp: false`), while everyone else
-    // gets the redacted `{faceDown: true}` back. A tap-to-reveal needs
-    // wiring onto whichever one actually renders for this viewer.
+    // authorization `actionMenuEl` already used (`actionsForCard`).
     // `pile` is the one hoisted to the top of this function (D45).
     const canReveal = Boolean(options.onReveal) && actionsForCard(pile, card, options.viewerId).includes('reveal');
     // *nit (2026-08-26), direct user request: "cards are Movable not
@@ -638,42 +714,30 @@ export function renderZoneCards(container, zone, allZones, options = {}) {
     // never compete for the same tap).
     const canRotate = Boolean(options.onRotate) && actionsForCard(pile, card, options.viewerId).includes('rotate');
 
-    if (card.faceDown) {
-      const back = cardBackElement(card.id);
-      if (canReveal) {
-        back.classList.add('revealable');
-        back.addEventListener('click', () => performReveal(card, options.viewerId, options.onReveal));
-      }
-      wrapper.append(back);
-      if (card.owner !== null && card.owner !== options.viewerId) {
-        // Someone else's still-hidden card: no visibility, no authority,
-        // so no actions - just the anonymous back and whose it is.
-        wrapper.append(ownerTag(resolveOwnerName?.(card.owner) ?? card.owner));
-      }
-    } else {
-      let cardOptions;
-      if (canReveal) cardOptions = { onClick: () => performReveal(card, options.viewerId, options.onReveal) };
-      else if (canRotate) cardOptions = { onClick: () => options.onRotate(card.id) };
-      else cardOptions = { disabled: true };
-      const face = cardElement(card, cardOptions);
-      if (canReveal) face.classList.add('revealable');
-      if (canRotate) face.classList.add('rotatable');
-      wrapper.append(face);
-      if (card.owner) wrapper.append(ownerTag(resolveOwnerName?.(card.owner) ?? card.owner));
-      // UX follow-up (real bug, found live via a screenshot): a plain
-      // hand card has no `faceUp` field at all (visibility is a
-      // PILE-level "in-hand" rule, not per-card like a zone's) - `!card.
-      // faceUp` treated that missing field the same as an explicit
-      // `faceUp: false`, wrongly labeling every hand card "hidden from
-      // others" now that hand cards flow through this same generic
-      // renderer. `=== false` only fires for a zone-kind card that
-      // actually carries the field.
-      if (card.faceUp === false) {
-        const hiddenTag = document.createElement('div');
-        hiddenTag.className = 'owner-tag';
-        hiddenTag.textContent = 'hidden from others';
-        wrapper.append(hiddenTag);
-      }
+    // *nit (real bug, found live, D84: "remove card redaction entirely
+    // ... TOTAL PERMISSIVE"): the `card.faceDown` branch this used to
+    // dispatch on is dead code now - `faceDown` was NEVER a real
+    // game-state field, only a marker `Pile.redactCard` (now deleted
+    // everywhere) stamped onto a card it was hiding. Every card reaching
+    // this renderer is the real thing now, always - always the face.
+    // `faceUp` is still a real field (was this card dealt/played face-up
+    // or down), so it stays visible as a plain status tag, not a
+    // face-down BACK - "hidden from others" was misleading the moment
+    // redaction went away (nothing is hidden from anyone now).
+    let cardOptions;
+    if (canReveal) cardOptions = { onClick: () => performReveal(card, options.viewerId, options.onReveal) };
+    else if (canRotate) cardOptions = { onClick: () => options.onRotate(card.id) };
+    else cardOptions = { disabled: true };
+    const face = cardElement(card, cardOptions);
+    if (canReveal) face.classList.add('revealable');
+    if (canRotate) face.classList.add('rotatable');
+    wrapper.append(face);
+    if (card.owner) wrapper.append(ownerTag(resolveOwnerName?.(card.owner) ?? card.owner));
+    if (card.faceUp === false) {
+      const hiddenTag = document.createElement('div');
+      hiddenTag.className = 'owner-tag';
+      hiddenTag.textContent = 'face-down';
+      wrapper.append(hiddenTag);
     }
 
     container.append(wrapper);
@@ -731,31 +795,31 @@ function showDropHint(rowElement, placement) {
  * D53 (Sprint 22, replaces D45's `dropRule` string): the pile TYPE's
  * own `resolveDropTarget` (`resolveDropTargetFor`, `pileActions.js`)
  * decides the geometry - `ui.js` makes one polymorphic call, no
- * kind-branching left here at all. `zone` still resolves real
+ * kind-branching left here at all. `plain` still resolves real
  * before/onto/after halo geometry (delegated to `dropTarget.js`
- * internally by `zonePile.js`); `deck`/`hand`/`discard` still resolve
+ * internally by `Pile.js`); `deck`/`hand`/`discard` still resolve
  * to `{}` (plain append, no positional choice) - same outcomes as
  * before, just owned by each module instead of switched on centrally.
  */
-function showZoneDragOver(zoneElement, row, point, kind) {
-  zoneElement.classList.add('zone-drag-over');
+function showPileDragOver(pileElement, row, point, kind) {
+  pileElement.classList.add('drag-over');
   showDropHint(row, resolveDropTargetFor(kind, cardBoxesIn(row), point));
 }
 
-function clearZoneDragOver(zoneElement, row) {
-  zoneElement.classList.remove('zone-drag-over');
+function clearPileDragOver(pileElement, row) {
+  pileElement.classList.remove('drag-over');
   clearDropHints(row);
 }
 
-function performZoneDrop(zoneElement, row, zoneId, cardId, point, onDropCard, kind) {
-  clearZoneDragOver(zoneElement, row);
+function performPileDrop(pileElement, row, pileId, cardId, point, onDropCard, kind) {
+  clearPileDragOver(pileElement, row);
   if (!cardId) return;
   // US-32/33: the drop point decides stack vs. overlap vs. plain
   // append. Aiming at the card being dragged itself is meaningless
   // (it's about to leave that position), so it's treated as open
   // space rather than a self-referential placement.
   const placement = resolveDropTargetFor(kind, cardBoxesIn(row).filter((b) => b.cardId !== cardId), point);
-  onDropCard(cardId, zoneId, placement);
+  onDropCard(cardId, pileId, placement);
 }
 
 /**
@@ -764,7 +828,7 @@ function performZoneDrop(zoneElement, row, zoneId, cardId, point, onDropCard, ki
  * so the drop-target wiring below only needs to exist once.
  *
  * US-28: dropping a dragged card here plays it (from hand) or moves it
- * (from another zone) - `opts.onDropCard(cardId, zone.id)` does the
+ * (from another pile) - `opts.onDropCard(cardId, pile.id)` does the
  * PLAY-vs-MOVE_CARD branching (main.js knows where the card currently
  * lives, this file doesn't need to). Additive: tap-to-play and the
  * "Move to…" dropdown are untouched, this is one more way in, not a
@@ -842,7 +906,7 @@ export function wirePanelLayout(panelElement, id, headingElement, options) {
  * `renderPile` wraps with a separately-built header - each one calls
  * this shell directly against itself. `renderPileShell` is what's
  * actually shared: the "Actionable" title bar (`<header-actions>`,
- * pile-level actions), the addressability (`data-zone-id`/`data-kind`),
+ * pile-level actions), the addressability (`data-pile-id`/`data-kind`),
  * and the drop-target wiring every Pile needs REGARDLESS of how its
  * cards are drawn - `buildRow(container)` is the one thing that
  * differs, building whatever content sits below the header and
@@ -853,23 +917,23 @@ export function wirePanelLayout(panelElement, id, headingElement, options) {
  * (`renderZonePanel`, below), which owns both of those exactly once for
  * everything inside it.
  */
-export function renderPileShell(container, zone, allZones, options, buildRow) {
+export function renderPileShell(container, pile, allPiles, options, buildRow) {
   container.replaceChildren();
   container.className = 'pile-section';
-  container.dataset.zoneId = zone.id; // D25: addressable as a drop target
+  container.dataset.pileId = pile.id; // D25: addressable as a drop target
   // D45/D53: the kind travels with the element so the touch-drag path
   // (which only has the DOM node, not the view object, at drop time)
   // can resolve its own drop-target geometry too - see
   // touchTargetAt/attachTouchDrag.
-  container.dataset.kind = zone.kind;
+  container.dataset.kind = pile.kind;
 
   // UX follow-up (direct user request): "like zones, Piles are
   // Actionable and should have a title bar with action buttons for
   // that pile type" - every pile's own heading is a real
   // `renderActionHeader` now (the same builder the deck's own title bar
-  // already used), not a plain text div. `pileLevelActions(zone.kind,
+  // already used), not a plain text div. `pileLevelActions(pile.kind,
   // ...)` returns `[]` for every kind with nothing pile-level to offer
-  // (zone/discard/foundation/cascade/rankAdjacent today), so this is a
+  // (plain/discard/foundation/cascade/rankAdjacent today), so this is a
   // pure superset of the old plain-text heading for those - no visual
   // change unless a kind actually has pile-level actions.
   //
@@ -877,7 +941,7 @@ export function renderPileShell(container, zone, allZones, options, buildRow) {
   // here even though `handPile.pileActions` offers them to a hand's
   // owner - they used to reorder a CLIENT-ONLY local view of the hand
   // (D14, `handOrder.js`), which had no home left once `renderHand`'s
-  // bespoke rendering was retired (a hand's cards render in `zone.
+  // bespoke rendering was retired (a hand's cards render in `pile.
   // cards`' own order now, same as any other pile). Showing the buttons
   // without a working sort behind them would be a false affordance -
   // left out until sort becomes a real thing to wire up (either a
@@ -889,20 +953,20 @@ export function renderPileShell(container, zone, allZones, options, buildRow) {
     // *nit (2026-08-26), direct user request: the card count no longer
     // appears in a pile's own title text ("Deck (32)" -> "Deck") - the
     // count is still visible elsewhere for kinds where it matters (the
-    // deck's own stack badge, a zone's actual card row).
-    zone.name,
-    pileLevelActions(zone.kind, {
-      isOwner: zone.ownerId === options.viewerId,
+    // deck's own stack badge, a plain pile's actual card row).
+    pile.name,
+    pileLevelActions(pile.kind, {
+      isOwner: pile.ownerId === options.viewerId,
       isHost: options.isHost,
-      // US-60/61 (Sprint 23): a shared (ownerless) zone/discard pile's
-      // split/take are open to any player - `zonePile`/`discardPile`'s
+      // US-60/61 (Sprint 23): a shared (ownerless) plain/discard pile's
+      // split/take are open to any player - `Pile`/`DiscardPile`'s
       // own `pileActions` can't tell "shared" from "someone else's
       // personal pile" from `isOwner` alone (both are simply `false`).
-      isShared: zone.ownerId == undefined,
+      isShared: pile.ownerId == undefined,
       // US-62 (Sprint 23): hide/show are mutually exclusive, keyed off
-      // the pile's OWN current orientation (`zonePile`/`discardPile`'s
+      // the pile's OWN current orientation (`Pile`/`DiscardPile`'s
       // `orientationActions`) - needs the actual cards, not just counts.
-      cards: zone.cards,
+      cards: pile.cards,
     })
       // Found live while smoke-testing Phase 84 (US-71/D62): `remove`
       // is a KIND-level offer (`Pile.pileActions`), but the default
@@ -912,7 +976,7 @@ export function renderPileShell(container, zone, allZones, options, buildRow) {
       // exactly this). Same known-id exemption `renderZonePanel`
       // already hardcodes for the Table Zone, just for its pile
       // counterpart.
-      .filter((id) => id !== 'sortRank' && id !== 'sortSuit' && !(id === 'remove' && zone.id === 'table')),
+      .filter((id) => id !== 'sortRank' && id !== 'sortSuit' && !(id === 'remove' && pile.id === 'table')),
     {
       // `pile-title`, not `panel-title` - visually/semantically distinct
       // from a Zone's own heading class, and the selector
@@ -923,9 +987,9 @@ export function renderPileShell(container, zone, allZones, options, buildRow) {
       // UX follow-up (direct user request): "a Deck is a specific kind
       // of Pile" - which of ITS OWN offered actions are disabled (Deal,
       // at zero cards) is now read polymorphically per pile type
-      // (`disabledPileActionsFor`), not a `zone.kind === 'deck'` check
+      // (`disabledPileActionsFor`), not a `pile.kind === 'deck'` check
       // hardcoded here.
-      disabled: disabledPileActionsFor(zone.kind, zone.count ?? zone.cards.length),
+      disabled: disabledPileActionsFor(pile.kind, pile.count ?? pile.cards.length),
       // US-61 (Sprint 23), Smith's ruling (Phase 70): `take` confirms
       // unconditionally EXCEPT a 1-card pile, where it's identical in
       // effect to that card's own un-confirmed single-card `pickup`.
@@ -933,11 +997,25 @@ export function renderPileShell(container, zone, allZones, options, buildRow) {
       // so stop asking" - `disabledPileActionsFor` only ever ENABLES
       // this button when the pile is already empty, so the confirm was
       // asking about a consequence (losing cards) that can't happen.
-      noConfirm: [...((zone.cards?.length ?? zone.count) === 1 ? ['take'] : []), 'remove'],
-      onAction: (id) => options.onPileAction?.(zone.id, id),
+      noConfirm: [...((pile.cards?.length ?? pile.count) === 1 ? ['take'] : []), 'remove'],
+      onAction: (id, value) => options.onPileAction?.(pile.id, id, value),
+      // *nit (direct user request): "a menu for the change pile action
+      // and give me an indication of the currently selected pile type" -
+      // `changePileType`'s current value (this pile's own `kind`) and
+      // its full choice list (`CHANGE_PILE_TYPE_KINDS`, D87: every
+      // registered kind, symmetrically - any pile can become any other
+      // kind, deck/hand included on both ends now) live here, not in
+      // `ACTION_SPECS` - the spec only knows this action IS an enum
+      // (`enum: true`), never which pile it's rendering for.
+      enumOptions: {
+        changePileType: {
+          value: pile.kind,
+          choices: CHANGE_PILE_TYPE_KINDS.map((kind) => ({ value: kind, label: pileKindLabel(kind) })),
+        },
+      },
       // *nit (2026-08-26): rename affordance, any player.
-      rawName: zone.name,
-      onRename: options.onRenamePile ? (name) => options.onRenamePile(zone.id, name) : undefined,
+      rawName: pile.name,
+      onRename: options.onRenamePile ? (name) => options.onRenamePile(pile.id, name) : undefined,
       // *nit (2026-08-26), direct user request: "All Movables can be
       // drag/drop" - every pile's title is a drag source now (was
       // gated to `isReparentable` kinds only). A non-reparentable kind
@@ -948,7 +1026,7 @@ export function renderPileShell(container, zone, allZones, options, buildRow) {
       // zone's siblings - that half is purely cosmetic, never a
       // game-rule concern, for any kind.
       pileDraggable: Boolean(options.onMovePile) || Boolean(options.onReorderPile),
-      pileId: zone.id,
+      pileId: pile.id,
     },
   );
 
@@ -957,9 +1035,9 @@ export function renderPileShell(container, zone, allZones, options, buildRow) {
   if (options.onDropCard) {
     container.addEventListener('dragover', (event) => {
       event.preventDefault();
-      showZoneDragOver(container, row, { x: event.clientX, y: event.clientY }, zone.kind);
+      showPileDragOver(container, row, { x: event.clientX, y: event.clientY }, pile.kind);
     });
-    container.addEventListener('dragleave', () => clearZoneDragOver(container, row));
+    container.addEventListener('dragleave', () => clearPileDragOver(container, row));
     container.addEventListener('drop', (event) => {
       event.preventDefault();
       // *nit (2026-08-26), direct user request: "relocated within their
@@ -974,10 +1052,10 @@ export function renderPileShell(container, zone, allZones, options, buildRow) {
       // ineligible kind's cross-zone attempt gets rejected).
       const draggedPileId = pileDragFromDrop(event.dataTransfer);
       if (draggedPileId) {
-        const draggedZoneId = allZones.find((z) => z.id === draggedPileId)?.zoneId;
-        if (draggedPileId !== zone.id && draggedZoneId === zone.zoneId) {
+        const draggedZoneId = allPiles.find((p) => p.id === draggedPileId)?.zoneId;
+        if (draggedPileId !== pile.id && draggedZoneId === pile.zoneId) {
           event.stopPropagation();
-          options.onReorderPile?.(draggedPileId, zone.id);
+          options.onReorderPile?.(draggedPileId, pile.id);
         }
         return;
       }
@@ -985,8 +1063,8 @@ export function renderPileShell(container, zone, allZones, options, buildRow) {
       // it here so the Zone's own drop handler doesn't ALSO fire and
       // spawn a redundant new pile for the same drop.
       event.stopPropagation();
-      performZoneDrop(container, row, zone.id, event.dataTransfer.getData('text/plain'),
-        { x: event.clientX, y: event.clientY }, options.onDropCard, zone.kind);
+      performPileDrop(container, row, pile.id, event.dataTransfer.getData('text/plain'),
+        { x: event.clientX, y: event.clientY }, options.onDropCard, pile.kind);
     });
   }
 }
@@ -997,12 +1075,12 @@ export function renderPileShell(container, zone, allZones, options, buildRow) {
  * wrapper around `renderPileShell`, same shape `<fan-pile>`/
  * `<deck-stack>` now have for their own row shapes.
  */
-export function renderPile(container, zone, allZones, options = {}) {
-  renderPileShell(container, zone, allZones, options, (c) => {
+export function renderPile(container, pile, allPiles, options = {}) {
+  renderPileShell(container, pile, allPiles, options, (c) => {
     const row = document.createElement('div');
     row.className = 'card-row';
     c.append(row);
-    renderZoneCards(row, zone, allZones, options);
+    renderPileCards(row, pile, allPiles, options);
     return row;
   });
 }
@@ -1024,11 +1102,11 @@ export function renderPile(container, zone, allZones, options = {}) {
  * whole Zone - "Piles move with their containing Zone." A Pile
  * (`renderPile`, above) never wires its own.
  */
-export function renderZonePanel(zoneElement, id, title, piles, allZones, options) {
+export function renderZonePanel(zoneElement, id, title, piles, allPiles, options) {
   zoneElement.replaceChildren();
   zoneElement.className = 'zone';
   // The Zone's own stable identity (`opts.layout` key) - distinct from
-  // any one pile's own `data-zone-id` (`renderPile`), since a Zone can
+  // any one pile's own `data-pile-id` (`renderPile`), since a Zone can
   // hold several piles and so has no single pile id of its own.
   zoneElement.dataset.groupId = id;
 
@@ -1091,19 +1169,19 @@ export function renderZonePanel(zoneElement, id, title, piles, allZones, options
     // just previews "something droppable" unconditionally.
     body.addEventListener('dragover', (event) => {
       event.preventDefault();
-      // `zoneEl` (`.zone`), not `body` (`.zone-body`) - matches the
-      // existing `.zone.zone-drag-over` CSS rule (Phase 72's task.md AC:
-      // "reuses `.zone-drag-over`"); toggling it on `body` alone
-      // wouldn't match either that rule or `.pile-section.zone-drag-over`,
+      // `zoneElement` (`.zone`), not `body` (`.zone-body`) - matches the
+      // existing `.zone.drag-over` CSS rule (Phase 72's task.md AC:
+      // "reuses the drag-over highlight"); toggling it on `body` alone
+      // wouldn't match either that rule or `.pile-section.drag-over`,
       // so nothing would actually render.
-      zoneElement.classList.add('zone-drag-over');
+      zoneElement.classList.add('drag-over');
     });
     body.addEventListener('dragleave', (event) => {
-      if (event.target === body) zoneElement.classList.remove('zone-drag-over');
+      if (event.target === body) zoneElement.classList.remove('drag-over');
     });
     body.addEventListener('drop', (event) => {
       event.preventDefault();
-      zoneElement.classList.remove('zone-drag-over');
+      zoneElement.classList.remove('drag-over');
       // Stop here, whichever branch below actually applies - otherwise
       // this would ALSO bubble to `#zones`'s own "drop on open table
       // space ungroups" handler (`main.js`), double-dispatching a
@@ -1121,16 +1199,16 @@ export function renderZonePanel(zoneElement, id, title, piles, allZones, options
   // should be internalized in the fan-pile webcomponent, same for all
   // Pile type components" - which ELEMENT renders a pile is decided
   // here, off the pile CLASS's own `static component` (D56, `componentFor`,
-  // `pileActions.js`), never a `zone.kind === 'hand'` check inside any
+  // `pileActions.js`), never a `pile.kind === 'hand'` check inside any
   // one component. `<fan-pile>`/`<deck-stack>` are now fully self-
   // contained Piles (their own header+row+drop wiring, via
   // `renderPileShell`) - `<pile-panel>` is just the flat-row case's own
   // equally-thin wrapper, not a generic container the other two nest
   // inside any more.
-  for (const zone of piles) {
-    const element = document.createElement(componentFor(zone.kind));
+  for (const pile of piles) {
+    const element = document.createElement(componentFor(pile.kind));
     body.append(element);
-    element.render(zone, allZones, options);
+    element.render(pile, allPiles, options);
   }
 
   // Bug fix (direct user request): a card dropped on a Zone's own empty
@@ -1157,7 +1235,7 @@ export function renderZonePanel(zoneElement, id, title, piles, allZones, options
 
 /**
  * D55 (Sprint 23): Zone is a real, independently-declared entity -
- * `zoneRecords` (`state.zones`, `viewFor`'s `zoneRecords`) is the real
+ * `zoneRecords` (`state.zones`, `viewFor`'s `zones`) is the real
  * registry a pile's own `zoneId` points into, and each record's own
  * `type` (`'shared'`/`'perPlayer'`, `src/zones/zoneTypes.js`) drives
  * its default class/position - the same one-module-per-type dispatch
@@ -1165,8 +1243,8 @@ export function renderZonePanel(zoneElement, id, title, piles, allZones, options
  * whether `ownerId` happens to be truthy. This function has zero
  * opinion about which Zone a pile starts in or how it got there
  * (`state.js`'s `GameConfig.zones`/`buildPiles`/`MOVE_PILE` own that
- * entirely) - it just groups `zones` (the piles) by `zoneId` and
- * renders one generic `<zone-panel>` per group.
+ * entirely) - it just groups `piles` by `zoneId` and renders one
+ * generic `<zone-panel>` per group.
  *
  * A `perPlayer`-type Zone renders "in front of" its owner's seat by
  * default (its own type module's `defaultPosition`); a `shared`-type
@@ -1181,16 +1259,16 @@ export function renderZonePanel(zoneElement, id, title, piles, allZones, options
  * seat its owner's roster entry is drawn at; one with no seated owner
  * (shouldn't happen) is skipped defensively.
  */
-export function renderZones(container, zones, seatedPlayers, zoneRecords, options = {}) {
+export function renderZones(container, piles, seatedPlayers, zoneRecords, options = {}) {
   container.replaceChildren();
 
   const byZoneId = new Map();
-  for (const zone of zones) {
-    if (!byZoneId.has(zone.zoneId)) byZoneId.set(zone.zoneId, []);
-    byZoneId.get(zone.zoneId).push(zone);
+  for (const pile of piles) {
+    if (!byZoneId.has(pile.zoneId)) byZoneId.set(pile.zoneId, []);
+    byZoneId.get(pile.zoneId).push(pile);
   }
 
-  for (const [zoneId, piles] of byZoneId) {
+  for (const [zoneId, pilesInZone] of byZoneId) {
     // `zoneId` is a validated reference (`state.js`'s `buildPiles`
     // throws at table-creation time on anything that isn't) - every
     // group here has a real record, no defensive fallback needed.
@@ -1208,7 +1286,7 @@ export function renderZones(container, zones, seatedPlayers, zoneRecords, option
 
     if (record.ownerId) {
       const ownerName = options.resolveOwnerName?.(record.ownerId) ?? record.ownerId;
-      zoneElement.render(record.id, ownerName, piles, zones, options);
+      zoneElement.render(record.id, ownerName, pilesInZone, piles, options);
       // AFTER `.render()`, not before - `renderZonePanel`'s own first
       // line (`zoneEl.className = 'zone'`) would otherwise wipe this
       // class out.
@@ -1234,7 +1312,7 @@ export function renderZones(container, zones, seatedPlayers, zoneRecords, option
       // parentless: no visible Zone heading at all, only the pile's -
       // indistinguishable from a pile that was never grouped into a
       // real Zone at all. Always render it now, `record.name` as-is.
-      zoneElement.render(record.id, record.name, piles, zones, options);
+      zoneElement.render(record.id, record.name, pilesInZone, piles, options);
     }
   }
 }
@@ -1453,7 +1531,7 @@ export function renderDeckStack(container, count, options = {}) {
     // absent on the pre-game preview screen (`#host-deck-area`, no
     // game running yet), which stays a plain inert visual exactly as
     // before.
-    const back = cardBackElement(options.topCard?.id);
+    const back = cardBackElement(options.topCard);
     back.classList.add('deck-stack-card');
     stack.append(back);
     const badge = document.createElement('span');
@@ -1463,12 +1541,12 @@ export function renderDeckStack(container, count, options = {}) {
     // D67, direct user correction ("drop isn't triggering an action
     // it's moving cards around... use the same mechanism as all the
     // other piles, this is a generic pile behavior for all piles"):
-    // wired exactly like `renderZoneCards`'s own per-card drag - a
+    // wired exactly like `renderPileCards`'s own per-card drag - a
     // real card id in `dataTransfer`, the same `onDropCard`/
     // `onCardDrag`/`attachTouchDrag` plumbing every other pile's cards
     // already use. No new mechanism, no pile-specific special case -
     // dropping this wherever it lands dispatches the ordinary MOVE_CARD/
-    // PICKUP/PLAY path (`dropCardOnZone`, main.js) unchanged, because
+    // PICKUP/PLAY path (`dropCardOnPile`, main.js) unchanged, because
     // it now carries a real, findable card id.
     if (options.topCard && options.onDropCard) {
       back.draggable = true;

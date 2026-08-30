@@ -18,7 +18,7 @@ import { ExilePile } from './ExilePile.js';
 import { StackPile } from './StackPile.js';
 
 export const PILE_TYPES = {
-  zone: Pile,
+  plain: Pile,
   deck: DeckPile,
   hand: HandPile,
   discard: DiscardPile,
@@ -31,20 +31,40 @@ export const PILE_TYPES = {
 };
 
 /**
- * D71 (US-74): `changePileType`'s eligible kinds, in cycle order - the
- * single source of truth for both `state.js`'s `CHANGE_PILE_TYPE`
- * eligibility check and `main.js`'s "advance to the next kind"
- * cycling, so the two can never drift apart. `deck`/`hand` excluded -
- * structural reasons (fixed-id lookup; per-player exactly-one
- * invariant) unrelated to card content, so they stay excluded
- * regardless of the pile being empty. Registry-declaration order
- * (Smith Gate 1 - no strong reason to prefer another).
+ * D87 (*nit, direct user request: "all pile types must be convertible to
+ * any other pile type... deck -> hand -> discard -> all are allowed"):
+ * every registered kind is both a valid source AND target for
+ * `changePileType` now - the D86 source/target asymmetry (deck/hand as
+ * targets only) is gone, superseded by this explicit "ALL" directive.
+ * Single source of truth for `ui.js`'s change-type menu choices; the
+ * reducer itself (`state.js`'s `CHANGE_PILE_TYPE`) no longer needs a
+ * separate list at all - any existing pile's `kind` is trivially already
+ * valid as a source (it got there through this same registry), so it
+ * only checks the TARGET kind is a real `PILE_TYPES` key.
+ *
+ * This only stays safe because the conversion is genuinely presentation-
+ * only (direct user request: "it's just a presentation thing" - cards/
+ * count/id never change, only `kind`+maybe the default `name`) AND
+ * because `ensureHandPile` (`state.js`) was hardened alongside this to
+ * never reuse a canonical id (`hand:<playerId>`) that's already claimed
+ * by a pile that used to be that player's hand but got converted away -
+ * see its own comment. Without that fix, converting a hand away and then
+ * drawing/dealing again would have produced two piles sharing one id.
  */
-export const CHANGE_PILE_TYPE_CYCLE = [
-  'zone', 'discard', 'foundation', 'cascade', 'rankAdjacent',
-  // D79 (US-82): the MTG kinds join the cycle rather than being carved
-  // out. They're general-purpose containers like the rest, and excluding
-  // them would be exactly the kind of unprompted special case this
-  // project's own discipline warns against.
-  'battlefield', 'exile', 'stack',
-];
+export const CHANGE_PILE_TYPE_KINDS = Object.keys(PILE_TYPES);
+
+/**
+ * *nit (direct user request): a change-type MENU needs a human label per
+ * kind, not just the raw `kind` string - reuses the exact same "plain ->
+ * Pile, else capitalize" rule `state.js`'s `defaultNameWord` already
+ * establishes for a freshly-created pile's own default name, so a menu
+ * entry reads the same word a pile spawned as that kind would actually
+ * be called. Duplicated rather than imported: `ui.js` (this function's
+ * only caller) deliberately never imports `state.js` (presentation layer
+ * staying decoupled from the reducer module), and this one-line rule is
+ * cheaper to keep in sync by inspection than to add that coupling for.
+ */
+export function pileKindLabel(kind) {
+  if (kind === 'plain') return 'Pile';
+  return kind.charAt(0).toUpperCase() + kind.slice(1);
+}

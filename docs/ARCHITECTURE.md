@@ -5,7 +5,405 @@
 (D21-D23) are binding for the current sprint (US-32..36, "snap-to
 stack/overlap + deck operations" + a user-directed foundational `Pile`
 storage unification, D23, sequenced first).
-**Last updated:** 2026-08-16
+**Last updated:** 2026-08-29
+
+## Core invariant (direct user request, stated repeatedly - binding on every Pile type, present and future)
+
+Piles are arrangements of Cards/TableObjects. All cards/table objects
+can be moved (drag and drop) by any player at any time from any pile
+or zone to any pile or zone, no matter what.
+
+A derived Pile type MAY add its own special pile-level actions for
+convenience (untapAll, split, take, changePileType, ...) - those are
+free to be kind-specific, restricted, or omitted entirely. What a
+derived type may NEVER do is remove or restrict the baseline card-level
+drag-and-drop (`move`/`pickup`) every card has by virtue of being a
+card on a table - this app is a table simulator, not a rules engine
+(the same framing already established for Recard the Gathering: the
+software models zones/tapping/life/movement, players enforce mana
+costs/combat/timing themselves). A real card on a real table can always
+be picked up and moved, house rules or game rules notwithstanding; nothing
+in this codebase should lock a card in place the way a physical table
+never could.
+
+As of D83, this is fully literal: no per-card ownership check either (a
+still-hidden private card, or any card in another player's hand, can be
+moved by anyone), and no per-viewer restriction of any kind - "no
+matter what" means no matter what. As of D84, it goes one step further
+still: card identity REDACTION (D7) is gone too - a viewer sees every
+card's real identity, always, not just whether it can be moved. As of
+D85, the same removal reaches the three BULK/pile-level actions that
+still had their own separate authorization gate.
+
+### D90. The word "zone" never means "pile" anywhere in this codebase again
+Direct user request, prompted by asking what `CHANGE_PILE_TYPE`'s
+`kind: 'zone'` target actually did: "the shape is Table->Zone->Pile->
+Card. KISS, simplify... change the value for kind from zone to 'plain'
+and please rename anything that is not a zone to some other name. I
+don't want any kind of thing that conflates zones and piles." A full
+audit found the conflation ran far deeper than the one kind string -
+D55 (the original Zone/Pile split) had already flagged the risk in its
+own doc comments, but several places never got the follow-through.
+
+**What changed, all mechanical renames - no behavior change anywhere**:
+- The base Pile kind: `PILE_TYPES.zone` -> `PILE_TYPES.plain` (displays
+  as "Pile" in the UI, unchanged). `SNAPSHOT_VERSION` bumped 3->4 (an
+  old save with `kind: "zone"` is discarded on load, not silently
+  mis-rendered - matches this project's standing precedent for every
+  prior snapshot-shape break, no migration written).
+- `state.js`: `zonesOf()` -> `pilesOf()` (it always returned Piles,
+  never Zone records - its own doc comment already half-admitted this).
+  `findZoneAndCard()` -> `findPileAndCard()`, its `{zoneId, card}`
+  return -> `{pileId, card}`. `PLAY`'s `action.zoneId` -> `pileId`;
+  `MOVE_CARD`'s `action.toZoneId` -> `toPileId` - both actually meant
+  "which PILE" despite the name, a collision the code's own module doc
+  comment used to warn readers about explicitly (that warning is gone
+  now - there's nothing left to warn about). `DEFAULT_ZONE_ID` ->
+  `DEFAULT_PILE_ID` (the default Table PILE's id, not a zone id).
+- `viewFor`'s wire shape: the per-pile view array, confusingly named
+  `zones` (with the REAL Zone registry forced into the awkward
+  `zoneRecords` name specifically to avoid colliding with it), is now
+  `piles` - and the real registry is just `zones`, as it should always
+  have been.
+- `ui.js`/`main.js`: `renderZoneCards` -> `renderPileCards`,
+  `performZoneDrop`/`showZoneDragOver`/`clearZoneDragOver` ->
+  `performPileDrop`/`showPileDragOver`/`clearPileDragOver`,
+  `dropCardOnZone` (main.js) -> `dropCardOnPile`, the `data-zone-id` DOM
+  attribute -> `data-pile-id`, and every `zone`-named parameter/local
+  that actually held a pile view (`renderPileShell`'s `zone`/`allZones`,
+  `renderZonePanel`'s `allZones`, `renderZones`' `zones` param, the
+  touch-drag target-kind tag `'zone'`) -> `pile`/`allPiles`/`piles`/
+  `'pile'`. The shared `.zone-drag-over` CSS class (applied to BOTH a
+  real Zone box and a Pile's own row, by design, for visual consistency)
+  is now the level-neutral `.drag-over`, applied to both, rather than a
+  Pile borrowing a class literally named after the Zone entity.
+- `pileActions.js`: `ACTION_SPECS`' `target`/`from` tag meaning "any
+  table-side pile" was `'zone'`, consumed as `spec.target === 'zone'` in
+  `targetsForAction` - renamed to `'table'` (matching the codebase's own
+  existing `tableSide` vocabulary), since it's a destination CATEGORY,
+  not a Zone reference or a Pile kind.
+
+**Deliberately unchanged - these already meant the real Zone entity,
+renaming them would have been the same mistake in reverse**: `CREATE_ZONE`/
+`RENAME_ZONE`/`REMOVE_ZONE`, `MOVE_PILE`'s `targetZoneId`, `CREATE_PILE`'s
+`zoneId` (validated against `state.zones`, a real Zone id), every pile's
+own `zoneId` field (which Zone it belongs to - a correct cross-reference,
+not a conflation), `TABLE_ZONE_ID`, `playerZoneId`, `ensureZoneRecord`,
+`<zone-panel>`/`ZonePanel.js`, the `.zone` CSS class, `renderZonePanel`,
+`renderZones` (it renders real Zone panels; only its misnamed pile-list
+PARAMETER needed fixing), `GameConfig.zones`, `zoneDeclarations`.
+`CREATE_ZONE` itself was double-checked against the audit's own initial
+(wrong) claim that it never creates a real Zone - it does, via
+`makeStandaloneZone`/`ensureZoneRecord`, alongside a starter pile in one
+bundled convenience action; no behavior change needed there.
+
+Verified: 509/509 tests (every affected test file's fixtures/action
+shapes updated to match), `make check`/`lint-js`/`lint-style` clean (7
+pre-existing cognitive-complexity errors, unchanged baseline),
+`lint-design` unchanged from its own pre-existing baseline (unrelated
+sizing/overlap debt, not touched by this rename). One real, live bug
+caught mid-refactor: `main.js`'s `playerAnchorRect` queried
+`[data-zone-id="hand:<playerId>"]` for the cursor-motion anchor - would
+have silently broken (anchor always falling back to the whole screen)
+had it not been grepped and fixed alongside the DOM attribute rename.
+
+### D89. Orphaned hand piles made structurally impossible again, not handled
+Direct user request, after seeing D88's reclaim fix had to specifically
+account for an ownerless hand pile: "no need to support orphaned piles
+since that should now never happen." D87 had dropped `CHANGE_PILE_TYPE`'s
+requirement that a `hand`-target pile already have a real `ownerId` -
+that was the ONE path that could ever produce an orphaned (`ownerId:
+null`) hand-kind pile. Reinstated the guard (originally D86's, dropped
+by D87's "ALL are allowed" widening) rather than keep the state possible
+and correctly handled: `CHANGE_PILE_TYPE` rejects converting an
+ownerless pile to `hand` again, with a clear message. `DEAL`'s
+`index === -1` branch (a hand pile with no matching current player) is
+genuinely unreachable through any live action again, matching
+Morpheus's original D23 assessment - left in place as harmless dead
+code (same reasoning D23 gave: it's real protection if a
+`LEAVE`/`REMOVE_PLAYER` action is ever added), not deleted, since it
+costs nothing to keep and this session didn't add it.
+
+Every other D87 widening is untouched - `deck` still has no ownership
+requirement as a target, and every kind (deck/hand included) is still a
+valid SOURCE. Only the one specific gap - an ownerless `hand` - is
+closed. Verified live and via TDD (`make check`/`lint-js` clean, 7
+pre-existing baseline).
+
+### D88. Card conservation is now an enforced runtime invariant, not an assumption
+Direct user request, framed as a general principle rather than another
+one-off patch: "once the game starts card ids are generated for every
+card in every pile... gets a unique id and no cards can be created or
+destroyed during play. so there shouldn't be any situation where cards
+go missing." The D87 `ensureHandPile` id-collision bug was ONE way to
+violate that; there's no reason to trust every future reducer/helper to
+individually get card bookkeeping right instead of just guaranteeing it.
+
+**The mechanism**: `reduce()` (`state.js`) - the single choke point
+every action already passes through, on the host only (D3: guests never
+call it) - captures the full flat list of card ids across every pile
+before running the action, runs it, then compares against the list
+after. Unless the action is `RESET` (the one legitimate "new epoch" -
+`buildDeck` assigns brand new ids on purpose for a new round), the two
+lists must describe the exact same multiset: same ids, same count, no
+id appearing more than once. Any violation throws immediately, naming
+the action and exactly which ids are missing/duplicated/appeared from
+nowhere - a silent, hard-to-reproduce "a card vanished" report becomes
+a loud, precise one at the exact action that caused it. Cheap enough to
+run unconditionally (a few hundred cards, once per dispatch) rather
+than being test-only.
+
+**A real bug the invariant caught immediately, not a false positive**:
+turning this on broke the existing, intentional "second DEAL clears
+hands and re-deals from scratch" test - because the cards being cleared
+out of hands were never actually returned anywhere, just dropped from
+`state` entirely. Fixed `DEAL`: a fresh (non-`DEAL_MORE`) deal now
+reclaims every hand-kind pile's current cards (via new `toDeckCard`,
+the inverse of `toHandCard` - strips `owner`/`faceUp`/`layout` back to
+a plain `{id, rank, suit}` deck card) into the SAME pool it deals from,
+before the round-robin split. This also fixed the second-order case D23
+flagged as "unreachable" and D87 made reachable for real: an ownerless
+hand-kind pile (`ownerId: null`, via D87's own permissiveness) used to
+have its cards silently wiped by the exact same `isFresh` branch - now
+reclaimed like any other hand.
+
+Verified live and via TDD: `assertCardsConserved` unit-tested directly
+(missing/duplicated/appeared-from-nowhere, each with its own clear
+error), plus a full realistic action sequence proving the invariant
+doesn't false-positive on legitimate play. `make check`/`lint-js` clean
+(7 pre-existing baseline, unchanged).
+
+### D87. `CHANGE_PILE_TYPE` widened to full symmetry - every kind is both a valid source and target, cards always preserved exactly
+Direct user correction to D86: "all pile types must be convertible to
+any other pile type and deck -> hand -> discard -> all are allowed.
+important after each transition the pile must have the exact same
+cards as before. it's just a presentation thing." D86's source/target
+asymmetry (deck/hand as targets only, never sources) is superseded -
+this is an explicit "ALL" directive, not a further narrow case.
+
+**What changed:**
+- `CHANGE_PILE_TYPE_TARGETS`/`CHANGE_PILE_TYPE_CYCLE` (two lists) are
+  replaced by one, `CHANGE_PILE_TYPE_KINDS = Object.keys(PILE_TYPES)`
+  (`piles/pileTypes.js`) - every registered kind, used as both the
+  source and target eligibility set. `state.js`'s `CHANGE_PILE_TYPE`
+  reducer no longer checks the source at all (an existing pile's `kind`
+  is trivially already valid) - only that the requested target kind is
+  a real `PILE_TYPES` key.
+- The `hand`-target `ownerId` requirement (D86) is also gone - a shared
+  pile CAN become a `hand` now. It degrades gracefully, not unsafely:
+  `HandPile.cardActions` checks `pile.ownerId === viewerId`, which is
+  false for every viewer when `ownerId` is `null`, so everyone gets
+  `'move'` and nobody gets `'play'` - a hand nobody can formally "play"
+  from, not a crash or a privacy hole.
+- `HandPile.pileActions`/`DeckPile.pileActions` now include
+  `'changePileType'` (owner-only / host-only respectively, matching
+  each kind's existing gating for its other pile-level actions) - the
+  picker UI actually renders on hand/deck piles now, not just permitted
+  server-side.
+- **Cards were never touched by this reducer** (still true, unchanged
+  from D63) - `kind` (and maybe the default `name`) are the only fields
+  it writes. This is WHY the user's "just presentation" framing holds:
+  the exact same card objects, same ids, same order, same count, ride
+  through every conversion untouched, chained arbitrarily
+  (deck->hand->discard->zone->deck...).
+
+**The real hazard this reopens, and its fix**: `state.piles` is keyed
+by id, and two of those ids (`DECK_PILE_ID`, `` `hand:<playerId>` ``)
+were previously ONLY ever held by a pile that WAS that kind - `deckOf`/
+`ensureHandPile` (and by extension `DRAW`/`DEAL`/`PICKUP`/`TAKE_PILE`/
+`PICKUP_SPLIT`/`PLAY`) all resolve "the" deck/hand for someone by
+scanning for an existing one and otherwise minting a NEW pile at that
+canonical id. Once a pile can convert AWAY from `deck`/`hand` while
+keeping its id, that assumption breaks: the canonical id is still
+"occupied" by a pile that's no longer that kind, so a naive fresh
+canonical-id pile would collide with it - two DIFFERENT pile objects
+sharing one id, silently corrupting whichever `.find`/`.map` call
+happened to run next.
+
+Fixed at the one place a fresh canonical id ever gets minted post-
+initial-state: `ensureHandPile` now checks whether its canonical id
+(`` `hand:<playerId>` ``) is already claimed by ANY pile (regardless of
+kind) before reusing it, and falls back to a fresh `randomPileId()`
+(the same `crypto.randomUUID()`-or-fallback `makeTableSidePile` already
+used, now factored out and shared) when it is. `RESET`/
+`createInitialState` needed no equivalent fix for the deck - both are
+full-state rebuilds that already explicitly filter out whatever
+currently holds `DECK_PILE_ID` before constructing the fresh one (see
+`RESET`'s own comment, pre-existing, written for an unrelated reason
+but sufficient here too).
+
+Verified live, the user's own example: dealt 5 cards, converted the
+hand to `deck` (exactly 5 cards carried over, same ids), drew again -
+a genuinely new hand pile was minted at a fresh id, the converted
+5-card pile was left completely untouched, and no two piles ever
+shared an id. TDD, `make check`/`lint-js` clean (7 pre-existing
+baseline, unchanged).
+
+### D86. `CHANGE_PILE_TYPE` fixed - pile kind IS the look, not just the game-rules; deck/hand join as valid TARGETS
+Direct user correction: "what you implemented is more akin to changing
+the pile name... I want to be able to change a pile type so it LOOKs
+different. the pile type determines the look and feel. if it's a hand
+pile it's in a fan. if it's a deck pile they are stacked on top." They
+were right, and it was a real bug, not a preference: `CHANGE_PILE_TYPE_
+CYCLE` (zone/discard/foundation/cascade/rankAdjacent/battlefield/exile/
+stack) is 8 kinds, and every one of them shares the exact same
+`component: 'pile-panel'` (`Pile.js`'s default, never overridden by any
+of the 8). Cycling through the menu changed `canAccept`/`cardActions`
+game-rules and the label shown, but visually nothing ever changed - the
+"look and feel" promise the picker made was never actually kept for any
+of its options.
+
+**The fix, in two parts** (`state.js`, `piles/pileTypes.js`, `ui.js`):
+
+1. **`deck`/`hand` join as TARGETS only.** New export
+   `CHANGE_PILE_TYPE_TARGETS = [...CHANGE_PILE_TYPE_CYCLE, 'deck', 'hand']`
+   - `ui.js`'s menu and `state.js`'s `isTargetEligible` both read this
+   list now. `CHANGE_PILE_TYPE_CYCLE` itself is UNCHANGED and still the
+   SOURCE-side eligibility check (`isEligible`) - a `deck`/`hand` pile
+   can never be the thing you're converting FROM. This asymmetry is
+   deliberate, not a shortcut: `DECK_PILE_ID`/`ensureHandPile`'s
+   kind+owner scan both assume a hand/deck pile's identity is stable;
+   letting a hand convert away and a fresh canonical one get created on
+   the next DEAL/DRAW/PICKUP would produce two piles racing for the same
+   canonical id. `HandPile`/`DeckPile.pileActions()` never offered
+   `changePileType` in the UI anyway (`sortRank`/`sortSuit` and
+   `deal`/`shuffle` respectively) - this makes the reducer match what
+   the UI already guaranteed.
+
+   Converting TO `hand` requires the pile to already have a real
+   `ownerId` - rejected otherwise ("it has no owner"). This is
+   structural (a hand fundamentally belongs to exactly one player, the
+   same reason `HandPile` has always required it), not a Core-invariant
+   authorization gate - D82-85's permissiveness campaign doesn't touch
+   it. Converting TO `deck` has no such requirement.
+
+2. **Real bug found while wiring this up**: five reducers (`PICKUP_
+   SPLIT`, `TAKE_PILE`, `PLAY`, `PICKUP`, `DRAW`) resolved "the acting
+   player's hand pile" via the hardcoded string `` `hand:${playerId}` ``
+   (`handPileId`), never by actually looking one up. `ensureHandPile`
+   (which all of them relied on to guarantee one exists first) checks
+   `kind === 'hand' && ownerId === playerId` - a DIFFERENT rule. Once a
+   pile can become `kind: 'hand'` while keeping its own non-canonical
+   id, that mismatch means `ensureHandPile` correctly sees "a hand
+   already exists" and does nothing, but the five reducers then look for
+   a pile at the canonical id, find nothing there, and their `.map`
+   silently drops the cards into no destination at all. New helper
+   `resolveHandPileId(piles, playerId)` (mirrors `ensureHandPile`'s own
+   check, falls back to the canonical id only when no hand-kind pile
+   exists yet) replaces the raw string lookup at all five call sites.
+   `MOVE_CARD`/`CREATE_PILE` needed no change - `transferCard` already
+   detects a hand destination via `toPile.kind === 'hand'`, not by id
+   (D83's own fix).
+
+**Not touched:** existing cards in a pile converting to `deck`/`hand`
+are not re-stamped to that kind's shape (no `toHandCard` re-run) - same
+"no revalidation on conversion" risk already accepted for foundation/
+cascade/rankAdjacent, extended here rather than special-cased away.
+
+### D85. Bulk pile actions (Split/Pickup, Take, Set Orientation) made fully permissive
+D82-D84 closed every per-card gate. Three pile-LEVEL reducers still had
+their own separate authorization, never generalized alongside the
+per-card work because the earlier requests were about per-card
+drag-and-drop specifically. Direct user request: "remove the remaining
+invariants on drag and drop - FULLY PERMISSIVE" - this is what was left.
+
+**What changed** (all in `state.js`):
+- `splitPileAt` (`SPLIT_PILE`/`PICKUP_SPLIT`): the `pile.ownerId !==
+  playerId` throw is gone - any player can split any personal pile now,
+  not just its owner. The `canRemoveCard(...,'move')` check stays (it's
+  structural - excludes `HandPile` - not an authorization gate).
+- `TAKE_PILE`: the `zone`/`discard`-only kind allowlist, the
+  `pile.ownerId` check, and the `isHiddenCard` visibility guard are all
+  gone. A take now works on ANY pile kind (deck, hand included) for ANY
+  player, hidden cards included - `isHiddenCard` itself is deleted, no
+  callers left.
+- `SET_PILE_ORIENTATION`: the owner-only (personal pile) / host-only
+  (shared pile) gate is gone - any player can flip any zone/discard
+  pile's orientation. `state.hostId` is kept (still a real identity
+  fact, set at first JOIN) but no reducer reads it for authorization any
+  more.
+
+**Deliberately NOT touched:** the pile kind restrictions that are not
+authorization (`SET_PILE_ORIENTATION` still only accepts `zone`/
+`discard`; `SPLIT_PILE`'s deck-is-anonymous branch), and the UI offer
+layer's `isOwner`/`isShared` gating in `Pile.pileActions()` (which
+piles even show a Take/Split/Hide/Show button) - that governs a wider
+set of actions (`changePileType`, `remove`) than were named in this
+request, so left alone pending explicit direction rather than expanded
+unprompted.
+
+### D84. Card redaction removed entirely - every viewer sees every card, always
+D83 (below) still left identity VISIBILITY standing even as it removed
+ACTION authorization (you could now move a card you couldn't see the
+face of, same as a shared face-down card already worked - but you still
+couldn't see it). Direct, explicit user correction: "remove card
+redaction entirely there are lots of games (including RTG) where a
+player must take a card from another player - TOTAL PERMISSIVE." That
+last part is the concrete case this closes: taking a KNOWN, specific
+card from another player's hand needs to be able to see it first, which
+redaction (even with move/pickup now unconditional) still prevented.
+
+**What changed:** `Pile.redactCard` (and `DeckPile`'s own now-identical
+override) are deleted outright, not just made permissive - there is no
+redaction mechanism left to call. `viewFor` (`state.js`) no longer
+truncates ANY pile: the deck's full stock (not just its top card) and
+every hand's full, real contents (not just a count) go out to every
+viewer now. `otherHandCounts`/`deckCount`/`myHand` stay as convenience
+fields for existing consumers (roster tallies, etc.) - not privacy
+limits any more, since the same data is also fully present in `zones[]`
+for anyone who reads it there.
+
+**What this means for `faceUp`/`faceDown`:** still real GAME-STATE
+fields (was a card dealt/played face-up or face-down) - `REVEAL`/
+`ROTATE_CARD` and the physical card-back rendering (`ui.js`) are
+unaffected, a "face-down" card still LOOKS face-down on the table. What
+changed is that the data crossing the wire was never actually hidden
+behind that state to begin with - `faceUp`/`faceDown` is now presentation
+state a player can already see through, not a privacy boundary.
+
+### D83. Extended to full permissiveness: no per-card ownership/visibility gate either, hand included
+D82 (below) still left two things standing: per-card ownership/
+visibility on `pickup`/`move`/`rotate` (a still-hidden PRIVATE card
+could only be moved/rotated by its own owner) and a hand's owner-only
+gate (nothing was offered on another player's hand card at all).
+Direct, explicit user correction: "get rid of can move. it should
+always return true. please fully permissive drag and drop for all
+cards and piles. remove the older restrictions from ALL pile and zone
+types" - confirmed, when asked directly, to include hand ("yes - fully
+permissive everywhere, hand included"). Both are gone now: `Pile.
+cardActions()` offers `pickup`/`move`/`rotate` unconditionally (no
+`isOwned`/`isMine` check left at all); `HandPile.cardActions()` offers
+`'move'` to a non-owner instead of `[]` - any player can drag a card
+straight out of anyone else's hand now, moved (not force-revealed;
+that's still only what `'play'`, the owner's own leaving-hand verb,
+does).
+
+**Deliberately NOT touched: card identity REDACTION (D7's `redactCard`,
+`Pile.js`).** This invariant is about drag-and-drop ACTION
+authorization ("can a viewer move a card"), not about identity
+VISIBILITY ("can a viewer see what a card is") - those are different
+questions, and only the first was asked to go away. Moving a card whose
+face you can't see is not new; a shared face-down card has always
+worked exactly that way. Nothing in this codebase now, or asked for,
+makes every card's rank/suit visible to every viewer - hidden cards
+stay genuinely hidden, they're just never immovable, by anyone, for any
+reason.
+
+`reveal`'s own `isHidden` condition also stays - not an authorization
+restriction, a no-op guard ("Turn over" on an already-face-up card has
+nothing to do).
+
+### D82. Core invariant enforced: `MeldPile`/`ExilePile` reopened to full drag-and-drop
+Recorded after `MeldPile`/`ExilePile` overrides accumulated the exact
+kind-level lockout this invariant forbids (Foundation cards were made
+categorically un-removable, "the real Solitaire rule a foundation
+exists to enforce"; Exile was made one-way, "by definition"). Both
+were direct-user-request features at the time, each individually
+reasonable-sounding, but the accumulation is exactly what this
+invariant exists to prevent - reversed: both now inherit the base
+`Pile.cardActions()` (drag-and-drop always available), unchanged only
+in what they DON'T offer as pile-level convenience (Foundation still
+offers no bulk take/split; Exile still offers no `take`).
 
 ## Decisions (resolves PRD Feasibility Flags 1 & 2)
 

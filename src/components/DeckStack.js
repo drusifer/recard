@@ -20,14 +20,14 @@ import { renderPileShell, renderDeckStack } from '../ui.js';
  * visual and Deal count input, via the already-proven `renderDeckStack`.
  */
 export class DeckStackElement extends HTMLElement {
-  render(zone, allZones, options) {
-    renderPileShell(this, zone, allZones, options, (container) => {
+  render(pile, allPiles, options) {
+    renderPileShell(this, pile, allPiles, options, (container) => {
       const row = document.createElement('div');
       container.append(row);
-      // D67: `zone.cards` now carries the pile's own top card (redacted,
+      // D67: `pile.cards` now carries the pile's own top card (redacted,
       // real id) for hidden-visibility kinds like `deck` - `renderDeckStack`
       // uses it as a genuine drag source, same mechanism as any other pile.
-      renderDeckStack(row, zone.count ?? zone.cards.length, { ...options, pileId: zone.id, topCard: zone.cards[0] });
+      renderDeckStack(row, pile.count ?? pile.cards.length, { ...options, pileId: pile.id, topCard: pile.cards[0] });
       return row;
     });
   }

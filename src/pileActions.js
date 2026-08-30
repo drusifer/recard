@@ -53,18 +53,19 @@ export const ACTION_SPECS = {
   // entirely - `play` is the only hand-play action now, unconditionally
   // public, the fast default gesture (tap or drag), matching Draw's own
   // "highest-frequency action gets a shortcut" precedent (D36). Keeps
-  // `target: 'zone'` because a native drag of the card itself DOES let
-  // the drop location choose a destination zone (`highlightDragTargets`
-  // in ui.js reads this).
-  play: { label: 'Play', target: 'zone', from: 'hand', icon: '▶' },
-  pickup: { label: 'Pick up', target: 'hand', from: 'zone', icon: '↑' },
-  move: { label: 'Move', target: 'zone', from: 'zone', icon: '⇄' },
-  reveal: { label: 'Turn over', target: null, from: 'zone', icon: '👁' },
+  // `target: 'table'` because a native drag of the card itself DOES let
+  // the drop location choose a destination pile (`highlightDragTargets`
+  // in ui.js reads this). D90: `'table'`, not `'zone'` - this means "any
+  // table-side pile" (`tableSide`), never the real Zone entity.
+  play: { label: 'Play', target: 'table', from: 'hand', icon: '▶' },
+  pickup: { label: 'Pick up', target: 'hand', from: 'table', icon: '↑' },
+  move: { label: 'Move', target: 'table', from: 'table', icon: '⇄' },
+  reveal: { label: 'Turn over', target: null, from: 'table', icon: '👁' },
   // D48/D40: in-place like `reveal` (no destination to pick), but stays
   // a hover-row button rather than a tap gesture - `reveal`'s tap
   // conversion (Sprint 12/Phase 55) was its own dedicated Smith-gated
   // story, not a default every in-place action inherits.
-  rotate: { label: 'Rotate', target: null, from: 'zone', icon: '⟳' },
+  rotate: { label: 'Rotate', target: null, from: 'table', icon: '⟳' },
 
   // Pile-level (D29): act on the whole pile, not the hovered card -
   // dealing does not act on the hovered card at all, it acts on the
@@ -118,13 +119,14 @@ export const ACTION_SPECS = {
   // were never part of before (US-35/36 shipped as a standalone button
   // row, not through `pileLevelActions` at all).
   shuffle: { label: 'Shuffle', destructive: false, hint: 'Shuffle the deck stock in place.', icon: '⇌' },
-  // Sprint 23 (US-60): `split` is no longer deck-only - `zonePile`/
-  // `discardPile` offer it too now (`pileActions.js`'s per-type
-  // `pileActions`), so the hint is generic rather than naming the deck
-  // specifically. Label/behavior unchanged for the deck's own callers.
-  split: { label: 'Split into piles', destructive: false, hint: 'Split this pile roughly in half into a new pile of the same kind.', icon: '✂' },
+  // *nit (direct user request): the old `'split'` (roughly-in-half,
+  // deck-only or zone/discard-only, instant on click) is retired - see
+  // `Pile.pileActions`'s own comment. `state.js`'s `SPLIT_PILE`/
+  // `PICKUP_SPLIT` are real, tested, index-driven reducer actions now;
+  // their own header-menu entries land with the picker UI that supplies
+  // the index (a follow-up phase), not here yet.
   // Sprint 23 (US-61): pile-level, no `target` - a button, not a drag
-  // gesture, same shape as `deal`/`shuffle`/`split` above. `destructive:
+  // gesture, same shape as `deal`/`shuffle` above. `destructive:
   // true` unconditionally, no size-based exception (Smith's Gate 1
   // ruling - a size-gated confirm is a worse, less-predictable
   // affordance than a consistent one) - the single-card skip Smith also
@@ -138,16 +140,29 @@ export const ACTION_SPECS = {
   // "flip it back" cost the way `take`/`reshuffleDeal` have.
   hide: { label: 'Hide', destructive: false, hint: 'Turn every card in this pile face-down.', icon: '🙈' },
   show: { label: 'Show', destructive: false, hint: 'Turn every card in this pile face-up.', icon: '👁' },
-  // D71 (US-74): cycles through CHANGE_PILE_TYPE_CYCLE (zone/discard/
-  // foundation/cascade/rankAdjacent), offered by Pile.pileActions() -
-  // same base method every eligible subclass inherits/overrides, so
-  // each kind gets it "for free" without a separate opt-in. Allowed on
-  // a non-empty pile too as of a direct user request (2026-08-27).
+  // D71 (US-74): offered by Pile.pileActions() - same base method every
+  // eligible subclass inherits/overrides, so each kind gets it "for
+  // free" without a separate opt-in. Allowed on a non-empty pile too as
+  // of a direct user request (2026-08-27).
+  //
+  // *nit (direct user request): "a menu for the change pile action and
+  // give me an indication of the currently selected pile type" - `enum:
+  // true` is a new ACTION_SPECS shape (an EnumAction, not the plain
+  // single-click shape every other entry above uses): the header renders
+  // it as a menu button showing the CURRENT value, opening a list of
+  // every choice on click, rather than a plain icon that fires once.
+  // Generic at this table's level - any future multi-choice pile action
+  // can reuse the same `enum: true` flag - but the actual current
+  // value/choices are per-instance data only the render call site has
+  // (`renderPileShell`'s `enumOptions`, `ui.js`), same "static spec +
+  // per-instance options" split `disabled`/`noConfirm`/`labels` already
+  // use elsewhere in this table's callers.
   changePileType: {
     label: 'Change type',
     destructive: false,
-    hint: 'Change this pile to the next kind.',
+    hint: 'Change this pile to a different kind.',
     icon: '⇋',
+    enum: true,
   },
   // D79 (US-82): the untap step, as one atomic action rather than N
   // rotates. Not destructive - untapping loses nothing and is trivially
@@ -208,14 +223,14 @@ export function targetsForAction(action, piles, { viewerId, fromPileId } = {}) {
   return piles
     .filter((pile) => {
       if (spec.target === 'hand') return pile.kind === 'hand' && pile.ownerId === viewerId;
-      if (spec.target === 'zone') {
-        // D45: was `pile.kind !== 'zone'` - generalized the same way
-        // state.js's `zonesOf` was, so a dragged play/move correctly
-        // lights up a Discard pile too, not just plain zones.
+      if (spec.target === 'table') {
+        // D45: was `pile.kind !== 'plain'` - generalized the same way
+        // state.js's `pilesOf` was, so a dragged play/move correctly
+        // lights up a Discard pile too, not just plain piles.
         //
         // UX follow-up (direct user request): a hand pile is `tableSide`
         // now too (it renders at its owner's seat like any other
-        // table-side pile - `state.js`'s `viewFor`/`zonesOf`), but it
+        // table-side pile - `state.js`'s `viewFor`/`pilesOf`), but it
         // must never light up as a generic play/move DESTINATION - only
         // `pickup`'s own `target: 'hand'` branch above may ever target a
         // hand, and only the viewer's OWN. Without this, dragging any
@@ -245,7 +260,7 @@ export function targetsForAction(action, piles, { viewerId, fromPileId } = {}) {
  * tell a shared (ownerless) pile from someone else's personal one,
  * since both make `isOwner` simply `false`.
  *
- * @param {'deck'|'hand'|'zone'|'discard'} kind
+ * @param {'deck'|'hand'|'plain'|'discard'} kind
  * @param {{isHost?: boolean, isOwner?: boolean, isShared?: boolean}} context
  * @returns {string[]} action ids
  */

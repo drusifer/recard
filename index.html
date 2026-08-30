@@ -33,36 +33,24 @@
     <h1>Host a table</h1>
     <div id="host-form" class="panel">
       <label>Your name <input id="host-name" type="text" maxlength="20" /></label>
+      <!-- Direct user request: "every game should ONLY be based on
+           preset" - no "Custom" manual-config path any more. `deckConfig`
+           (type/numDecks/jokers) and `gameConfig` (piles/zones/tableZone)
+           both come entirely from whichever preset is selected here -
+           `#host-preset-preview` below is a read-only reflection of that,
+           never a separate editable source of truth. -->
       <label>Quick-start
-        <select id="host-preset">
-          <option value="">Custom (set up manually below)</option>
-        </select>
+        <select id="host-preset"></select>
       </label>
-      <p id="host-preset-preview" class="deck-config" hidden></p>
-      <!-- US-70 (D61): only meaningful once a preset is picked - a
-           saved layout override is always recorded against a preset
-           name, "Custom" has none. Hidden rather than disabled/empty
-           when there's nothing to choose beyond the built-in default,
-           same "don't show a control with nothing real to offer"
-           convention `host-preset-preview` above already uses. -->
-      <label id="host-layout-row" hidden>Layout
+      <p id="host-preset-preview" class="deck-config"></p>
+      <!-- US-70 (D61): a preset is always selected now, so this is
+           always meaningful - "Default" plus any layout the host has
+           saved under this preset's name. -->
+      <label id="host-layout-row">Layout
         <select id="host-layout">
           <option value="">Default</option>
         </select>
       </label>
-      <!-- D47: DeckDefinition's first host-facing field. Jokers stays
-           visible regardless of type - pinochle's own build() silently
-           ignores it rather than this control needing to know which
-           types care about jokers and which don't. -->
-      <label>Deck type
-        <select id="host-deck-type">
-          <option value="standard">Standard (52 cards)</option>
-          <option value="pinochle">Pinochle (48 cards)</option>
-          <option value="rtg">Recard the Gathering (60 cards)</option>
-        </select>
-      </label>
-      <label>Decks <select id="host-num-decks"><option value="1">1</option><option value="2">2</option></select></label>
-      <label>Jokers <select id="host-jokers"><option value="0">0</option><option value="2">2</option><option value="4">4</option></select></label>
       <!-- D46: GameConfig's first real field. Checked (allowed) by
            default, matching every prior sprint's behavior exactly - Add
            Zone was always available before this control existed. -->

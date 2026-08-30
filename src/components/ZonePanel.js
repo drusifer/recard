@@ -15,13 +15,13 @@ import { renderZonePanel } from '../ui.js';
  *
  * Deliberately does NOT reimplement any of that - `render()` just calls
  * the existing, already-proven `renderZonePanel(container, id, title,
- * piles, allZones, opts)` (`ui.js`) with `this` as the container, same
+ * piles, allPiles, opts)` (`ui.js`) with `this` as the container, same
  * "thin adapter around proven logic" shape every component in this
  * pass uses.
  */
 export class ZonePanelElement extends HTMLElement {
-  render(id, title, piles, allZones, options) {
-    renderZonePanel(this, id, title, piles, allZones, options);
+  render(id, title, piles, allPiles, options) {
+    renderZonePanel(this, id, title, piles, allPiles, options);
   }
 }
 

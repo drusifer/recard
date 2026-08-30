@@ -837,3 +837,140 @@ the -10 button, confirmed it synced correctly in both directions -
 "anyone may adjust anyone's score" is real, not just a comment.
 Re-verified the blank-input-reverts-not-zeroes fix live myself. No
 blockers. Handed to Morpheus for review.
+
+## *fix: D86 CHANGE_PILE_TYPE look-and-feel fix (2026-08-29) - PASSED
+
+User's correction was right and Neo's root-cause was real: `CHANGE_
+PILE_TYPE_CYCLE`'s 8 kinds all shared `component: 'pile-panel'` -
+cycling through the picker never changed the actual look, only
+game-rules/label. Fix: `deck`/`hand` join a new `CHANGE_PILE_TYPE_
+TARGETS` list (targets only, never sources - `CHANGE_PILE_TYPE_CYCLE`
+stays the unchanged source list), plus a real bug fix (`resolveHandPileId`)
+so a converted hand pile with a non-canonical id actually works end to
+end instead of silently swallowing cards.
+
+Independent verification:
+- 500/500 unit tests, re-run myself, not trusted from the handoff.
+- **Mutation-tested both new guards, both real:**
+  1. Killed the `!pile.ownerId` hand-target guard - the exact "shared
+     pile cannot become a hand" test fails clean, nothing else does.
+  2. Killed `resolveHandPileId` back to the old hardcoded
+     `` `hand:${playerId}` `` lookup at TWO independent call sites
+     (`PLAY`'s `fromPileId`, `DRAW`'s `toPileId`) separately - both
+     killed the SAME new integration test (`Pile hand:p1 does not
+     exist` for PLAY; a duplicate-hand-pile count mismatch for DRAW),
+     confirming the fix has real teeth at more than one call site, not
+     just the one the test happened to exercise first.
+- Grepped `state.js` for every remaining `handPileId(` call - only the
+  definition, `resolveHandPileId`'s own fallback, and `ensureHandPile`'s
+  creation path remain. No stray hardcoded-id lookup left in any of the
+  5 reducers Neo touched (PICKUP_SPLIT/TAKE_PILE/PLAY/PICKUP/DRAW).
+- `make check` + `lint-js`: identical to the reported 7 pre-existing
+  cognitive-complexity baseline, nothing new.
+- Confirmed `CHANGE_PILE_TYPE_TARGETS` wiring: `ui.js`'s menu import/
+  choices list and `state.js`'s `isTargetEligible` both read the new
+  export, `CHANGE_PILE_TYPE_CYCLE` untouched everywhere it's still the
+  source-side check. No dangling references to the old import shape.
+- Did NOT add browser/e2e coverage for the actual visual render
+  (`<deck-stack>`/`<fan-pile>` appearing on a converted pile) - the
+  render-dispatch code path itself (`componentFor(zone.kind)` at
+  `ui.js` render time) is pre-existing and unchanged, already proven
+  live for real deck/hand piles today; only the REDUCER's eligibility
+  list changed. Same reasoning precedent as the D56 UAT entry above
+  (no DOM/CSS/rendering code touched -> unit coverage is the correct
+  layer, not a fabricated e2e run). Flagging this instead of silently
+  skipping it: if Smith wants a live visual confirmation of the actual
+  fan/stack look on a freshly-converted pile, that's still open.
+
+**Verdict: PASS.** No blockers. Handed to Morpheus for review.
+
+## *nit: D87 CHANGE_PILE_TYPE full symmetry (2026-08-29) - PASSED
+
+Direct user override of D86: "all pile types must be convertible to
+any other pile type... it's just a presentation thing." Source/target
+asymmetry gone - `CHANGE_PILE_TYPE_KINDS` is now one list both ways.
+
+Targeted check (matches the abbreviated `*nit` loop, no Morpheus step):
+- 270/270 across the 4 directly-touched files (state/piles/rtgPiles/
+  pileLevelActions.test.js), independently re-run.
+- **Mutation-killed the one guard that actually matters here**:
+  reverted `ensureHandPile` to its pre-D87 unconditional canonical-id
+  reuse - killed exactly the new collision test, with the exact
+  predicted failure mode (`3 !== 4`: 4 piles sharing only 3 unique
+  ids, not a crash, a silent corruption that only an id-uniqueness
+  assertion would ever catch). Confirms the fix is load-bearing, not
+  decorative.
+- Grepped for stray `CHANGE_PILE_TYPE_CYCLE`/`_TARGETS` references -
+  one harmless historical comment in `main.js` (describes retired
+  cycling math, not a live import), no live code left pointing at the
+  deleted exports.
+- `make check`/`lint-js`: clean, same 7 pre-existing baseline.
+- Did not re-verify the exact-card-preservation claim myself beyond
+  reading Neo's new test + live script output (both concrete,
+  ids-equal assertions, not just "same length") - reasonable to trust
+  for a `*nit`, this isn't privacy/authorization-shaped.
+
+No blockers. **Verdict: PASS.**
+
+## *fix: D90 zone/pile naming conflation fix (2026-08-30) - PASSED
+
+Large blast radius (action field shapes, `viewFor`'s wire shape, the
+entire render/drag-drop pipeline in `ui.js`/`main.js`) - treated as a
+`*fix`, not a `*nit`, given the scope.
+
+- 509/509 independently re-run.
+- **Mutation-tested the core rename**: reverted `PLAY`'s
+  `action.pileId` back to reading `action.zoneId` (while dispatch still
+  sends `pileId`) - 16 tests failed immediately across Discard/
+  Foundation/Cascade/RankAdjacent/Split/Pickup end-to-end coverage,
+  confirming the rename is genuinely load-bearing everywhere, not
+  cosmetic.
+- **Stray-reference sweep**: grepped the full `src/`+`tests/` tree for
+  every old name (`zonesOf`, `findZoneAndCard`, `renderZoneCards`,
+  `kind: 'zone'`, `action.zoneId`/`toZoneId` on PLAY/MOVE_CARD,
+  `data-zone-id`, `view.zoneRecords`) - zero live references left,
+  only correctly-historical comment mentions in `state.js` (D90's own
+  note documenting what got renamed).
+- `make check`/`lint-js`: clean, same 7 pre-existing baseline.
+- Reviewed the one real bug Neo found and fixed mid-refactor
+  (`playerAnchorRect`'s DOM query still targeting the old
+  `data-zone-id` attribute after the rename, which would have silently
+  broken the cursor-motion anchor) - confirms the value of the full
+  grep sweep over trusting the mechanical renames alone.
+- Did not re-verify `lint-design`'s violation set pixel-by-pixel
+  against a clean baseline (a `git stash` comparison mid-session had a
+  near-miss with an auto-appended CHAT.md conflict, recovered cleanly)
+  - the violation descriptions are identical in content/wording to
+  Trin's own previously-documented baseline (Table-Zone/Bob overlaps,
+  unrelated pre-existing layout debt), and this refactor touched no
+  sizing/layout CSS, only names - reasonable confidence without
+  re-running the risky comparison a second time.
+
+No blockers. **Verdict: PASS.**
+
+## *fix: D88 card-conservation invariant + DEAL reclaim fix (2026-08-30) - PASSED
+
+Direct user request, framed as a general guarantee, not a one-off:
+"no cards can be created or destroyed during play... there shouldn't be
+any situation where cards go missing." `reduce()` now checks this after
+every action (except `RESET`).
+
+Independent verification:
+- 509/509 full suite, re-run myself.
+- **The strongest check for this one: mutation-tested LIVE through the
+  real `reduce()` path, not just the direct `assertCardsConserved` unit
+  tests.** Reverted `DEAL`'s reclaim fix (the exact line that returns
+  cleared hand cards to the pool), ran a real two-DEAL sequence through
+  `reduce()` end to end, and got the invariant firing on its own with a
+  precise diagnostic (`missing: A-clubs-0, 2-clubs-0, ...`) - proves the
+  guard is wired into the real dispatch path, not just exercised by
+  hand-constructed before/after states in the unit tests.
+- `make check`/`lint-js`: clean, same 7 pre-existing baseline.
+- Reviewed the `RESET` exemption specifically - correct, it's the one
+  place `buildDeck` legitimately mints brand new ids for a new round;
+  every other reducer only ever rearranges existing cards.
+- Confirmed the second-order fix (an ownerless, D87-converted hand pile
+  also gets reclaimed) is real, not just claimed - Neo's own new test
+  for it passed independently.
+
+No blockers. **Verdict: PASS.**

@@ -13,7 +13,7 @@
 /**
 Bump when the snapshot shape changes; older blobs are then discarded.
 */
-export const SNAPSHOT_VERSION = 3; // 3 = real Zone entity + per-pile zoneId (D55); a v2 pile has neither, so `ui.js`'s zoneId-based grouping would put every pile in its own zone-of-one - discarded rather than silently mis-rendered, same reasoning as D31's hands bump
+export const SNAPSHOT_VERSION = 4; // 4 = D90's Zone/Pile naming fix - the base Pile kind is `'plain'` now, was `'zone'`; a v3 pile with `kind: "zone"` would fail every `PILE_TYPES[pile.kind]` lookup - discarded rather than silently mis-rendered, same reasoning as the v3 bump (D55) before it
 
 export const STORAGE_KEY = 'recard:host-state:v1';
 

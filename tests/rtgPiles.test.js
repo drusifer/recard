@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { PILE_TYPES, CHANGE_PILE_TYPE_CYCLE } from '../src/piles/pileTypes.js';
+import { PILE_TYPES, CHANGE_PILE_TYPE_KINDS } from '../src/piles/pileTypes.js';
 import { BattlefieldPile } from '../src/piles/BattlefieldPile.js';
 import { ExilePile } from '../src/piles/ExilePile.js';
 import { StackPile } from '../src/piles/StackPile.js';
@@ -18,9 +18,9 @@ test('PILE_TYPES: the three MTG pile kinds are registered', () => {
   assert.equal(PILE_TYPES.stack, StackPile);
 });
 
-test('CHANGE_PILE_TYPE_CYCLE: the new kinds join the cycle', () => {
+test('CHANGE_PILE_TYPE_KINDS: the three MTG kinds are eligible', () => {
   for (const kind of ['battlefield', 'exile', 'stack']) {
-    assert.ok(CHANGE_PILE_TYPE_CYCLE.includes(kind), kind);
+    assert.ok(CHANGE_PILE_TYPE_KINDS.includes(kind), kind);
   }
 });
 
@@ -51,8 +51,14 @@ test('BattlefieldPile: a non-owner of a personal battlefield gets nothing', () =
 
 // --- ExilePile ---------------------------------------------------------
 
-test('ExilePile: exiled cards are face-up and offer no card actions', () => {
-  assert.deepEqual(ExilePile.cardActions(), [], 'exile is one-way');
+// *nit (direct user request, reversed): "exile is one-way" used to mean
+// no card action at all (`cardActions` always `[]`). `docs/
+// ARCHITECTURE.md`'s "Core invariant" forbids that - drag-and-drop is
+// always available, exile included. Exiled cards ARE face-up, and now
+// get the same reveal/pickup/move/rotate as any other visible card.
+test('ExilePile: exiled cards are face-up and get the same card actions as any other pile', () => {
+  const faceUp = { id: 'c1', faceUp: true, owner: null };
+  assert.deepEqual(ExilePile.cardActions({ kind: 'exile' }, faceUp, 'p1'), ['pickup', 'move', 'rotate']);
 });
 
 test('ExilePile: never offers take — exile cannot be scooped back', () => {

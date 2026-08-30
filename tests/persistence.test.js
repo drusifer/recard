@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createInitialState, reduce, handsOf, zonesOf, deckOf } from '../src/state.js';
+import { createInitialState, reduce, handsOf, pilesOf, deckOf } from '../src/state.js';
 import { SNAPSHOT_VERSION, snapshot, save, load, clear, expectedReturners, STORAGE_KEY } from '../src/persistence.js';
 
 /**
@@ -35,7 +35,7 @@ test('a snapshot keeps the table, scores and roster', () => {
   assert.equal(typeof snap.savedAt, 'number');
   assert.equal(snap.players.length, 2);
   assert.equal(snap.scores.g, 1);
-  assert.equal(zonesOf(snap).length, zonesOf(state).length, 'every zone survives');
+  assert.equal(pilesOf(snap).length, pilesOf(state).length, 'every zone survives');
 });
 
 // SUPERSEDED BY D31 (Sprint 11). This test used to assert the exact
@@ -94,7 +94,7 @@ test('D46: gameConfig round-trips through save/load', () => {
   const state = createInitialState({}, () => 0.5, { allowsPlayerZones: false });
   const storage = fakeStorage();
   save(storage, state, 'ABC123');
-  assert.deepEqual(load(storage).state.gameConfig, { allowsPlayerZones: false, piles: [], zones: [] });
+  assert.deepEqual(load(storage).state.gameConfig, { allowsPlayerZones: false, tableZone: true, piles: [], zones: [] });
 });
 
 test('D46: a snapshot from before this field existed restores fine, with no gameConfig at all - not a version bump, additive only', () => {

@@ -1,13 +1,15 @@
 /**
  * The Pile base class (D56) - real derived types: a Pile is cards +
- * behavior, full stop. There is no such thing as a "zone pile" - that
- * word belongs to the Zone entity alone (`state.zones`, `<zone-panel>`).
- * The generic, no-accept-rule, per-card `{owner, faceUp}` pile (`kind:
- * 'zone'`) isn't a distinctly-named subtype either - it IS this base
- * class, concrete and directly usable, not abstract. Every other kind
- * (`DeckPile`, `HandPile`, `DiscardPile`, `CascadePile`,
- * `RankAdjacentPile`, `MeldPile` and its subclasses) is a real
- * specialization that overrides only what differs - real `class X
+ * behavior, full stop. D90 (direct user request, "the shape is
+ * Table->Zone->Pile->Card, KISS, simplify... I don't want any kind of
+ * thing that conflates zones and piles"): there is no such thing as a
+ * "zone pile" - that word belongs to the Zone entity alone
+ * (`state.zones`, `<zone-panel>`). The generic, no-accept-rule, per-card
+ * `{owner, faceUp}` pile (`kind: 'plain'`) isn't a distinctly-named
+ * subtype either - it IS this base class, concrete and directly usable,
+ * not abstract. Every other kind (`DeckPile`, `HandPile`, `DiscardPile`,
+ * `CascadePile`, `RankAdjacentPile`, `MeldPile` and its subclasses) is a
+ * real specialization that overrides only what differs - real `class X
  * extends Pile`, not a sibling module duplicating the shared rule.
  *
  * `src/piles/pileTypes.js`'s `PILE_TYPES` registry maps a pile's `kind`
@@ -20,9 +22,12 @@
  * data objects (`{id, kind, name, ownerId, cards, zoneId}`) - no change
  * to persistence/network serialization.
  *
- * `kind: 'zone'` is the wire/data string CREATE_ZONE still falls back
- * to (unchanged - renaming a persisted string carries no benefit here,
- * only churn) - it maps to this base class in the registry.
+ * `kind: 'plain'` (D90 - was `'zone'`, the exact conflation this pile
+ * type existed to warn against in its own doc comment) is the wire/data
+ * string `CREATE_ZONE` falls back to - it maps to this base class in
+ * the registry. `SNAPSHOT_VERSION` bumped alongside the rename (D90,
+ * no back-compat shim - an old save with a `kind: "zone"` pile on disk
+ * is discarded on load, same as any other snapshot-shape break).
  */
 import { resolveDropTarget as resolveHaloTarget } from '../dropTarget.js';
 
@@ -58,9 +63,16 @@ export class Pile {
    * legitimately share one tag (D56). */
   static component = 'pile-panel';
 
-  /** D55/US-63: eligible for `MOVE_PILE`/`SPLIT_PILE`/`TAKE_PILE`/
-   * `SET_PILE_ORIENTATION`. True by default (this base class and
-   * `DiscardPile`); `DeckPile` and `HandPile` override it `false`. */
+  /** D55/US-63: eligible for `MOVE_PILE` (reparenting into a different
+   * Zone). True by default (this base class and `DiscardPile`);
+   * `HandPile`/`CascadePile`/`RankAdjacentPile`/`MeldPile` override it
+   * `false` - each for its own structural reason (a hand's per-player
+   * invariant; a cascade/rank-adjacent/meld's fixed role in its own
+   * game). *nit fix: this comment used to also claim `SPLIT_PILE`/
+   * `TAKE_PILE`/`SET_PILE_ORIENTATION` read this flag - they never did
+   * (their own hardcoded `zone`/`discard` kind checks, or `SPLIT_PILE`/
+   * `PICKUP_SPLIT`'s `cardActions`-derived eligibility, `state.js`'s
+   * `splitPileAt`) - stale, not a real behavior. */
   static reparentable = true;
 
   /** The only kind with real before/onto/after halo geometry -
@@ -77,43 +89,39 @@ export class Pile {
     return true;
   }
 
-  /** D7: a viewer sees a card's identity if it's face-up, or they own
-   * it. Otherwise they see only that it exists and (if applicable)
-   * whose it is - never its rank/suit. `layout`/`orientation` both
-   * survive redaction deliberately: they describe arrangement, not
-   * identity. */
-  static redactCard(card, viewerId) {
-    if (card.faceUp || card.owner === viewerId) return card;
-    let redacted = { id: card.id, owner: card.owner, faceDown: true };
-    if (card.layout) redacted = { ...redacted, layout: card.layout };
-    if (card.orientation) redacted = { ...redacted, orientation: card.orientation };
-    return redacted;
-  }
-
   /**
-   * A face-down card can be turned over by anyone if it's unowned, or
-   * by its owner; never by a non-owner. Only a face-up card can be
-   * picked up. A still-hidden card can only be moved OR rotated by its
-   * owner; anything visible, or face-down but unowned, is movable by
-   * anyone.
+   * *nit (direct user request): "get rid of can move, it should always
+   * return true - fully permissive drag and drop for all cards and
+   * piles... no matter what." `pickup`/`move`/`rotate` used to be gated
+   * by ownership/visibility - unconditional now, for every viewer, on
+   * every card (`docs/ARCHITECTURE.md`'s "Core invariant").
+   *
+   * `reveal` is the one entry that keeps a condition (`faceUp === false`)
+   * - not an authorization restriction, "there is nothing to reveal" on
+   * a card that's already face-up. `redactCard` is gone entirely now
+   * (a later, separate direct user request, D84: "remove card
+   * redaction entirely... TOTAL PERMISSIVE") - `faceUp` is a plain
+   * game-state field (was a card dealt/played face-up or down) with no
+   * privacy meaning left; every viewer sees every card's real identity
+   * regardless of it.
    */
-  static cardActions(pile, card, viewerId) {
-    const isHidden = card.faceDown === true || card.faceUp === false;
-    const isOwned = card.owner != null;
-    const isMine = card.owner === viewerId;
-
-    return ['reveal', 'pickup', 'move', 'rotate'].filter((action) => {
-      if (action === 'reveal') return isHidden && (!isOwned || isMine);
-      if (action === 'pickup') return !isHidden;
-      if (action === 'move' || action === 'rotate') return !isHidden || !isOwned || isMine;
-      return false;
-    });
+  static cardActions(pile, card) {
+    return card.faceUp === false ? ['reveal', 'pickup', 'move', 'rotate'] : ['pickup', 'move', 'rotate'];
   }
 
   /**
-   * D55/US-60/61/62: `split`/`take`/`hide`/`show` act on the whole
-   * pile, open to any player for a SHARED pile (`isShared`), owner-only
-   * for a personal one (`isOwner`).
+   * D55/US-60/61/62: `take`/`hide`/`show` act on the whole pile, open to
+   * any player for a SHARED pile (`isShared`), owner-only for a personal
+   * one (`isOwner`).
+   *
+   * *nit (direct user request): the old `'split'` (roughly-in-half,
+   * instant on click) is gone - replaced by an index-driven Split/
+   * Pickup that needs a real picker UI (raise the pile into a fan, hover
+   * to choose the cut point) not yet built. `state.js`'s `SPLIT_PILE`/
+   * `PICKUP_SPLIT` reducer actions are real and tested; this offer list
+   * intentionally does NOT list an id for them yet - a button with
+   * nowhere to send an `index` would be a false affordance (Nielsen #9),
+   * worse than no button at all until that picker exists.
    */
   static pileActions({ isOwner, isShared, cards } = {}) {
     if (!isOwner && !isShared) return [];
@@ -122,7 +130,7 @@ export class Pile {
     // doesn't override this method) unconditionally; the reducer is
     // still the real authorization/empty-only gate (D43's standing
     // discipline - this decides what to OFFER, not what's ALLOWED).
-    return ['split', 'take', 'changePileType', 'remove', ...orientationActions(cards)];
+    return ['take', 'changePileType', 'remove', ...orientationActions(cards)];
   }
 
   /**

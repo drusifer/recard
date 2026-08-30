@@ -801,11 +801,13 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    native drag-and-drop otherwise gives no feedback at all until release.
    UX follow-up (direct user request): "zone is one thing, pile is
    another" - a card is always dropped onto a specific PILE now
-   (`renderPile`, `ui.js`), never generically "the zone", so
-   `.pile-section.zone-drag-over` needs the same feedback `.zone.
-   zone-drag-over` already gives a standalone zone. */
-.zone.zone-drag-over,
-.pile-section.zone-drag-over {
+   (`renderPile`, `ui.js`), never generically "the zone", so a Pile's own
+   drop-over needs the same feedback a Zone's does. D90: one shared,
+   level-neutral class (`.drag-over`) rather than a Pile borrowing a
+   class literally named after the Zone entity - applies identically to
+   `.zone` and `.pile-section`, same visual either way. */
+.zone.drag-over,
+.pile-section.drag-over {
   border-color: var(--accent);
   background: rgba(79, 157, 255, 0.12);
 }
@@ -1519,7 +1521,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    confirmed live, its bounding box was pixel-identical to its lone
    pile's. Sized to one card slot (not a bigger, more visually
    demanding target) - unobtrusive at rest, and the existing
-   `.zone.zone-drag-over` highlight (triggered on the SAME `body`
+   `.zone.drag-over` highlight (triggered on the SAME `body`
    listener this space extends) already gives drag feedback without
    this needing its own. */
 .zone-drop-gutter {
@@ -1537,7 +1539,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    subtler color keeps it visually distinct from the Zone's solid
    `var(--border)` outline) and not un-styled either. Addressable/
    droppable exactly like a Zone is - `pileElement`/`touchTargetAt` key
-   off `.pile-section[data-zone-id]`, and the drag-over highlight below
+   off `.pile-section[data-pile-id]`, and the drag-over highlight below
    applies to `.pile-section` too - but it never draws a SECOND
    zone-shaped box or wires its own move/resize; a Pile always lives
    inside exactly one Zone, which owns both of those once. */
@@ -1774,6 +1776,97 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   border-radius: 0.15rem;
 }
 
+/* *nit (direct user request): "a menu for the change pile action and
+   give me an indication of the currently selected pile type" -
+   `ui.js`'s `buildEnumActionMenu` (an EnumAction, e.g. `changePileType`).
+   `<details>`/`<summary>` gives open/close and click-outside-to-close
+   for free - `position: relative` here is only so `.pile-action-menu`
+   below anchors to THIS control, not the whole `.pile-section`. */
+.pile-action-enum {
+  position: relative;
+  display: inline-flex;
+}
+
+/* The indicator itself: unlike `.pile-action-btn` (icon-only, fixed
+   1.3rem square), this shows the CURRENT choice's own label as text, so
+   it needs to size to that text, not a fixed glyph box - same compact
+   header-row sizing spirit (small font, tight padding), just width-
+   flexible. A `<summary>`, not a `<button>` - browsers already render it
+   focusable/clickable with its own default disclosure marker, which the
+   two rules below replace with nothing (no marker) since the label text
+   already communicates "menu" the same way every other header control
+   here communicates its own affordance (an icon), with no arrow needed
+   to say so twice. Naturally outside `tests/designLint.check.mjs`'s 44px
+   check (its selector only matches `button`) - the same "small habitual
+   header control, not a primary touch target" territory
+   `.pile-action-btn` already occupies, not a new exemption to add. */
+.pile-action-enum-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 1.3rem;
+  padding: 0 0.35rem;
+  font-size: 0.7rem;
+  line-height: 1;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--accent);
+  border-radius: 0.15rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pile-action-enum-btn::marker,
+.pile-action-enum-btn::-webkit-details-marker {
+  display: none;
+  content: '';
+}
+
+/* The open menu - a real touch target per item (unlike the compact
+   toggle above), since these ARE what a viewer taps to commit to a
+   choice, not a habitual small header control. */
+.pile-action-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 10;
+  margin-top: 0.2rem;
+  display: flex;
+  flex-direction: column;
+  min-width: 8rem;
+  background: var(--surface-2);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+.pile-action-menu-item {
+  min-height: 44px;
+  padding: 0 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: left;
+  font-size: 0.8rem;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--text);
+  cursor: pointer;
+}
+.pile-action-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+/* The currently-selected kind, marked inside its own row rather than a
+   separate always-visible label - the toggle button already shows the
+   current value at rest (`.pile-action-enum-btn`'s own text content);
+   this is the "you are here" marker for once the menu is open. */
+.pile-action-menu-item-current {
+  font-weight: 700;
+  color: var(--accent);
+}
+.pile-action-menu-item-current::after {
+  content: ' ✓';
+}
+
 /* *nit (2026-08-26), direct user request ("cards are Movable not
    Actionable"): the card hover-popup (`.card-action-row`, `ui.js`'s
    `attachActionRow`) and its follow-mode label (`.radial-follow-ghost`,
@@ -1896,7 +1989,7 @@ body.panel-drag-active {
    it reads as resizable at rest, before the pointer ever finds the
    small corner grip; `.panel-resize-handle` is that grip. */
 .panel-resizable {
-  /* Deliberately subtler than the accent-colored `.zone-drag-over`
+  /* Deliberately subtler than the accent-colored `.drag-over`
      drop-target highlight (which means something is actively
      happening) - this means "you CAN do something here", a standing
      affordance, not a live state change. */
@@ -2001,6 +2094,24 @@ body.panel-resize-active {
   flex-direction: column;
   background: #201d18;
   border-color: #0d0b09;
+}
+
+/* *nit (real bug, found live): a card back now carries `.card-rtg` too
+   (added for SIZING only - `cardBackElement`, `ui.js`, dispatches
+   through the same `faceFor` a face-up card uses) - but `.card.card-rtg`
+   above sets `background` as a SHORTHAND, which resets `background-image`
+   to `none` when the shorthand doesn't repeat it. Applied to a back, that
+   silently wiped out the branded `.card-back` art, leaving a flat dark
+   rectangle. Three classes (0,3,0) beats `.card.card-rtg`'s two (0,2,0)
+   regardless of source order, so this always wins back the real art. */
+.card.card-back.card-rtg {
+  background-color: #16341f;
+  background-image:
+    image-set(url("assets/brand/card-back.webp") type("image/webp")),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0 2px, transparent 2px 6px);
+  background-size: cover;
+  background-position: center;
+  border-color: #0c1d12;
 }
 
 .rtg-art {

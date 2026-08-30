@@ -17,8 +17,8 @@ import { renderPile } from '../ui.js';
  * pile class's own `component` calls for.
  */
 export class PilePanelElement extends HTMLElement {
-  render(zone, allZones, options) {
-    renderPile(this, zone, allZones, options);
+  render(pile, allPiles, options) {
+    renderPile(this, pile, allPiles, options);
   }
 }
 

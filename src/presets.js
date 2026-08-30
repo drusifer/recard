@@ -87,22 +87,25 @@ const SIMPLE_LAYOUT = {
 
 
 /**
- * The fourteen Recard the Gathering decks that sit on the table
- * alongside the main deck pile (US-83). Derived from the compiled
- * catalog rather than hand-listed, so adding a deck to
- * `content/rtg/decks/` puts it on the table automatically instead of
- * silently going missing.
+ * All fifteen Recard the Gathering decks that sit on the table (US-83).
+ * Derived from the compiled catalog rather than hand-listed, so adding a
+ * deck to `content/rtg/decks/` puts it on the table automatically
+ * instead of silently going missing. `rtg-mono-white` (Dawnbreak Legion)
+ * used to be excluded here and special-cased as the always-present
+ * default Deck pile instead - direct user request removed that default
+ * entirely ("no more unconditional presets, everything must be in the
+ * preset config"), so it's now just the fifteenth peer in this same
+ * list, no different from the other fourteen.
  */
-const RTG_TABLE_DECKS = deckLists()
-  .filter((deck) => deck.id !== 'rtg-mono-white')
-  .map((deck) => ({ kind: 'deck', ownerId: null, count: 1, deckList: deck.id, name: deck.name, id: deck.id }));
+// Direct user request: "all piles must be in a zone, and all zones and
+// piles must have a name" - the fifteen table decks below each declare
+// this same `zoneId` (rather than defaulting to a standalone Zone per
+// deck, one per pile, D55's usual fallback), so they render together as
+// one titled "Decks" Zone instead of fifteen separately-headed ones.
+const RTG_DECKS_ZONE_ID = 'rtg-decks';
 
-// Only the FOURTEEN table-side decks are positioned here. The main deck
-// pile keeps the fixed id `deck` and lives inside the Table Zone
-// (`makeDeckPile` binds it to TABLE_ZONE_ID), so it has no standalone
-// panel of its own to place - including it in this grid just left a gap.
-// Verified by looking at the real rendered table, not assumed.
-const RTG_DECK_IDS = RTG_TABLE_DECKS.map((deck) => deck.id);
+const RTG_TABLE_DECKS = deckLists()
+  .map((deck) => ({ kind: 'deck', ownerId: null, count: 1, deckList: deck.id, name: deck.name, id: deck.id, zoneId: RTG_DECKS_ZONE_ID }));
 
 export const PRESETS = [
   {
@@ -110,6 +113,7 @@ export const PRESETS = [
     numDecks: 1,
     jokers: 0,
     cardsPerPlayer: 26,
+    tableZone: true,
     layout: SIMPLE_LAYOUT,
   },
   {
@@ -117,6 +121,7 @@ export const PRESETS = [
     numDecks: 1,
     jokers: 0,
     cardsPerPlayer: 10,
+    tableZone: true,
     // *nit (direct user request): no discard pile - this game doesn't
     // use one. The generic shared Table zone covers whatever ad hoc
     // table-side play this preset needs, same as War/Hearts below.
@@ -163,6 +168,7 @@ export const PRESETS = [
     numDecks: 1,
     jokers: 0,
     cardsPerPlayer: 13,
+    tableZone: true,
     layout: SIMPLE_LAYOUT,
   },
   {
@@ -170,6 +176,7 @@ export const PRESETS = [
     numDecks: 1,
     jokers: 0,
     cardsPerPlayer: 5,
+    tableZone: true,
     layout: SIMPLE_LAYOUT,
   },
   {
@@ -177,6 +184,7 @@ export const PRESETS = [
     numDecks: 1,
     jokers: 0,
     cardsPerPlayer: 2,
+    tableZone: true,
     layout: SIMPLE_LAYOUT,
   },
   {
@@ -185,6 +193,7 @@ export const PRESETS = [
     numDecks: 1,
     jokers: 0,
     cardsPerPlayer: 12,
+    tableZone: true,
     layout: SIMPLE_LAYOUT,
   },
   {
@@ -192,6 +201,7 @@ export const PRESETS = [
     numDecks: 1,
     jokers: 0,
     cardsPerPlayer: 0,
+    tableZone: true,
     piles: [
       { kind: 'foundation', ownerId: null, count: 4 },
       { kind: 'cascade', ownerId: null, count: 7 },
@@ -215,6 +225,7 @@ export const PRESETS = [
     numDecks: 1,
     jokers: 0,
     cardsPerPlayer: 0,
+    tableZone: true,
     piles: [
       { kind: 'rankAdjacent', ownerId: null, count: 2 },
       { kind: 'cascade', ownerId: 'perPlayer', count: 1 },
@@ -241,21 +252,24 @@ export const PRESETS = [
     // and timing - exactly as the Solitaire preset is "not a full
     // solitaire engine".
     //
-    // `cardsPerPlayer: 7` is a real opening hand. Life totals start at
-    // 20 by convention; the Score panel's own +/-1/+/-10 controls (which
+    // No default Deck/Table pile (`tableZone: false`, direct user
+    // request - "no more unconditional presets, everything must be in
+    // the preset config") and no auto-dealt opening hand
+    // (`cardsPerPlayer: 0`) to go with it: a player picks a deck from
+    // the "Decks" Zone below and draws their own opening hand from it,
+    // same as drawing any other card. Life totals start at 20 by
+    // convention; the Score panel's own +/-1/+/-10 controls (which
     // already exist) are what track them, so no new mechanism is needed.
     name: 'Recard the Gathering',
     type: 'rtg',
-    deckList: 'rtg-mono-white',
     numDecks: 1,
     jokers: 0,
-    cardsPerPlayer: 7,
+    cardsPerPlayer: 0,
+    tableZone: false,
+    zones: [{ id: RTG_DECKS_ZONE_ID, name: 'Decks' }],
     piles: [
-      // The other fourteen decks, pre-stocked and face-down on the
-      // table, so players can pick a deck by drawing from it. The main
-      // `deck` pile is the fifteenth (Dawnbreak Legion, above) - listing
-      // it here as well would put a duplicate sixteenth deck on the
-      // table.
+      // Fifteen decks, pre-stocked and face-down on the table, so
+      // players can pick a deck by drawing from it.
       ...RTG_TABLE_DECKS,
       // The standard MTG zones each player owns. `hand` already exists
       // for every player; library is the shared deck piles above.
@@ -267,21 +281,23 @@ export const PRESETS = [
     ],
     // NOTE (flagged, not solved): fifteen deck piles plus two players'
     // zones is a LOT of panels - Smith raised exactly this as Gate-1
-    // condition C3. The decks are laid out in two tidy rows along the
-    // top here, well clear of the seat ring, but this is the most
-    // crowded table any preset produces and is worth a real UX pass.
-    // 14 decks as a 5-wide grid down the left, the shared panels in a
-    // column on the right. Panel width is 150px because a deck's NAME is
-    // its title ("Thornwild Wardens", "The Tidegrowth") - the first cut
-    // at 96px ran the titles into each other, which only showed up on a
-    // real screenshot.
+    // condition C3. Grouping all fifteen table decks into one "Decks"
+    // Zone (below) collapses that into a single panel; still worth a
+    // real UX pass on the table as a whole.
+    // Direct user request: captured from an actual arranged table
+    // (devtools -> `recard:panel-layout:v1`) rather than calibrated
+    // like the rows above - kept verbatim, same convention as the War
+    // preset's captured layout. `stack` isn't in the captured set, so
+    // it keeps its prior calibrated position. The individual decks used
+    // to be separately-positioned panels here; now that they're one
+    // Zone (`RTG_DECKS_ZONE_ID`, see `zones` above) they get one panel
+    // entry, sized to the bounding box the captured per-deck positions
+    // covered. No `table-zone` entry - `tableZone: false` above means
+    // nothing ever renders there.
     layout: {
-      ...row(RTG_DECK_IDS.slice(0, 5), { x: 30, y: 16, w: 150, h: 120, gap: 8 }),
-      ...row(RTG_DECK_IDS.slice(5, 10), { x: 30, y: 144, w: 150, h: 120, gap: 8 }),
-      ...row(RTG_DECK_IDS.slice(10), { x: 30, y: 272, w: 150, h: 120, gap: 8 }),
-      'table-zone': { x: 850, y: 16, w: 250, h: 160 },
+      score: { x: 590.3828125, y: 230.00390625, w: 250, h: 120 },
+      [RTG_DECKS_ZONE_ID]: { x: 30, y: 16, w: 782, h: 376 },
       stack: { x: 850, y: 186, w: 250, h: 130 },
-      score: { x: 850, y: 326, w: 250, h: 120 },
     },
   },
 ];

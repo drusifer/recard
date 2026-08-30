@@ -1,12 +1,11 @@
 /**
  * MeldPile (D56, new abstract base) - the shared shape every
- * rule-checked, "locked once placed" pile has: no card is ever
- * removable, nothing is offered on a placed card, and inserts are
- * always a plain append (no before/after halo splicing - a meld has
- * exactly one growth point). `FoundationPile` is the first concrete
- * subclass (via `RunPile`); `SetPile` is a documented placeholder for a
- * same-rank meld, not yet built by any sprint - do not implement
- * `canAccept` here speculatively.
+ * rule-checked "locked once placed" pile has: inserts are always a
+ * plain append (no before/after halo splicing - a meld has exactly one
+ * growth point). `FoundationPile` is the first concrete subclass (via
+ * `RunPile`); `SetPile` is a documented placeholder for a same-rank
+ * meld, not yet built by any sprint - do not implement `canAccept`
+ * here speculatively.
  *
  * Not directly instantiable in practice (no `kind` maps to it in
  * `pileTypes.js`) - subclasses must supply their own `canAccept`.
@@ -25,12 +24,19 @@ export class MeldPile extends Pile {
    * - reparenting one between zones was never a meaningful operation. */
   static reparentable = false;
 
-  /** Nothing is ever offered on a card once it's part of a meld -
-   * `canRemoveCard` (inherited) reuses this, so it falls out to always
-   * `false` for free, same pattern as `DiscardPile`. */
-  static cardActions() {
-    return [];
-  }
+  /** *nit (direct user request, reversed): "no card is ever removable"
+   * used to be enforced here (`cardActions` always `[]`) as "the real
+   * Solitaire rule a foundation exists to enforce." Direct, repeated
+   * user correction: this app is a table simulator, not a rules engine
+   * (`docs/ARCHITECTURE.md`'s "Core invariant") - drag-and-drop is
+   * ALWAYS available on ANY card, no pile-type override may remove it.
+   * `cardActions` is no longer overridden here at all - a meld's cards
+   * get the exact same base `Pile` reveal/pickup/move/rotate rule
+   * (privacy-filtered, D7) as any other pile's. `SPLIT_PILE`/
+   * `PICKUP_SPLIT` (`state.js`'s `splitPileAt`) now derive their own
+   * eligibility straight from this - "cardActions are the more general
+   * case" (direct user request) - so a meld is bulk-splittable too, no
+   * separate flag needed any more. */
 
   /**
    * D71 (US-74): `changePileType` is the first pile-level action ever

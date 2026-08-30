@@ -24,11 +24,11 @@ test('a guest gets draw on the deck, but nothing deal-related - dealing stays ho
   assert.deepEqual(actions, ['draw']);
 });
 
-test('hands and zones have no pile-level actions', () => {
+test('hands and plain piles have no pile-level actions', () => {
   // Deliberately narrow: this table exists for dealing, and inventing
-  // pile-level actions for zones "while we are here" would put controls
-  // on screen that no story asked for.
-  for (const kind of ['hand', 'zone', 'nonsense']) {
+  // pile-level actions for plain piles "while we are here" would put
+  // controls on screen that no story asked for.
+  for (const kind of ['hand', 'plain', 'nonsense']) {
     assert.deepEqual(pileLevelActions(kind, { isHost: true }), [], `${kind} must offer nothing`);
   }
 });
@@ -65,8 +65,8 @@ test('reshuffleDeal is marked destructive and deal is not', () => {
 
 // --- Sprint 12 (US-46, D34/D36) ---------------------------------------
 
-test('D34: the hand offers pile-level actions to its own owner - sort only (pass removed, direct user request)', () => {
-  assert.deepEqual(pileLevelActions('hand', { isHost: false, isOwner: true }), ['sortRank', 'sortSuit']);
+test('D34/D87: the hand offers pile-level actions to its own owner - sort + changePileType (pass removed, direct user request)', () => {
+  assert.deepEqual(pileLevelActions('hand', { isHost: false, isOwner: true }), ['sortRank', 'sortSuit', 'changePileType']);
 });
 
 test('D34: a hand pile offers nothing to a viewer who does not own it', () => {
@@ -116,37 +116,37 @@ test('D34: draw is no longer offered as a per-card action from the deck (moved t
   assert.deepEqual(actionsForCard(deck, { id: 'c' }, 'me'), []);
 });
 
-// --- Phase 56 (Sprint 12, T56.1): shuffle/split join the deck's
-// pile-level table, moving off their standalone button row. ---------
+// --- Phase 56 (Sprint 12, T56.1): shuffle joins the deck's pile-level
+// table, moving off its standalone button row. `split` joined it too at
+// the time, but is retired now - see `Pile.pileActions`'s own comment
+// (direct user request: an index-driven Split/Pickup replaces it,
+// awaiting its own picker UI before it gets a header button again). ---
 
-test('Phase 56: the deck offers shuffle/split to the host, alongside deal/reshuffleDeal/draw', () => {
+test('Phase 56: the deck offers shuffle to the host, alongside deal/reshuffleDeal/draw', () => {
   const actions = pileLevelActions('deck', { isHost: true });
-  for (const id of ['draw', 'deal', 'reshuffleDeal', 'shuffle', 'split']) {
+  for (const id of ['draw', 'deal', 'reshuffleDeal', 'shuffle']) {
     assert.ok(actions.includes(id), `expected "${id}" in ${JSON.stringify(actions)}`);
   }
+  assert.ok(!actions.includes('split'), 'split is retired - no header button until its picker UI exists');
 });
 
-test('Phase 56: shuffle/split stay host-only, exactly like deal/reshuffleDeal', () => {
+test('Phase 56: shuffle stays host-only, exactly like deal/reshuffleDeal', () => {
   const actions = pileLevelActions('deck', { isHost: false });
   assert.deepEqual(actions, ['draw']);
-  assert.ok(!actions.includes('shuffle') && !actions.includes('split'));
+  assert.ok(!actions.includes('shuffle'));
 });
 
-test('Phase 56: shuffle and split are declared with a label and hint, and neither is destructive', () => {
-  for (const id of ['shuffle', 'split']) {
-    const spec = ACTION_SPECS[id];
-    assert.ok(spec, `${id} must be declared`);
-    assert.ok(spec.label?.length > 0, `${id} needs a label`);
-    assert.ok(spec.hint?.length > 0, `${id} needs a hint`);
-    assert.equal(spec.destructive, false, `${id} must not be destructive - unlike reshuffleDeal, it never clears a hand`);
-  }
+test('Phase 56: shuffle is declared with a label and hint, and is not destructive', () => {
+  const spec = ACTION_SPECS.shuffle;
+  assert.ok(spec, 'shuffle must be declared');
+  assert.ok(spec.label?.length > 0, 'shuffle needs a label');
+  assert.ok(spec.hint?.length > 0, 'shuffle needs a hint');
+  assert.equal(spec.destructive, false, 'shuffle must not be destructive - unlike reshuffleDeal, it never clears a hand');
 });
 
-test('Phase 56: shuffle/split are never draggable - they act on the deck itself, in place', () => {
-  for (const id of ['shuffle', 'split']) {
-    assert.equal(ACTION_SPECS[id].target, undefined);
-    assert.equal(ACTION_SPECS[id].singleTarget, undefined);
-  }
+test('Phase 56: shuffle is never draggable - it acts on the deck itself, in place', () => {
+  assert.equal(ACTION_SPECS.shuffle.target, undefined);
+  assert.equal(ACTION_SPECS.shuffle.singleTarget, undefined);
 });
 
 // --- Phase 57 (T57.1): confirm, don't reimplement - move/pickup stay
@@ -162,8 +162,8 @@ test('Phase 57: a 2-zone early game gives move exactly ONE legal target - the ex
   // zone can legally receive it, so `targetsForAction` genuinely returns
   // a single-element list here - this is not a contrived edge case.
   const piles = [
-    { id: 'table', kind: 'zone', ownerId: null },
-    { id: 'alice-personal', kind: 'zone', ownerId: 'alice' },
+    { id: 'table', kind: 'plain', ownerId: null },
+    { id: 'alice-personal', kind: 'plain', ownerId: 'alice' },
   ];
   const targets = targetsForAction('move', piles, { viewerId: 'alice', fromPileId: 'table' });
   assert.deepEqual(targets, ['alice-personal'],

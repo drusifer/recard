@@ -1,4 +1,4 @@
-import { renderPileShell, renderZoneCards } from '../ui.js';
+import { renderPileShell, renderPileCards } from '../ui.js';
 
 /**
  * UX follow-up (direct user request): "create WebComponents for the
@@ -18,16 +18,16 @@ import { renderPileShell, renderZoneCards } from '../ui.js';
  * `renderPileShell` (`ui.js`) is what's actually SHARED across all
  * three: the header, the addressability, the drop wiring. This only
  * supplies the one thing unique to a fan - the row's own fanned card
- * layout (`renderZoneCards`'s `opts.fan` branch: each card's `--raise-
+ * layout (`renderPileCards`'s `opts.fan` branch: each card's `--raise-
  * base` rotate/translateY, identical to `renderHand`'s old formula).
  */
 export class FanPileElement extends HTMLElement {
-  render(zone, allZones, options) {
-    renderPileShell(this, zone, allZones, options, (container) => {
+  render(pile, allPiles, options) {
+    renderPileShell(this, pile, allPiles, options, (container) => {
       const row = document.createElement('div');
       row.className = 'card-row fan-row';
       container.append(row);
-      renderZoneCards(row, zone, allZones, { ...options, fan: true });
+      renderPileCards(row, pile, allPiles, { ...options, fan: true });
       return row;
     });
   }
