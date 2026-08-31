@@ -223,18 +223,59 @@ forwards to, before touching anything:
    spots as it's encountered, not a dedicated pass.
 
 User has already overridden my original A.1 recommendation and directed
-E concretely - both now IN PROGRESS with Neo, not awaiting further
-confirmation.
+E concretely.
+
+## Session close-out: what actually shipped vs. this plan (2026-08-31)
+
+**Shipped, committed, pushed (`f9d410b`, both `main`/`dev`), recorded
+as D93/D94 in `docs/ARCHITECTURE.md`:**
+1. Deck pileId-parameterization (A, corrected) - done, then the user
+   pushed FURTHER than this plan anticipated: the entire `Pile`
+   hierarchy is real ES class instances now (constructor, instance
+   methods, `toJSON()`), not plain data through static methods. This
+   plan's own diagnosis (item 2, "hollow shell components... the real
+   polymorphic model exists one layer down") is now moot in its
+   original form - the model isn't one layer down any more, it's the
+   direct call shape (`revivePile(pile).cardActions(...)`) everywhere.
+2. `viewFor`'s own `switch` (flagged in this plan's diagnosis as one of
+   the two concrete monstrosities, alongside `zoneOptions`) - replaced
+   by `Pile.getView()`/`contributeToView()`. Direct user request, not
+   originally item 5 (kind-check migration) but the same category of
+   fix, arrived at directly.
+
+**NOT done - still real, open work, not abandoned:**
+- Shell inlining (E: `<pile-panel>`/`renderPile`,
+  `<zone-panel>`/`renderZonePanel` collapsing into their own
+  `.render()` bodies) - scoped in this plan, never executed. Re-verify
+  the "zero other callers" facts still hold before starting (this
+  session's other changes may have added a caller).
+- Universal-DnD guarantee test (D) - never written. Still a genuinely
+  good, small, isolated addition - `Object.values(PILE_TYPES)` +
+  `.prototype.cardActions` iteration.
+- `zoneOptions` split into 3 layer-scoped objects (B) - the original
+  "kitchen sink" complaint's most direct fix, never started. `main.js`
+  is bigger now (D93's class-conversion touched it), worth re-measuring
+  before assuming the same 3-way split is still the right shape.
+
+**The original complaint's root causes ARE substantially addressed**,
+even though the specific sequencing in this plan wasn't followed
+literally - "hollow shell components over a real model underneath" is
+now "real polymorphic dispatch, directly" (piles are instances, not
+just a class registry nobody calls into). The remaining open items
+(shell inlining, DnD test, options split) are smaller, more mechanical
+follow-ups on a now-solid foundation, not blocked on anything.
 
 ## Next Steps
 
-1. Handed to Neo for steps 1-2 (deck pileId-parameterization, shell
-   inlining) - in progress. Do NOT let Neo batch ahead into (B)/(C)
-   before 1-3 ship and are Trin-verified; each step in the sequencing
-   list is independently shippable on purpose.
-2. Post each step's completion as its own decision broadcast (D92+) in
-   `docs/ARCHITECTURE.md` when it actually ships - this state.md entry
-   is the PLAN, not yet a recorded decision.
-3. Review Neo's work on all 5 steps for architecture correctness once
-   Trin gates each - this is Morpheus's own review obligation, don't
-   skip it just because the plan originated here.
+1. **Not currently assigned to anyone.** If resuming cold with no new
+   user direction, do NOT assume the three open items above are next -
+   ask, or wait. This session ended on an unrelated feature (D95, count
+   badges), not mid-plan.
+2. If asked to continue this plan: start with the DnD guarantee test
+   (D) - smallest, most isolated, zero risk of touching working
+   rendering code. Shell inlining (E) next, re-verifying caller counts
+   first. `zoneOptions` split (B) last - re-measure `main.js`'s current
+   shape before assuming the original 3-object design still fits.
+3. Post each step's completion as its own decision broadcast in
+   `docs/ARCHITECTURE.md` when it actually ships, same discipline as
+   D93/D94 above.

@@ -348,4 +348,10 @@ sequenceDiagram
     Note right of Neo: "Correction/generalizatio<br/>n: count badge should be<br/>a universal pile feature<br/>(every kind, upper-left<br/>corner), not hand-only<br/>inline-in-header.…"
     Neo->>Trin: "swe fix"
     Note right of Neo: "Count badge generalized<br/>to ALL piles, not hand-<br/>only. Removed the<br/>showsCountBadge per-kind<br/>flag entirely (pointless<br/>once universal) -<br/>render…"
+    Neo->>User: "swe handoff"
+    Note right of Neo: "Session's work committed<br/>and pushed to main:<br/>f9d410b (35 files,<br/>D91-D95). Card-back<br/>polymorphism, split<br/>picker, no-canonical-<br/>piles reducer…"
+    Neo->>User: "handoff"
+    Note right of Neo: "Session close-out:<br/>state.md rewritten fresh<br/>- D91-D95 summary, open<br/>items (shell inlining,<br/>DnD guarantee test,<br/>zoneOptions split not<br/>yet do…"
+    Morpheus->>User: "handoff"
+    Note right of Morpheus: "Close-out: refactor plan<br/>reconciled with what<br/>shipped - deck pileId-<br/>fix + viewFor switch<br/>both landed as D93/D94,<br/>went further than<br/>original…"
 ```

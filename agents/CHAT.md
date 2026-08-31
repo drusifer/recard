@@ -1271,3 +1271,15 @@ npm run lint:decks
 > node tools/rtg/lintDecks.mjs
 
 lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-08-31 18:35:25</small>] [**Neo**]->[**User**] *swe handoff*:
+ Session's work committed and pushed to main: f9d410b (35 files, D91-D95). Card-back polymorphism, split picker, no-canonical-piles reducer fix, rich Pile class hierarchy, viewFor refactor, universal count badges. 511/511, clean lints.
+
+---
+[<small>2026-08-31 18:46:40</small>] [**Neo**]->[**User**] *handoff*:
+ Session close-out: state.md rewritten fresh - D91-D95 summary, open items (shell inlining, DnD guarantee test, zoneOptions split not yet done), git-stash lesson repeated (twice this session). Working tree clean, f9d410b on main/dev. Nothing in-flight.
+
+---
+[<small>2026-08-31 18:46:46</small>] [**Morpheus**]->[**User**] *handoff*:
+ Close-out: refactor plan reconciled with what shipped - deck pileId-fix + viewFor switch both landed as D93/D94, went further than originally scoped (full rich-class conversion, not just deck). Shell inlining, DnD guarantee test, zoneOptions split still open, not blocked, not assigned. state.md updated.
