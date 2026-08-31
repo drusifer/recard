@@ -2,12 +2,10 @@
  * MeldPile (D56, new abstract base) - the shared shape every
  * rule-checked "locked once placed" pile has: inserts are always a
  * plain append (no before/after halo splicing - a meld has exactly one
- * growth point). `FoundationPile` is the first concrete subclass (via
- * `RunPile`); `SetPile` is a documented placeholder for a same-rank
- * meld, not yet built by any sprint - do not implement `canAccept`
- * here speculatively.
+ * growth point). `FoundationPile` (via `RunPile`) and `SetPile` (D91)
+ * are its two concrete, registered subclasses.
  *
- * Not directly instantiable in practice (no `kind` maps to it in
+ * Not directly instantiable itself (no `kind` maps to `MeldPile` in
  * `pileTypes.js`) - subclasses must supply their own `canAccept`.
  */
 import { Pile } from './Pile.js';
@@ -46,21 +44,28 @@ export class MeldPile extends Pile {
    * gate `Pile.pileActions()` uses, for consistency - a meld is
    * normally ownerless/shared (Solitaire's foundations), same as any
    * other shared pile.
+   *
+   * D91: `split` joins it, per this class's own comment above ("a meld
+   * is bulk-splittable too, no separate flag needed any more") -
+   * `disabledActions` is inherited unchanged from `Pile` (below 2
+   * cards), same minimum `splitPileAt` enforces. (`pickupSplit` briefly
+   * joined it too and was a direct user correction - "there is not
+   * supposed to be a pickupSplit" - removed.)
    */
-  static pileActions({ isOwner, isShared } = {}) {
+  pileActions({ isOwner, isShared } = {}) {
     if (!isOwner && !isShared) return [];
-    return ['changePileType'];
+    return ['split', 'changePileType'];
   }
 
   /** No before/after halo - a meld has exactly one landing spot
    * (`canAccept` decides whether a card may land there at all). */
-  static resolveDropTarget() {
+  resolveDropTarget() {
     return {};
   }
 
   /** Append-only, same "top of the pile is the end of the array"
    * convention the base `Pile` open-ended case uses. */
-  static insertCard(pile, card) {
-    return { ...pile, cards: [...pile.cards, card] };
+  insertCard(card) {
+    return { ...this.toJSON(), cards: [...this.cards, card] };
   }
 }

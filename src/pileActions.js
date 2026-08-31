@@ -1,4 +1,4 @@
-import { PILE_TYPES } from './piles/pileTypes.js';
+import { PILE_TYPES, revivePile, pileForKind } from './piles/pileTypes.js';
 
 /**
  * What a card in a given Pile can *do*, and where it can go (D23/D25).
@@ -119,12 +119,30 @@ export const ACTION_SPECS = {
   // were never part of before (US-35/36 shipped as a standalone button
   // row, not through `pileLevelActions` at all).
   shuffle: { label: 'Shuffle', destructive: false, hint: 'Shuffle the deck stock in place.', icon: '⇌' },
-  // *nit (direct user request): the old `'split'` (roughly-in-half,
-  // deck-only or zone/discard-only, instant on click) is retired - see
-  // `Pile.pileActions`'s own comment. `state.js`'s `SPLIT_PILE`/
-  // `PICKUP_SPLIT` are real, tested, index-driven reducer actions now;
-  // their own header-menu entries land with the picker UI that supplies
-  // the index (a follow-up phase), not here yet.
+  // D91/D92 (direct user request: "we're missing... split pile", then
+  // "split should always fan the pile to allow the guided picker" -
+  // deck included, no exceptions): the old `'split'` (roughly-in-half,
+  // instant on click) was retired long ago in favor of a real, tested,
+  // index-driven `SPLIT_PILE` reducer action - this is that picker
+  // (`ui.js`'s `renderSplitPicker`, raise-and-choose-a-gap), the SAME
+  // one for every pile kind including `deck` (`DeckPile.showsFace`
+  // always `false` is what keeps a deck's own fan showing backs, not
+  // real faces - `pile.cards` is the deck's real, full contents in the
+  // view, D84). No pile-kind branch anywhere any more - `main.js`'s
+  // `handlePileAction` just toggles the picker, full stop. Not
+  // `destructive` (no confirm dialog) - opening the picker commits
+  // nothing by itself.
+  //
+  // D91 follow-up, direct user correction: a separate `pickupSplit`
+  // action briefly existed here (instant, roughly-half into the
+  // player's own hand) and was WRONG - "there is not supposed to be a
+  // pickupSplit, just pickup (put all the cards from this pile in my
+  // hand) and separately Split." "Pickup" is `take` (below) - it
+  // already does exactly that. Removed entirely; the `PICKUP_SPLIT`
+  // reducer action itself (predates this whole thread, real and
+  // tested) is untouched, simply has no UI trigger, same as `split`
+  // did before its own picker existed.
+  split: { label: 'Split', destructive: false, hint: 'Split this pile in two.', icon: '✂' },
   // Sprint 23 (US-61): pile-level, no `target` - a button, not a drag
   // gesture, same shape as `deal`/`shuffle` above. `destructive:
   // true` unconditionally, no size-based exception (Smith's Gate 1
@@ -198,7 +216,15 @@ export const ACTION_SPECS = {
  * @returns {string[]} action ids, in the order they should be offered.
  */
 export function actionsForCard(pile, card, viewerId) {
-  return PILE_TYPES[pile.kind]?.cardActions(pile, card, viewerId) ?? [];
+  // An unrecognized `kind` offers nothing rather than silently falling
+  // back to the base Pile's real actions (`revivePile`'s own fallback
+  // is for reviving a KNOWN-valid state record, not for tolerating a
+  // corrupt/unknown one here) - a real, deliberate distinction, not a
+  // missed guard: this is presentation-layer input that must degrade
+  // safely, never grant real drag-and-drop to something the registry
+  // doesn't recognize.
+  if (!Object.hasOwn(PILE_TYPES, pile.kind)) return [];
+  return revivePile(pile).cardActions(card, viewerId);
 }
 
 /**
@@ -265,7 +291,7 @@ export function targetsForAction(action, piles, { viewerId, fromPileId } = {}) {
  * @returns {string[]} action ids
  */
 export function pileLevelActions(kind, context = {}) {
-  return PILE_TYPES[kind]?.pileActions(context) ?? [];
+  return pileForKind(kind)?.pileActions(context) ?? [];
 }
 
 /**
@@ -281,7 +307,7 @@ export function pileLevelActions(kind, context = {}) {
  * @returns {string[]} action ids currently disabled
  */
 export function disabledPileActionsFor(kind, count) {
-  return PILE_TYPES[kind]?.disabledActions?.(count) ?? [];
+  return pileForKind(kind)?.disabledActions(count) ?? [];
 }
 
 /**
@@ -298,6 +324,7 @@ export function componentFor(kind) {
   return PILE_TYPES[kind]?.component ?? 'pile-panel';
 }
 
+
 /**
  * D53 (Sprint 22, replaces D45's `dropRuleFor`/`dropRule` enum): the
  * drop-target geometry for a pile of this kind, computed by the pile
@@ -312,6 +339,6 @@ export function componentFor(kind) {
  * @returns {{targetCardId?: string, side?: 'before'|'after', layout?: string}}
  */
 export function resolveDropTargetFor(kind, cardBoxes, point) {
-  return PILE_TYPES[kind]?.resolveDropTarget(cardBoxes, point) ?? {};
+  return pileForKind(kind)?.resolveDropTarget(cardBoxes, point) ?? {};
 }
 

@@ -1,8 +1,14 @@
-import { buildDeck, shuffle } from './deck.js';
-import { PILE_TYPES } from './piles/pileTypes.js';
+import { buildDeck, shuffle, RANKS, SUITS } from './deck.js';
+import { PILE_TYPES, revivePile } from './piles/pileTypes.js';
 
 const DEFAULT_PILE_ID = 'table';
-const DECK_PILE_ID = 'deck';
+// Exported (only this one, of the three) - `main.js`'s `dealFromDeck`
+// needs it for `reshuffleDeal`: `RESET` always rebuilds the preset's
+// own starting deck at this well-known id (RESET's own contract, not a
+// runtime lookup assumption - see its own comment), so the `DEAL` that
+// follows a reshuffle targets this id specifically, not whichever pile
+// was originally clicked (`RESET` may have just wiped or replaced it).
+export const DECK_PILE_ID = 'deck';
 const TABLE_ZONE_ID = 'table-zone';
 
 /** A player's Zone id - shared by their hand pile and any personal
@@ -336,21 +342,21 @@ export function createInitialState(deckConfig = {}, rng = Math.random, gameConfi
 // indexing `state.piles` by hand, so "which pile kind am I looking at"
 // is stated once here instead of re-derived at every call site.
 
-/** The draw stock's cards. UX follow-up: matched by `id`, not `kind`,
- * now that a deck-kind pile is no longer necessarily THE deck - decks
- * can be created/moved into zones like any other table-side pile
- * (`deckPile.tableSide`), so more than one may exist. `DECK_PILE_ID` is
- * still the one and only pile DRAW/DEAL/SHUFFLE_DECK act on - the D24
- * invariant ("exactly one deck pile always exists") now reads as
- * "exactly one pile with this SPECIFIC id", not "exactly one pile of
- * this kind". */
+/**
+ * The cards of the pile every preset that uses one creates at the
+ * well-known starting id `DECK_PILE_ID` - a convenience reader for
+ * that ONE common case (tests, the pre-deal roster preview's own card
+ * count), never a claim that this is "the" deck the reducer treats
+ * specially. D92 (direct user request, "THERE SHOULD BE NO CANONICAL
+ * PILES"): `DRAW`/`DEAL`/`SHUFFLE_DECK` no longer call this - each
+ * acts on whatever pile `action.pileId` names, same as every other
+ * pile-targeted action. A deck is just a pile of cards; this id is a
+ * preset's own starting layout choice, not a runtime assumption.
+ */
 export function deckOf(state) {
-  // `?? []`: a preset that opts out of the default Deck pile (D24
-  // follow-up, RTG's own `zones`-only "Decks" - `gameConfig.tableZone:
-  // false`) has no DECK_PILE_ID at all. Only `DEAL` reaches this with
-  // no such pile present (cardsPerPlayer 0, no deck to click to reach
-  // DRAW/SHUFFLE_DECK in the first place), so an empty deck is the
-  // correct read, not a defensive guess.
+  // `?? []`: a preset that opts out of the default Deck pile (RTG's
+  // own `zones`-only "Decks", `gameConfig.tableZone: false`) has no
+  // pile at this id at all - an empty read, not a defensive guess.
   return state.piles.find((p) => p.id === DECK_PILE_ID)?.cards ?? [];
 }
 
@@ -536,9 +542,9 @@ function splitPileAt(pile, index, playerId) {
     throw new Error(`Cannot split pile ${pile.id} at index ${index}: must be between 1 and ${pile.cards.length - 1}`);
   }
   if (pile.kind !== 'deck') {
-    const type = PILE_TYPES[pile.kind];
+    const instance = revivePile(pile);
     const moved = pile.cards.slice(index);
-    if (moved.some((card) => !type.canRemoveCard(pile, card, playerId, 'move'))) {
+    if (moved.some((card) => !instance.canRemoveCard(card, playerId, 'move'))) {
       throw new Error(`Player ${playerId} is not authorized to split pile ${pile.id}`);
     }
   }
@@ -617,14 +623,12 @@ function transferCard(state, { fromPileId, toPileId, cardId, viewerId, action, p
   const card = fromPile.cards.find((c) => c.id === cardId);
   if (!card) throw new Error(`Card ${cardId} is not in pile ${fromPileId}`);
 
-  const fromType = PILE_TYPES[fromPile.kind];
-  if (!fromType.canRemoveCard(fromPile, card, viewerId, action)) {
+  if (!revivePile(fromPile).canRemoveCard(card, viewerId, action)) {
     throw new Error(`Player ${viewerId} is not authorized to ${action} ${cardId}`);
   }
 
   const toPile = state.piles.find((p) => p.id === toPileId);
   if (!toPile) throw new Error(`Pile ${toPileId} does not exist`);
-  const toType = PILE_TYPES[toPile.kind];
   let movedCard = transform ? transform(card) : card;
   // *nit (real bug, found live): D83's "fully permissive drag and drop"
   // means a plain MOVE_CARD/CREATE_PILE can now target ANY hand as a
@@ -646,7 +650,7 @@ function transferCard(state, { fromPileId, toPileId, cardId, viewerId, action, p
   // card, not just whether it exists. Every pre-Sprint-22 kind accepts
   // unconditionally (zero behavior change) - `foundation`/`cascade`/
   // `rankAdjacent` are the first real callers.
-  if (!toType.canAccept(toPile, movedCard)) {
+  if (!revivePile(toPile).canAccept(movedCard)) {
     throw new Error(`Pile ${toPileId} cannot accept card ${cardId}`);
   }
 
@@ -655,8 +659,8 @@ function transferCard(state, { fromPileId, toPileId, cardId, viewerId, action, p
   // same-zone reorder) work correctly without a special case - the
   // second pass inserts into the pile the first pass already removed
   // the card from.
-  const withoutCard = state.piles.map((p) => (p.id === fromPileId ? fromType.removeCard(p, cardId) : p));
-  const piles = withoutCard.map((p) => (p.id === toPileId ? toType.insertCard(p, movedCard, placement) : p));
+  const withoutCard = state.piles.map((p) => (p.id === fromPileId ? revivePile(p).removeCard(cardId) : p));
+  const piles = withoutCard.map((p) => (p.id === toPileId ? revivePile(p).insertCard(movedCard, placement) : p));
   return { ...state, piles };
 }
 
@@ -748,14 +752,33 @@ const ACTIONS = {
   // has its cards reclaimed via `toDeckCard` and folded into the SAME
   // pool `dealRoundRobin` deals from, before the split - a re-deal
   // redistributes the whole game's cards, it never destroys any.
+  /**
+   * D92 (direct user request, "THERE SHOULD BE NO CANONICAL PILES"):
+   * deals from whichever pile `action.pileId` names - no more
+   * hardcoded `DECK_PILE_ID`. A deck is just a pile of cards; Deal is a
+   * convenience shortcut for "distribute this pile's cards round-robin
+   * to every player," not a mechanic bound to one blessed pile.
+   *
+   * Deliberately does NOT throw when no pile matches `action.pileId` -
+   * `main.js`'s `startGame()` dispatches `DEAL` unconditionally on
+   * every game start regardless of preset, and a preset that opts out
+   * of the default Deck pile entirely (RTG, `gameConfig.tableZone:
+   * false`, `cardsPerPlayer: 0`) genuinely has no pile to name - an
+   * empty pool is the correct read there, not an error (same reasoning
+   * `deckOf`'s own comment already gave this exact case). `DRAW`/
+   * `SHUFFLE_DECK` above DO throw - those are only ever reachable by
+   * clicking an actual existing pile's own button, so a missing pile
+   * there is a real bug, not an expected preset shape.
+   */
   DEAL(state, action) {
     const isFresh = action.type === 'DEAL';
     const players = state.players;
+    const pile = state.piles.find((p) => p.id === action.pileId);
     const reclaimed = isFresh
       ? state.piles.filter((p) => p.kind === 'hand').flatMap((p) => p.cards.map((card) => toDeckCard(card)))
       : [];
     const { remaining, dealt } = dealRoundRobin(
-      [...deckOf(state), ...reclaimed],
+      [...(pile?.cards ?? []), ...reclaimed],
       players.length,
       action.cardsPerPlayer,
       (left) =>
@@ -765,8 +788,7 @@ const ACTIONS = {
     let piles = state.piles;
     for (const player of players) piles = ensureHandPile(piles, player.id);
     piles = piles.map((p) => {
-      // UX follow-up: `id`, not `kind` - see `deckOf`'s own comment.
-      if (p.id === DECK_PILE_ID) return withCards(p, remaining);
+      if (p.id === action.pileId) return withCards(p, remaining);
       if (p.kind !== 'hand') return p;
       const index = players.findIndex((pl) => pl.id === p.ownerId);
       if (index === -1) return isFresh ? withCards(p, []) : p;
@@ -1102,13 +1124,20 @@ const ACTIONS = {
     };
   },
 
+  /**
+   * D92 (direct user request, "THERE SHOULD BE NO CANONICAL PILES"):
+   * shuffles whichever pile `action.pileId` names - no more hardcoded
+   * `DECK_PILE_ID`. Reorders the pile and nothing else - the one thing
+   * `RESET` can't do, since it also rebuilds the deck and wipes
+   * hands/zones/pass markers. Everything else flows through untouched
+   * via the spread, so there's no field to forget.
+   */
   SHUFFLE_DECK(state, action) {
-    // D22/US-35: reorders the stock and nothing else - the one thing
-    // `RESET` can't do, since it also rebuilds the deck and wipes
-    // hands/zones/pass markers. Everything else flows through
-    // untouched via the spread, so there's no field to forget.
+    if (state.piles.every((p) => p.id !== action.pileId)) {
+      throw new Error(`Pile ${action.pileId} does not exist`);
+    }
     const rng = action.rng ?? Math.random;
-    return replacePile(state, DECK_PILE_ID, (deck) => withCards(deck, shuffle(deck.cards, rng)));
+    return replacePile(state, action.pileId, (deck) => withCards(deck, shuffle(deck.cards, rng)));
   },
 
   PLAY(state, action) {
@@ -1153,7 +1182,7 @@ const ACTIONS = {
     const { pileId, card } = found;
     if (card.faceUp) return state;
     const pile = state.piles.find((p) => p.id === pileId);
-    if (!PILE_TYPES[pile.kind].canRemoveCard(pile, card, action.playerId, 'reveal')) {
+    if (!revivePile(pile).canRemoveCard(card, action.playerId, 'reveal')) {
       throw new Error(`Player ${action.playerId} is not authorized to reveal ${action.cardId}`);
     }
     return replacePile(state, pileId, (p) =>
@@ -1177,7 +1206,7 @@ const ACTIONS = {
     }
     const { pileId, card } = found;
     const pile = state.piles.find((p) => p.id === pileId);
-    if (!PILE_TYPES[pile.kind].canRemoveCard(pile, card, action.playerId, 'rotate')) {
+    if (!revivePile(pile).canRemoveCard(card, action.playerId, 'rotate')) {
       throw new Error(`Player ${action.playerId} is not authorized to rotate ${action.cardId}`);
     }
     const orientation = card.orientation === 'landscape' ? 'portrait' : 'landscape';
@@ -1212,6 +1241,45 @@ const ACTIONS = {
     return replacePile(state, action.pileId, (p) =>
       withCards(p, p.cards.map((card) => ({ ...card, orientation: 'portrait' }))),
     );
+  },
+
+  /**
+   * SORT_PILE (D91, direct user request: "we're missing a bunch of pile
+   * actions, like sort by rank, sort by suit"). `HandPile.pileActions`
+   * has offered `sortRank`/`sortSuit` since D14's hand redesign, but
+   * they never dispatched anywhere - D14's own `handOrder.js` was a
+   * CLIENT-ONLY overlay on top of a fixed hand array, retired once a
+   * hand became a real state-level pile with nothing built to replace
+   * it (`ui.js` filtered the buttons out rather than ship a false
+   * affordance - see `renderPileShell`'s own note). This is that
+   * reducer action, finally.
+   *
+   * `action.by` picks the primary key (`'rank'` or `'suit'`); the OTHER
+   * key breaks ties, so same-rank cards under a rank sort still land in
+   * a fixed suit order instead of "whatever order they arrived in" -
+   * fully deterministic either way. A card without a real `rank`/`suit`
+   * (a non-standard deck type) sorts as index `-1` for that key -
+   * `Array.prototype.sort` is stable, so it simply keeps its relative
+   * position rather than throwing or scattering.
+   *
+   * Owner-only, not owner-or-shared (unlike `UNTAP_ALL` above): the one
+   * pile kind that currently offers this is a hand, which is always
+   * owned, never shared - narrower on purpose to match what's actually
+   * offered today, not a general "any pile" feature nothing asked for.
+   */
+  SORT_PILE(state, action) {
+    const pile = state.piles.find((p) => p.id === action.pileId);
+    if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
+    if (pile.ownerId !== action.playerId) {
+      throw new Error(`Player ${action.playerId} is not authorized to sort pile ${action.pileId}`);
+    }
+    const [primaryKey, secondaryKey] = action.by === 'suit' ? ['suit', 'rank'] : ['rank', 'suit'];
+    const primaryOrder = primaryKey === 'suit' ? SUITS : RANKS;
+    const secondaryOrder = secondaryKey === 'suit' ? SUITS : RANKS;
+    const sorted = pile.cards.toSorted((a, b) =>
+      (primaryOrder.indexOf(a[primaryKey]) - primaryOrder.indexOf(b[primaryKey]))
+      || (secondaryOrder.indexOf(a[secondaryKey]) - secondaryOrder.indexOf(b[secondaryKey])));
+    return replacePile(state, action.pileId, (p) => withCards(p, sorted));
   },
 
   PICKUP(state, action) {
@@ -1257,17 +1325,28 @@ const ACTIONS = {
     });
   },
 
+  /**
+   * D92 (direct user request, "THERE SHOULD BE NO CANONICAL PILES"): a
+   * deck is just a pile of cards - `DRAW` targets whichever pile
+   * `action.pileId` names, same as every other pile-targeted action
+   * (`MOVE_CARD`/`SPLIT_PILE`/etc). No more hardcoded `DECK_PILE_ID`,
+   * no `kind === 'deck'` gate either - fully permissive, matching the
+   * Core invariant; which pile kinds actually OFFER a Draw button in
+   * the UI is `DeckPile.pileActions()`'s call, a presentation choice,
+   * not a reducer restriction.
+   */
   DRAW(state, action) {
-    const deck = deckOf(state);
-    if (deck.length === 0) {
-      throw new Error('Cannot draw: deck is empty');
+    const pile = state.piles.find((p) => p.id === action.pileId);
+    if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
+    if (pile.cards.length === 0) {
+      throw new Error(`Cannot draw: pile ${action.pileId} is empty`);
     }
     const handPiles = ensureHandPile(state.piles, action.playerId);
     const withHand = { ...state, piles: handPiles };
     return transferCard(withHand, {
-      fromPileId: DECK_PILE_ID,
+      fromPileId: action.pileId,
       toPileId: resolveHandPileId(handPiles, action.playerId),
-      cardId: deck[0].id,
+      cardId: pile.cards[0].id,
       viewerId: action.playerId,
       action: 'draw',
       // No `transform` needed - `transferCard` applies `toHandCard`
@@ -1574,97 +1653,21 @@ export function reduce(state, action) {
  * @param {ReturnType<typeof createInitialState>} state
  * @param {string} playerId
  */
+/**
+ * D94 (direct user request: "state.js viewFor is a monstrosity...
+ * just do pile.getView()... every case statement should be a derived
+ * method call"). The old `switch (pileVisibility(pile))` had three
+ * branches that, post-D84 ("TOTAL PERMISSIVE" - full cards always,
+ * no redaction), were nearly byte-identical - the only real
+ * differences were `DeckPile` adding a `count` field and `HandPile`
+ * also feeding `myHand`/`otherHandCounts`, and BOTH of those are now
+ * real polymorphic overrides (`getView`/`contributeToView`) on the
+ * `Pile` hierarchy instead of inline branches here. This loop is the
+ * entire replacement.
+ */
 export function viewFor(state, playerId) {
-  const otherHandCounts = {};
-  let myHand = [];
-  const pileViews = [];
-  let deckCount = 0;
-
-  for (const pile of state.piles) {
-    switch (pileVisibility(pile)) {
-      // 'hidden'/'in-hand' piles never send contents to a non-viewer -
-      // only a count, so a hand's *size* stays public (needed for the
-      // roster's card counts) while its cards never leave the host.
-      case 'hidden': {
-        // UX follow-up (real bug, found live): more than one deck-kind
-        // (hidden-visibility) pile can exist now (`deckPile.tableSide`)
-        // - this used to blindly overwrite `deckCount` with whichever
-        // hidden pile it saw LAST, silently showing the wrong count the
-        // instant a second one existed. `DECK_PILE_ID` names the ONE
-        // pile that IS "the deck" for that badge - `deckCount` is kept
-        // for the pre-game preview screen (`#host-deck-area`), which has
-        // no `piles` concept at all.
-        //
-        // UX follow-up (direct user request): "a Deck is a specific
-        // kind of Pile... it is not a Zone at all" - the SAME dual-
-        // routing `myHand`/`otherHandCounts` already do for the hand
-        // pile (below): the main deck ALSO joins `piles` now (`cards:
-        // []`, `count` carries its size - `ui.js`'s `renderPile` reads
-        // `count` before falling back to `cards.length`), so it flows
-        // through the exact same generic Pile pipeline every other pile
-        // does, instead of being a special top-level `deckCount` field
-        // with its own bespoke render path in `main.js`.
-        if (pile.id === DECK_PILE_ID) deckCount = pile.cards.length;
-        // *nit (direct user request, D84: "remove card redaction
-        // entirely... TOTAL PERMISSIVE"): the deck's FULL contents go
-        // out to every viewer now, not just the top card - `count` is
-        // still carried too (equal to `cards.length`, kept for every
-        // existing consumer that reads it instead of the array length).
-        pileViews.push({ id: pile.id, name: pile.name, ownerId: pile.ownerId ?? null, kind: pile.kind, zoneId: pile.zoneId, cards: pile.cards, count: pile.cards.length });
-        break;
-      }
-      case 'in-hand': {
-        if (pile.ownerId === playerId) myHand = pile.cards;
-        else otherHandCounts[pile.ownerId] = pile.cards.length;
-        // UX follow-up (direct user request): the D17 personal seat zone
-        // is retired - a hand pile is now ALSO a real seat-zone entry
-        // (`ui.js` renders every entry here as a `<zone-panel>`), so it
-        // needs an ownerId'd `piles` entry too, same as the `myHand`/
-        // `otherHandCounts` fields above still carry for every other
-        // consumer.
-        //
-        // *nit (direct user request, D84: "remove card redaction
-        // entirely... there are lots of games (including RTG) where a
-        // player must take a card from another player - TOTAL
-        // PERMISSIVE"): every hand's FULL, real cards go out to every
-        // viewer now - `otherHandCounts` above stays as a convenience
-        // tally for existing consumers, not a privacy limit.
-        pileViews.push({
-          id: pile.id,
-          name: pile.name,
-          ownerId: pile.ownerId ?? null,
-          kind: pile.kind,
-          zoneId: pile.zoneId,
-          cards: pile.cards,
-        });
-        break;
-      }
-      case 'mixed': {
-        pileViews.push({
-          id: pile.id,
-          name: pile.name,
-          ownerId: pile.ownerId ?? null,
-          // D45: the view carries `kind` now - D42 deliberately left it
-          // out because nothing needed it with only one 'mixed' type in
-          // existence; `discardPile` (also 'mixed') is the second, and
-          // `ui.js` needs it to pick FAN vs. STACK drop behavior
-          // (dropRuleFor(kind)) instead of assuming every pile is a fan.
-          kind: pile.kind,
-          zoneId: pile.zoneId,
-          // *nit (direct user request, D84): was `.map((card) =>
-          // PILE_TYPES[pile.kind].redactCard(card, playerId))` -
-          // `redactCard` is gone entirely now (every Pile subclass
-          // that ever overrode it is deleted; the base method too),
-          // there is nothing left to call. Full cards, always.
-          cards: pile.cards,
-        });
-        break;
-      }
-    }
-  }
-
-  return {
-    myHand, otherHandCounts, piles: pileViews, deckCount, players: state.players, scores: state.scores,
+  const view = {
+    myHand: [], otherHandCounts: {}, piles: [], players: state.players, scores: state.scores,
     // D55/D90: the real Zone registry (`{id, name, ownerId}`). Used to be
     // named `zoneRecords` specifically to avoid colliding with a `zones`
     // field that was actually an array of PILE views (the exact
@@ -1680,4 +1683,6 @@ export function viewFor(state, playerId) {
     // at all, and must default to "allowed" the same way here as there).
     gameConfig: { allowsPlayerZones: state.gameConfig?.allowsPlayerZones ?? true },
   };
+  for (const pile of state.piles) revivePile(pile).contributeToView(view, playerId);
+  return view;
 }

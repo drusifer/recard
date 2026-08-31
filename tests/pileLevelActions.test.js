@@ -118,16 +118,17 @@ test('D34: draw is no longer offered as a per-card action from the deck (moved t
 
 // --- Phase 56 (Sprint 12, T56.1): shuffle joins the deck's pile-level
 // table, moving off its standalone button row. `split` joined it too at
-// the time, but is retired now - see `Pile.pileActions`'s own comment
-// (direct user request: an index-driven Split/Pickup replaces it,
-// awaiting its own picker UI before it gets a header button again). ---
+// the time, was retired pending a real picker UI, and rejoined again at
+// D91 (direct user request, "add the split pile action to the Deck
+// Pile type") - instant/always-half for a deck specifically (`main.js`'s
+// `handlePileAction`), never the interactive picker a pile with real
+// visible cards gets. ---
 
-test('Phase 56: the deck offers shuffle to the host, alongside deal/reshuffleDeal/draw', () => {
+test('Phase 56/D91: the deck offers shuffle and split to the host, alongside deal/reshuffleDeal/draw', () => {
   const actions = pileLevelActions('deck', { isHost: true });
-  for (const id of ['draw', 'deal', 'reshuffleDeal', 'shuffle']) {
+  for (const id of ['draw', 'deal', 'reshuffleDeal', 'shuffle', 'split']) {
     assert.ok(actions.includes(id), `expected "${id}" in ${JSON.stringify(actions)}`);
   }
-  assert.ok(!actions.includes('split'), 'split is retired - no header button until its picker UI exists');
 });
 
 test('Phase 56: shuffle stays host-only, exactly like deal/reshuffleDeal', () => {

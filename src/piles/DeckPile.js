@@ -26,49 +26,74 @@ export class DeckPile extends Pile {
 
   /** No halo geometry is reachable for the deck (D29's own strip
    * renders it, never `dropTarget.js`). */
-  static resolveDropTarget() {
+  resolveDropTarget() {
     return {};
   }
 
   /** Dealing from an empty deck has never made sense - its button is
-   * disabled (not hidden - a host should still see it exists) at 0. */
-  static disabledActions(count) {
-    return count <= 0 ? ['deal'] : [];
+   * disabled (not hidden - a host should still see it exists) at 0.
+   * D91: `split` disabled below 2 cards, same minimum `splitPileAt`
+   * (state.js) enforces for every kind. */
+  disabledActions(count) {
+    return [...(count <= 0 ? ['deal'] : []), ...(count < 2 ? ['split'] : [])];
   }
 
   /** D34: Draw moved to a pile-level action - the deck has never
    * rendered a per-card hover row, so this stays empty by construction. */
-  static cardActions() {
+  cardActions() {
     return [];
+  }
+
+  /** D94: `count` joins the base view shape - kept for every existing
+   * consumer that reads it instead of `cards.length` (D84 already sends
+   * the deck's real, full contents to every viewer, so the two numbers
+   * are always identical now; this is a compatibility field, not a
+   * privacy-era leftover with different meaning). */
+  getView() {
+    return { ...super.getView(), count: this.cards.length };
+  }
+
+  /** D92 (direct user request: "split should always fan the pile to
+   * allow the guided picker" - deck included, no instant-shortcut
+   * carve-out). A real deck card never carries a `faceUp` field at all
+   * (only `toHandCard`/PLAY's transform ever set one) - the base
+   * `Pile.showsFace` (`card.faceUp !== false`) would read that missing
+   * field as "face-up" and show the real card. `visibility: 'hidden'`
+   * already says nobody sees a deck's cards; this is what makes the
+   * picker (`ui.js`'s `renderSplitPicker`, reused unchanged for a deck
+   * via `<deck-stack>` now) actually agree - a deck's fan shows real
+   * backs, same silhouette as any other hidden card, never the faces. */
+  showsFace() {
+    return false;
   }
 
   /**
   Draw is open to everyone; every other deck action is host-only.
-  *nit (direct user request): `'split'` (the old always-in-half
-  `SPLIT_DECK`) is gone, replaced by the same index-driven Split/Pickup
-  every other kind now shares (`state.js`'s `SPLIT_PILE`/`PICKUP_SPLIT`)
-  - not yet offered here until its picker UI exists, same reasoning as
-  `Pile.pileActions`'s own comment.
+  D91 (direct user request, "add the split pile action to the Deck Pile
+  type"): `split` joins the host-only list. No `pickupSplit` here - that
+  action doesn't exist at all any more (direct user correction: "there
+  is not supposed to be a pickupSplit") - `take` already covers
+  "everything into my hand" for any pile, deck included.
 
   `changePileType` (D87, *nit "all pile types must be convertible to any
   other pile type"): a deck is no longer exempt from the picker -
   host-gated, matching every other deck-management action here.
   */
-  static pileActions({ isHost } = {}) {
-    return isHost ? ['draw', 'deal', 'reshuffleDeal', 'shuffle', 'changePileType'] : ['draw'];
+  pileActions({ isHost } = {}) {
+    return isHost ? ['draw', 'deal', 'reshuffleDeal', 'shuffle', 'split', 'changePileType'] : ['draw'];
   }
 
   /** DRAW has never been per-card authorized - deck cards carry no
    * owner, so unlike the base case there's no `cardActions` entry to
    * reuse (deck's `cardActions` is intentionally always empty, above). */
-  static canRemoveCard() {
+  canRemoveCard() {
     return true;
   }
 
   /** Unexercised by any current action - DRAW only ever removes from
    * the deck, never inserts into it. Adds to the top, matching a
    * physical deck (index 0, unlike the base class's append). */
-  static insertCard(pile, card) {
-    return { ...pile, cards: [card, ...pile.cards] };
+  insertCard(card) {
+    return { ...this.toJSON(), cards: [card, ...this.cards] };
   }
 }

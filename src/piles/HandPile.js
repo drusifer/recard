@@ -54,8 +54,21 @@ export class HandPile extends Pile {
    * comment on `redactCard` being gone; this is not a privacy switch
    * any more, whoever holds the card can already be seen by everyone).
    */
-  static cardActions(pile, card, viewerId) {
-    return pile.ownerId === viewerId ? ['play'] : ['move'];
+  cardActions(card, viewerId) {
+    return this.ownerId === viewerId ? ['play'] : ['move'];
+  }
+
+  /**
+   * A hand's own `faceUp` (`toHandCard`, state.js) stamps "this card
+   * entered a hand", never a real table orientation - so the base
+   * `Pile`'s default (follow `card.faceUp`) is wrong here for EVERY
+   * viewer, not just a non-owner. This class is what a hand renders as
+   * to anyone who ISN'T its owner (`ui.js`'s `pileInstanceFor` picks
+   * `PlayerHandPile` instead for the owner) - showing backs, same as a
+   * real opponent's hand.
+   */
+  showsFace() {
+    return false;
   }
 
   /** Sorting on someone else's behalf has never been possible and
@@ -63,7 +76,21 @@ export class HandPile extends Pile {
    * be convertible to any other pile type"): a hand is no longer
    * exempt from the picker - owner-gated, matching sort's own rule,
    * since it's the pile's own presentation choice to make. */
-  static pileActions({ isOwner } = {}) {
+  pileActions({ isOwner } = {}) {
     return isOwner ? ['sortRank', 'sortSuit', 'changePileType'] : [];
+  }
+
+  /**
+   * D94: the one real difference left between `viewFor`'s old "hidden"/
+   * "in-hand"/"mixed" branches, once `Pile.getView()` made the other two
+   * identical - a hand ALSO feeds `view.myHand` (the viewer's own,
+   * full cards) or `view.otherHandCounts` (everyone else's, count
+   * only - still real, full cards are in `view.piles` too since D84,
+   * this is a convenience tally existing consumers already read).
+   */
+  contributeToView(view, viewerId) {
+    super.contributeToView(view, viewerId);
+    if (this.ownerId === viewerId) view.myHand = this.cards;
+    else view.otherHandCounts[this.ownerId] = this.cards.length;
   }
 }

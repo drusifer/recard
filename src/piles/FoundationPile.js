@@ -13,8 +13,8 @@ import { RunPile } from './RunPile.js';
 export class FoundationPile extends RunPile {
   /** US-56: empty foundation accepts only an Ace; otherwise defers to
    * `RunPile`'s "same suit, next rank" rule. */
-  static canAccept(pile, card) {
-    if (pile.cards.length === 0) return card.rank === 'A';
-    return super.canAccept(pile, card);
+  canAccept(card) {
+    if (this.cards.length === 0) return card.rank === 'A';
+    return super.canAccept(card);
   }
 }

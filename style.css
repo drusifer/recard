@@ -396,15 +396,24 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    unavailable - don't dim them like a disabled action button. */
 .card:disabled { opacity: 1; cursor: default; }
 
+/* *nit (direct user request): rank stacked above suit, not side by
+   side - a fanned/overlapped card only shows a narrow strip of its left
+   edge, and the widest LINE in that strip is what has to fit, not the
+   widest combined glyph run. */
 .card-corner {
   position: absolute;
   top: 0.2rem;
   left: 0.3rem;
-  font-size: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   font-weight: 700;
   line-height: 1.05;
   text-align: center;
 }
+
+.card-corner-rank { font-size: 0.8rem; }
+.card-corner-suit { font-size: 0.7rem; }
 
 .card-pip {
   font-size: 1.35rem;
@@ -474,6 +483,73 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    an individual click target, just a tighter fan than the first pass. */
 .fan-row .middle-card + .middle-card {
   margin-left: calc(-1 * (var(--card-w) * 0.65) - var(--card-gap));
+}
+
+/* D91: the Split picker (`renderSplitPicker`, ui.js) - a `fan-row` used
+   OUTSIDE a hand's own `.seat-zone` (any pile can be split, not just a
+   hand), so it needs its own nowrap/clearance rather than relying on
+   `.seat-zone .fan-row.card-row` below. `position: relative` anchors
+   the guide/highlight overlays DIRECTLY to this row (not the
+   `.pile-section` container, which also spans the header above it) -
+   a real UX bug found live: guides/highlight used to anchor to the
+   container, so they stretched from behind the title bar down through
+   the cards, reading as stray residual lines unrelated to the pointer.
+   Anchoring to the row itself, exactly the cards' own box, fixed it. */
+.split-picker-row {
+  position: relative;
+  flex-wrap: nowrap;
+  overflow: visible;
+  padding-bottom: 0.9rem;
+  cursor: pointer;
+}
+
+/* A disabled `<button class="card">` (`renderSplitPicker`'s cards are
+   all non-interactive while picking) never fires `click` at all in a
+   browser, disabled elements are excluded from activation behavior
+   entirely - so a click landing ON a card, not the gap between two,
+   would silently do nothing instead of reaching `.split-picker-row`'s
+   own click listener. `pointer-events: none` removes the card from hit-
+   testing altogether, so every pointer/click event passes straight
+   through to the row underneath it - the picker's real target either
+   way, card or gap. */
+.split-picker-card .card { pointer-events: none; }
+
+/* Faint vertical marks at the 25/50/75% points along the row, purely a
+   visual guide - the real hit-test is `nearestGap` (ui.js), computed
+   from the actual card positions, not these fixed percentages. */
+.split-picker-guides {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.split-picker-guide {
+  position: absolute;
+  /* `bottom: 0`, not a positive offset: `.split-picker-row`'s own
+     `padding-bottom` already reserves the fan's droop clearance, and
+     an absolutely positioned child's `inset` is relative to the
+     PADDING box - stacking a second bottom offset on top of that one
+     would double-subtract it, leaving the guide short of the row's
+     real bottom edge. */
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border);
+  opacity: 0.5;
+}
+
+/* The nearest-gap indicator, following the pointer - a solid accent
+   line so the exact commit point (a click anywhere on the row) is
+   never ambiguous. */
+.split-picker-highlight {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  margin-left: -1.5px;
+  background: var(--accent);
+  border-radius: 2px;
+  pointer-events: none;
 }
 
 /* Headroom for the fan's rotation/arc (US-30) so rotated card corners
@@ -762,11 +838,6 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .middle-card.drop-before::before { left: -0.35rem; }
 .middle-card.drop-after::after { right: -0.35rem; }
-
-.owner-tag {
-  font-size: 0.8rem;
-  color: var(--muted);
-}
 
 /* A named zone (US-19) - its own bordered sub-panel so it reads as a
    distinct area on the table, not just a blob of cards (Smith Gate 1:
@@ -1226,6 +1297,33 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   font-size: 0.8rem;
   font-weight: 700;
   color: var(--text);
+}
+
+/* D95 (direct user request: "make card counts a feature for all
+   Piles... upper left corner... like a badge") - universal, every pile
+   kind, one mechanism (`renderPileShell`, ui.js). `position: absolute`
+   against `.pile-section` itself (already `position: relative`), so it
+   sits in the same corner regardless of whether the pile below it
+   renders as a flat row, a fan, or a stack - never anchored to any one
+   card the way `.deck-count-badge` is to the deck's single stack card
+   (that badge is suppressed inside a real pile now, `renderDeckStack`'s
+   own comment - only the standalone pre-game preview screen, which
+   never reaches `renderPileShell` at all, still uses it). `z-index`
+   above the header/cards so it's never covered by either. */
+.pile-count-badge {
+  position: absolute;
+  top: -0.5rem;
+  left: -0.5rem;
+  z-index: 2;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+  pointer-events: none;
 }
 
 /* Compact "closed hand" fan for other players (US-21) - capped visual

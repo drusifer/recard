@@ -1,33 +1,55 @@
 /**
- * The Pile base class (D56) - real derived types: a Pile is cards +
- * behavior, full stop. D90 (direct user request, "the shape is
- * Table->Zone->Pile->Card, KISS, simplify... I don't want any kind of
- * thing that conflates zones and piles"): there is no such thing as a
- * "zone pile" - that word belongs to the Zone entity alone
- * (`state.zones`, `<zone-panel>`). The generic, no-accept-rule, per-card
- * `{owner, faceUp}` pile (`kind: 'plain'`) isn't a distinctly-named
- * subtype either - it IS this base class, concrete and directly usable,
- * not abstract. Every other kind (`DeckPile`, `HandPile`, `DiscardPile`,
- * `CascadePile`, `RankAdjacentPile`, `MeldPile` and its subclasses) is a
+ * The Pile base class (D56, converted to real instances D93 - direct
+ * user request: "you've got to undo the Piles are plain data objects
+ * decision... I'm trying to create a rich type hierarchy with domain
+ * abstraction"). A Pile is a real object now: `new Pile(data)` (or
+ * `revivePile(data)` (pileTypes.js), which picks the right subclass by `kind`) gives
+ * you something with real INSTANCE methods (`pile.cardActions(card,
+ * viewerId)`), not a static method you pass the data into
+ * (`PILE_TYPES[pile.kind].cardActions(pile, card, viewerId)`) - every
+ * `pile.kind` switch/case this codebase had is a real polymorphic
+ * dispatch now, not a lookup table pretending to be one.
+ *
+ * Serialization is free, not extra ceremony: `toJSON()` returns the
+ * plain fields, and `JSON.stringify` (every `session.send`/
+ * `localStorage` write already does this on the whole state tree)
+ * calls it automatically - no call site anywhere needed to change.
+ * `pileTypes.js`'s `revivePile(data)` is the reverse: reconstructs a
+ * real instance from plain data arriving over the wire or from
+ * storage, picking the right subclass by `kind` - lives there rather
+ * than here since it needs the full `PILE_TYPES` registry, and THIS
+ * file is one of the things that registry imports (a circular import
+ * back to here would break the module graph).
+ *
+ * `state.piles` in the reducer still holds PLAIN records at rest, not
+ * live instances - `insertCard`/`removeCard` (the only two methods
+ * that produce a NEW pile rather than just answering a question about
+ * an existing one) return plain shapes, same as the reducer's own
+ * `{...pile, field}` update style elsewhere, so the state tree stays
+ * uniform and every existing plain-object test fixture still works
+ * unchanged. Everywhere ELSE - every card/pile-action/visibility QUERY
+ * - goes through a real instance (`revivePile(pile).method(...)`),
+ * which is where the actual "case statement instead of a class"
+ * problem lived.
+ *
+ * D90: there is no such thing as a "zone pile" - that word belongs to
+ * the Zone entity alone (`state.zones`, `<zone-panel>`). The generic,
+ * no-accept-rule, per-card `{owner, faceUp}` pile (`kind: 'plain'`)
+ * isn't a distinctly-named subtype either - it IS this base class,
+ * concrete and directly usable, not abstract. Every other kind is a
  * real specialization that overrides only what differs - real `class X
  * extends Pile`, not a sibling module duplicating the shared rule.
  *
  * `src/piles/pileTypes.js`'s `PILE_TYPES` registry maps a pile's `kind`
- * string to its class; `state.js`/`ui.js`/`pileActions.js` dispatch
- * through `PILE_TYPES[pile.kind]`, calling its STATIC methods
- * (`PILE_TYPES[kind].canRemoveCard(pile, card, viewerId, action)`) -
- * unchanged call shape from the pre-D56 module-registry days, since a
- * class's static members are read exactly the same way a module
- * namespace's exports were. Pile *records* in `state.js` stay plain
- * data objects (`{id, kind, name, ownerId, cards, zoneId}`) - no change
- * to persistence/network serialization.
+ * string to its class - used by `revivePile`, not by
+ * callers reaching into it directly any more (the three call sites
+ * that used to - `state.js`/`pileActions.js`/`persistence.js` - now go
+ * through `revivePile(pile).method(...)`).
  *
- * `kind: 'plain'` (D90 - was `'zone'`, the exact conflation this pile
- * type existed to warn against in its own doc comment) is the wire/data
- * string `CREATE_ZONE` falls back to - it maps to this base class in
- * the registry. `SNAPSHOT_VERSION` bumped alongside the rename (D90,
- * no back-compat shim - an old save with a `kind: "zone"` pile on disk
- * is discarded on load, same as any other snapshot-shape break).
+ * `kind: 'plain'` (D90 - was `'zone'`) is the wire/data string
+ * `CREATE_ZONE` falls back to - it maps to this base class in the
+ * registry. `SNAPSHOT_VERSION` bumped alongside the rename (D90, no
+ * back-compat shim).
  */
 import { resolveDropTarget as resolveHaloTarget } from '../dropTarget.js';
 
@@ -50,7 +72,8 @@ function orientationActions(cards = []) {
 export class Pile {
   /** Per-card `{owner, faceUp}` visibility - "Open" when every card is
    * face-up, "Mixed" when they differ. The base default; `DeckPile`
-   * (hidden) and `HandPile` (in-hand) override it. */
+   * (hidden) and `HandPile` (in-hand) override it. Stays a static class
+   * property (a fact ABOUT the type, not about any one instance). */
   static visibility = 'mixed';
 
   /** D45: a legal PLAY/MOVE_CARD destination. True by default - kept
@@ -66,26 +89,89 @@ export class Pile {
   /** D55/US-63: eligible for `MOVE_PILE` (reparenting into a different
    * Zone). True by default (this base class and `DiscardPile`);
    * `HandPile`/`CascadePile`/`RankAdjacentPile`/`MeldPile` override it
-   * `false` - each for its own structural reason (a hand's per-player
-   * invariant; a cascade/rank-adjacent/meld's fixed role in its own
-   * game). *nit fix: this comment used to also claim `SPLIT_PILE`/
-   * `TAKE_PILE`/`SET_PILE_ORIENTATION` read this flag - they never did
-   * (their own hardcoded `zone`/`discard` kind checks, or `SPLIT_PILE`/
-   * `PICKUP_SPLIT`'s `cardActions`-derived eligibility, `state.js`'s
-   * `splitPileAt`) - stale, not a real behavior. */
+   * `false` - each for its own structural reason. */
   static reparentable = true;
+
+  /**
+   * D93: real instance fields, not a plain-object shape callers had to
+   * remember - `id`/`kind`/`name`/`ownerId`/`zoneId`/`cards` are
+   * whatever the caller passes (matches the pre-D93 record shape
+   * exactly, so `revivePile(existingPlainPile)` round-trips unchanged).
+   */
+  constructor({ id, kind, name, ownerId = null, cards = [], zoneId } = {}) {
+    this.id = id;
+    this.kind = kind;
+    this.name = name;
+    this.ownerId = ownerId;
+    this.cards = cards;
+    this.zoneId = zoneId;
+  }
+
+  /** Free serialization - `JSON.stringify` calls this automatically on
+   * anything that has it, so every existing `session.send`/
+   * `localStorage` write (already stringifying the whole state tree)
+   * needs zero changes. Plain fields only, same shape a pre-D93 pile
+   * record always had. */
+  toJSON() {
+    return { id: this.id, kind: this.kind, name: this.name, ownerId: this.ownerId, cards: this.cards, zoneId: this.zoneId };
+  }
+
+  /**
+   * D94 (direct user request: "state.js viewFor is a monstrosity...
+   * just do pile.getView()... every case statement should be a derived
+   * method call"). The per-pile wire shape `state.js`'s `viewFor` sends
+   * to a client - full cards, always (D84, "TOTAL PERMISSIVE", the DATA
+   * was never redacted - only `showsFace` decides the VISUAL, a
+   * separate concern this method has nothing to do with). `DeckPile`
+   * overrides this to add `count` (kept for existing consumers that
+   * read it instead of `cards.length`); every other kind's shape is
+   * identical, which is exactly why the old `switch (pileVisibility
+   * (pile))` in `viewFor` had three near-duplicate branches instead of
+   * one real difference.
+   */
+  getView() {
+    return { id: this.id, name: this.name, ownerId: this.ownerId ?? null, kind: this.kind, zoneId: this.zoneId, cards: this.cards };
+  }
+
+  /**
+   * Adds this pile's contribution to the whole-game `view` object
+   * `viewFor` assembles - its own `getView()` shape into `view.piles`,
+   * by default. `HandPile` overrides this to ALSO feed `view.myHand`/
+   * `view.otherHandCounts` - the one real per-kind difference left once
+   * `getView()` above made the other two "hidden"/"mixed" `viewFor`
+   * branches identical. This is the actual replacement for the old
+   * `switch` - one polymorphic call per pile, no case statement
+   * anywhere in `viewFor` itself.
+   */
+  contributeToView(view) {
+    view.piles.push(this.getView());
+  }
+
+  /**
+   * Whether a card in this pile shows its real face to a viewer, or its
+   * back. Default: follows the card's own real table orientation
+   * (`faceUp`) - a face-down card looks face-down to every viewer, same
+   * as a real table (D84 never redacted the DATA, only ever the
+   * "who can move it" question; this is the separate VISUAL question).
+   * `HandPile` overrides this - a hand's own `faceUp` was never a real
+   * orientation - and `PlayerHandPile` overrides it again for the one
+   * viewer whose hand it actually is.
+   */
+  showsFace(card) {
+    return card.faceUp !== false;
+  }
 
   /** The only kind with real before/onto/after halo geometry -
    * `dropTarget.js`'s pure math. Every subclass that isn't a plain open
    * pile overrides this to `{}`. */
-  static resolveDropTarget(cardBoxes, point) {
+  resolveDropTarget(cardBoxes, point) {
     return resolveHaloTarget(cardBoxes, point);
   }
 
   /** Nothing has ever gated an insert by card content for the base
    * case - unconditional accept. `MeldPile` subclasses are the real
    * content-based callers. */
-  static canAccept() {
+  canAccept() {
     return true;
   }
 
@@ -99,13 +185,11 @@ export class Pile {
    * `reveal` is the one entry that keeps a condition (`faceUp === false`)
    * - not an authorization restriction, "there is nothing to reveal" on
    * a card that's already face-up. `redactCard` is gone entirely now
-   * (a later, separate direct user request, D84: "remove card
-   * redaction entirely... TOTAL PERMISSIVE") - `faceUp` is a plain
-   * game-state field (was a card dealt/played face-up or down) with no
-   * privacy meaning left; every viewer sees every card's real identity
-   * regardless of it.
+   * (D84: "remove card redaction entirely... TOTAL PERMISSIVE") -
+   * `faceUp` is a plain game-state field with no privacy meaning left;
+   * every viewer sees every card's real identity regardless of it.
    */
-  static cardActions(pile, card) {
+  cardActions(card) {
     return card.faceUp === false ? ['reveal', 'pickup', 'move', 'rotate'] : ['pickup', 'move', 'rotate'];
   }
 
@@ -114,54 +198,56 @@ export class Pile {
    * any player for a SHARED pile (`isShared`), owner-only for a personal
    * one (`isOwner`).
    *
-   * *nit (direct user request): the old `'split'` (roughly-in-half,
-   * instant on click) is gone - replaced by an index-driven Split/
-   * Pickup that needs a real picker UI (raise the pile into a fan, hover
-   * to choose the cut point) not yet built. `state.js`'s `SPLIT_PILE`/
-   * `PICKUP_SPLIT` reducer actions are real and tested; this offer list
-   * intentionally does NOT list an id for them yet - a button with
-   * nowhere to send an `index` would be a false affordance (Nielsen #9),
-   * worse than no button at all until that picker exists.
+   * D91: `split` (the old roughly-in-half `'split'`'s real, index-
+   * driven replacement) is offered here now that a real picker UI
+   * exists (`ui.js`'s `renderSplitPicker`) - `disabledActions` below
+   * still gates it off below 2 cards, matching `splitPileAt`'s
+   * (state.js) own minimum. `take` (above) already covers "everything
+   * into my hand" - a separate `pickupSplit` briefly existed alongside
+   * it and was a direct user correction: "there is not supposed to be
+   * a pickupSplit."
    */
-  static pileActions({ isOwner, isShared, cards } = {}) {
+  pileActions({ isOwner, isShared, cards } = {}) {
     if (!isOwner && !isShared) return [];
     // US-71/72/73 (D62/D63): `remove`/`changePileType` are offered here
-    // for every base-Pile-derived kind (`zone`, `discard` - DiscardPile
-    // doesn't override this method) unconditionally; the reducer is
+    // for every base-Pile-derived kind unconditionally; the reducer is
     // still the real authorization/empty-only gate (D43's standing
     // discipline - this decides what to OFFER, not what's ALLOWED).
-    return ['take', 'changePileType', 'remove', ...orientationActions(cards)];
+    return ['take', 'split', 'changePileType', 'remove', ...orientationActions(cards)];
   }
 
   /**
    * Which of this pile's own offered actions are disabled by its
    * current state (e.g. `DeckPile`'s `deal` at zero cards). `remove`
-   * (D62) is empty-only at the reducer - *nit, direct user request
-   * ("don't enable X unless empty"): disabled here too instead of
+   * (D62) is empty-only at the reducer - disabled here too instead of
    * letting a click reach the reducer's block message every time on a
    * non-empty pile (Nielsen #5, prevent the error rather than catch it
    * after the fact).
    *
-   * `changePileType` was disabled here the same way under D62/D63, but
-   * direct user request (2026-08-27) reopened it on non-empty piles -
-   * the reducer's own empty-only guard is gone too, see `state.js`'s
-   * `CHANGE_PILE_TYPE` doc comment for the risk that reopens.
+   * D91: `split` disabled below 2 cards - `splitPileAt` (state.js)
+   * throws under that minimum, same reasoning as `remove`.
    */
-  static disabledActions(count) {
-    return count > 0 ? ['remove'] : [];
+  disabledActions(count) {
+    const disabled = count > 0 ? ['remove'] : [];
+    if (count < 2) disabled.push('split');
+    return disabled;
   }
 
   /** D43: the write-side authorization check is the READ-side offer
    * check - `cardActions` already states exactly which actions a card
-   * offers to a viewer. `this` resolves to whichever subclass this was
-   * actually called through, so an override of `cardActions` alone
-   * (without touching `canRemoveCard`) still takes effect correctly. */
-  static canRemoveCard(pile, card, viewerId, action) {
-    return this.cardActions(pile, card, viewerId).includes(action);
+   * offers to a viewer. Real prototype dispatch: calling `this.
+   * cardActions(...)` on a subclass instance already resolves to that
+   * subclass's own override, no explicit re-dispatch needed. */
+  canRemoveCard(card, viewerId, action) {
+    return this.cardActions(card, viewerId).includes(action);
   }
 
-  static removeCard(pile, cardId) {
-    return { ...pile, cards: pile.cards.filter((c) => c.id !== cardId) };
+  /** Returns a plain NEW pile shape (not `this` mutated, not a new
+   * instance) - the reducer stores plain records at rest; this result
+   * re-enters `state.piles` exactly the same way a pre-D93 `{...pile,
+   * cards: […]}` spread did. */
+  removeCard(cardId) {
+    return { ...this.toJSON(), cards: this.cards.filter((c) => c.id !== cardId) };
   }
 
   /**
@@ -169,13 +255,15 @@ export class Pile {
    * pair ends up *second*. Dropping after the target, that's the
    * dropped card; dropping before it, the dropped card becomes the
    * target's new predecessor, so it is the TARGET that now sits second
-   * and carries the layout.
+   * and carries the layout. Returns a plain shape, same reasoning as
+   * `removeCard` above.
    */
-  static insertCard(pile, card, placement = {}) {
+  insertCard(card, placement = {}) {
     const { targetCardId, side = 'after', layout } = placement;
-    if (!targetCardId) return { ...pile, cards: [...pile.cards, withLayout(card, layout)] };
+    const base = this.toJSON();
+    if (!targetCardId) return { ...base, cards: [...this.cards, withLayout(card, layout)] };
 
-    const { cards } = pile;
+    const { cards } = this;
     const index = cards.findIndex((c) => c.id === targetCardId);
     if (index === -1) {
       throw new Error(`Target card ${targetCardId} is not in the destination zone`);
@@ -183,8 +271,8 @@ export class Pile {
 
     if (side === 'before') {
       const placed = [...cards.slice(0, index), withLayout(card, null), ...cards.slice(index)];
-      return { ...pile, cards: placed.map((c) => (c.id === targetCardId ? withLayout(c, layout) : c)) };
+      return { ...base, cards: placed.map((c) => (c.id === targetCardId ? withLayout(c, layout) : c)) };
     }
-    return { ...pile, cards: [...cards.slice(0, index + 1), withLayout(card, layout), ...cards.slice(index + 1)] };
+    return { ...base, cards: [...cards.slice(0, index + 1), withLayout(card, layout), ...cards.slice(index + 1)] };
   }
 }

@@ -1,4 +1,4 @@
-import { renderPileShell, renderDeckStack } from '../ui.js';
+import { renderPileShell, renderDeckStack, renderSplitPicker } from '../ui.js';
 
 /**
  * UX follow-up (direct user request): "a Deck is a specific kind of
@@ -21,12 +21,23 @@ import { renderPileShell, renderDeckStack } from '../ui.js';
  */
 export class DeckStackElement extends HTMLElement {
   render(pile, allPiles, options) {
+    // D92 (direct user request: "split should always fan the pile to
+    // allow the guided picker" - deck included): identical branch to
+    // `renderPile`'s own (ui.js) - a deck toggled into the picker
+    // (`options.splitPicker`) renders the same `renderSplitPicker` row
+    // every other pile kind gets, not a deck-specific shortcut.
+    if (options.splitPicker?.pileId === pile.id) {
+      renderPileShell(this, pile, allPiles, options, (container) => renderSplitPicker(container, pile, options));
+      return;
+    }
     renderPileShell(this, pile, allPiles, options, (container) => {
       const row = document.createElement('div');
       container.append(row);
-      // D67: `pile.cards` now carries the pile's own top card (redacted,
-      // real id) for hidden-visibility kinds like `deck` - `renderDeckStack`
-      // uses it as a genuine drag source, same mechanism as any other pile.
+      // D84: `pile.cards` carries the deck's full, real contents now
+      // (TOTAL PERMISSIVE - the data was never redacted, only who sees
+      // it visually) - `renderDeckStack` still only ever shows the top
+      // one as the stack's own drag source, same mechanism as any other
+      // pile's top card.
       renderDeckStack(row, pile.count ?? pile.cards.length, { ...options, pileId: pile.id, topCard: pile.cards[0] });
       return row;
     });

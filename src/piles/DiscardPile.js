@@ -17,14 +17,14 @@ import { Pile } from './Pile.js';
 export class DiscardPile extends Pile {
   /** No before/after halo - a discard pile has exactly one landing
    * spot (on top). */
-  static resolveDropTarget() {
+  resolveDropTarget() {
     return {};
   }
 
   /** STACK means every drop lands on top, unconditionally - no
    * placement/halo splicing like the base class. Prepends (index 0),
    * matching `DeckPile`'s "top of the pile is index 0" convention. */
-  static insertCard(pile, card) {
-    return { ...pile, cards: [card, ...pile.cards] };
+  insertCard(card) {
+    return { ...this.toJSON(), cards: [card, ...this.cards] };
   }
 }

@@ -23,7 +23,7 @@
 import { DiscardPile } from './DiscardPile.js';
 
 export class ExilePile extends DiscardPile {
-  static pileActions({ isOwner, isShared } = {}) {
+  pileActions({ isOwner, isShared } = {}) {
     if (!isOwner && !isShared) return [];
     return ['changePileType', 'remove'];
   }

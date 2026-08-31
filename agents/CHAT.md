@@ -965,3 +965,309 @@ lint:decks — 15 deck(s) balanced
 ---
 [<small>2026-08-30 18:04:03</small>] [**Neo**]->[**User**] *swe handoff*:
  State saved for context clear. neo.docs/state.md rewritten (compact index through D90, lesson on git stash danger with the make-skill CHAT.md hook, clear resume instructions). 509/509 green, check+lint-js+lint-style clean. 31 files uncommitted this whole session (D82-D90 + earlier RTG work), awaiting explicit commit request.
+
+---
+[<small>2026-08-30 18:08:33</small>] [**Neo**]->[**User**] *resume*:
+ Resuming as Neo (cold start). state.md said 31 files uncommitted through D90 - that's stale, D82-D90 is now committed as 14ddf1a, tree is clean. No task in-flight; oldest deferred item is Split/Pickup picker UI. Awaiting direction.
+
+---
+[<small>2026-08-30 18:12:54</small>] [**Neo**]->[**Trin**] *swe fix*:
+ Starting *nit: checking src/presets.js for staleness, likely against D90's zone/pile rename.
+
+---
+[<small>2026-08-30 18:13:25</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1250.19153
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-08-30 18:14:10</small>] [**Neo**]->[**User**] *swe fix*:
+ Presets audit: schema fields (tableZone/piles/zones/type) all consistent with D90's zone/pile rename - already updated in that same commit. All pile kinds in presets.js are valid PILE_TYPES keys. RULES_REFERENCE/DECK_TYPES coverage matches. 509/509 green. No staleness found in code/schema. Only known gap: FIXED PIXEL layout coords (flagged in-file, pre-existing, not new). Asking user what specifically looked stale.
+
+---
+[<small>2026-08-30 18:18:30</small>] [**Neo**]->[**Trin**] *swe fix*:
+ Starting *fix: Gin Rummy - (1) cards show owner name + 'face down' text below them (unwanted), (2) face-down cards render face-up. Investigating card rendering/visibility path.
+
+---
+[<small>2026-08-30 18:28:33</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-style | /home/drusifer/Projects/recard/build/build.out
+=== make lint-style @ 2026-08-30 18:28:32 ===
+npm run lint:style
+
+> lint:style
+> stylelint style.css
+
+
+---
+[<small>2026-08-30 18:28:56</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Reworked *fix using polymorphism per user pushback (no if/then): Pile.showsFace/showsOwnerTag added, HandPile overrides both false, new PlayerHandPile extends HandPile overrides showsFace true. ui.js's pileClassFor(pile,viewerId) picks the class - zero pile.kind branching in renderPileCards. Complexity back to exact baseline (25). 509/509, check/lint-js/lint-style clean. Full: src/piles/PlayerHandPile.js. @Trin *qa test
+
+---
+[<small>2026-08-30 18:30:56</small>] [**Neo**]->[**Trin**] *swe fix*:
+ Starting *nit: remove owner tags from card rendering entirely - not a requested feature, per direct user request.
+
+---
+[<small>2026-08-30 18:32:22</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-style | /home/drusifer/Projects/recard/build/build.out
+=== make lint-style @ 2026-08-30 18:32:21 ===
+npm run lint:style
+
+> lint:style
+> stylelint style.css
+
+
+---
+[<small>2026-08-30 18:32:27</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ *nit done: owner tags removed entirely (not requested). Deleted ui.js's ownerTag()+call site, Pile/HandPile's showsOwnerTag hook, .owner-tag CSS, unused resolveOwnerName destructure. renderPileCards complexity now 22 (was 25). 509/509, check/lint-js/lint-style clean. @Trin *qa test
+
+---
+[<small>2026-08-30 18:39:23</small>] [**Neo**]->[**Trin**] *swe impl*:
+ Starting *impl: finish the Meld pile types - RunPile is fully implemented (same-suit sequential) but never registered in PILE_TYPES; SetPile is a documented placeholder with no canAccept. Plan: implement SetPile.canAccept (same-rank), register both 'run' and 'set' as real PILE_TYPES kinds.
+
+---
+[<small>2026-08-30 18:40:58</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-style | /home/drusifer/Projects/recard/build/build.out
+=== make lint-style @ 2026-08-30 18:40:56 ===
+npm run lint:style
+
+> lint:style
+> stylelint style.css
+
+
+---
+[<small>2026-08-30 18:41:36</small>] [**Neo**]->[**Trin**] *swe decision*:
+ D91 recorded: finished Meld pile family - SetPile.canAccept implemented (same-rank), run/set registered in PILE_TYPES (no snapshot bump, additive). Also folded in this thread's card-back polymorphism + owner-tag removal. 513/513 (4 new tests), check/lint-js/lint-style clean, 7-error baseline unchanged. Full: docs/ARCHITECTURE.md D91. @Trin *qa uat
+
+---
+[<small>2026-08-30 19:00:47</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1257.900773
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-08-30 19:00:55</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Sort by rank/suit implemented: new SORT_PILE reducer (owner-only, rank or suit primary key with the other as tiebreak, stable/deterministic), wired to the hand's existing sortRank/sortSuit buttons (previously offered but filtered out - no reducer action existed). 518/518, check/lint-js/lint-style clean, 7-error baseline unchanged. @Trin *qa test
+
+---
+[<small>2026-08-30 19:03:12</small>] [**Neo**]->[**Trin**] *swe impl*:
+ Starting *impl: Split/Pickup picker UI - full fan-raise/hover-to-choose-index design per user's original spec, client-local 'which pile is mid-split' state (no home for this yet, unlike panelLayout.js's persisted prefs).
+
+---
+[<small>2026-08-30 19:05:39</small>] [**Neo**]->[**Trin**] *swe fix*:
+ Pausing Split picker mid-impl to take a quick *nit: card-corner shows rank+suit on ONE line ('10 ♠') - when a card is fanned/overlapped, only a narrow left strip is visible and the suit symbol (end of the line) gets covered by the next card. Fix: stack rank above suit so both fit the narrow strip.
+
+---
+[<small>2026-08-30 19:06:20</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-style | /home/drusifer/Projects/recard/build/build.out
+=== make lint-style @ 2026-08-30 19:06:19 ===
+npm run lint:style
+
+> lint:style
+> stylelint style.css
+
+
+---
+[<small>2026-08-30 19:06:26</small>] [**Neo**]->[**Trin**] *swe fix*:
+ Card corner nit done: rank/suit now stack vertically (StandardCardFace.js's corner is two spans, .card-corner is flex-column) instead of one line - suit survives the narrow visible strip when fanned/overlapped. 518/518, check/lint-js/lint-style clean. No unit test coverage for this (ui.js/card-face DOM rendering isn't in the node:test suite - visual, needs a live look). Resuming Split picker impl.
+
+---
+[<small>2026-08-30 19:17:59</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1256.431196
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-08-30 19:19:20</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Split/Pickup picker done (fan-raise/hover-pick-index, per user go-ahead). ACTION_SPECS split/pickupSplit; Pile+MeldPile offer them (2+ cards); ui.js renderSplitPicker (guides+highlight, fixed a real disabled-button click-swallow bug). Caveat: main.js renderGameFromView complexity 65->77, disclosed not hidden. 509/509, check/lint-style clean. No live browser check yet. Full: neo.docs/state.md. @Trin *qa uat
+
+---
+[<small>2026-08-30 21:37:10</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-style | /home/drusifer/Projects/recard/build/build.out
+=== make lint-style @ 2026-08-30 21:37:09 ===
+npm run lint:style
+
+> lint:style
+> stylelint style.css
+
+
+---
+[<small>2026-08-30 21:37:21</small>] [**Neo**]->[**Trin**] *swe fix*:
+ Feedback addressed: (1) pickupSplit now instant/always-half, no picker (kept simple per request). (2) Fixed real UX bug: picker guides/highlight were anchored to the whole pile-section incl. header, stretching stray lines - now anchored to the card row itself. (3) DeckPile offers split (instant/always-half, same as pickup - no visible cards to pick a gap on). 510/510, check/lint-style clean, lint-js unchanged. Full: neo.docs/state.md. @Trin *qa uat
+
+---
+[<small>2026-08-30 21:41:22</small>] [**Neo**]->[**Trin**] *swe fix*:
+ Correction from user: no separate 'pickupSplit' action - Pickup already means 'take' (all cards into hand, existing action), Split always uses the guide picker. Removing pickupSplit entirely from ACTION_SPECS/pileActions offer lists/main.js dispatch. PICKUP_SPLIT reducer action itself (pre-existing, tested, predates this thread) left untouched - just no UI trigger, same as before this whole thread started.
+
+---
+[<small>2026-08-30 21:44:14</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-style | /home/drusifer/Projects/recard/build/build.out
+=== make lint-style @ 2026-08-30 21:44:13 ===
+npm run lint:style
+
+> lint:style
+> stylelint style.css
+
+
+---
+[<small>2026-08-30 21:44:20</small>] [**Neo**]->[**Trin**] *swe fix*:
+ pickupSplit removed entirely (correction: no such action - Pickup=take, Split=picker only). ACTION_SPECS/Pile/MeldPile/DeckPile pileActions+disabledActions updated; main.js's PICKUP_SPLIT dispatch path removed, performInstantSplit renamed performInstantDeckSplit (deck-only now). PICKUP_SPLIT reducer itself untouched (pre-existing, tested, just no UI trigger). 510/510, check/lint-style clean, lint-js unchanged. @Trin *qa uat
+
+---
+[<small>2026-08-30 21:49:17</small>] [**User**]->[**all**] *request*:
+ *chat @morpheus I'm deeply concerned about the quality of the code coming out of this project. main.js has an enormous kitchensink zoneOptions and ui.js renderZones is the opposite of encapsulation. Plan a refactor that properly utilizes our type hierarchy Table -> Zone -> Pile -> Card. Use rich webcomponents to encapsulate specific behaviors. Guarantee Drag And Drop For all - no restriction - Universal Change Pile Type (WTF Deck?) - Remember YAGNI, KISS, and always DRY
+
+---
+[<small>2026-08-30 21:49:41</small>] [**Morpheus**]->[**User**] *resume*:
+ Resuming as Morpheus - *lead refactor request: main.js zoneOptions + ui.js renderZones encapsulation, enforce universal DnD, question Deck's inclusion in changePileType. Reading current code before proposing anything.
+
+---
+[<small>2026-08-30 21:52:38</small>] [**Morpheus**]->[**User**] *lead guide*:
+ Refactor plan drafted (not a decision, full text in morpheus.docs/state.md). Root cause: options-bag has no interface segregation; WebComponents are hollow shells over ui.js's procedural functions - the real Pile hierarchy underneath is sound, unused by rendering. Found a real bug: CHANGE_PILE_TYPE has no guard on the canonical deck pile. Plan: fix Deck, narrow options into 3 layer-scoped objects, migrate stragglers to the class hierarchy, add a DnD-guarantee test. Not a rewrite. One open question for user.
+
+---
+[<small>2026-08-30 21:59:54</small>] [**Morpheus**]->[**Neo**] *lead decide*:
+ Correction accepted: no canonical piles, full stop. DRAW/DEAL/DEAL_MORE/SHUFFLE_DECK hardcode DECK_PILE_ID today - real bug, bigger than changePileType alone. Fix: parameterize by pileId, same pattern MOVE_CARD/SPLIT_PILE already use. Shells: PilePanel/renderPile and ZonePanel/renderZonePanel are pure 1:1 passthroughs (verified, zero other callers) - inlining first. DeckStack/renderDeckStack stays shared (main.js's pre-game screen calls it directly too). Starting Neo now.
+
+---
+[<small>2026-08-30 22:00:56</small>] [**Neo**]->[**Morpheus**] *resume*:
+ Resuming as Neo - implementing Morpheus's D92 plan step 1 (deck pileId-parameterization) and step 2 (shell inlining: pile-panel/zone-panel). TDD, one step at a time.
+
+---
+[<small>2026-08-30 22:10:43</small>] [**Morpheus**]->[**Neo**] *lead decide*:
+ Framing correction, now governing: a deck is just a pile of cards - ids assigned once at init, never change. App simulates a table; Zones/Piles organize it; pile actions (Draw/Deal/Shuffle/Split/Take) are convenience shortcuts, never privileged mechanics on one blessed pile. DRAW/DEAL/SHUFFLE_DECK reducer goes fully permissive on any pile by id, no kind check - DeckPile.pileActions() alone decides which kind's header offers the buttons. Full: morpheus.docs/state.md. Proceeding with Neo.
+
+---
+[<small>2026-08-30 22:17:32</small>] [**Neo**]->[**Trin**] *swe fix*:
+ Correction: Split should ALWAYS use the guided fan picker, deck included - no instant-shortcut carve-out. Fixing: DeckPile.showsFace override (always false - deck cards have no real faceUp field, base Pile's check would wrongly show real faces), DeckStack wired to renderSplitPicker same as pile-panel, removing the deck-kind branch from handlePileAction entirely (one less special case, not more).
+
+---
+[<small>2026-08-30 22:19:59</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-style | /home/drusifer/Projects/recard/build/build.out
+=== make lint-style @ 2026-08-30 22:19:58 ===
+npm run lint:style
+
+> lint:style
+> stylelint style.css
+
+
+---
+[<small>2026-08-30 22:20:25</small>] [**Neo**]->[**Trin**] *swe fix*:
+ Split-for-deck fixed: DeckPile.showsFace always false (deck cards have no faceUp field, base Pile would've wrongly shown real faces). DeckStack now branches into the same renderSplitPicker as pile-panel. Removed the deck-kind branch in handlePileAction + performInstantDeckSplit entirely - one code path for every pile kind. 511/511, check/lint-style clean, lint-js unchanged. @Trin *qa uat
+
+---
+[<small>2026-08-30 22:20:43</small>] [**Neo**]->[**Trin**] *swe impl*:
+ Resuming D92 refactor plan step 1: DRAW/DEAL/DEAL_MORE/SHUFFLE_DECK pileId-parameterization (fully permissive, no kind check - deckOf/DECK_PILE_ID lookups retired). Split-for-deck fix just landed was a related side-thread, not part of this sequence - back on track now.
+
+---
+[<small>2026-08-30 22:29:02</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make lint-js | /home/drusifer/Projects/recard/build/build.out
+1765:17  error  Refactor this function to reduce its Cognitive Complexity from 25 to the 15 allowed  sonarjs/cognitive-complexity
+
+✖ 7 problems (7 errors, 0 warnings)
+
+
+---
+[<small>2026-08-30 22:29:14</small>] [**Neo**]->[**Trin**] *swe fix*:
+ Step 1 done: DRAW/DEAL/DEAL_MORE/SHUFFLE_DECK all pileId-scoped, no DECK_PILE_ID hardcoding in the reducer. DEAL tolerates a missing pile as empty (RTG dispatches DEAL unconditionally with no deck pile - expected); DRAW/SHUFFLE_DECK throw (only reachable via a real pile's button). DECK_PILE_ID exported for the one legit remaining use (reshuffleDeal, post-RESET). Bulk-updated ~90 test dispatches. 511/511, check/lint-style clean, lint-js at baseline. @Trin *qa uat
+
+---
+[<small>2026-08-30 22:54:41</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-style | /home/drusifer/Projects/recard/build/build.out
+=== make lint-style @ 2026-08-30 22:54:40 ===
+npm run lint:style
+
+> lint:style
+> stylelint style.css
+
+
+---
+[<small>2026-08-30 22:55:06</small>] [**Neo**]->[**Morpheus**] *swe impl*:
+ Core class conversion done: Pile + all 12 subclasses are real ES classes now - instance methods, toJSON() (free serialization), revivePile()/pileInstanceFor() reconstruct instances. state.piles stays plain records at rest (insertCard/removeCard return plain shapes). Only 3 files ever called PILE_TYPES directly, all updated. Caught a real regression: unrecognized kind must offer nothing, not fall back to base Pile's real actions. 511/511, check/lint-style clean, lint-js at baseline.
+
+---
+[<small>2026-08-31 10:20:51</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-style | /home/drusifer/Projects/recard/build/build.out
+=== make lint-style @ 2026-08-31 10:20:50 ===
+npm run lint:style
+
+> lint:style
+> stylelint style.css
+
+
+---
+[<small>2026-08-31 10:21:16</small>] [**Neo**]->[**Morpheus**] *swe decision*:
+ viewFor refactor done: the old switch(pileVisibility(pile)) with 3 near-duplicate branches is gone. Pile.getView()/contributeToView() replace it - DeckPile overrides getView (adds count), HandPile overrides contributeToView (feeds myHand/otherHandCounts). viewFor is a 1-line loop now. Also retired deckCount entirely (id-based, a canonical-pile vestige) - main.js derives it from view.piles. 511/511, check/lint-style clean, lint-js at baseline. @Morpheus for review
+
+---
+[<small>2026-08-31 18:19:32</small>] [**Neo**]->[**Trin**] *swe fix*:
+ Starting *nit: Hand should always show a card-count badge (both viewer's own + opponents' hands), like the Deck's count badge but adapted for fan layout (no single stack card to anchor to - badge goes in the pile's header instead).
+
+---
+[<small>2026-08-31 18:22:19</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-style | /home/drusifer/Projects/recard/build/build.out
+=== make lint-style @ 2026-08-31 18:22:18 ===
+npm run lint:style
+
+> lint:style
+> stylelint style.css
+
+
+---
+[<small>2026-08-31 18:22:32</small>] [**Neo**]->[**Trin**] *swe fix*:
+ Hand count badge nit done: Pile.showsCountBadge (static, false by default), HandPile overrides true. pileActions.js's showsCountBadge(kind) accessor (same pattern as componentFor). renderActionHeader gets a countBadge option - a real pill badge in the header, not title text (deck keeps its own separate stack-visual badge, not doubled up). Shows for both own hand and opponents'. 513/513, check/lint-style clean, lint-js at baseline. No live visual check yet (DOM/CSS, no unit harness for that).
+
+---
+[<small>2026-08-31 18:25:23</small>] [**Neo**]->[**Trin**] *swe fix*:
+ Correction/generalization: count badge should be a universal pile feature (every kind, upper-left corner), not hand-only inline-in-header. Redesigning: move to renderPileShell (the one function every pile component - panel/fan/deck-stack - funnels through), absolutely positioned corner badge on the pile section itself. Will also retire deck's OLD bespoke stack-card badge (renderDeckStack) once the universal one covers it - one mechanism, not two.
+
+---
+[<small>2026-08-31 18:28:44</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-style | /home/drusifer/Projects/recard/build/build.out
+=== make lint-style @ 2026-08-31 18:28:43 ===
+npm run lint:style
+
+> lint:style
+> stylelint style.css
+
+
+---
+[<small>2026-08-31 18:29:01</small>] [**Neo**]->[**Trin**] *swe fix*:
+ Count badge generalized to ALL piles, not hand-only. Removed the showsCountBadge per-kind flag entirely (pointless once universal) - renderPileShell now appends one absolutely-positioned corner badge (upper-left) for every pile, since it's the one function every pile component funnels through. Deck's own old stack-card badge suppressed inside a real pile (would double up) but still shows on the standalone pre-game preview screen. 511/511, check/lint-style clean, lint-js at baseline.
+
+---
+[<small>2026-08-31 18:34:28</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1195.380692
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced

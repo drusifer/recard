@@ -118,3 +118,4 @@ test('resolveDropTargetFor (D53): delegates to the pile module\'s own resolveDro
   assert.deepEqual(resolveDropTargetFor('plain', boxes, point),
     { targetCardId: 'a', side: 'after', layout: 'stack' });
 });
+

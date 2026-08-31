@@ -41,8 +41,20 @@ export const StandardCardFace = {
     const symbol = SUIT_SYMBOL[card.suit];
     const corner = document.createElement('span');
     corner.className = 'card-corner';
-    // non-breaking space - keeps "10 ♠" from wrapping mid-corner
-    corner.textContent = `${card.rank}\u{A0}${symbol}`;
+    // *nit (direct user request): rank and suit used to sit on one line
+    // ("10 ♠") - a fanned/overlapped card only shows a narrow strip of
+    // its left edge (`.fan-row`/`.middle-card[data-layout]`'s negative
+    // margins), and the suit symbol, at the END of that line, was the
+    // first thing to fall under the next card. Stacking them (rank atop
+    // suit) means the widest line is just the rank alone, narrow enough
+    // to survive the same strip that used to cut the suit off.
+    const rank = document.createElement('span');
+    rank.className = 'card-corner-rank';
+    rank.textContent = card.rank;
+    const suit = document.createElement('span');
+    suit.className = 'card-corner-suit';
+    suit.textContent = symbol;
+    corner.append(rank, suit);
     const pip = document.createElement('span');
     pip.className = 'card-pip';
     pip.textContent = symbol;

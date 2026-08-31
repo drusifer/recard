@@ -6,7 +6,7 @@ import {
 import { seatPosition } from './seating.js';
 import { ZONE_TYPES } from './zones/zoneTypes.js';
 import { faceFor } from './cards/cardFaces.js';
-import { CHANGE_PILE_TYPE_KINDS, pileKindLabel } from './piles/pileTypes.js';
+import { CHANGE_PILE_TYPE_KINDS, pileKindLabel, pileInstanceFor } from './piles/pileTypes.js';
 
 /**
  * The card SHELL, shared by every card face (D76). The `<button>`, its
@@ -20,15 +20,16 @@ import { CHANGE_PILE_TYPE_KINDS, pileKindLabel } from './piles/pileTypes.js';
  * `StandardCardFace` unchanged, and is what any card without a `face`
  * field still gets.
  */
-function cardElement(card, { onClick, disabled } = {}) {
+function cardElement(card, { onClick, disabled, back = false } = {}) {
   const element = document.createElement('button');
   element.type = 'button';
   const face = faceFor(card);
   const extraClass = face.className?.(card) ?? '';
-  element.className = 'card' + (extraClass ? ` ${extraClass}` : '');
+  element.className = 'card' + (back ? ' card-back' : '') + (extraClass ? ` ${extraClass}` : '');
   element.dataset.cardId = card.id;
 
-  face.render(element, card);
+  if (back) element.textContent = '🂠';
+  else face.render(element, card);
 
   if (onClick && !disabled) element.addEventListener('click', () => onClick(card));
   else element.disabled = true;
@@ -53,13 +54,6 @@ function cardBackElement(card) {
   element.textContent = '🂠';
   if (card?.id) element.dataset.cardId = card.id;
   return element;
-}
-
-function ownerTag(name) {
-  const tag = document.createElement('div');
-  tag.className = 'owner-tag';
-  tag.textContent = name;
-  return tag;
 }
 
 /**
@@ -570,7 +564,7 @@ function performReveal(card, viewerId, onReveal) {
 }
 
 export function renderPileCards(container, pileView, allPiles, options = {}) {
-  const { resolveOwnerName, onMoveCard, onCardLift, onCardDrag } = options;
+  const { onMoveCard, onCardLift, onCardDrag } = options;
   container.replaceChildren();
   // D45: was hardcoded `kind: 'plain'` below - harmless while plain was
   // the only 'mixed'-visibility pile type, a real bug the moment a
@@ -719,26 +713,27 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
     // dispatch on is dead code now - `faceDown` was NEVER a real
     // game-state field, only a marker `Pile.redactCard` (now deleted
     // everywhere) stamped onto a card it was hiding. Every card reaching
-    // this renderer is the real thing now, always - always the face.
-    // `faceUp` is still a real field (was this card dealt/played face-up
-    // or down), so it stays visible as a plain status tag, not a
-    // face-down BACK - "hidden from others" was misleading the moment
-    // redaction went away (nothing is hidden from anyone now).
+    // this renderer is the real thing now, always - the DATA is never
+    // hidden from anyone (D84). The VISUAL is a separate, per-pile-TYPE
+    // question D84 never touched, so it's answered polymorphically
+    // through the Pile hierarchy (`pileInstanceFor`, `Pile.showsFace`)
+    // instead of branching on `pile.kind` here - `PlayerHandPile` is
+    // what makes a hand still show its own owner's cards face-up despite
+    // `faceUp: false` (`toHandCard`); every other pile follows the
+    // card's own real `faceUp` for the first time (previously always
+    // the real face plus a redundant "face-down" text label - a
+    // face-down card should look face-down, not show its content
+    // captioned "you shouldn't be able to see this").
+    const pileInstance = pileInstanceFor(pile, options.viewerId);
+    const isBack = !pileInstance.showsFace(card, options.viewerId);
     let cardOptions;
-    if (canReveal) cardOptions = { onClick: () => performReveal(card, options.viewerId, options.onReveal) };
-    else if (canRotate) cardOptions = { onClick: () => options.onRotate(card.id) };
-    else cardOptions = { disabled: true };
+    if (canReveal) cardOptions = { onClick: () => performReveal(card, options.viewerId, options.onReveal), back: isBack };
+    else if (canRotate) cardOptions = { onClick: () => options.onRotate(card.id), back: isBack };
+    else cardOptions = { disabled: true, back: isBack };
     const face = cardElement(card, cardOptions);
     if (canReveal) face.classList.add('revealable');
     if (canRotate) face.classList.add('rotatable');
     wrapper.append(face);
-    if (card.owner) wrapper.append(ownerTag(resolveOwnerName?.(card.owner) ?? card.owner));
-    if (card.faceUp === false) {
-      const hiddenTag = document.createElement('div');
-      hiddenTag.className = 'owner-tag';
-      hiddenTag.textContent = 'face-down';
-      wrapper.append(hiddenTag);
-    }
 
     container.append(wrapper);
   }
@@ -927,6 +922,23 @@ export function renderPileShell(container, pile, allPiles, options, buildRow) {
   // touchTargetAt/attachTouchDrag.
   container.dataset.kind = pile.kind;
 
+  // D95 (direct user request: "make card counts a feature for all
+  // Piles... upper left corner... like a badge") - universal now, no
+  // per-kind opt-in: every pile gets the same corner-stamped count,
+  // here in `renderPileShell` because it's the ONE function every pile
+  // component (`<pile-panel>`/`<fan-pile>`/`<deck-stack>`) actually
+  // funnels through - one append, not three copies. Absolutely
+  // positioned (`.pile-count-badge`, style.css) against `.pile-section`
+  // itself, not any one card - the same corner regardless of whether
+  // the pile renders as a flat row, a fan, or a stack. `pile.count ??
+  // pile.cards.length` matches every other place a possibly-redacted
+  // pile's true size is read (a hidden `deck` pile's view carries
+  // `count` explicitly; every other kind's is just its real array).
+  const countBadge = document.createElement('span');
+  countBadge.className = 'pile-count-badge';
+  countBadge.textContent = pile.count ?? pile.cards.length;
+  container.append(countBadge);
+
   // UX follow-up (direct user request): "like zones, Piles are
   // Actionable and should have a title bar with action buttons for
   // that pile type" - every pile's own heading is a real
@@ -937,23 +949,19 @@ export function renderPileShell(container, pile, allPiles, options, buildRow) {
   // pure superset of the old plain-text heading for those - no visual
   // change unless a kind actually has pile-level actions.
   //
-  // NOTE (flagged, not yet done): `sortRank`/`sortSuit` are filtered out
-  // here even though `handPile.pileActions` offers them to a hand's
-  // owner - they used to reorder a CLIENT-ONLY local view of the hand
-  // (D14, `handOrder.js`), which had no home left once `renderHand`'s
-  // bespoke rendering was retired (a hand's cards render in `pile.
-  // cards`' own order now, same as any other pile). Showing the buttons
-  // without a working sort behind them would be a false affordance -
-  // left out until sort becomes a real thing to wire up (either a
-  // client-side order layer reintroduced generically, or a real reducer
-  // action, now that a hand is state-level).
+  // D91: `sortRank`/`sortSuit` used to be filtered out here - they'd
+  // offered from `handPile.pileActions` since D14 with nothing behind
+  // them (D14's own client-only `handOrder.js` overlay had no home left
+  // once a hand became a real state-level pile). `SORT_PILE` (state.js)
+  // is that real reducer action now, so the buttons are a real
+  // affordance and no longer need hiding.
   const heading = document.createElement('header-actions');
   container.append(heading);
   heading.render(
     // *nit (2026-08-26), direct user request: the card count no longer
-    // appears in a pile's own title text ("Deck (32)" -> "Deck") - the
-    // count is still visible elsewhere for kinds where it matters (the
-    // deck's own stack badge, a plain pile's actual card row).
+    // appears in a pile's own title text ("Deck (32)" -> "Deck") - D95
+    // (below, `renderPileShell`'s own corner-badge append) is where
+    // every pile's count actually shows now, not the title.
     pile.name,
     pileLevelActions(pile.kind, {
       isOwner: pile.ownerId === options.viewerId,
@@ -976,7 +984,7 @@ export function renderPileShell(container, pile, allPiles, options, buildRow) {
       // exactly this). Same known-id exemption `renderZonePanel`
       // already hardcodes for the Table Zone, just for its pile
       // counterpart.
-      .filter((id) => id !== 'sortRank' && id !== 'sortSuit' && !(id === 'remove' && pile.id === 'table')),
+      .filter((id) => !(id === 'remove' && pile.id === 'table')),
     {
       // `pile-title`, not `panel-title` - visually/semantically distinct
       // from a Zone's own heading class, and the selector
@@ -1075,7 +1083,129 @@ export function renderPileShell(container, pile, allPiles, options, buildRow) {
  * wrapper around `renderPileShell`, same shape `<fan-pile>`/
  * `<deck-stack>` now have for their own row shapes.
  */
+/**
+ * The Split picker (D91, direct user request: "we're missing... split
+ * pile" - `SPLIT_PILE` (state.js) has been a real, tested reducer
+ * action since long before this; there was simply never a way to
+ * trigger it, on the standing "no false affordance" discipline
+ * (`Pile.pileActions`'s own comment). Spec: raise the cards into a
+ * tight fan and KEEP them raised until toggled off; hovering
+ * highlights the nearest gap between cards, with guide marks at the
+ * 25/50/75% marks along the row; clicking that gap commits.
+ *
+ * D92 (direct user request: "split should always fan the pile to allow
+ * the guided picker" - deck included, no instant-shortcut carve-out):
+ * called from `<deck-stack>` (`DeckStack.js`) exactly the same way
+ * `<pile-panel>` calls it - a deck's card array is real and full in
+ * the view (D84, "TOTAL PERMISSIVE" - the DATA was never redacted),
+ * `DeckPile.showsFace` (always `false`) is what keeps the fan showing
+ * real backs, not real faces, for a pile whose whole point is staying
+ * hidden. No pile-kind branch here at all - the picker doesn't know or
+ * care that a deck is any different from any other pile.
+ *
+ * Every card renders inert (`disabled: true`) while picking - the
+ * normal drag/click affordances would fight the hover-to-choose-a-gap
+ * gesture this row exists for. `pileInstanceFor`'s `showsFace` still
+ * decides face-vs-back per card (same rule as the normal row) - picking
+ * a split point is not a special "peek" mode.
+ */
+export function renderSplitPicker(container, pile, options) {
+  // `fan-row` reuses the exact raise (`--raise-base`, below) and
+  // overlap-margin rules the hand's own fan already established (
+  // `.fan-row .middle-card`/`.fan-row .middle-card + .middle-card`,
+  // style.css) - a tight fan is a tight fan, no reason to duplicate the
+  // formula for a second row shape.
+  const row = document.createElement('div');
+  row.className = 'card-row split-picker-row fan-row';
+  container.append(row);
+
+  const pileInstance = pileInstanceFor(pile, options.viewerId);
+  const wrappers = pile.cards.map((card, index) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'middle-card split-picker-card';
+    // A shallow rotate+raise per card, pivoting off-center - just
+    // enough to read as "lifted into a fan", not the full hand-fan
+    // curve (`renderPileCards`' own `--raise-base`, a wider spread
+    // that would push a long pile off the panel).
+    const center = (pile.cards.length - 1) / 2;
+    const offset = index - center;
+    wrapper.style.setProperty('--raise-base', `rotate(${offset * 3}deg) translateY(${-4 - Math.abs(offset) * 1.5}px)`);
+    const isBack = !pileInstance.showsFace(card, options.viewerId);
+    wrapper.append(cardElement(card, { disabled: true, back: isBack }));
+    row.append(wrapper);
+    return wrapper;
+  });
+
+  // Anchored to `row` itself, not `container` (the whole pile-section,
+  // header included) - a real bug caught before the user ever hit it
+  // live: `container`'s own height spans the title bar too, so a guide
+  // positioned against IT stretched from behind the header down through
+  // the cards, reading as a stray line with no relationship to what was
+  // under the pointer. `row` is exactly the cards' own box.
+  const guides = document.createElement('div');
+  guides.className = 'split-picker-guides';
+  for (const pct of [25, 50, 75]) {
+    const guide = document.createElement('div');
+    guide.className = 'split-picker-guide';
+    guide.style.left = `${pct}%`;
+    guides.append(guide);
+  }
+  row.append(guides);
+
+  const highlight = document.createElement('div');
+  highlight.className = 'split-picker-highlight';
+  highlight.hidden = true;
+  row.append(highlight);
+
+  // The x-coordinate of gap `index` (`cards[0..index)` stay, `cards
+  // [index..]` move - the same convention `splitPileAt`, state.js,
+  // uses) - the midpoint between the card just before it and the card
+  // just after, in viewport coordinates so it can be compared straight
+  // against a pointer event's own `clientX`.
+  function gapX(index) {
+    const before = wrappers[index - 1].getBoundingClientRect();
+    const after = wrappers[index].getBoundingClientRect();
+    return (before.right + after.left) / 2;
+  }
+
+  function nearestGap(clientX) {
+    let nearest = 1;
+    let nearestDistance = Infinity;
+    for (let index = 1; index < wrappers.length; index++) {
+      const distance = Math.abs(clientX - gapX(index));
+      if (distance < nearestDistance) { nearestDistance = distance; nearest = index; }
+    }
+    return nearest;
+  }
+
+  if (wrappers.length >= 2) {
+    row.addEventListener('pointermove', (event) => {
+      const index = nearestGap(event.clientX);
+      const rowRect = row.getBoundingClientRect();
+      highlight.hidden = false;
+      highlight.style.left = `${gapX(index) - rowRect.left}px`;
+      highlight.dataset.index = String(index);
+    });
+    row.addEventListener('pointerleave', () => { highlight.hidden = true; });
+    row.addEventListener('click', () => {
+      if (highlight.hidden) return;
+      options.onSplitCommit?.(Number(highlight.dataset.index));
+    });
+  }
+
+  return row;
+}
+
 export function renderPile(container, pile, allPiles, options = {}) {
+  // D91-follow-up: a pile toggled into Split/Pickup picking mode
+  // (`options.splitPicker`, set by `main.js`'s local-only UI state -
+  // this never reaches the reducer until a gap is actually clicked)
+  // renders the picker row instead of the normal card row. Nothing
+  // else about the shell (heading/actions/drop wiring) changes.
+  if (options.splitPicker?.pileId === pile.id) {
+    renderPileShell(container, pile, allPiles, options, (c) => renderSplitPicker(c, pile, options));
+    return;
+  }
   renderPileShell(container, pile, allPiles, options, (c) => {
     const row = document.createElement('div');
     row.className = 'card-row';
@@ -1534,10 +1664,20 @@ export function renderDeckStack(container, count, options = {}) {
     const back = cardBackElement(options.topCard);
     back.classList.add('deck-stack-card');
     stack.append(back);
-    const badge = document.createElement('span');
-    badge.className = 'deck-count-badge';
-    badge.textContent = count;
-    stack.append(badge);
+    // D95 (direct user request: "make card counts a feature for all
+    // Piles... like a badge"): every real pile now gets a universal
+    // corner badge from `renderPileShell` itself - `<deck-stack>`'s OWN
+    // badge here would double up with it. `options.pileId` is only ever
+    // set by `DeckStackElement` (a real pile, wrapped in
+    // `renderPileShell`); the pre-game preview screen (`#host-deck-area`)
+    // calls this directly with no `pileId` and no `renderPileShell`
+    // wrapper at all, so it still needs this one to show anything.
+    if (!options.pileId) {
+      const badge = document.createElement('span');
+      badge.className = 'deck-count-badge';
+      badge.textContent = count;
+      stack.append(badge);
+    }
     // D67, direct user correction ("drop isn't triggering an action
     // it's moving cards around... use the same mechanism as all the
     // other piles, this is a generic pile behavior for all piles"):

@@ -2,15 +2,23 @@
  * The pile-type registry (D42, D56) - `pile.kind` dispatches here
  * instead of being switched on as a string across state.js,
  * pileActions.js, and ui.js. Maps each `kind` string to its real class
- * (`extends Pile`) - a class's static members are read exactly the same
- * way a module namespace's exports were, so every `PILE_TYPES[kind]
- * .method(...)` call site is unchanged.
+ * (`extends Pile`).
+ *
+ * D93 (direct user request: "undo the Piles are plain data objects
+ * decision... rich type hierarchy with domain abstraction"): piles are
+ * real instances now, not plain data passed into static methods -
+ * `revivePile(data)`/`pileInstanceFor(pile, viewerId)` below are the
+ * two places a `kind` string turns into a live `new SubClass(data)`,
+ * so nowhere else needs to reach into `PILE_TYPES` directly.
  */
 import { Pile } from './Pile.js';
 import { DeckPile } from './DeckPile.js';
 import { HandPile } from './HandPile.js';
+import { PlayerHandPile } from './PlayerHandPile.js';
 import { DiscardPile } from './DiscardPile.js';
 import { FoundationPile } from './FoundationPile.js';
+import { RunPile } from './RunPile.js';
+import { SetPile } from './SetPile.js';
 import { CascadePile } from './CascadePile.js';
 import { RankAdjacentPile } from './RankAdjacentPile.js';
 import { BattlefieldPile } from './BattlefieldPile.js';
@@ -23,6 +31,8 @@ export const PILE_TYPES = {
   hand: HandPile,
   discard: DiscardPile,
   foundation: FoundationPile,
+  run: RunPile,
+  set: SetPile,
   cascade: CascadePile,
   rankAdjacent: RankAdjacentPile,
   battlefield: BattlefieldPile,
@@ -67,4 +77,52 @@ export const CHANGE_PILE_TYPE_KINDS = Object.keys(PILE_TYPES);
 export function pileKindLabel(kind) {
   if (kind === 'plain') return 'Pile';
   return kind.charAt(0).toUpperCase() + kind.slice(1);
+}
+
+/**
+ * Reconstructs a real `Pile` instance from plain data (a wire message,
+ * a `localStorage` read, or a plain record already living in
+ * `state.piles`) - already an instance, returned unchanged. The one
+ * place a `kind` string turns into a live object anywhere outside this
+ * module.
+ */
+export function revivePile(data) {
+  if (data instanceof Pile) return data;
+  const Cls = PILE_TYPES[data.kind] ?? Pile;
+  return new Cls(data);
+}
+
+/**
+ * A throwaway instance carrying only `kind` - for the handful of
+ * `pileActions.js` accessors that only ever had a bare kind STRING in
+ * scope (not a real pile object), historically because the two real
+ * call sites (`ui.js`/`main.js`) never had one either (see
+ * `pileLevelActions`'s own comment). None of the methods these
+ * accessors call (`pileActions`/`disabledActions`/`resolveDropTarget`)
+ * read any instance field beyond `kind` itself, so this is safe.
+ *
+ * `undefined` for an unregistered kind - deliberately NOT `revivePile`'s
+ * "fall back to the base Pile" default: these accessors are
+ * presentation-layer input that must degrade to a safe empty result for
+ * a kind the registry doesn't recognize, never silently grant a base
+ * Pile's real actions to something bogus. Each caller supplies its own
+ * safe fallback (`?? []`/`?? {}`).
+ */
+export function pileForKind(kind) {
+  const Cls = PILE_TYPES[kind];
+  return Cls ? new Cls({ kind }) : undefined;
+}
+
+/**
+ * The real instance that actually decides how this pile renders a card
+ * TO `viewerId` - `PILE_TYPES[pile.kind]` for every pile, except a hand
+ * pile viewed by its own owner, which is a `PlayerHandPile` instead
+ * (`HandPile`'s `showsFace` is correct for anyone else). The one place
+ * that decision gets made, so `ui.js`'s render loop calls
+ * `pileInstanceFor(pile, viewerId).showsFace(card, viewerId)`
+ * polymorphically without ever branching on `pile.kind` itself.
+ */
+export function pileInstanceFor(pile, viewerId) {
+  const Cls = pile.kind === 'hand' && pile.ownerId === viewerId ? PlayerHandPile : (PILE_TYPES[pile.kind] ?? Pile);
+  return new Cls(pile);
 }

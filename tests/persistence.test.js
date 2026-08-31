@@ -20,7 +20,7 @@ function playedGame() {
   let state = createInitialState({}, () => 0.5);
   state = reduce(state, { type: 'JOIN', playerId: 'h', name: 'Host' });
   state = reduce(state, { type: 'JOIN', playerId: 'g', name: 'Guest' });
-  state = reduce(state, { type: 'DEAL', cardsPerPlayer: 5 });
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 5 });
   state = reduce(state, { type: 'CREATE_ZONE', name: 'Discard' });
   state = reduce(state, { type: 'ADJUST_SCORE', targetPlayerId: 'g', delta: 1 });
   state = reduce(state, { type: 'PLAY', playerId: 'h', cardId: state.piles.find((p) => p.kind === 'hand').cards[0].id });

@@ -35,6 +35,66 @@ card's real identity, always, not just whether it can be moved. As of
 D85, the same removal reaches the three BULK/pile-level actions that
 still had their own separate authorization gate.
 
+### D91. Card-back rendering is polymorphic per Pile subclass; the Meld family is finished (`run`/`set` registered)
+Two direct user requests in one thread, both resolved through the
+existing `Pile` class hierarchy rather than new conditionals:
+
+**Face-down cards render as an actual back, decided per pile type.**
+Playing a real game of Gin Rummy surfaced a live bug D84's redaction
+removal never intended: every hand card showed its real rank/suit PLUS
+a redundant "face-down" text label and an owner-name tag under every
+single card (clutter - a hand's own seat/header already says whose
+cards they are). First-pass fix used `pile.kind !== 'hand'` conditionals
+inline in `ui.js`'s `renderPileCards` - rejected by direct user request
+("you are not writing clean code... use Polymorphism... we have a Pile
+Hierarchy use it"). Reworked as two new `Pile` static hooks:
+`showsFace(pile, card, viewerId)` (base: follows the card's real
+`faceUp` - D84 never redacted the DATA, only who can move it; this is
+the separate VISUAL question) and, briefly, `showsOwnerTag` (removed
+again below). `HandPile` overrides `showsFace` `false` (a hand's own
+`faceUp`, stamped by `toHandCard`, was never a real orientation, so a
+generic hand always renders as backs); the new `PlayerHandPile extends
+HandPile` overrides it back to `true` for the one case - the viewer
+looking at their own hand. `src/piles/pileTypes.js`'s new
+`pileClassFor(pile, viewerId)` is the one place that picks
+`PlayerHandPile` vs `PILE_TYPES[pile.kind]`; `renderPileCards` calls
+`.showsFace(...)` with zero `pile.kind` branching left.
+
+The owner-name tag itself was then cut entirely (direct user request:
+"remove owner tags completely that is not a requested feature") -
+`ui.js`'s `ownerTag()` helper, its call site, `Pile`/`HandPile`'s
+`showsOwnerTag` hook (dead once its one caller was gone), and the
+`.owner-tag` CSS rule all deleted rather than kept unused. Net result on
+`renderPileCards`'s own cognitive-complexity lint number: 25 (original
+baseline) -> 26 (rejected if-check version) -> 25 (polymorphic version)
+-> 22 (after the tag removal) - a real improvement over where it
+started, not just a wash.
+
+**The Meld pile family is finished, not just `FoundationPile`.**
+`RunPile` (same-suit sequential) was fully implemented since D56 but
+only ever reachable through `FoundationPile extends RunPile` - no
+`kind` mapped to it directly, so a player could never create a plain
+Gin Rummy-style run meld, only Solitaire's ace-anchored one. `SetPile`
+(same-rank meld) was a documented placeholder with `canAccept` never
+implemented at all. Direct user request ("finish the Meld pile types"),
+prompted by the same live Gin Rummy session having no way to meld:
+implemented `SetPile.canAccept` (empty accepts anything; non-empty
+requires the same rank as the pile's existing cards - suit is
+unconstrained since a single deck structurally can't offer a rank+suit
+duplicate anyway) and registered both `run: RunPile` and `set: SetPile`
+in `PILE_TYPES` (`src/piles/pileTypes.js`). No `SNAPSHOT_VERSION` bump -
+unlike D90's rename, this only ADDS kinds, an old save with no `run`/
+`set` piles is still fully valid. No preset wiring - same "manual,
+host-driven" convention every other kind uses (`changePileType` reaches
+both automatically via `CHANGE_PILE_TYPE_KINDS = Object.keys(PILE_TYPES)`,
+D87); a player converts any pile to `run`/`set` themselves, same as any
+other kind.
+
+Verified: 513/513 tests (4 new: registry count, `RunPile`/`SetPile`
+`canAccept`, `SetPile`'s inherited Meld behavior, `pileKindLabel`),
+`make check`/`lint-js`/`lint-style` clean at the unchanged 7-error
+cognitive-complexity baseline.
+
 ### D90. The word "zone" never means "pile" anywhere in this codebase again
 Direct user request, prompted by asking what `CHANGE_PILE_TYPE`'s
 `kind: 'zone'` target actually did: "the shape is Table->Zone->Pile->

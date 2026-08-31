@@ -20,7 +20,7 @@ export class BattlefieldPile extends Pile {
   /** Permanents spread rather than stack, so a drop lands beside its
    * neighbours (base `Pile` halo behaviour) - inherited deliberately. */
 
-  static pileActions({ isOwner, isShared } = {}) {
+  pileActions({ isOwner, isShared } = {}) {
     if (!isOwner && !isShared) return [];
     return ['untapAll', 'changePileType', 'remove'];
   }
@@ -28,7 +28,7 @@ export class BattlefieldPile extends Pile {
   /** `remove`/`changePileType` stay empty-only (inherited); `untapAll`
    * is never disabled - untapping an empty board is a harmless no-op,
    * and greying it out mid-game would just read as broken. */
-  static disabledActions(count) {
+  disabledActions(count) {
     return count > 0 ? ['remove'] : [];
   }
 }

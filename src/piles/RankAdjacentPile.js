@@ -20,17 +20,17 @@ export class RankAdjacentPile extends Pile {
   /**
   No before/after halo - exactly one landing spot (on top).
   */
-  static resolveDropTarget() {
+  resolveDropTarget() {
     return {};
   }
 
   /** US-58: empty accepts anything; otherwise the next card must be
    * exactly one rank above OR below the current top card, any suit,
    * wrapping King<->Ace (Spit has no "ends" the way Foundation does). */
-  static canAccept(pile, card) {
-    if (pile.cards.length === 0) return true;
+  canAccept(card) {
+    if (this.cards.length === 0) return true;
     // `insertCard` prepends (STACK convention) - index 0 is the top.
-    const top = pile.cards[0];
+    const top = this.cards[0];
     const cardIndex = RANKS.indexOf(card.rank);
     const topIndex = RANKS.indexOf(top.rank);
     const diff = Math.abs(cardIndex - topIndex);
@@ -42,14 +42,14 @@ export class RankAdjacentPile extends Pile {
    * request (2026-08-27) - see `state.js`'s `CHANGE_PILE_TYPE` doc
    * comment for the risk that carries. Same `isOwner`/`isShared` gate
    * `Pile`'s own `pileActions()` uses. */
-  static pileActions({ isOwner, isShared } = {}) {
+  pileActions({ isOwner, isShared } = {}) {
     if (!isOwner && !isShared) return [];
     return ['changePileType'];
   }
 
   /** Every drop lands on top, unconditionally - same STACK shape as
    * `DiscardPile.insertCard`. */
-  static insertCard(pile, card) {
-    return { ...pile, cards: [card, ...pile.cards] };
+  insertCard(card) {
+    return { ...this.toJSON(), cards: [card, ...this.cards] };
   }
 }

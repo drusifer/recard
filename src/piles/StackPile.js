@@ -18,17 +18,17 @@ export class StackPile extends Pile {
   /**
   One landing spot - on top. No before/after halo.
   */
-  static resolveDropTarget() {
+  resolveDropTarget() {
     return {};
   }
 
   /** LIFO: prepend, matching `DiscardPile`/`DeckPile`'s "top of the pile
    * is index 0" convention. */
-  static insertCard(pile, card) {
-    return { ...pile, cards: [card, ...pile.cards] };
+  insertCard(card) {
+    return { ...this.toJSON(), cards: [card, ...this.cards] };
   }
 
-  static pileActions({ isOwner, isShared } = {}) {
+  pileActions({ isOwner, isShared } = {}) {
     if (!isOwner && !isShared) return [];
     return ['changePileType', 'remove'];
   }

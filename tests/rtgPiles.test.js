@@ -30,14 +30,14 @@ test('BattlefieldPile: a permanent can be tapped, moved and picked up', () => {
   // Tapping IS `rotate` (D76 note): the battlefield is the one pile
   // where it's the primary interaction, so it must stay offered.
   const card = { id: 'c1', faceUp: true, owner: null };
-  const actions = BattlefieldPile.cardActions({ kind: 'battlefield' }, card, 'p1');
+  const actions = new BattlefieldPile({ kind: 'battlefield' }).cardActions(card, 'p1');
   assert.ok(actions.includes('rotate'));
   assert.ok(actions.includes('move'));
   assert.ok(actions.includes('pickup'));
 });
 
 test('BattlefieldPile: offers untapAll, and never split or take', () => {
-  const actions = BattlefieldPile.pileActions(shared);
+  const actions = new BattlefieldPile({}).pileActions(shared);
   assert.ok(actions.includes('untapAll'), 'the untap step is a real, frequent action');
   // You do not scoop up the battlefield the way you scoop a pile of
   // cards - every permanent on it belongs to a distinct game object.
@@ -46,7 +46,7 @@ test('BattlefieldPile: offers untapAll, and never split or take', () => {
 });
 
 test('BattlefieldPile: a non-owner of a personal battlefield gets nothing', () => {
-  assert.deepEqual(BattlefieldPile.pileActions(stranger), []);
+  assert.deepEqual(new BattlefieldPile({}).pileActions(stranger), []);
 });
 
 // --- ExilePile ---------------------------------------------------------
@@ -58,11 +58,11 @@ test('BattlefieldPile: a non-owner of a personal battlefield gets nothing', () =
 // get the same reveal/pickup/move/rotate as any other visible card.
 test('ExilePile: exiled cards are face-up and get the same card actions as any other pile', () => {
   const faceUp = { id: 'c1', faceUp: true, owner: null };
-  assert.deepEqual(ExilePile.cardActions({ kind: 'exile' }, faceUp, 'p1'), ['pickup', 'move', 'rotate']);
+  assert.deepEqual(new ExilePile({ kind: 'exile' }).cardActions(faceUp, 'p1'), ['pickup', 'move', 'rotate']);
 });
 
 test('ExilePile: never offers take — exile cannot be scooped back', () => {
-  const actions = ExilePile.pileActions(shared);
+  const actions = new ExilePile({}).pileActions(shared);
   assert.ok(!actions.includes('take'));
   assert.ok(!actions.includes('split'));
 });
@@ -71,12 +71,12 @@ test('ExilePile: never offers take — exile cannot be scooped back', () => {
 
 test('StackPile: is last-in-first-out — a new spell goes on top', () => {
   const pile = { id: 's', kind: 'stack', cards: [{ id: 'first' }] };
-  const after = StackPile.insertCard(pile, { id: 'second' });
+  const after = new StackPile(pile).insertCard({ id: 'second' });
   assert.equal(after.cards[0].id, 'second', 'most recent resolves first');
 });
 
 test('StackPile: the top item can be taken off to resolve it', () => {
-  const actions = StackPile.cardActions({ kind: 'stack' }, { id: 'c', faceUp: true }, 'p1');
+  const actions = new StackPile({ kind: 'stack' }).cardActions({ id: 'c', faceUp: true }, 'p1');
   assert.ok(actions.includes('move'), 'resolving = moving it to wherever it goes');
 });
 
