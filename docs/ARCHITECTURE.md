@@ -1,11 +1,11 @@
 # Architecture — Recard
 
 **Owner:** Morpheus (Tech Lead)
-**Status:** v1, v1.1, v1.2, v1.3, v1.4 shipped. v1.5 decisions below
-(D21-D23) are binding for the current sprint (US-32..36, "snap-to
-stack/overlap + deck operations" + a user-directed foundational `Pile`
-storage unification, D23, sequenced first).
-**Last updated:** 2026-08-29
+**Status:** v1-v1.4 shipped; the sprint-numbered framing below (v1.5,
+D21-D23) is historical - decisions are numbered continuously now and
+the highest number is always the current binding state, not a
+particular sprint's scope.
+**Last updated:** 2026-09-01 (D92-D99)
 
 ## Core invariant (direct user request, stated repeatedly - binding on every Pile type, present and future)
 
@@ -34,6 +34,184 @@ still: card identity REDACTION (D7) is gone too - a viewer sees every
 card's real identity, always, not just whether it can be moved. As of
 D85, the same removal reaches the three BULK/pile-level actions that
 still had their own separate authorization gate.
+
+### D99. Hand size default sourced from preset data, not two disagreeing hardcoded numbers
+Direct user request: "fix the hand size default by including that in
+the preset data." `lastDealCount` (`main.js`) was hardcoded to `1`;
+`index.html`'s `#cards-per-player` input carried its own, DIFFERENT
+hardcoded `value="7"` - two magic numbers for the same concept, neither
+sourced from a preset, silently disagreeing with each other. Fixed:
+`lastDealCount` now initializes from `selectedPreset.cardsPerPlayer`
+(the same source `create-table`'s own re-sync already used); the HTML
+`value="7"` was removed outright - dead markup, `create-table`'s
+handler always overwrites this field from the preset before the
+(initially `hidden`) share panel is ever shown, so it was never
+actually visible to a user. No unit coverage exists for `main.js`'s DOM
+glue (established pattern) - verified live via Playwright instead, with
+two different presets (War: 26, Gin Rummy: 10), zero page errors.
+
+### D98. MERGE_PILE: dropping a pile onto another pile merges its cards into it
+Direct user request: "all piles can be dropped into any other pile...
+all the cards on the dropped pile [are] added to the target pile and
+once empty the dropped pile is removed. The target pile maintains its
+type." A genuinely new drop target, not a variant of `MOVE_PILE` (D55):
+`MOVE_PILE` fires when a dragged pile lands on a Zone's own EMPTY space
+(always a sibling there, never a merge - Smith's Gate 1 ruling,
+unchanged); the new `MERGE_PILE` reducer case fires when a dragged pile
+lands directly ON another pile's own body.
+
+Two direct user corrections landed the same session, before this
+settled:
+1. **Order.** The first implementation looped `transferCard` once per
+   source card, so each target kind's own `insertCard` convention
+   applied per-card - a real bug for any prepend-style target
+   (`deck`/`discard`): inserting c1-then-c2-then-c3 at the front reverses
+   them. "I prefer... the cards are added in the same order" -> replaced
+   with a single `[...target.cards, ...source.cards]` concat, one rule
+   for every kind, no per-card authorization/`canAccept` check any more
+   (traded away on purpose for simplicity).
+2. **No zone distinction.** The first implementation only merged on a
+   CROSS-zone pile-on-pile drop; a same-zone drop still reordered
+   (`REORDER_PILE`, D-number never assigned - a purely cosmetic action
+   that only ever had this one UI trigger). "remove the weird zone
+   distinction, KISS" -> ANY pile dropped directly on ANY other pile
+   merges now, full stop, regardless of zone. Consequence:
+   `onReorderPile`/`performReorderPile` (`main.js`) had exactly one
+   caller each, both now removed as real dead code. `REORDER_PILE` the
+   REDUCER (`state.js`) is deliberately left in place, untouched and
+   still tested, in case a future gesture wants it back.
+
+Source `deck`/`hand`/the default Table pile are exempt as a MERGE
+source, reusing `REMOVE_PILE`'s (D62) own exact exemption set rather
+than inventing new rules - a merge always ends by removing the source,
+so it inherits exactly what already can't be removed (`deck` is found
+by fixed id elsewhere, never by search; every player must always have
+exactly one `hand`; the built-in Table pile is never player-removable).
+Merging INTO any of them (as the TARGET) is unaffected.
+
+Neo/Trin/Morpheus gate cleared twice (initial ship, then the
+simplification): 514/514, lint at the unchanged 7-function cognitive-
+complexity baseline, multiple load-bearing points mutation-tested.
+
+### D97. Deck's D34 `cardActions` exception struck; HandPile split into `PlayerHandPile`/`OpponentHandPile`
+Two direct user corrections, same session:
+
+**Deck.** "It is absolutely permissable to put cards back on the deck
+and take cards off... split deck, etc." D34's `DeckPile.cardActions() {
+return []; }` (justified at the time by "the deck has never rendered a
+per-card hover row") is gone - `DeckPile` now has a real, unconditional
+`cardActions()` override returning `['reveal', 'pickup', 'move',
+'rotate']`, not the base `Pile` rule (`faceUp === false`), since a real
+deck card never carries a `faceUp` field at all - that condition would
+never fire for one. `canRemoveCard` gained a matching override adding
+`action === 'draw'` on top of the base rule, since `draw` is a
+pile-level action (`DeckPile.pileActions()`), never a per-card
+`cardActions()` entry, but `DRAW`'s own authorization (`transferCard`)
+still routes through this same check.
+
+**Hand.** "I don't like the special ownership property for hand...
+make PlayerHand and OpponentHand as separate classes to encapsulate the
+visibility differences." One `HandPile` used to compute `this.ownerId
+=== viewerId` internally inside `cardActions`/`showsFace`/
+`contributeToView` - now `PlayerHandPile`/`OpponentHandPile` (real
+siblings, `pileInstanceFor` picks between them) each give an
+unconditional answer for their own perspective; no pile method anywhere
+still asks "is this mine?". `pileActions` deliberately stayed shared/
+ctx-based on `HandPile` itself - it was never the offending pattern
+(every other kind's `pileActions` already takes a pre-computed
+`{isOwner}` flag from its caller), and `pileLevelActions`
+(`pileActions.js`)'s one caller with no real pile/viewerId in scope
+(the pre-game deck preview) structurally can't use class-selection at
+all.
+
+Real consequence surfaced by the split, not cosmetic: `state.js`'s
+`transferCard`/`splitPileAt`/`buildView` were authorizing via
+`revivePile` (viewer-agnostic) for 3 genuinely viewer-aware checks that
+only worked before because `HandPile` did the comparison internally -
+switched to `pileInstanceFor(pile, viewerId)`. Mutation-verified:
+reverting either that switch or `pileInstanceFor`'s own `ownerId ===
+viewerId` branch fails a real `state.test.js` PLAY test immediately
+(every owner would silently lose the ability to play their own hand).
+
+511/511 (net -1 from removing 2 stale pre-existing deck-cardActions
+assertions across `pileActions.test.js`/`pileLevelActions.test.js`),
+lint-js back at the unchanged 7-function baseline after fixing 2 real
+new violations this work introduced (an unused import, two
+block-comment-style errors) - not waved through.
+
+### D96. Universal drag-and-drop guarantee, as a structural test rather than folklore
+Morpheus's post-D91-D95 refactor-plan item D (`agents/morpheus.docs/
+state.md`): one test iterating `Object.values(PILE_TYPES)`, asserting
+every concrete subclass's `cardActions` for a visible card includes
+`move` or `play`, so a FUTURE pile kind that accidentally restricts
+drag-and-drop fails CI immediately - same "executable guarantee, not
+folklore" instinct as `assertCardsConserved` (D88). Originally shipped
+naming `DeckPile` as the one documented exception (its `cardActions`
+was `[]` by design, D34) - superseded days later by D97 above, which
+struck that exception entirely; the test now covers every registered
+kind with zero carve-outs.
+
+### D95. Card-count badges are a universal pile feature, not hand-only
+Direct user request: "make card counts a feature for ALL Piles."
+First-pass landed hand-only, inline in the header text - corrected to a
+single mechanism in `renderPileShell` (the one function every pile
+component - panel/fan/deck-stack - funnels through): an absolutely-
+positioned corner badge (upper-left), appended once, for every kind.
+Deck's own older stack-card badge is suppressed inside a real pile
+(would double up) but still serves the standalone pre-game preview
+screen, which never reaches `renderPileShell`.
+
+### D94. `viewFor`'s per-kind branching replaced by real polymorphic dispatch
+`viewFor`'s old `switch (pileVisibility(pile))` (three near-identical
+branches, a leftover from before D93's class conversion) replaced by
+`Pile.getView()`/`contributeToView()` - `viewFor` itself is now a
+one-line loop over `state.piles`, calling each pile's own instance
+method. The old top-level `deckCount` view field (itself a canonical-
+pile vestige) is retired; `main.js` derives it from `view.piles` now.
+
+### D93. THERE SHOULD BE NO CANONICAL PILES; the Pile hierarchy is real class instances now
+Direct user directive (forceful, all-caps): "THERE SHOULD BE NO
+CANONICAL PILES." `DRAW`/`DEAL`/`DEAL_MORE`/`SHUFFLE_DECK` no longer
+hardcode `DECK_PILE_ID` - every action is `pileId`-scoped now, the same
+pattern `MOVE_CARD`/`SPLIT_PILE` always used. Framing that generalizes
+past this one fix, stated directly by the user as the model going
+forward: "a deck is just a pile of cards" - pile-level actions
+(Draw/Deal/Shuffle/Split/Take) are CONVENIENCE SHORTCUTS for common
+table-organizing moves a player could otherwise make by hand, one drag
+at a time, never privileged game mechanics bound to one blessed pile.
+
+Bigger follow-on surfaced by fixing this properly, same session, also
+direct user override of an earlier architectural assumption ("undo the
+Piles are plain data objects decision... rich type hierarchy with
+domain abstraction"): the ENTIRE `Pile` class hierarchy (`src/piles/
+*.js`) converted from plain-data-plus-static-methods to real ES class
+instances - constructor, instance methods, `toJSON()` for free
+serialization. `revivePile(data)`/`pileInstanceFor(pile, viewerId)`
+(`src/piles/pileTypes.js`) are the only two places a `kind` string
+turns into a live `new SubClass(data)` object anywhere in the codebase.
+`state.piles` stays plain records at rest by design - `insertCard`/
+`removeCard` return plain shapes, so persistence and every existing
+plain-fixture test kept working unchanged.
+
+### D92. Split/Pickup is a real guided fan-and-choose-a-gap picker, for every pile kind including Deck
+Direct user request ("we're missing... split pile" - `SPLIT_PILE`,
+D-numbered earlier, had been a real tested reducer action with no way
+to actually trigger it, "no false affordance" discipline). `ui.js`'s
+`renderSplitPicker`: raises the pile's cards into a tight fan, kept
+raised until toggled off or committed, hovering highlights the nearest
+gap with guide marks at 25/50/75%, clicking commits. Direct follow-up
+correction ("split should always fan the pile to allow the guided
+picker" - deck included, no instant-shortcut carve-out): `DeckPile`
+reuses the exact same picker via `<deck-stack>`, `DeckPile.showsFace()`
+returning `false` unconditionally is what keeps its fan showing real
+backs rather than leaking card identity through the shared picker code.
+A separate `pickupSplit` action briefly existed alongside plain `take`
+and `split` - reversed by direct user correction ("there is not
+supposed to be a pickupSplit... Pickup is Take"): `take` already covers
+"everything into my hand" for any pile. Sort by rank/suit (offered by
+`HandPile.pileActions` since D14 with nothing behind it, once D14's own
+client-only `handOrder.js` overlay was retired) is wired to a real
+`SORT_PILE` reducer action now, not a dead affordance.
 
 ### D91. Card-back rendering is polymorphic per Pile subclass; the Meld family is finished (`run`/`set` registered)
 Two direct user requests in one thread, both resolved through the

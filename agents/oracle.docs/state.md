@@ -305,3 +305,44 @@ changePileType), from the user's perspective, HCI heuristics applied.
 Neo already live-verified functionally via Playwright during
 implementation (Phase 84) - Smith's pass should probe usability/
 learnability specifically, not just re-confirm it runs.
+
+## Groom — docs backfill + CHAT archive (2026-09-01)
+
+Triggered directly (`*ora groom docs and address backfill question`) -
+not a sprint close, a standalone doc-health pass answering a question
+Morpheus/Neo had flagged repeatedly this session: state files kept
+claiming `docs/ARCHITECTURE.md` was "current through D95"/"D99" when it
+was actually stuck at D91 since 2026-08-29 (a real, disclosed drift,
+same class of gap `docs/DECISIONS.md` already has at D20).
+
+- **`docs/ARCHITECTURE.md`**: backfilled D92-D99 (split/pickup guided
+  picker; no-canonical-piles + rich Pile class hierarchy; `viewFor`
+  polymorphic dispatch; universal count badges; universal-DnD guarantee
+  test; Deck cardActions exception struck + HandPile split; MERGE_PILE
+  added then simplified; hand-size default fix). Sourced from Neo/
+  Morpheus/Trin's own state-file summaries this session, cross-checked
+  against the actual CHAT.md decision-broadcast messages, not
+  reconstructed from memory alone. Header stamp/status line updated
+  (was still referencing the long-superseded v1.5/D21-D23 sprint
+  framing).
+- **`docs/DECISIONS.md`**: left untouched, same standing policy since
+  Sprint 14 (superseded by `ARCHITECTURE.md`'s per-sprint sections) -
+  did NOT try to backfill this one too; two separate decision logs
+  drifting independently is worse than one current one.
+- **`agents/oracle.docs/memory.md`**: Major Decisions table got a gap
+  row (D58-D91, same convention as the existing D21-D52 gap row) and a
+  fresh D92-D99 summary row. Repository Structure Memory's `task.md`
+  note flagged stale (still says "current through Sprint 22") - NOT
+  edited, that's Mouse's file per Oracle's own boundary rule.
+- **CHAT.md archived** (rolling `*ora archive`, not `*ora report` - no
+  sprint actually closed): 268 messages had accumulated, well past the
+  50-100 threshold. 199 archived to `agents/chat_archive/
+  CHAT-ARCHIVE-20260901.md` (verified message-count-conserving: 199 +
+  69 kept = 268 exactly), one pointer summary added matching the
+  existing convention, `CHAT.diagram.md` regenerated via `bobp
+  chat-diagram`.
+
+### Next Steps
+Nothing in-flight. If `task.md` staleness matters before the next
+sprint starts, that's Mouse's groom, not mine - flagged in
+`memory.md`, not acted on here.
