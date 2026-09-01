@@ -193,6 +193,28 @@ and dropping each card from src to target then removing the src pile."
    the new order semantics), lint-js at the same 7-fn baseline,
    lint-style clean. Mutation-verified the concat-order line too.
 
+## Session update (2026-09-01): *nit hand size default fix
+
+Direct user request: "fix the hand size default by including that in
+the preset data." Real bug, found by tracing every `cardsPerPlayer`
+default path: `lastDealCount` (main.js) was hardcoded to `1`, while
+`#cards-per-player`'s own HTML `value="7"` was a DIFFERENT hardcoded
+number for the same concept - neither sourced from preset data, and
+they disagreed with each other. Fixed both:
+- `lastDealCount = selectedPreset.cardsPerPlayer` (was `= 1`) - safe
+  because `onPresetSelected()` already ran synchronously at module load
+  by the time this line executes (verified by reading execution order,
+  then confirmed live).
+- Removed `index.html`'s hardcoded `value="7"` entirely - dead markup,
+  `create-table`'s handler always overwrites it from the preset before
+  `#host-share` (which starts `hidden`) is ever shown.
+- **Live-verified via Playwright** (no unit test coverage exists for
+  main.js's DOM glue, matching this codebase's established pattern):
+  loaded the page, clicked Host -> Create Table with no preset change,
+  confirmed `#cards-per-player` shows `26` (War's real `cardsPerPlayer`,
+  not either old hardcoded number), zero page errors.
+- 514/514, lint-js/style unchanged. Handed to Trin.
+
 ## Next Steps
 
 **Nothing in-flight - ready to commit.** Gate cleared (Neo->Trin->

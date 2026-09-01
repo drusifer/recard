@@ -74,8 +74,14 @@
       <ul id="host-roster" class="roster"></ul>
       <!-- D53: min 0, not 1 - Solitaire/Spit deal the whole deck into
            declared table zones instead of a hand, so 0 is a real value
-           a preset can prefill here, not a typo to block. -->
-      <label>Cards per player <input id="cards-per-player" type="number" min="0" max="20" value="7" /></label>
+           a preset can prefill here, not a typo to block. No static
+           `value` - *nit (direct user request, "fix the hand size
+           default by including that in the preset data"): this panel
+           starts `hidden` and main.js's `create-table` handler always
+           overwrites this field from the selected preset's own
+           `cardsPerPlayer` before revealing it, so a hardcoded fallback
+           here was dead markup, never actually seen. -->
+      <label>Cards per player <input id="cards-per-player" type="number" min="0" max="20" /></label>
       <!-- Smith Gate 1 #3: say what the table is waiting for BEFORE it
            happens, or the screen changes under the host with no cause. -->
       <p id="autostart-status" class="deck-config" hidden></p>

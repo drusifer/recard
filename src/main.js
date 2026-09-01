@@ -1509,8 +1509,17 @@ function performCreatePileWithCard(cardId, zoneId) {
 // Start" so a mid-game host can't mis-tap into a reset (Smith Gate 1). ---
 /** Remembers the host's last deal count so a re-render doesn't reset an
  *  input the host already typed into - `renderZones`/`<deck-stack>`
- *  rebuild the deck pile wholesale on every state broadcast. */
-let lastDealCount = 1;
+ *  rebuild the deck pile wholesale on every state broadcast.
+ *
+ *  *nit (direct user request, "fix the hand size default by including
+ *  that in the preset data"): was hardcoded to `1`, disagreeing with
+ *  `#cards-per-player`'s own hardcoded HTML default of `7` (index.html)
+ *  - two magic numbers for the same concept, neither sourced from a
+ *  preset. `selectedPreset` is already real by this point (`onPresetSelected()`
+ *  ran synchronously at module load, above) - the initial default is
+ *  just whichever preset the dropdown starts on, same source of truth
+ *  `Create Table`'s own re-sync (below) already uses. */
+let lastDealCount = selectedPreset.cardsPerPlayer;
 
 // D91/D92 (direct user request, "we're missing... split pile" / "split
 // should always fan the pile"): which pile (if any) is currently

@@ -1072,3 +1072,16 @@ concat, order-preserving for every kind.
 pass unchanged (only its UI trigger, now unreachable, was removed).
 Grepped for stray `onReorderPile`/`performReorderPile` references - none
 left. `lint-js`/`lint-style` unchanged. No blockers. **Verdict: PASS.**
+
+## *nit: hand size default sourced from preset data (2026-09-01) - PASSED
+
+`lastDealCount` (main.js) was hardcoded `1`, `#cards-per-player`'s HTML
+`value` was a different hardcoded `7` - fixed to both derive from
+`selectedPreset.cardsPerPlayer`.
+
+514/514 independently re-run, lint unchanged. No unit coverage exists
+for this (main.js DOM glue, established pattern) - independently live-
+verified myself with a SECOND preset (Gin Rummy, cardsPerPlayer:10,
+explicitly selected) rather than just trusting Neo's single-preset
+check: `#cards-per-player` showed `10` after Create Table, zero page
+errors. No blockers. **Verdict: PASS.**

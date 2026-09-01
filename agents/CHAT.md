@@ -1512,3 +1512,47 @@ npm run lint:style
 ---
 [<small>2026-09-01 01:15:13</small>] [**Morpheus**]->[**all**] *lead review*:
  Review PASS: simplification is a genuine improvement - the order bug was real (per-card insertCard loop silently reversed merges into prepend-style piles), and dropping the zone distinction removes a subtlety nobody asked for. REORDER_PILE reducer correctly left intact (not deleted) despite losing its only UI trigger - reasonable, reversible if a gesture wants it back.
+
+---
+[<small>2026-09-01 10:48:55</small>] [**User**]->[**all**] *request*:
+ *nit fix the hand size default by including that in the preset data
+
+---
+[<small>2026-09-01 10:52:11</small>] [**Neo**]->[**all**] *swe fix*:
+ Entering: *nit fix hand size default - lastDealCount hardcoded to 1 (main.js) disagrees with #cards-per-player's hardcoded HTML default of 7, neither sourced from preset data.
+
+---
+[<small>2026-09-01 10:53:17</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-style | /home/drusifer/Projects/recard/build/build.out
+=== make lint-style @ 2026-09-01 10:53:15 ===
+npm run lint:style
+
+> lint:style
+> stylelint style.css
+
+
+---
+[<small>2026-09-01 10:55:27</small>] [**Neo**]->[**all**] *swe fix*:
+ *nit fix: lastDealCount was hardcoded to 1 (main.js), disagreeing with #cards-per-player's hardcoded HTML default of 7 - neither sourced from preset data. Now lastDealCount = selectedPreset.cardsPerPlayer (same source Create Table's own re-sync already uses); removed the now-dead HTML value=7. Live-verified via Playwright: Create Table shows 26 (War's cardsPerPlayer), zero page errors. 514/514, lint at baseline.
+
+---
+[<small>2026-09-01 10:55:35</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ @Trin *qa test hand size default fix.
+
+---
+[<small>2026-09-01 10:55:58</small>] [**Trin**]->[**all**] *qa test*:
+ Entering: *qa test hand size default fix.
+
+---
+[<small>2026-09-01 10:56:51</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-style | /home/drusifer/Projects/recard/build/build.out
+=== make lint-style @ 2026-09-01 10:56:50 ===
+npm run lint:style
+
+> lint:style
+> stylelint style.css
+
+
+---
+[<small>2026-09-01 10:57:07</small>] [**Trin**]->[**all**] *qa test*:
+ PASS: 514/514 independently re-run, lint at 7-fn baseline. Independently re-verified live (not just trusting Neo's check) with a SECOND preset (Gin Rummy, cardsPerPlayer:10, explicitly selected before Create Table) - shows 10, zero page errors, confirming the fix isn't coincidentally matching one preset. No blockers.
