@@ -1030,10 +1030,9 @@ export function renderPileShell(container, pile, allPiles, options, buildRow) {
       // (hand/foundation/cascade/rankAdjacent - deck reversed by a
       // later *nit, see DeckPile.js) still can't change ZONES (the
       // drop handler below rejects that, matching `MOVE_PILE`'s own
-      // game-rule eligibility) but CAN be reordered among its own
-      // zone's siblings - that half is purely cosmetic, never a
-      // game-rule concern, for any kind.
-      pileDraggable: Boolean(options.onMovePile) || Boolean(options.onReorderPile),
+      // game-rule eligibility) but CAN still be dropped onto another
+      // pile to merge (below) - that's never a game-rule concern.
+      pileDraggable: Boolean(options.onMovePile) || Boolean(options.onMergePile),
       pileId: pile.id,
     },
   );
@@ -1048,30 +1047,23 @@ export function renderPileShell(container, pile, allPiles, options, buildRow) {
     container.addEventListener('dragleave', () => clearPileDragOver(container, row));
     container.addEventListener('drop', (event) => {
       event.preventDefault();
-      // *nit (2026-08-26), direct user request: "relocated within their
-      // zone (ordering)" - a dragged PILE dropped directly onto ANOTHER
-      // pile in the SAME zone still just reorders it to sit right there
-      // (purely cosmetic, always allowed - `onReorderPile`, below).
-      //
       // (direct user request) - "all piles can be dropped into any other
       // pile... cards added to the target, dropped pile removed once
-      // empty." A drop onto a pile in a DIFFERENT zone used to bubble up
-      // to the containing Zone's own drop handler (`onMovePile` -
-      // reparent as a sibling there). That reparent-as-sibling behavior
-      // still exists for a pile dropped on a zone's own EMPTY space
-      // (Smith's Gate 1 ruling, D55, unchanged) - but landing directly
-      // ON another pile now merges into it instead, `stopPropagation()`'d
-      // here so it no longer reaches that handler.
+      // empty." Direct user correction: "remove the weird zone
+      // distinction, KISS" - ANY pile dropped directly onto another pile
+      // merges, full stop, no same-zone/cross-zone split. A drop onto a
+      // pile in a DIFFERENT zone used to bubble up to the containing
+      // Zone's own drop handler (`onMovePile` - reparent as a sibling
+      // there) - that reparent-as-sibling behavior still exists for a
+      // pile dropped on a zone's own EMPTY space (Smith's Gate 1 ruling,
+      // D55, unchanged), but landing directly ON another pile always
+      // merges now, `stopPropagation()`'d here so it no longer reaches
+      // that handler.
       const draggedPileId = pileDragFromDrop(event.dataTransfer);
       if (draggedPileId) {
         if (draggedPileId === pile.id) return;
         event.stopPropagation();
-        const draggedZoneId = allPiles.find((p) => p.id === draggedPileId)?.zoneId;
-        if (draggedZoneId === pile.zoneId) {
-          options.onReorderPile?.(draggedPileId, pile.id);
-        } else {
-          options.onMergePile?.(draggedPileId, pile.id);
-        }
+        options.onMergePile?.(draggedPileId, pile.id);
         return;
       }
       // An ordinary card drop DOES belong to this specific pile - stop

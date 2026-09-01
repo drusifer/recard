@@ -1718,20 +1718,30 @@ function seedPlainPileWithCards(state, playerId, pileId, count) {
 // pile... cards added to the target, dropped pile removed once empty,
 // target keeps its type." A different drop target than MOVE_PILE
 // (dropped directly ON a pile, not a zone's own empty space).
-test('MERGE_PILE: moves every card into the target, removes the now-empty source, target kind unchanged', () => {
+test('MERGE_PILE: appends the source\'s cards after the target\'s own, in their original relative order, removes the now-empty source, target kind unchanged', () => {
   let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
   state = reduce(state, { type: 'CREATE_ZONE', name: 'Source', kind: 'discard' });
   state = reduce(state, { type: 'CREATE_ZONE', name: 'Target', kind: 'plain' });
   const source = pilesOf(state).find((z) => z.name === 'Source');
   const target = pilesOf(state).find((z) => z.name === 'Target');
-  const seeded = seedPlainPileWithCards(state, 'p1', source.id, 2);
-  state = seeded.state;
+  // Target already has one card of its own, so "appended after" is a
+  // real, checkable claim, not vacuously true for an empty target.
+  state = seedPlainPileWithCards(state, 'p1', target.id, 1).state;
+  state = seedPlainPileWithCards(state, 'p1', source.id, 2).state;
+  // Capture each pile's actual order right before the merge, rather
+  // than trusting the seeding helper's own returned list - the real
+  // claim under test is "target's pre-merge order + source's pre-merge
+  // order, concatenated", not any particular dealing sequence.
+  const targetBefore = pilesOf(state).find((z) => z.id === target.id).cards;
+  const sourceBefore = pilesOf(state).find((z) => z.id === source.id).cards;
 
   state = reduce(state, { type: 'MERGE_PILE', playerId: 'p1', pileId: source.id, targetPileId: target.id });
 
   assert.equal(pilesOf(state).find((z) => z.id === source.id), undefined, 'source pile is gone');
   const merged = pilesOf(state).find((z) => z.id === target.id);
-  assert.deepEqual(merged.cards.map((c) => c.id).toSorted(), seeded.cards.map((c) => c.id).toSorted());
+  assert.deepEqual(merged.cards.map((c) => c.id),
+    [...targetBefore, ...sourceBefore].map((c) => c.id),
+    'target\'s own cards first, then the source\'s cards in their original order - direct user correction, not reversed');
   assert.equal(merged.kind, 'plain', 'target keeps its own kind, not the source\'s');
 });
 
@@ -1766,15 +1776,20 @@ test('MERGE_PILE: rejects merging a pile into itself, an unknown target, a deck/
   );
 });
 
-test('MERGE_PILE: merging INTO a deck prepends (deck\'s own insertCard order), same as a real card drag would', () => {
+// Direct user correction: "I prefer... the cards are added in the same
+// order" - merging into a deck used to prepend per-card (reversing the
+// source's order); now it's the same plain append-after rule every
+// other kind gets, no per-kind special case.
+test('MERGE_PILE: merging INTO a deck appends after the existing cards, same order, same rule as any other target kind', () => {
   let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
   state = reduce(state, { type: 'CREATE_ZONE', name: 'Source', kind: 'plain' });
   const source = pilesOf(state).find((z) => z.name === 'Source');
-  const seeded = seedPlainPileWithCards(state, 'p1', source.id, 1);
-  state = seeded.state;
+  state = seedPlainPileWithCards(state, 'p1', source.id, 2).state;
+  const deckBefore = deckOf(state);
+  const sourceBefore = pilesOf(state).find((z) => z.id === source.id).cards;
 
   state = reduce(state, { type: 'MERGE_PILE', playerId: 'p1', pileId: source.id, targetPileId: 'deck' });
-  assert.equal(deckOf(state)[0].id, seeded.cards[0].id, 'lands on top, matching a physical deck');
+  assert.deepEqual(deckOf(state).map((c) => c.id), [...deckBefore, ...sourceBefore].map((c) => c.id));
   assert.equal(deckOf(state).length, 52);
 });
 
@@ -1875,6 +1890,13 @@ test('CREATE_PILE: the same authorization as MOVE_CARD - a non-owner CAN move so
 // open to any player like RENAME_PILE/RENAME_ZONE, not gated by
 // `reparentable` (unlike a cross-zone move, staying inside the SAME
 // zone is never a game-rule concern for any kind).
+//
+// UI trigger removed (direct user correction, MERGE_PILE: "remove the
+// weird zone distinction, KISS" - a pile dropped on another pile always
+// merges now, no more same-zone-reorders exception). The reducer action
+// itself is untouched and still real/correct - kept, not deleted, in
+// case a future gesture wants it; these tests protect that it still
+// works if dispatched directly.
 
 test('REORDER_PILE: moves a pile to sit immediately before another pile in the SAME zone', () => {
   let state = reduce(createInitialState({}, () => 0.5), { type: 'CREATE_PILE', zoneId: 'table-zone', kind: 'plain', name: 'A' });

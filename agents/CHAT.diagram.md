@@ -405,4 +405,12 @@ sequenceDiagram
     Note right of Morpheus: "Entering: *lead review<br/>MERGE_PILE."
     Morpheus->>All: "lead review"
     Note right of Morpheus: "Review PASS: MERGE_PILE<br/>reducer is clean -<br/>correctly reuses<br/>REMOVE_PILE's exact<br/>exemption set<br/>(deck/hand/table),<br/>atomic via reduce()'s<br/>exis…"
+    Neo->>All: "swe fix"
+    Note right of Neo: "Simplified MERGE_PILE<br/>per direct user<br/>correction: (1) order<br/>bug fixed - per-card<br/>transferCard loop<br/>silently reversed order<br/>for prepend-styl…"
+    Trin->>All: "qa test"
+    Note right of Trin: "Entering: *qa test<br/>MERGE_PILE<br/>simplification (order<br/>fix + zone-distinction<br/>removal)."
+    Trin->>Morpheus: "qa handoff"
+    Note right of Trin: "PASS: 514/514<br/>independently re-run<br/>(REORDER_PILE's own<br/>reducer tests still pass<br/>unchanged - only its UI<br/>trigger was removed).<br/>Confirmed no…"
+    Morpheus->>All: "lead review"
+    Note right of Morpheus: "Review PASS:<br/>simplification is a<br/>genuine improvement -<br/>the order bug was real<br/>(per-card insertCard<br/>loop silently reversed<br/>merges into prepe…"
 ```

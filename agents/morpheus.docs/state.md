@@ -345,6 +345,15 @@ replacing what used to bubble up as a reparent-into-that-zone
 wanted same-zone drops to merge too, that's a one-line UI change
 (`renderPileShell`'s drop handler) - revisit if raised.
 
+**Resolved same session**: user did want it simplified - "remove the
+weird zone distinction, KISS." The flagged judgment call above is gone;
+every pile-on-pile drop merges now, no zone check. Also fixed a real
+bug the flagged review missed: the per-card `transferCard` loop reversed
+merge order into prepend-style targets (deck/discard) - now a plain,
+order-preserving concat. `onReorderPile`/`performReorderPile` correctly
+removed as dead code (their one caller is gone); `REORDER_PILE` the
+reducer stays, untouched, in case a future gesture wants it.
+
 ## Next Steps
 
 1. **Item D done.** Two plan items remain, not currently assigned:

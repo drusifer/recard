@@ -1162,14 +1162,13 @@ function renderGameFromView(view) {
     onRemoveZone: isSessionEnded ? null : (zoneId) => performRemoveZone(zoneId),
     // (bloop: piles/zones/cards are all Movable)
     onMovePile: isSessionEnded ? null : (pileId, targetZoneId) => performMovePile(pileId, targetZoneId),
-    // *nit (2026-08-26): "relocated within their zone (ordering)" -
-    // every pile can be reordered among its own zone's siblings, even
-    // a kind `onMovePile`/`MOVE_PILE` would reject for a cross-zone
-    // move (purely cosmetic, no game-rule concern either way).
-    onReorderPile: isSessionEnded ? null : (pileId, beforePileId) => performReorderPile(pileId, beforePileId),
     // (direct user request) - dropping a pile directly onto another pile
-    // (different zone - same-zone still reorders, above) merges its
-    // cards into the target and removes it once empty.
+    // merges its cards into the target and removes it once empty, no
+    // matter which zone either one is in ("remove the weird zone
+    // distinction, KISS" - superseded the earlier same-zone-reorder
+    // split; `REORDER_PILE`, state.js, is unused from the UI now but
+    // left in place, not deleted - a real, tested, independently-useful
+    // action, just without a live trigger since this was its only one).
     onMergePile: isSessionEnded ? null : (pileId, targetPileId) => performMergePile(pileId, targetPileId),
     onDropCardOnZone: isSessionEnded ? null : (cardId, zoneId) => performCreatePileWithCard(cardId, zoneId),
     isHost: role === 'host',
@@ -1461,18 +1460,6 @@ function performMovePile(pileId, targetZoneId) {
     try { dispatch({ type: 'MOVE_PILE', playerId: myId, pileId, targetZoneId }); }
     catch (error) { globalThis.alert(error.message); }
   } else session.send({ type: 'action', action: { type: 'MOVE_PILE', pileId, targetZoneId } });
-}
-
-// *nit (2026-08-26): reorder a pile among its own zone's siblings -
-// same dispatch shape as every other pile-affecting action, purely
-// cosmetic (no authorization beyond "these two piles share a zone",
-// which the reducer itself re-checks).
-function performReorderPile(pileId, beforePileId) {
-  if (isSessionEnded) return;
-  if (role === 'host') {
-    try { dispatch({ type: 'REORDER_PILE', playerId: myId, pileId, beforePileId }); }
-    catch (error) { globalThis.alert(error.message); }
-  } else session.send({ type: 'action', action: { type: 'REORDER_PILE', pileId, beforePileId } });
 }
 
 // (direct user request) - "all piles can be dropped into any other

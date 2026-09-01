@@ -139,7 +139,8 @@ exceptions, not even for a "quick check."**
 
 ## Session update (2026-09-01): MERGE_PILE (drop pile onto pile)
 
-**Status: shipped, awaiting Trin.** Direct user request: "all piles can
+**Status: shipped, gate cleared, then simplified twice more per direct
+user correction (see bottom of this block).** Direct user request: "all piles can
 be dropped into any other pile... cards added to the target, dropped
 pile removed once empty, target keeps its type... semantically dragging
 and dropping each card from src to target then removing the src pile."
@@ -170,6 +171,27 @@ and dropping each card from src to target then removing the src pile."
   flagged giant options-assembly function, from threading one more
   option through it - not a new violation), lint-style clean.
   Mutation-verified the source-removal line has real teeth.
+
+**Simplified twice more, both direct user corrections, same session**:
+1. The per-card `transferCard` loop above had a REAL BUG: looping
+   `insertCard` one card at a time reverses the result for any
+   prepend-style target (`deck`/`discard`) - c1-then-c2-then-c3 at the
+   front ends up c3,c2,c1. Fixed: a plain `[...target.cards,
+   ...source.cards]` concat, one rule for every kind, no per-card
+   authorization/`canAccept` dance any more (traded away on purpose).
+2. The same-zone-reorders/cross-zone-merges split flagged above as "my
+   own judgment call, not explicitly specified" is GONE - direct user
+   correction: "remove the weird zone distinction, KISS." ANY pile
+   dropped directly on ANY other pile merges now, no exceptions.
+   Dropping on a Zone's own EMPTY space is still unchanged (always a
+   sibling, Smith's Gate 1/D55).
+3. Consequence of #2: `onReorderPile`/`performReorderPile` had exactly
+   one caller each - removed as real dead code, not scope creep.
+   `REORDER_PILE` the REDUCER (`state.js`) is untouched and still
+   tested; it just has no live UI trigger any more.
+4. 514/514 (test count net-unchanged - fixed 2 `MERGE_PILE` tests for
+   the new order semantics), lint-js at the same 7-fn baseline,
+   lint-style clean. Mutation-verified the concat-order line too.
 
 ## Next Steps
 

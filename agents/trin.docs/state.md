@@ -1058,3 +1058,17 @@ keeps its type." New reducer action, plus real DOM drag-drop wiring in
   rather than silently assumed.
 
 No blockers. **Verdict: PASS.** Handed to Morpheus for review.
+
+## *nit: MERGE_PILE simplification (order fix + zone distinction removed) (2026-09-01) - PASSED
+
+Direct user correction to the above: my own flagged judgment call (same-
+zone reorders, cross-zone merges) is gone - "remove the weird zone
+distinction, KISS", every pile-on-pile drop merges now. Also a real bug
+fix: the old per-card `transferCard`/`insertCard` loop silently reversed
+merge order into any prepend-style target (deck/discard) - now a plain
+concat, order-preserving for every kind.
+
+514/514 independently re-run - `REORDER_PILE`'s own reducer tests still
+pass unchanged (only its UI trigger, now unreachable, was removed).
+Grepped for stray `onReorderPile`/`performReorderPile` references - none
+left. `lint-js`/`lint-style` unchanged. No blockers. **Verdict: PASS.**

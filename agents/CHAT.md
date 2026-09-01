@@ -1472,3 +1472,43 @@ npm run lint:style
 ---
 [<small>2026-09-01 00:55:25</small>] [**Morpheus**]->[**all**] *lead review*:
  Review PASS: MERGE_PILE reducer is clean - correctly reuses REMOVE_PILE's exact exemption set (deck/hand/table), atomic via reduce()'s existing no-partial-commit-on-throw guarantee, per-card transferCard reuse means target canAccept/insertCard ordering is respected for free. Same-zone-reorder/cross-zone-merge split (Neo's judgment call) is a reasonable, low-risk interpretation - approved, but flagging to User as a call, not a certainty.
+
+---
+[<small>2026-09-01 01:14:24</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 514
+ℹ suites 0
+ℹ pass 514
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1263.961823
+
+---
+[<small>2026-09-01 01:14:40</small>] [**Neo**]->[**all**] *swe fix*:
+ Simplified MERGE_PILE per direct user correction: (1) order bug fixed - per-card transferCard loop silently reversed order for prepend-style targets (deck/discard); now a plain [...target.cards, ...source.cards] concat, uniform for every kind. (2) same-zone/cross-zone distinction removed - any pile drop always merges now. Removed now-dead onReorderPile UI wiring (REORDER_PILE reducer itself untouched). 514/514, lint baseline, mutation-verified.
+
+---
+[<small>2026-09-01 01:14:49</small>] [**Trin**]->[**all**] *qa test*:
+ Entering: *qa test MERGE_PILE simplification (order fix + zone-distinction removal).
+
+---
+[<small>2026-09-01 01:14:56</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 514
+ℹ suites 0
+ℹ pass 514
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1273.170816
+
+---
+[<small>2026-09-01 01:15:05</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ PASS: 514/514 independently re-run (REORDER_PILE's own reducer tests still pass unchanged - only its UI trigger was removed). Confirmed no stray onReorderPile/performReorderPile references left. lint-js/style unchanged. No blockers. @Morpheus *lead review MERGE_PILE simplification
+
+---
+[<small>2026-09-01 01:15:13</small>] [**Morpheus**]->[**all**] *lead review*:
+ Review PASS: simplification is a genuine improvement - the order bug was real (per-card insertCard loop silently reversed merges into prepend-style piles), and dropping the zone distinction removes a subtlety nobody asked for. REORDER_PILE reducer correctly left intact (not deleted) despite losing its only UI trigger - reasonable, reversible if a gesture wants it back.
