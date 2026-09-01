@@ -1050,20 +1050,27 @@ export function renderPileShell(container, pile, allPiles, options, buildRow) {
       event.preventDefault();
       // *nit (2026-08-26), direct user request: "relocated within their
       // zone (ordering)" - a dragged PILE dropped directly onto ANOTHER
-      // pile now reorders it to sit right there if they already share a
-      // zone (purely cosmetic, always allowed - `onReorderPile`, below).
-      // A drop onto a pile in a DIFFERENT zone is a reparent request
-      // instead - deliberately NOT `stopPropagation()`'d for that case,
-      // so it bubbles up to the containing Zone's own drop handler
-      // (`renderZonePanel`), which is what actually calls `onMovePile`
-      // (and, via `state.js`'s own `reparentable` check, is where an
-      // ineligible kind's cross-zone attempt gets rejected).
+      // pile in the SAME zone still just reorders it to sit right there
+      // (purely cosmetic, always allowed - `onReorderPile`, below).
+      //
+      // (direct user request) - "all piles can be dropped into any other
+      // pile... cards added to the target, dropped pile removed once
+      // empty." A drop onto a pile in a DIFFERENT zone used to bubble up
+      // to the containing Zone's own drop handler (`onMovePile` -
+      // reparent as a sibling there). That reparent-as-sibling behavior
+      // still exists for a pile dropped on a zone's own EMPTY space
+      // (Smith's Gate 1 ruling, D55, unchanged) - but landing directly
+      // ON another pile now merges into it instead, `stopPropagation()`'d
+      // here so it no longer reaches that handler.
       const draggedPileId = pileDragFromDrop(event.dataTransfer);
       if (draggedPileId) {
+        if (draggedPileId === pile.id) return;
+        event.stopPropagation();
         const draggedZoneId = allPiles.find((p) => p.id === draggedPileId)?.zoneId;
-        if (draggedPileId !== pile.id && draggedZoneId === pile.zoneId) {
-          event.stopPropagation();
+        if (draggedZoneId === pile.zoneId) {
           options.onReorderPile?.(draggedPileId, pile.id);
+        } else {
+          options.onMergePile?.(draggedPileId, pile.id);
         }
         return;
       }

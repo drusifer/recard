@@ -1024,3 +1024,37 @@ failed the same way. Both restored, confirmed byte-identical
 (`git diff --stat` on the touched files matched expectations exactly).
 
 No blockers. **Verdict: PASS.** Handed to Morpheus for review.
+
+## *impl: MERGE_PILE (drop pile onto pile) (2026-09-01) - PASSED
+
+Direct user request: "all piles can be dropped into any other pile...
+cards added to the target, dropped pile removed once empty, target
+keeps its type." New reducer action, plus real DOM drag-drop wiring in
+`ui.js`/`main.js` (not reducer-only).
+
+- 514/514 independently re-run (3 new `MERGE_PILE` reducer tests).
+- `lint-js`: same 7 flagged functions as baseline - one number grew
+  (`main.js`'s already-flagged giant options function, 77->90, from one
+  more option threaded through) but this is the same pre-existing
+  violation growing, not a new one; `lint-style` clean.
+- **Mutation-tested 2 points independently of what Neo already
+  checked**: (1) skipped the final source-pile-removal line - the new
+  "source pile is gone" assertion failed exactly as expected, restored
+  clean; (2) killed the `deck`/`hand` source-exemption guard (`if
+  (false)`) - the corresponding rejection test failed, restored clean,
+  `git diff --stat` confirmed no residue.
+- **Real, disclosed gap, not silently skipped**: this touches actual
+  drag-and-drop DOM code (`renderPileShell`'s drop handler now branches
+  same-zone-reorder vs. cross-zone-merge), not just the reducer. Did NOT
+  fabricate e2e/Playwright coverage for the literal drag gesture -
+  reviewed the diff by hand instead (confirmed `stopPropagation()`
+  placement is correct, the self-drop early-return matches prior
+  behavior exactly, no double-dispatch risk to the zone-level handler).
+  If a live visual/drag check is wanted, that's still open.
+- Reviewed Neo's own flagged judgment call (same-zone pile-on-pile drop
+  still reorders; only cross-zone now merges) - reasonable interpretation
+  that preserves the existing reorder feature, but genuinely a judgment
+  call the user didn't explicitly specify either way - correctly flagged
+  rather than silently assumed.
+
+No blockers. **Verdict: PASS.** Handed to Morpheus for review.

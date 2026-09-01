@@ -1167,6 +1167,10 @@ function renderGameFromView(view) {
     // a kind `onMovePile`/`MOVE_PILE` would reject for a cross-zone
     // move (purely cosmetic, no game-rule concern either way).
     onReorderPile: isSessionEnded ? null : (pileId, beforePileId) => performReorderPile(pileId, beforePileId),
+    // (direct user request) - dropping a pile directly onto another pile
+    // (different zone - same-zone still reorders, above) merges its
+    // cards into the target and removes it once empty.
+    onMergePile: isSessionEnded ? null : (pileId, targetPileId) => performMergePile(pileId, targetPileId),
     onDropCardOnZone: isSessionEnded ? null : (cardId, zoneId) => performCreatePileWithCard(cardId, zoneId),
     isHost: role === 'host',
     // US-41/D29: dealing lives on the deck, where the cards are - the
@@ -1469,6 +1473,17 @@ function performReorderPile(pileId, beforePileId) {
     try { dispatch({ type: 'REORDER_PILE', playerId: myId, pileId, beforePileId }); }
     catch (error) { globalThis.alert(error.message); }
   } else session.send({ type: 'action', action: { type: 'REORDER_PILE', pileId, beforePileId } });
+}
+
+// (direct user request) - "all piles can be dropped into any other
+// pile... cards added to the target, dropped pile removed once empty."
+// Same dispatch shape as every other pile-affecting action above.
+function performMergePile(pileId, targetPileId) {
+  if (isSessionEnded) return;
+  if (role === 'host') {
+    try { dispatch({ type: 'MERGE_PILE', playerId: myId, pileId, targetPileId }); }
+    catch (error) { globalThis.alert(error.message); }
+  } else session.send({ type: 'action', action: { type: 'MERGE_PILE', pileId, targetPileId } });
 }
 
 

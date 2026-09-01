@@ -1699,6 +1699,85 @@ test('MOVE_PILE: no target ungroups - a fresh standalone Zone of the pile\'s own
   assert.ok(state.zones.some((z) => z.id === discard.id));
 });
 
+// `MOVE_CARD`'s own `findPileAndCard` deliberately never searches deck/
+// hand piles (this file's own header comment on that helper) - so
+// seeding a real card into a plain test pile has to go DEAL -> PLAY ->
+// MOVE_CARD, same path a real player's card actually takes onto the
+// table, rather than moving straight out of the deck.
+function seedPlainPileWithCards(state, playerId, pileId, count) {
+  let s = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: count });
+  const cards = handOf(s, playerId).slice(0, count);
+  for (const card of cards) {
+    s = reduce(s, { type: 'PLAY', playerId, cardId: card.id });
+    s = reduce(s, { type: 'MOVE_CARD', playerId, cardId: card.id, toPileId: pileId });
+  }
+  return { state: s, cards };
+}
+
+// (direct user request) - "all piles can be dropped into any other
+// pile... cards added to the target, dropped pile removed once empty,
+// target keeps its type." A different drop target than MOVE_PILE
+// (dropped directly ON a pile, not a zone's own empty space).
+test('MERGE_PILE: moves every card into the target, removes the now-empty source, target kind unchanged', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Source', kind: 'discard' });
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Target', kind: 'plain' });
+  const source = pilesOf(state).find((z) => z.name === 'Source');
+  const target = pilesOf(state).find((z) => z.name === 'Target');
+  const seeded = seedPlainPileWithCards(state, 'p1', source.id, 2);
+  state = seeded.state;
+
+  state = reduce(state, { type: 'MERGE_PILE', playerId: 'p1', pileId: source.id, targetPileId: target.id });
+
+  assert.equal(pilesOf(state).find((z) => z.id === source.id), undefined, 'source pile is gone');
+  const merged = pilesOf(state).find((z) => z.id === target.id);
+  assert.deepEqual(merged.cards.map((c) => c.id).toSorted(), seeded.cards.map((c) => c.id).toSorted());
+  assert.equal(merged.kind, 'plain', 'target keeps its own kind, not the source\'s');
+});
+
+test('MERGE_PILE: rejects merging a pile into itself, an unknown target, a deck/hand source, or the default Table pile', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Solo', kind: 'plain' });
+  const solo = pilesOf(state).find((z) => z.name === 'Solo');
+  // `hand:p1` is lazily created on first DEAL/DRAW, not by JOIN alone -
+  // deal one card so a real hand pile exists to reject.
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 1 });
+
+  assert.throws(
+    () => reduce(state, { type: 'MERGE_PILE', playerId: 'p1', pileId: solo.id, targetPileId: solo.id }),
+    /itself/,
+  );
+  assert.throws(
+    () => reduce(state, { type: 'MERGE_PILE', playerId: 'p1', pileId: solo.id, targetPileId: 'nope' }),
+    /does not exist/,
+  );
+  assert.throws(
+    () => reduce(state, { type: 'MERGE_PILE', playerId: 'p1', pileId: 'deck', targetPileId: solo.id }),
+    /Cannot merge/,
+  );
+  assert.throws(
+    () => reduce(state, { type: 'MERGE_PILE', playerId: 'p1', pileId: 'hand:p1', targetPileId: solo.id }),
+    /Cannot merge/,
+  );
+  assert.throws(
+    () => reduce(state, { type: 'MERGE_PILE', playerId: 'p1', pileId: 'table', targetPileId: solo.id }),
+    /Cannot merge/,
+    'the built-in default Table pile is exempt, same as REMOVE_PILE',
+  );
+});
+
+test('MERGE_PILE: merging INTO a deck prepends (deck\'s own insertCard order), same as a real card drag would', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Source', kind: 'plain' });
+  const source = pilesOf(state).find((z) => z.name === 'Source');
+  const seeded = seedPlainPileWithCards(state, 'p1', source.id, 1);
+  state = seeded.state;
+
+  state = reduce(state, { type: 'MERGE_PILE', playerId: 'p1', pileId: source.id, targetPileId: 'deck' });
+  assert.equal(deckOf(state)[0].id, seeded.cards[0].id, 'lands on top, matching a physical deck');
+  assert.equal(deckOf(state).length, 52);
+});
+
 // D73 follow-up (direct user request, "fix separate code paths for
 // make zone - there can be only 1"): CREATE_ZONE and MOVE_PILE's own
 // ungroup case now share ONE "spawn a fresh standalone Zone"

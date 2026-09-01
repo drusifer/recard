@@ -326,6 +326,25 @@ gating logic, to avoid rebuilding the "rules engine" this codebase has
 repeatedly, deliberately rejected. See `neo.docs/state.md` for the
 fuller writeup. Not started.
 
+## Session update (2026-09-01, continued): MERGE_PILE shipped
+
+Direct user request: dropping a pile directly onto another pile merges
+all its cards into the target (target keeps its own kind) and removes
+the emptied source. New `MERGE_PILE` reducer case + real drag-drop
+wiring in `ui.js`/`main.js`. Neo->Trin->Morpheus gate cleared, PASS,
+514/514, mutation-tested. Reuses `REMOVE_PILE`'s own deck/hand/Table
+exemption set rather than inventing new rules.
+
+**One real architectural judgment call, not explicitly specified by the
+user - approved but flagged**: a pile dropped onto another pile in the
+SAME zone still reorders (pre-existing, separately-requested feature,
+left unchanged); only a CROSS-zone pile-on-pile drop now merges,
+replacing what used to bubble up as a reparent-into-that-zone
+(`onMovePile`). Dropping onto a Zone's own empty space is untouched
+(still always a sibling, Smith's Gate 1/D55). If the user actually
+wanted same-zone drops to merge too, that's a one-line UI change
+(`renderPileShell`'s drop handler) - revisit if raised.
+
 ## Next Steps
 
 1. **Item D done.** Two plan items remain, not currently assigned:

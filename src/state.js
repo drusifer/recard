@@ -969,6 +969,73 @@ const ACTIONS = {
   },
 
   /**
+   * (direct user request) - "all piles can be dropped into any other
+   * pile... all the cards on the dropped pile [are] added to the target
+   * pile and once empty the dropped pile is removed. The target pile
+   * maintains its type... semantically dragging and dropping each card
+   * from src pile to target pile and then removing the src pile."
+   *
+   * A DIFFERENT drop target than `MOVE_PILE` above, not a variant of it:
+   * dropping a pile onto a ZONE's own empty space still always makes it
+   * a sibling there, never a merge (Smith's Gate 1 ruling, D55, unchanged)
+   * - this only fires when a dragged pile is dropped directly ONTO
+   * another PILE's own body, a drop target that didn't exist before this.
+   *
+   * Implemented exactly as literally described: reuses `transferCard`
+   * once per card (same authorization, same `insertCard` ordering per
+   * target kind - a merge into a `deck` prepends, into a `discard`
+   * stacks, same as one real card drag would), then removes the
+   * now-empty source pile. `reduce()`'s case functions never partially
+   * commit on a throw (every other multi-step reducer here already
+   * relies on this - see `DEAL`/`splitPileAt`), so a target that
+   * legitimately rejects a card (`Foundation`/`Cascade`/`RankAdjacent`'s
+   * real `canAccept` content gates, via `transferCard`'s own check)
+   * aborts the WHOLE merge cleanly, never a half-emptied source pile.
+   *
+   * Source `deck`/`hand`/the default Table pile are the one exemption,
+   * matching `REMOVE_PILE`'s own exact set - not a new restriction
+   * invented here, the same structural reasons those piles already can't
+   * be removed (`deck` is found by fixed id elsewhere in this file, not
+   * by searching; every player must always have exactly one `hand`; the
+   * built-in Table pile is never player-removable). Merging INTO any of
+   * them (as the TARGET) is unaffected and works exactly as
+   * `transferCard` already allows.
+   */
+  MERGE_PILE(state, action) {
+    const { pileId, targetPileId, playerId } = action;
+    if (pileId === targetPileId) throw new Error('Cannot merge a pile into itself');
+    const sourcePile = state.piles.find((p) => p.id === pileId);
+    if (!sourcePile) throw new Error(`Pile ${pileId} does not exist`);
+    if (state.piles.every((p) => p.id !== targetPileId)) {
+      throw new Error(`Pile ${targetPileId} does not exist`);
+    }
+    if (sourcePile.kind === 'deck' || sourcePile.kind === 'hand') {
+      throw new Error(`Cannot merge a "${sourcePile.kind}" pile into another pile`);
+    }
+    // Same exemption `REMOVE_PILE` already declares for its own reason
+    // (the built-in Table pile is never a player-removable pile) - a
+    // merge always ends by removing the source, so it inherits the
+    // same restriction.
+    if (sourcePile.id === DEFAULT_PILE_ID) {
+      throw new Error('Cannot merge the default Table pile into another pile');
+    }
+
+    // Always 'move', never 'play' - a hand source is already excluded
+    // above, so there is no PLAY-visibility transform to apply here.
+    let next = state;
+    for (const card of sourcePile.cards) {
+      next = transferCard(next, {
+        fromPileId: pileId,
+        toPileId: targetPileId,
+        cardId: card.id,
+        viewerId: playerId,
+        action: 'move',
+      });
+    }
+    return { ...next, piles: next.piles.filter((p) => p.id !== pileId) };
+  },
+
+  /**
    * (direct user request) - "Panels can be moved from zone to zone
    * [MOVE_PILE, above] and relocated within their zone (ordering)."
    * `state.piles`' own array order IS render order within a zone

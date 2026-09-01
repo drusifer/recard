@@ -1416,3 +1416,59 @@ npm run lint:style
 ---
 [<small>2026-09-01 00:19:49</small>] [**Morpheus**]->[**all**] *lead review*:
  Review PASS: HandPile split matches the request exactly - cardActions/showsFace/contributeToView are now real per-class facts (PlayerHandPile/OpponentHandPile), no instance ever asks 'is this mine?'. pileActions correctly stayed shared/ctx-based on HandPile itself since it was never the offending pattern (every other kind's pileActions already takes {isOwner}). No blockers.
+
+---
+[<small>2026-09-01 00:44:01</small>] [**User**]->[**all**] *request*:
+ *impl all piles can be dropped into any other pile. that causes all the cards on the dropped pile to be added to the target pile and once empty the dropped pile is removed. the target pile maintains its type. Think of this as semantically dragging and dropping each card from src pile to target pile and then removing the src pile.
+
+---
+[<small>2026-09-01 00:44:09</small>] [**Neo**]->[**all**] *swe impl*:
+ Entering: *swe impl pile-onto-pile merge (drop a pile onto another pile -> its cards move to target, src pile removed once empty, target keeps its own kind).
+
+---
+[<small>2026-09-01 00:52:29</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 514
+ℹ suites 0
+ℹ pass 514
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1239.940141
+
+---
+[<small>2026-09-01 00:52:39</small>] [**Neo**]->[**all**] *swe impl*:
+ MERGE_PILE shipped: dropping a pile directly onto another pile (diff zone) moves all its cards into the target (transferCard per card, target's own insertCard order/kind unaffected) then removes the empty source. Same-zone pile-on-pile drop still reorders (unchanged, pre-existing feature) - judgment call, flagging for review. Source deck/hand/table exempt, matching REMOVE_PILE's own set. 514/514, lint at 7-fn baseline, mutation-verified.
+
+---
+[<small>2026-09-01 00:52:45</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ @Trin *qa uat MERGE_PILE feature - drop pile onto pile merges cards.
+
+---
+[<small>2026-09-01 00:53:17</small>] [**Trin**]->[**all**] *qa uat*:
+ Entering: *qa uat MERGE_PILE.
+
+---
+[<small>2026-09-01 00:53:57</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 514
+ℹ suites 0
+ℹ pass 514
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1244.964253
+
+---
+[<small>2026-09-01 00:54:38</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT PASS: MERGE_PILE. 514/514, lint at 7-fn baseline, lint-style clean. Mutation-killed 2 points (source removal, deck/hand guard), restored clean. Reviewed ui.js/main.js diff by hand - no live Playwright check for the actual drag gesture, disclosing not skipping silently. No blockers on reducer logic. @Morpheus *lead review MERGE_PILE
+
+---
+[<small>2026-09-01 00:55:01</small>] [**Morpheus**]->[**all**] *lead review*:
+ Entering: *lead review MERGE_PILE.
+
+---
+[<small>2026-09-01 00:55:25</small>] [**Morpheus**]->[**all**] *lead review*:
+ Review PASS: MERGE_PILE reducer is clean - correctly reuses REMOVE_PILE's exact exemption set (deck/hand/table), atomic via reduce()'s existing no-partial-commit-on-throw guarantee, per-card transferCard reuse means target canAccept/insertCard ordering is respected for free. Same-zone-reorder/cross-zone-merge split (Neo's judgment call) is a reasonable, low-risk interpretation - approved, but flagging to User as a call, not a certainty.

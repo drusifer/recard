@@ -137,6 +137,40 @@ exceptions, not even for a "quick check."**
   (verified empirically mid-session rather than assumed) - don't spend
   more than one honest check on a lint number that isn't blocking.
 
+## Session update (2026-09-01): MERGE_PILE (drop pile onto pile)
+
+**Status: shipped, awaiting Trin.** Direct user request: "all piles can
+be dropped into any other pile... cards added to the target, dropped
+pile removed once empty, target keeps its type... semantically dragging
+and dropping each card from src to target then removing the src pile."
+
+- New `MERGE_PILE` reducer case (`state.js`, right after `MOVE_PILE`):
+  loops `transferCard` once per source card (so each target's own
+  `insertCard` ordering applies - deck prepends, discard stacks), then
+  removes the emptied source. Exempts source `deck`/`hand`/the default
+  Table pile, reusing `REMOVE_PILE`'s own exact reasoning (not new
+  restrictions) - a merge always ends by removing the source, so it
+  inherits what already can't be removed.
+- **Judgment call, not explicitly specified - flag for review**: a
+  dragged pile dropped onto another pile in the SAME zone still just
+  REORDERS (pre-existing feature, unchanged); only a cross-zone drop
+  onto another pile now merges. Reasoning: preserves the existing,
+  separately-requested reorder feature rather than silently removing it;
+  the old cross-zone case used to bubble up and reparent-as-sibling in
+  the target's zone (`onMovePile`) - that's what got replaced by merge,
+  since it's the closest match to "drop pile into pile" semantically.
+  Dropping a pile on a Zone's own EMPTY space is UNCHANGED (still always
+  a sibling, Smith's Gate 1/D55 - a genuinely different drop target).
+- UI wiring: `ui.js`'s `renderPileShell` drop handler branches on
+  same-zone (reorder) vs. cross-zone (merge) for a dragged-pile-token;
+  `main.js` adds `performMergePile`/`onMergePile`, same dispatch shape
+  as `onMovePile`.
+- 514/514 (3 new `MERGE_PILE` reducer tests), lint-js at the same
+  7-flagged-function baseline (one number grew - `main.js`'s already-
+  flagged giant options-assembly function, from threading one more
+  option through it - not a new violation), lint-style clean.
+  Mutation-verified the source-removal line has real teeth.
+
 ## Next Steps
 
 **Nothing in-flight - ready to commit.** Gate cleared (Neo->Trin->
