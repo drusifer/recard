@@ -948,6 +948,36 @@ entire render/drag-drop pipeline in `ui.js`/`main.js`) - treated as a
 
 No blockers. **Verdict: PASS.**
 
+## *impl: universal-DnD guarantee test (D, Morpheus refactor plan item) (2026-08-31) - PASSED
+
+First real item of Morpheus's D91-D95-era refactor plan to actually
+start (`morpheus.docs/state.md`'s own sequencing: DnD test first,
+smallest/most isolated). New test in `tests/piles.test.js`, right after
+the existing "every concrete pile class extends Pile" test.
+
+- 512/512 independently re-run (was 511) - matches Neo's reported count.
+- `lint-style` clean; `lint-js` unchanged 7-error cognitive-complexity
+  baseline (`main.js`/`ui.js`/`touchDrag.js`), none in the touched file.
+- **Mutation-tested the new test itself, not just trusted it existed**:
+  temporarily made `HandPile.cardActions` always return `[]` - the new
+  guarantee test failed exactly as expected (confirmed by name in the
+  failure output, not just a nonzero exit count), nothing else needed
+  to change. Restored, re-ran full suite green, `git diff --stat`
+  confirmed `src/piles/HandPile.js` byte-identical (not in the diff at
+  all) - no mutation residue shipped.
+- Verified Deck's exclusion is a real, pre-existing, documented design
+  choice, not a hole poked in the guarantee to make it pass: read
+  `DeckPile.js`'s own `cardActions()` comment (D34, "the deck has never
+  rendered a per-card hover row") rather than taking Neo's handoff
+  summary at face value. Also confirmed via grep (Neo's own state.md
+  note, cross-checked) that no other subclass overrides `cardActions`
+  except `HandPile` (already returns `move`/`play`) - `ExilePile`'s
+  stale-looking comment about a removed `cardActions` override was
+  checked and confirmed accurate (it no longer overrides at all, just
+  inherits base `Pile`).
+
+No blockers. **Verdict: PASS.** Handed to Morpheus for code review.
+
 ## *fix: D88 card-conservation invariant + DEAL reclaim fix (2026-08-30) - PASSED
 
 Direct user request, framed as a general guarantee, not a one-off:

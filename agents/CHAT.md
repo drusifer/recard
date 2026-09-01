@@ -1283,3 +1283,71 @@ lint:decks — 15 deck(s) balanced
 ---
 [<small>2026-08-31 18:46:46</small>] [**Morpheus**]->[**User**] *handoff*:
  Close-out: refactor plan reconciled with what shipped - deck pileId-fix + viewFor switch both landed as D93/D94, went further than originally scoped (full rich-class conversion, not just deck). Shell inlining, DnD guarantee test, zoneOptions split still open, not blocked, not assigned. state.md updated.
+
+---
+[<small>2026-08-31 23:31:39</small>] [**User**]->[**all**] *request*:
+ *impl continue morph refactor
+
+---
+[<small>2026-08-31 23:31:45</small>] [**Morpheus**]->[**Neo**] *lead resolve*:
+ Resolved: next phase = universal-DnD guarantee test (D) per morpheus.docs/state.md Next Steps. Proceeding with *impl chain.
+
+---
+[<small>2026-08-31 23:31:57</small>] [**Neo**]->[**all**] *swe impl*:
+ Entering: universal-DnD guarantee test (D). Will iterate PILE_TYPES, assert every concrete subclass's cardActions for a visible card includes move/play.
+
+---
+[<small>2026-08-31 23:33:40</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-style | /home/drusifer/Projects/recard/build/build.out
+=== make lint-style @ 2026-08-31 23:33:39 ===
+npm run lint:style
+
+> lint:style
+> stylelint style.css
+
+
+---
+[<small>2026-08-31 23:33:47</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ DnD guarantee test (D) shipped: tests/piles.test.js, iterates PILE_TYPES asserting move/play present on a visible card, Deck named as the one documented exception (D34, no per-card hover row). 512/512 tests, lint-js at unchanged 7-error baseline, lint-style clean. @Trin *qa uat DnD guarantee test
+
+---
+[<small>2026-08-31 23:34:21</small>] [**Trin**]->[**all**] *qa uat*:
+ Entering: *qa uat on Neo's DnD guarantee test (D).
+
+---
+[<small>2026-08-31 23:35:57</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-style | /home/drusifer/Projects/recard/build/build.out
+=== make lint-style @ 2026-08-31 23:35:56 ===
+npm run lint:style
+
+> lint:style
+> stylelint style.css
+
+
+---
+[<small>2026-08-31 23:36:04</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT PASS: DnD guarantee test. 512/512 independently re-run, lint-style clean, lint-js unchanged 7-error baseline (all pre-existing, none in touched file). Mutation-killed HandPile.cardActions (returned []) - the new test itself failed, restored+confirmed green, byte-identical diff. Deck's exclusion verified legitimate via its own D34 file comment. No blockers. @Morpheus *lead review DnD guarantee test
+
+---
+[<small>2026-08-31 23:36:28</small>] [**Morpheus**]->[**all**] *lead review*:
+ Entering: *lead review DnD guarantee test.
+
+---
+[<small>2026-08-31 23:37:08</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 512
+ℹ suites 0
+ℹ pass 512
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1218.993217
+
+---
+[<small>2026-08-31 23:37:16</small>] [**Morpheus**]->[**all**] *lead review*:
+ Review PASS: DnD guarantee test matches plan item D exactly - correct file/style, zero behavior change, Deck exception legitimate+named not silently skipped. Fixed one misleading comment ref ('D95 refactor plan item D' conflated a decision number already used for count-badges with the plan's own lettering) to plain-language ref instead. 512/512 still green.
+
+---
+[<small>2026-08-31 23:37:19</small>] [**Morpheus**]->[**User**] *lead decision*:
+ Real finding while reviewing: docs/ARCHITECTURE.md is NOT actually current through D95 despite state.md's claim - grepped, only D91 exists as a header (file 'Last updated: 2026-08-29'). D92/D93/D94/D95 were broadcast to CHAT.md and summarized in state files but never written into ARCHITECTURE.md itself. Same drift pattern DECISIONS.md already has at D20. Not fixing unprompted - flagging for a call: backfill now, or backlog?

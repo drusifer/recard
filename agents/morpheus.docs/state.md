@@ -265,17 +265,46 @@ just a class registry nobody calls into). The remaining open items
 (shell inlining, DnD test, options split) are smaller, more mechanical
 follow-ups on a now-solid foundation, not blocked on anything.
 
+## Session update (2026-08-31): item D shipped
+
+`*impl continue morph refactor` resolved to this file's own sequencing
+note (item D, DnD guarantee test - smallest/most isolated). Full
+Neo->Trin->Morpheus gate cleared:
+- Neo: `tests/piles.test.js`, iterates `PILE_TYPES`, asserts
+  `move`/`play` on a visible card for every kind except `DeckPile`
+  (named exception, D34 - deck never renders a per-card hover row).
+- Trin: 512/512 independently re-run, mutation-killed the test itself
+  (temporarily broke `HandPile.cardActions` -> the new test failed by
+  name, not a coincidental other failure), restored byte-identical.
+- Morpheus (me): matches this plan's item D exactly, zero behavior
+  change. Fixed one misleading comment (`"D95 refactor plan item D"`
+  conflated the count-badge decision number with this plan's own A-E
+  lettering) to a plain-language reference instead.
+
+**Real finding, disclosed not silently fixed**: `docs/ARCHITECTURE.md`
+is NOT actually current through D95 as this file (and Neo's) claimed -
+grepped, only D91 exists as a header, file's own "Last updated" stamp
+is 2026-08-29. D92-D95 were broadcast to CHAT.md and summarized in
+state files but never written into ARCHITECTURE.md itself - same drift
+`docs/DECISIONS.md` already has at D20. Posted to CHAT.md, addressed to
+User, asking whether to backfill now or backlog - not fixed unprompted,
+this is a separate, larger job than the DnD test itself and wasn't
+asked for.
+
+Item D committed to git after this state save (see Next Steps).
+
 ## Next Steps
 
-1. **Not currently assigned to anyone.** If resuming cold with no new
-   user direction, do NOT assume the three open items above are next -
-   ask, or wait. This session ended on an unrelated feature (D95, count
-   badges), not mid-plan.
-2. If asked to continue this plan: start with the DnD guarantee test
-   (D) - smallest, most isolated, zero risk of touching working
-   rendering code. Shell inlining (E) next, re-verifying caller counts
-   first. `zoneOptions` split (B) last - re-measure `main.js`'s current
-   shape before assuming the original 3-object design still fits.
-3. Post each step's completion as its own decision broadcast in
-   `docs/ARCHITECTURE.md` when it actually ships, same discipline as
-   D93/D94 above.
+1. **Item D done.** Two plan items remain, not currently assigned:
+   - Shell inlining (E): `<pile-panel>`/`renderPile`,
+     `<zone-panel>`/`renderZonePanel` collapsing into their own
+     `.render()` bodies - re-verify "zero other callers" still holds
+     first (D93's class-conversion may have added one).
+   - `zoneOptions` split into 3 layer-scoped objects (B) - re-measure
+     `main.js`'s current size/shape before assuming the original
+     3-object design still fits; do this one last per this file's
+     established sequencing.
+2. **Open, unresolved**: the ARCHITECTURE.md D92-D95 backfill question
+   above - waiting on User's call, don't assume either way.
+3. Post each step's completion as its own decision broadcast, same
+   discipline as this session.

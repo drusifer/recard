@@ -14,12 +14,29 @@ serialization via each class's `toJSON()`, zero changes needed to
 
 ## Current Task
 
-**Status: session closed out clean.** Everything below is committed
-and pushed - `f9d410b` on both `origin/main` and `origin/dev` (fast-
-forwarded from `14ddf1a`, no divergence to merge). 511/511 tests,
-`make check`/`lint-js`/`lint-style` all green at the unchanged 7-error
-cognitive-complexity baseline. Working tree clean except this state
-file and `agents/CHAT.md`/`CHAT.diagram.md` (routine chat-log churn).
+**Status: D-item (universal-DnD guarantee test) shipped, awaiting Trin.**
+`*impl continue morph refactor` resolved to Morpheus's own next-item
+pick (`morpheus.docs/state.md` Next Steps #2): the DnD guarantee test,
+smallest/most isolated of the three open refactor items. Added to
+`tests/piles.test.js` (right after the existing "every concrete pile
+class extends Pile" test, same file/style, no new test file): iterates
+`Object.values(PILE_TYPES)`, constructs each with one visible card
+(`faceUp: true`, `ownerId: 'someone-else'`), asserts `cardActions()`
+includes `move` or `play`. `DeckPile` is explicitly named and skipped -
+its own file comment (D34) says it never renders a per-card hover row
+by design (Draw/Deal/Shuffle are pile-level, not per-card) - named
+rather than silently excluded by a broader rule, so a genuinely new
+future exception can't hide behind this one. Verified via `via` that no
+other subclass overrides `cardActions` except `HandPile` (already
+returns `move`/`play`) and `ExilePile`'s comment is stale history (it no
+longer overrides `cardActions` at all, inherits base `Pile`). 512/512
+tests (was 511), `lint-style` clean, `lint-js` unchanged at the
+pre-existing 7-error cognitive-complexity baseline (all in `main.js`/
+`ui.js`/`touchDrag.js`, none in the touched file). Handed to Trin for
+`*qa uat`.
+
+Not yet committed to git - waiting on Trin's UAT gate before that,
+per this session's usual `*impl` sequencing (D93/D94/D95 pattern).
 
 ### What shipped this session (D91-D95, all in commit `f9d410b`)
 
@@ -85,9 +102,13 @@ file and `agents/CHAT.md`/`CHAT.diagram.md` (routine chat-log churn).
 
 ## Next Steps
 
-Nothing in-flight. If resuming cold with no new user message yet, wait
-for direction rather than assuming there's unfinished work - this
-session ended clean, not mid-task.
+**In-flight**: DnD guarantee test is with Trin for `*qa uat`. If Trin's
+check passes, next per Morpheus's own sequencing is shell inlining
+(`<pile-panel>`/`renderPile`, `<zone-panel>`/`renderZonePanel`) -
+re-verify "zero other callers" still holds first (this session's other
+changes may have added one). `zoneOptions` split (B) is last, and
+`main.js`'s size should be re-measured before assuming the original
+3-object shape still fits.
 
 ### Known open items, not currently assigned
 1. **Morpheus's broader refactor plan** (`morpheus.docs/state.md`) has

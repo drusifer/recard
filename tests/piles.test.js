@@ -42,6 +42,27 @@ test('every concrete pile class extends Pile', () => {
   }
 });
 
+// Morpheus's refactor plan (agents/morpheus.docs/state.md), item D: a
+// structural GUARANTEE, not scattered
+// convention/folklore - iterates PILE_TYPES so a FUTURE kind that
+// accidentally restricts drag-and-drop fails CI immediately, same
+// "executable guarantee" instinct as assertCardsConserved. DeckPile is
+// the one documented, deliberate exception: it has never rendered a
+// per-card hover row (D34, DeckPile.js's own `cardActions` comment) -
+// Draw/Deal/Shuffle are pile-level actions instead, so it is named here
+// rather than silently skipped by a broader rule that could hide a
+// future, undocumented exception too.
+test('universal drag-and-drop guarantee: every concrete pile kind (except Deck) offers move or play on a visible card', () => {
+  const card = { id: 'c1', faceUp: true };
+  for (const [kind, PileClass] of Object.entries(PILE_TYPES)) {
+    if (PileClass === DeckPile) continue;
+    const pile = new PileClass({ kind, cards: [card], ownerId: 'someone-else' });
+    const actions = pile.cardActions(card, 'viewer-id');
+    assert.ok(actions.includes('move') || actions.includes('play'),
+      `${kind} pile must offer move or play for drag-and-drop (Core invariant): got ${JSON.stringify(actions)}`);
+  }
+});
+
 test('visibility matches state.js\'s existing PILE_VISIBILITY table exactly', () => {
   assert.equal(DeckPile.visibility, 'hidden');
   assert.equal(HandPile.visibility, 'in-hand');
