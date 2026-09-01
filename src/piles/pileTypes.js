@@ -13,7 +13,7 @@
  */
 import { Pile } from './Pile.js';
 import { DeckPile } from './DeckPile.js';
-import { HandPile } from './HandPile.js';
+import { OpponentHandPile } from './OpponentHandPile.js';
 import { PlayerHandPile } from './PlayerHandPile.js';
 import { DiscardPile } from './DiscardPile.js';
 import { FoundationPile } from './FoundationPile.js';
@@ -28,7 +28,7 @@ import { StackPile } from './StackPile.js';
 export const PILE_TYPES = {
   plain: Pile,
   deck: DeckPile,
-  hand: HandPile,
+  hand: OpponentHandPile,
   discard: DiscardPile,
   foundation: FoundationPile,
   run: RunPile,
@@ -114,13 +114,15 @@ export function pileForKind(kind) {
 }
 
 /**
- * The real instance that actually decides how this pile renders a card
- * TO `viewerId` - `PILE_TYPES[pile.kind]` for every pile, except a hand
+ * The real instance that decides how this pile behaves TOWARD
+ * `viewerId` - `PILE_TYPES[pile.kind]` for every pile, except a hand
  * pile viewed by its own owner, which is a `PlayerHandPile` instead
- * (`HandPile`'s `showsFace` is correct for anyone else). The one place
- * that decision gets made, so `ui.js`'s render loop calls
- * `pileInstanceFor(pile, viewerId).showsFace(card, viewerId)`
- * polymorphically without ever branching on `pile.kind` itself.
+ * (`OpponentHandPile`, `PILE_TYPES.hand`'s own entry, is correct for
+ * anyone else). The one place that decision gets made, so callers with
+ * a real viewer (`ui.js`'s render loop, `state.js`'s per-card
+ * authorization/view-building) call `pileInstanceFor(pile,
+ * viewerId).someMethod(...)` polymorphically, never branching on
+ * `pile.kind`/ownership themselves.
  */
 export function pileInstanceFor(pile, viewerId) {
   const Cls = pile.kind === 'hand' && pile.ownerId === viewerId ? PlayerHandPile : (PILE_TYPES[pile.kind] ?? Pile);

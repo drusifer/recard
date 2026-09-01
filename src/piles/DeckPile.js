@@ -38,12 +38,6 @@ export class DeckPile extends Pile {
     return [...(count <= 0 ? ['deal'] : []), ...(count < 2 ? ['split'] : [])];
   }
 
-  /** D34: Draw moved to a pile-level action - the deck has never
-   * rendered a per-card hover row, so this stays empty by construction. */
-  cardActions() {
-    return [];
-  }
-
   /** D94: `count` joins the base view shape - kept for every existing
    * consumer that reads it instead of `cards.length` (D84 already sends
    * the deck's real, full contents to every viewer, so the two numbers
@@ -83,17 +77,30 @@ export class DeckPile extends Pile {
     return isHost ? ['draw', 'deal', 'reshuffleDeal', 'shuffle', 'split', 'changePileType'] : ['draw'];
   }
 
-  /** DRAW has never been per-card authorized - deck cards carry no
-   * owner, so unlike the base case there's no `cardActions` entry to
-   * reuse (deck's `cardActions` is intentionally always empty, above). */
-  canRemoveCard() {
-    return true;
-  }
-
-  /** Unexercised by any current action - DRAW only ever removes from
-   * the deck, never inserts into it. Adds to the top, matching a
+  /** A card moved/put back onto the deck lands on top, matching a
    * physical deck (index 0, unlike the base class's append). */
   insertCard(card) {
     return { ...this.toJSON(), cards: [card, ...this.cards] };
+  }
+
+  /** Direct user correction: "it is absolutely permissable to put cards
+   * back on the deck and take cards off" - D34's old blanket `[]` struck.
+   * `reveal` is unconditional rather than the base rule's `faceUp ===
+   * false` check: a real deck card never carries a `faceUp` field at all
+   * (same fact `showsFace` above already relies on), so the base
+   * condition would never fire for one - a deck card is always
+   * effectively hidden at the PILE level (`visibility: 'hidden'`), not
+   * via a per-card flag. */
+  cardActions() {
+    return ['reveal', 'pickup', 'move', 'rotate'];
+  }
+
+  /** `draw` isn't a per-card action `cardActions` lists (it's a
+   * pile-level button, `pileActions` above) - DRAW's own authorization
+   * (`transferCard`, state.js) still routes through this same check, so
+   * it needs an explicit yes here. Everything else defers to the base
+   * Pile rule, which now reads the override above. */
+  canRemoveCard(card, viewerId, action) {
+    return action === 'draw' || super.canRemoveCard(card, viewerId, action);
   }
 }

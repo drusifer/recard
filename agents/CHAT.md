@@ -1351,3 +1351,68 @@ npm run lint:style
 ---
 [<small>2026-08-31 23:37:19</small>] [**Morpheus**]->[**User**] *lead decision*:
  Real finding while reviewing: docs/ARCHITECTURE.md is NOT actually current through D95 despite state.md's claim - grepped, only D91 exists as a header (file 'Last updated: 2026-08-29'). D92/D93/D94/D95 were broadcast to CHAT.md and summarized in state files but never written into ARCHITECTURE.md itself. Same drift pattern DECISIONS.md already has at D20. Not fixing unprompted - flagging for a call: backfill now, or backlog?
+
+---
+[<small>2026-08-31 23:42:56</small>] [**User**]->[**all**] *request*:
+ *strike the DeckPile cardActions exception - cards must be movable on/off deck like any pile (put back, take off, split, etc). Reverses D34's blanket [] override; Core invariant should apply to Deck too, not just table piles.
+
+---
+[<small>2026-08-31 23:43:01</small>] [**Neo**]->[**all**] *swe fix*:
+ Entering: *fix strike DeckPile cardActions exception.
+
+---
+[<small>2026-08-31 23:48:44</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make test | /home/drusifer/Projects/recard/build/build.out
+generatedMessage: true,
+code: 'ERR_ASSERTION',
+actual: [ 'reveal', 'pickup', 'move', 'rotate' ],
+expected: [],
+operator: 'deepStrictEqual',
+diff: 'simple'
+}
+
+---
+[<small>2026-09-01 00:06:42</small>] [**Neo**]->[**all**] *swe fix*:
+ Entering: *fix split HandPile into PlayerHandPile/OpponentHandPile - direct user correction, dislikes the internal ownerId===viewerId branch inside one class ('special ownership property'). Real architecture change: touches state.js's reducer authorization too, not just rendering.
+
+---
+[<small>2026-09-01 00:17:50</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 511
+ℹ suites 0
+ℹ pass 511
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1248.462447
+
+---
+[<small>2026-09-01 00:18:16</small>] [**Neo**]->[**all**] *swe fix*:
+ HandPile split into real PlayerHandPile/OpponentHandPile siblings (pileInstanceFor picks by ownerId===viewerId); state.js's 3 viewer-aware calls moved off revivePile onto pileInstanceFor - PLAY would've silently broken otherwise (mutation-verified). Also folded in: Deck's D34 cardActions exception struck per direct user correction. 511/511, lint at 7-error baseline.
+
+---
+[<small>2026-09-01 00:18:25</small>] [**Trin**]->[**all**] *qa uat*:
+ Entering: *qa uat HandPile split + Deck exception strike.
+
+---
+[<small>2026-09-01 00:19:18</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-style | /home/drusifer/Projects/recard/build/build.out
+=== make lint-style @ 2026-09-01 00:19:17 ===
+npm run lint:style
+
+> lint:style
+> stylelint style.css
+
+
+---
+[<small>2026-09-01 00:19:26</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT PASS: HandPile split. 511/511 independently re-run, lint-style clean, lint-js 7-error baseline unchanged. Mutation-killed 2 load-bearing points: (1) reverted transferCard to revivePile - PLAY failed immediately; (2) killed pileInstanceFor's ownerId===viewerId branch - same PLAY test failed. Both restored, byte-identical. No blockers. @Morpheus *lead review HandPile split
+
+---
+[<small>2026-09-01 00:19:34</small>] [**Morpheus**]->[**all**] *lead review*:
+ Entering: *lead review HandPile split.
+
+---
+[<small>2026-09-01 00:19:49</small>] [**Morpheus**]->[**all**] *lead review*:
+ Review PASS: HandPile split matches the request exactly - cardActions/showsFace/contributeToView are now real per-class facts (PlayerHandPile/OpponentHandPile), no instance ever asks 'is this mine?'. pileActions correctly stayed shared/ctx-based on HandPile itself since it was never the offending pattern (every other kind's pileActions already takes {isOwner}). No blockers.

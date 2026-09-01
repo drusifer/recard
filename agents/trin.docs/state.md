@@ -1004,3 +1004,23 @@ Independent verification:
   for it passed independently.
 
 No blockers. **Verdict: PASS.**
+
+## *fix: Deck cardActions exception struck + HandPile split into PlayerHandPile/OpponentHandPile (2026-09-01) - PASSED
+
+Both direct user corrections, same session. 511/511 independently
+re-run, `lint-style` clean, `lint-js` back at the 7-error baseline
+(2 real new errors from this work - unused import, block-comment style
+- fixed before sign-off, not waved through).
+
+**Mutation-tested the load-bearing fix, not just the new classes**: the
+real risk here wasn't the new `PlayerHandPile`/`OpponentHandPile`
+classes themselves, it was `state.js` switching 3 call sites from
+`revivePile` to `pileInstanceFor` for viewer-aware authorization/view
+building. Reverted `transferCard`'s call back to `revivePile` - a real
+`state.test.js` PLAY test failed immediately (every owner would have
+been unable to play their own hand). Separately reverted
+`pileInstanceFor`'s own `ownerId === viewerId` branch - same PLAY test
+failed the same way. Both restored, confirmed byte-identical
+(`git diff --stat` on the touched files matched expectations exactly).
+
+No blockers. **Verdict: PASS.** Handed to Morpheus for review.

@@ -1,5 +1,5 @@
 import { buildDeck, shuffle, RANKS, SUITS } from './deck.js';
-import { PILE_TYPES, revivePile } from './piles/pileTypes.js';
+import { PILE_TYPES, revivePile, pileInstanceFor } from './piles/pileTypes.js';
 
 const DEFAULT_PILE_ID = 'table';
 // Exported (only this one, of the three) - `main.js`'s `dealFromDeck`
@@ -542,7 +542,7 @@ function splitPileAt(pile, index, playerId) {
     throw new Error(`Cannot split pile ${pile.id} at index ${index}: must be between 1 and ${pile.cards.length - 1}`);
   }
   if (pile.kind !== 'deck') {
-    const instance = revivePile(pile);
+    const instance = pileInstanceFor(pile, playerId);
     const moved = pile.cards.slice(index);
     if (moved.some((card) => !instance.canRemoveCard(card, playerId, 'move'))) {
       throw new Error(`Player ${playerId} is not authorized to split pile ${pile.id}`);
@@ -623,7 +623,7 @@ function transferCard(state, { fromPileId, toPileId, cardId, viewerId, action, p
   const card = fromPile.cards.find((c) => c.id === cardId);
   if (!card) throw new Error(`Card ${cardId} is not in pile ${fromPileId}`);
 
-  if (!revivePile(fromPile).canRemoveCard(card, viewerId, action)) {
+  if (!pileInstanceFor(fromPile, viewerId).canRemoveCard(card, viewerId, action)) {
     throw new Error(`Player ${viewerId} is not authorized to ${action} ${cardId}`);
   }
 
@@ -1683,6 +1683,6 @@ export function viewFor(state, playerId) {
     // at all, and must default to "allowed" the same way here as there).
     gameConfig: { allowsPlayerZones: state.gameConfig?.allowsPlayerZones ?? true },
   };
-  for (const pile of state.piles) revivePile(pile).contributeToView(view, playerId);
+  for (const pile of state.piles) pileInstanceFor(pile, playerId).contributeToView(view, playerId);
   return view;
 }

@@ -1,4 +1,4 @@
-import { PILE_TYPES, revivePile, pileForKind } from './piles/pileTypes.js';
+import { PILE_TYPES, pileForKind, pileInstanceFor } from './piles/pileTypes.js';
 
 /**
  * What a card in a given Pile can *do*, and where it can go (D23/D25).
@@ -224,7 +224,7 @@ export function actionsForCard(pile, card, viewerId) {
   // safely, never grant real drag-and-drop to something the registry
   // doesn't recognize.
   if (!Object.hasOwn(PILE_TYPES, pile.kind)) return [];
-  return revivePile(pile).cardActions(card, viewerId);
+  return pileInstanceFor(pile, viewerId).cardActions(card, viewerId);
 }
 
 /**

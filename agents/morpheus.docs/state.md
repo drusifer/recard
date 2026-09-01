@@ -293,6 +293,39 @@ asked for.
 
 Item D committed to git after this state save (see Next Steps).
 
+## Session update (2026-09-01): two direct-correction fixes, unplanned but real
+
+Two user corrections landed outside this plan's own item list, both
+Neo->Trin->Morpheus gate-cleared, PASS, not yet committed:
+
+1. **Deck's D34 `cardActions` exception struck** - "it is absolutely
+   permissable to put cards back on the deck and take cards off." Real
+   architecture fix, not cosmetic: needed a `canRemoveCard` override
+   (`draw` isn't a per-card `cardActions` entry) and a `cardActions`
+   override that's unconditional rather than the base `faceUp === false`
+   rule (a deck card never carries `faceUp` at all).
+2. **HandPile split into `PlayerHandPile`/`OpponentHandPile`** - "I
+   don't like the special ownership property for hand... make PlayerHand
+   and OpponentHand as separate classes." Bigger than it looks: exposed
+   that `state.js` was calling `revivePile` (viewer-agnostic) for 3
+   genuinely viewer-aware checks that used to work only because
+   `HandPile` computed `this.ownerId === viewerId` internally - switched
+   those 3 to `pileInstanceFor(pile, viewerId)`, confirmed load-bearing
+   via mutation test (PLAY breaks immediately without it).
+   `pileActions` correctly stayed shared/ctx-based on `HandPile` itself
+   - it was never the offending pattern (every other kind's
+   `pileActions` already takes `{isOwner}`), and `pileLevelActions`'s
+   one caller with no real pile/viewerId (pre-game deck preview)
+   structurally can't use the class-selection mechanism anyway.
+
+Also scoped (discussion only, not implemented): a YAML-backed pile-
+capabilities table, following `tools/rtg/compile.mjs`'s exact
+authored-YAML -> compiled-committed-ES-module pattern, covering ONLY
+the unconditional per-kind baseline - explicitly NOT the dynamic
+gating logic, to avoid rebuilding the "rules engine" this codebase has
+repeatedly, deliberately rejected. See `neo.docs/state.md` for the
+fuller writeup. Not started.
+
 ## Next Steps
 
 1. **Item D done.** Two plan items remain, not currently assigned:

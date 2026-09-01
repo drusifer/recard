@@ -20,7 +20,8 @@ const cascade = { id: 'c:1', kind: 'cascade', ownerId: null };
 // actionsForCard directly, plus that an unknown kind offers nothing
 // rather than throwing.
 test('each pile type declares its own actions (D25/D34/D42)', () => {
-  assert.deepEqual(actionsForCard(deck, { id: 'c' }, 'me'), [], 'every deck action is pile-level now, D34');
+  assert.deepEqual(actionsForCard(deck, { id: 'c' }, 'me'), ['reveal', 'pickup', 'move', 'rotate'],
+    'D34\'s blanket [] struck - cards can be put back on/taken off the deck like any pile');
   assert.deepEqual(actionsForCard(myHand, { id: 'c' }, 'me'), ['play']);
   assert.deepEqual(actionsForCard(table, { faceUp: true, owner: null }, 'me'), ['pickup', 'move', 'rotate']);
   assert.deepEqual(actionsForCard({ id: 'x', kind: 'nonsense', ownerId: null }, { id: 'c' }, 'me'), [],

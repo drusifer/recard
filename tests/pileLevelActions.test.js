@@ -33,18 +33,12 @@ test('hands and plain piles have no pile-level actions', () => {
   }
 });
 
-// UPDATED for D34: `draw` itself moved OFF the per-card table onto
-// the pile-level one (this file's own later test covers the move) -
-// the deck's per-card table is now empty, not `['draw']`. The
-// underlying point of D29 this test protected - a pile-level action
-// can never leak into the per-card hover row - still holds and is
-// covered by the newer test below.
-test('the per-card action table has nothing for the deck (D29/D34)', () => {
-  // `deal`/`reshuffleDeal` never belonged here (D29); `draw` doesn't
-  // either any more (D34) - the deck's per-card table is empty because
-  // EVERY deck action is now pile-level, not card-level.
-  assert.deepEqual(actionsForCard(deck, { id: 'c' }, 'me'), []);
-});
+// D34's own premise (deck's per-card table is empty, draw is the only
+// deck-shaped card action and it's pile-level) is struck by the later
+// "put cards back on/take cards off the deck" correction - `deal`/
+// `reshuffleDeal`/`draw` still never belong to the per-card table
+// (D29's own point, still true), but the table is no longer empty: see
+// `tests/piles.test.js`'s `deck cardActions` test for the real list.
 
 test('every pile-level action declares a label and whether it destroys the round', () => {
   for (const id of ['deal', 'reshuffleDeal']) {
@@ -108,12 +102,8 @@ test('D36 BLOCKER: move and pickup never carry singleTarget, under any circumsta
   assert.equal(ACTION_SPECS.pickup.singleTarget, undefined);
 });
 
-test('D34: draw is no longer offered as a per-card action from the deck (moved to pile-level)', () => {
-  // Confirmed dead in ui.js/main.js before removing it: the deck has
-  // never rendered a per-card hover row (it renders via renderDeck, a
-  // separate D29 path), so this is a real architecture correction, not
-  // a behaviour change anything currently depends on.
-  assert.deepEqual(actionsForCard(deck, { id: 'c' }, 'me'), []);
+test('D34: draw is never offered as a per-card action from the deck - it stays pile-level, even now the deck has real per-card actions', () => {
+  assert.ok(!actionsForCard(deck, { id: 'c' }, 'me').includes('draw'));
 });
 
 // --- Phase 56 (Sprint 12, T56.1): shuffle joins the deck's pile-level

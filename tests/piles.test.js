@@ -4,6 +4,8 @@ import { PILE_TYPES, CHANGE_PILE_TYPE_KINDS, pileKindLabel } from '../src/piles/
 import { Pile } from '../src/piles/Pile.js';
 import { DeckPile } from '../src/piles/DeckPile.js';
 import { HandPile } from '../src/piles/HandPile.js';
+import { PlayerHandPile } from '../src/piles/PlayerHandPile.js';
+import { OpponentHandPile } from '../src/piles/OpponentHandPile.js';
 import { DiscardPile } from '../src/piles/DiscardPile.js';
 import { FoundationPile } from '../src/piles/FoundationPile.js';
 import { CascadePile } from '../src/piles/CascadePile.js';
@@ -27,7 +29,7 @@ test('the registry exposes exactly the twelve pile kinds', () => {
   assert.deepEqual(Object.keys(PILE_TYPES).toSorted(),
     ['battlefield', 'cascade', 'deck', 'discard', 'exile', 'foundation', 'hand', 'plain', 'rankAdjacent', 'run', 'set', 'stack']);
   assert.equal(PILE_TYPES.deck, DeckPile);
-  assert.equal(PILE_TYPES.hand, HandPile);
+  assert.equal(PILE_TYPES.hand, OpponentHandPile);
   assert.equal(PILE_TYPES.plain, Pile);
   assert.equal(PILE_TYPES.discard, DiscardPile);
   assert.equal(PILE_TYPES.run, RunPile);
@@ -43,19 +45,15 @@ test('every concrete pile class extends Pile', () => {
 });
 
 // Morpheus's refactor plan (agents/morpheus.docs/state.md), item D: a
-// structural GUARANTEE, not scattered
-// convention/folklore - iterates PILE_TYPES so a FUTURE kind that
-// accidentally restricts drag-and-drop fails CI immediately, same
-// "executable guarantee" instinct as assertCardsConserved. DeckPile is
-// the one documented, deliberate exception: it has never rendered a
-// per-card hover row (D34, DeckPile.js's own `cardActions` comment) -
-// Draw/Deal/Shuffle are pile-level actions instead, so it is named here
-// rather than silently skipped by a broader rule that could hide a
-// future, undocumented exception too.
-test('universal drag-and-drop guarantee: every concrete pile kind (except Deck) offers move or play on a visible card', () => {
+// structural GUARANTEE, not scattered convention/folklore - iterates
+// PILE_TYPES so a FUTURE kind that accidentally restricts drag-and-drop
+// fails CI immediately, same "executable guarantee" instinct as
+// assertCardsConserved. No named exceptions: Deck's own former [] override
+// was struck (direct user correction), so this now covers every
+// registered kind with zero carve-outs.
+test('universal drag-and-drop guarantee: every concrete pile kind offers move or play on a visible card', () => {
   const card = { id: 'c1', faceUp: true };
   for (const [kind, PileClass] of Object.entries(PILE_TYPES)) {
-    if (PileClass === DeckPile) continue;
     const pile = new PileClass({ kind, cards: [card], ownerId: 'someone-else' });
     const actions = pile.cardActions(card, 'viewer-id');
     assert.ok(actions.includes('move') || actions.includes('play'),
@@ -136,8 +134,14 @@ const myHand = { id: 'hand:me', kind: 'hand', ownerId: 'me' };
 const theirHand = { id: 'hand:you', kind: 'hand', ownerId: 'you' };
 const table = { id: 'table', kind: 'plain', ownerId: null };
 
-test('deck cardActions: always empty (D34 moved draw off the per-card table)', () => {
-  assert.deepEqual(new DeckPile(deck).cardActions({ id: 'c' }, 'me'), []);
+// D34's "always []" override struck (direct user correction: cards can
+// be put back on the deck and taken off, same as any pile). Draw/Deal/
+// Shuffle stay pile-level actions (unaffected). `reveal` is unconditional
+// here rather than the base rule's `faceUp === false` check - a real
+// deck card never carries a `faceUp` field at all, so a deck needs its
+// own override, not a plain inherit.
+test('deck cardActions: reveal/pickup/move/rotate, unconditionally - on/off the deck like any pile', () => {
+  assert.deepEqual(new DeckPile(deck).cardActions({ id: 'c' }, 'me'), ['reveal', 'pickup', 'move', 'rotate']);
 });
 
 // D92 (direct user request: "split should always fan the pile to allow
@@ -160,9 +164,16 @@ test('deck showsFace: always false, regardless of faceUp - a deck is always hidd
 // can drag a card straight out of anyone's hand. The owner still gets
 // `['play']`, not `['move']` - that's a naming necessity (PLAY's own
 // authorization needs the literal string `'play'`), not a restriction.
-test('hand cardActions: play for the owner, move for anyone else - never empty any more', () => {
-  assert.deepEqual(new HandPile(myHand).cardActions({ id: 'c' }, 'me'), ['play']);
-  assert.deepEqual(new HandPile(theirHand).cardActions({ id: 'c' }, 'me'), ['move']);
+//
+// Direct user correction (later): "I don't like the special ownership
+// property for hand... make PlayerHand and OpponentHand as separate
+// classes to encapsulate the visibility differences" - one `HandPile`
+// used to compute `this.ownerId === viewerId` itself; now
+// `pileInstanceFor` picks the class, and each one's `cardActions` is an
+// unconditional fact about that class, not a runtime comparison.
+test('hand cardActions: PlayerHandPile always offers play, OpponentHandPile always offers move', () => {
+  assert.deepEqual(new PlayerHandPile(myHand).cardActions({ id: 'c' }, 'me'), ['play']);
+  assert.deepEqual(new OpponentHandPile(theirHand).cardActions({ id: 'c' }, 'me'), ['move']);
 });
 
 // *nit (direct user request, "a hand is just a regular pile... behave
@@ -261,9 +272,9 @@ test('plain pile insertCard: placement before/after a target, layout on the corr
   assert.equal(after.cards.find((c) => c.id === 'x').layout, 'stack');
 });
 
-test('hand canRemoveCard: true - PLAY has never been authorized per-card, only per-hand-ownership (inherited from Pile, resolved via `this`)', () => {
-  assert.equal(new HandPile(myHand).canRemoveCard({ id: 'c' }, 'me', 'play'), true);
-  assert.equal(new HandPile(theirHand).canRemoveCard({ id: 'c' }, 'me', 'play'), false, 'not your hand');
+test('hand canRemoveCard: PLAY authorized on PlayerHandPile (your own hand), never on OpponentHandPile (inherited from Pile, resolved via cardActions)', () => {
+  assert.equal(new PlayerHandPile(myHand).canRemoveCard({ id: 'c' }, 'me', 'play'), true);
+  assert.equal(new OpponentHandPile(theirHand).canRemoveCard({ id: 'c' }, 'me', 'play'), false, 'not your hand');
 });
 
 test('hand removeCard/insertCard: pure, appends on insert (both inherited from Pile, unmodified)', () => {
@@ -274,8 +285,10 @@ test('hand removeCard/insertCard: pure, appends on insert (both inherited from P
   assert.deepEqual(inserted.cards.map((c) => c.id), ['b']);
 });
 
-test('deck canRemoveCard: always true - DRAW has never been per-card authorized (deck cards have no owner)', () => {
-  assert.equal(new DeckPile(deck).canRemoveCard({ id: 'c' }, 'anyone', 'draw'), true);
+test('deck canRemoveCard: reveal/pickup/move all true via cardActions; draw stays unconditionally true (not a per-card cardActions entry)', () => {
+  for (const action of ['reveal', 'pickup', 'move', 'draw']) {
+    assert.equal(new DeckPile(deck).canRemoveCard({ id: 'c' }, 'anyone', action), true, action);
+  }
 });
 
 test('deck removeCard/insertCard: pure (removeCard inherited from Pile, insertCard overridden to prepend)', () => {
@@ -283,7 +296,7 @@ test('deck removeCard/insertCard: pure (removeCard inherited from Pile, insertCa
   const removed = new DeckPile(pile).removeCard('a');
   assert.deepEqual(removed.cards.map((c) => c.id), ['b']);
   const inserted = new DeckPile(removed).insertCard({ id: 'c' });
-  assert.deepEqual(inserted.cards.map((c) => c.id), ['c', 'b'], 'unexercised by any current action - DRAW only ever removes, never inserts, into a deck');
+  assert.deepEqual(inserted.cards.map((c) => c.id), ['c', 'b'], 'a card put back on the deck lands on top, matching a physical deck');
 });
 
 // --- Discard (D45, reversed by direct user request: "discard pile is
