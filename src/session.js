@@ -194,6 +194,21 @@ export class Session {
   }
 
   /**
+   * Host only: actively tear down one specific peer's connection (direct
+   * user request, "trust the new key, but can it release/free the old
+   * one? I worry about resource leaks" - identity.js's `resolvePlayer`
+   * now always lets a returning key reclaim its seat, so `main.js` calls
+   * this on whatever OLD connection used to hold that key, rather than
+   * just overwriting the mapping and leaving it to leak). `conn.close()`
+   * fires the same `close` handler `#wireIncomingConnection` already
+   * wires up, so the roster updates and `this.peers` drops the entry the
+   * normal way - no separate bookkeeping needed here.
+   */
+  closePeer(peerId) {
+    this.peers.get(peerId)?.conn?.close();
+  }
+
+  /**
   Join side only: send a message to the host.
   */
   send(message) {

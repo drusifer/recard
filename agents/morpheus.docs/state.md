@@ -354,6 +354,31 @@ order-preserving concat. `onReorderPile`/`performReorderPile` correctly
 removed as dead code (their one caller is gone); `REORDER_PILE` the
 reducer stays, untouched, in case a future gesture wants it.
 
+## Session update (2026-09-01, continued): reconnect identity fix (real architectural decision, needs D100)
+
+Escalated from a *nit ("guest's hand shows wrong name") through a real
+*fix, per direct user request when the trade-off surfaced mid-
+investigation. Root cause: `identity.js`'s `resolvePlayer` refused a
+returning `playerKey` whenever WebRTC hadn't yet detected the OLD
+connection as gone - confirmed live this session that detection can
+lag indefinitely (held 25s, never self-corrected), so the guard
+false-positived on ordinary reconnects, silently minting a duplicate
+empty identity instead of resuming the real one.
+
+**Real, disclosed architectural decision**: `resolvePlayer` now trusts
+a returning key UNCONDITIONALLY - no more liveness check at all. This
+REMOVES the original protection against two tabs deliberately sharing
+one identity mid-game (verified live: it now silently evicts the older
+one instead of refusing the newer one). User's own explicit trade-off
+call, asked directly rather than assumed, addressing their own
+resource-leak concern via a new `Session.closePeer(peerId)` method
+that actively tears down the evicted connection.
+
+Not yet backfilled into `docs/ARCHITECTURE.md` as a numbered decision
+(D100) - Oracle wasn't active this session; flagging for the next
+`*ora groom`, same as the D92-D99 backfill gap Oracle already closed
+once this session.
+
 ## Next Steps
 
 1. **Item D done.** Two plan items remain, not currently assigned:

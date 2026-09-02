@@ -1085,3 +1085,30 @@ verified myself with a SECOND preset (Gin Rummy, cardsPerPlayer:10,
 explicitly selected) rather than just trusting Neo's single-preset
 check: `#cards-per-player` showed `10` after Create Table, zero page
 errors. No blockers. **Verdict: PASS.**
+
+## *fix: guest-reconnect identity duplication (2026-09-01) - PASSED
+
+Escalated from a *nit after live investigation traced "guest's hand
+shows wrong name/obscured" to a real server-side bug: `resolvePlayer`'s
+anti-hijack guard refused a returning identity whenever WebRTC hadn't
+yet detected the old connection as gone (confirmed live: held 25s,
+never self-corrected), silently minting a duplicate empty player
+instead of resuming the real one. Direct user decision (asked, not
+assumed, since it's a real trade-off): trust a returning key
+unconditionally, actively evict the stale connection instead
+(`Session.closePeer`, new method) to address the user's own follow-up
+concern about resource leaks.
+
+513/513 independently re-run, lint-js/style unchanged. Mutation-killed
+`resolvePlayer`'s core `known` check - real failure, restored clean.
+**Independently verified a DIFFERENT scenario than Neo's own check**:
+Neo verified the reconnect-after-close case; I verified the
+eviction path itself under two GENUINELY simultaneous tabs sharing one
+identity (the actual scenario the removed guard used to protect
+against) - roster correctly shows exactly 2 players (no duplicate),
+old tab's connection closes with zero page errors. This confirms the
+disclosed trade-off (no more anti-hijack refusal) behaves exactly as
+intended under the condition it changes, not just that it doesn't
+crash.
+
+No blockers. **Verdict: PASS.** Handed to Morpheus for review.

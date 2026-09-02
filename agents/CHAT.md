@@ -458,3 +458,69 @@ npm run lint:style
 ---
 [<small>2026-09-01 19:08:21</small>] [**Oracle**]->[**all**] *ora archive*:
  CHAT.md archived (268 -> 69 messages, rolling *ora archive since it exceeded the 50-100 threshold): 199 messages moved to agents/chat_archive/CHAT-ARCHIVE-20260901.md, pointer summary added, CHAT.diagram.md regenerated. Message count conserved exactly (199+69=268).
+
+---
+[<small>2026-09-01 20:55:17</small>] [**User**]->[**all**] *request*:
+ *nit when playing as the joiner (guest), own hand is obscured (shows backs) and labeled with the player's name instead of 'You'.
+
+---
+[<small>2026-09-01 20:58:34</small>] [**Neo**]->[**all**] *swe fix*:
+ Entering: *nit fix guest hand shows obscured+named-not-'You'. Root cause: main.js's 'identity' handler updates myId but never re-renders - if a state broadcast reaches the guest before/concurrent with identity resolving, the guest's client-side pileInstanceFor(pile, myId) picks OpponentHandPile for their own hand, and nothing re-renders once myId corrects itself.
+
+---
+[<small>2026-09-01 21:00:07</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make lint-js | /home/drusifer/Projects/recard/build/build.out
+1791:17  error  Refactor this function to reduce its Cognitive Complexity from 25 to the 15 allowed  sonarjs/cognitive-complexity
+
+✖ 7 problems (7 errors, 0 warnings)
+
+
+---
+[<small>2026-09-01 21:00:28</small>] [**Neo**]->[**all**] *swe fix*:
+ Fix: identity handler now calls renderGameFromView(latestView) if set, same pattern finishRestore already uses for a local-only re-render. 514/514, lint baseline unchanged. Could NOT live-verify the actual 2-peer WebRTC race (no e2e harness exists any more - D60 removed it; PeerJS's public broker likely unreachable in this sandbox anyway) - disclosing, not fabricating coverage. Confident in the fix by code reading: same re-render pattern already proven at finishRestore.
+
+---
+[<small>2026-09-01 22:06:48</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-style | /home/drusifer/Projects/recard/build/build.out
+=== make lint-style @ 2026-09-01 22:06:47 ===
+npm run lint:style
+
+> lint:style
+> stylelint style.css
+
+
+---
+[<small>2026-09-01 22:08:14</small>] [**Neo**]->[**all**] *swe fix*:
+ Real root cause found (guided by user's answer: reconnect scenario). resolvePlayer's anti-hijack guard false-positived on ordinary reconnects since WebRTC disconnect detection can lag indefinitely (confirmed live: held 25s, never resolved). Direct user decision: trust a returning key unconditionally; evict any stale connection actively (session.closePeer, new method) instead of silently duplicating identities. Live-verified fixed across 3 runs (no more ghost duplicate player, hand correctly shows You).
+
+---
+[<small>2026-09-01 22:08:22</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ @Trin *qa uat reconnect identity fix (identity.js/session.js/main.js).
+
+---
+[<small>2026-09-01 22:08:54</small>] [**Trin**]->[**all**] *qa uat*:
+ Entering: *qa uat reconnect identity fix.
+
+---
+[<small>2026-09-01 22:10:13</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 513
+ℹ suites 0
+ℹ pass 513
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1302.528177
+
+---
+[<small>2026-09-01 22:11:13</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ PASS: 513/513 re-run, lint unchanged. Mutation-killed resolvePlayer core logic, restored clean. Independently live-verified the NEW eviction path (not just Neo's reconnect case): two genuinely-simultaneous tabs sharing one identity now cleanly evict the old one, no duplicate, no errors - confirms the disclosed trade-off behaves as intended. No blockers. @Morpheus *lead review reconnect identity fix
+
+---
+[<small>2026-09-01 22:11:39</small>] [**Morpheus**]->[**all**] *lead review*:
+ Entering: *lead review reconnect identity fix.
+
+---
+[<small>2026-09-01 22:12:07</small>] [**Morpheus**]->[**all**] *lead review*:
+ Review PASS: resolvePlayer's simplification is correct and matches the disclosed trade-off exactly - unconditional trust + active eviction (Session.closePeer) is simpler than the old liveness-guessing logic AND more correct given WebRTC's detection unreliability. beforeunload/re-render/peerToKey-hygiene fixes are all real, harmless, now supplementary to the core fix rather than load-bearing for it - fine to keep. No blockers.

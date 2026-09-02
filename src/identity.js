@@ -31,22 +31,27 @@ export function newPlayerKey() {
 /**
  * Decides who a connecting peer *is*.
  *
+ * *fix (direct user report: rejoining as the "joiner" left them looking
+ * at their own hand as if it were an opponent's): this used to refuse a
+ * returning key if `peerToKey` still showed it mapped to a live peer -
+ * meant to stop two simultaneous tabs from sharing one hand, but WebRTC
+ * disconnect detection is unreliable enough (an abruptly closed tab may
+ * never be detected as gone within any useful time window - confirmed
+ * live, held for 25s and never resolved) that this false-positived on
+ * ordinary reconnects far more often than it ever caught a real second
+ * tab. Direct user decision: trust the presented key unconditionally -
+ * a returning player always reclaims their seat. The caller (`main.js`)
+ * is responsible for actively evicting whatever OLD connection used to
+ * hold this key, so a genuinely-live old tab gets disconnected for real
+ * (not silently duplicated) rather than leaking its connection.
+ *
  * @param {string|null|undefined} presentedKey the key the client sent, if any
  * @param {{id: string}[]} knownPlayers players already in game state
- * @param {Map<string,string>} peerToKey live peerId -> playerKey bindings
  * @returns {{playerKey: string, returning: boolean}}
  */
-export function resolvePlayer(presentedKey, knownPlayers, peerToKey) {
+export function resolvePlayer(presentedKey, knownPlayers) {
   const known = presentedKey && knownPlayers.some((p) => p.id === presentedKey);
   if (!known) return { playerKey: newPlayerKey(), returning: false };
-
-  // Refuse to hand a seat to a second peer while the first is still on
-  // it: two tabs sharing one key would otherwise both claim the hand,
-  // and the roster would flip between them. The newcomer gets a fresh
-  // identity instead of silently hijacking a live player.
-  const isAlreadyLive = peerToKey.values().toArray().includes(presentedKey);
-  if (isAlreadyLive) return { playerKey: newPlayerKey(), returning: false };
-
   return { playerKey: presentedKey, returning: true };
 }
 

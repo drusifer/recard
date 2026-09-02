@@ -3,37 +3,35 @@ import assert from 'node:assert/strict';
 import { newPlayerKey, resolvePlayer, peerFor } from '../src/identity.js';
 
 test('a first-time client with no key gets a fresh identity', () => {
-  const r = resolvePlayer(null, [], new Map());
+  const r = resolvePlayer(null, []);
   assert.equal(r.returning, false);
   assert.ok(r.playerKey);
 });
 
 test('a returning client presenting a known key reclaims that identity', () => {
   const key = newPlayerKey();
-  const r = resolvePlayer(key, [{ id: key }], new Map());
+  const r = resolvePlayer(key, [{ id: key }]);
   assert.deepEqual(r, { playerKey: key, returning: true });
 });
 
 test('an unknown key is not trusted - it gets a fresh identity', () => {
-  const r = resolvePlayer('made-up-key', [{ id: 'someone-else' }], new Map());
+  const r = resolvePlayer('made-up-key', [{ id: 'someone-else' }]);
   assert.equal(r.returning, false);
   assert.notEqual(r.playerKey, 'made-up-key',
     'accepting an arbitrary key would let anyone name themselves into a seat');
 });
 
-test('a key already in use by a live peer does not hijack that seat', () => {
+// *fix (direct user report + decision): a known key ALWAYS reclaims its
+// seat now, even if some other peer id still appears to hold it live -
+// WebRTC disconnect detection is unreliable enough that the old "refuse
+// while the first is still on it" guard false-positived on ordinary
+// reconnects far more than it ever caught a real second tab. The caller
+// (main.js) is responsible for actively evicting whatever connection
+// used to hold this key, so it can't be silently duplicated OR leaked.
+test('a returning key reclaims its seat unconditionally, even if another peer id still appears to hold it', () => {
   const key = newPlayerKey();
-  const live = new Map([['peer-1', key]]);
-  const r = resolvePlayer(key, [{ id: key }], live);
-  assert.equal(r.returning, false,
-    'the original player is still connected, so the newcomer must not take their hand');
-  assert.notEqual(r.playerKey, key);
-});
-
-test('the same key IS reusable once the original peer has gone', () => {
-  const key = newPlayerKey();
-  const r = resolvePlayer(key, [{ id: key }], new Map());
-  assert.equal(r.returning, true, 'this is the whole point: refresh, come back, get your seat');
+  const r = resolvePlayer(key, [{ id: key }]);
+  assert.deepEqual(r, { playerKey: key, returning: true });
 });
 
 test('newPlayerKey does not collide across calls', () => {

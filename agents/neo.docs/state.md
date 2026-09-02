@@ -215,6 +215,63 @@ they disagreed with each other. Fixed both:
   not either old hardcoded number), zero page errors.
 - 514/514, lint-js/style unchanged. Handed to Trin.
 
+## Session update (2026-09-01): *fix guest-reconnect identity bug
+
+Direct user report: "when playing as the joiner, my hand is obscured
+and shows GEMINI (the player's name) instead of You." What started as
+a *nit escalated into a real *fix after live investigation - see the
+full escalation trail in CHAT.md, condensed here:
+
+1. **First hypothesis (wrong but harmless)**: main.js's 'identity'
+   handler updated `myId` without re-rendering. Real gap, fixed
+   (`if (latestView) renderGameFromView(latestView);`), but didn't
+   reproduce the reported bug in live testing (2-context Playwright,
+   real WebRTC via PeerJS's public broker - reachable from this
+   sandbox, confirmed by curl before assuming otherwise).
+2. **User clarified**: happens specifically on reconnect. Reproduced
+   live: after a simulated tab-close+reopen, the host's own roster
+   showed a DUPLICATE player ("Claude - connected 5 cards" AND "Claude
+   - connected 0 cards") - the guest was silently issued a whole new,
+   empty identity instead of resuming their real one.
+3. **Root cause, confirmed by direct instrumentation** (temporary
+   console.log at the resolvePlayer call site, removed after):
+   `identity.js`'s `resolvePlayer` refuses to return a presented key if
+   `peerToKey` shows it mapped to any peer - meant to stop two
+   simultaneous tabs sharing one identity, but WebRTC/PeerJS disconnect
+   detection is unreliable enough that an abruptly-closed tab's
+   connection can look "live" indefinitely (held 25 SECONDS in testing,
+   never self-corrected). Two intermediate fixes (peerToKey staleness
+   pruning/ordering; a `beforeunload` graceful-close signal) did NOT
+   resolve it - the underlying detection gap is real and not something
+   app-level bookkeeping alone can close.
+4. **User's explicit decision** (asked directly, since this is a real
+   trade-off, not something to decide unilaterally): trust a returning
+   key UNCONDITIONALLY - `resolvePlayer` no longer takes a `peerToKey`
+   param or does any liveness check at all. User's own follow-up
+   concern (resource leaks) addressed: `Session.closePeer(peerId)` (new
+   method, `session.js`) actively tears down whatever OLD connection
+   held that key, rather than silently abandoning it. This REMOVES the
+   original anti-hijack protection (two tabs deliberately sharing a key
+   mid-game will now silently kick each other) - a real, disclosed
+   trade-off, not an oversight.
+
+**Live-verified 3x** (not just once): after reconnect, same pile id,
+correctly shows "You" + sort buttons, host roster shows exactly 2
+players, no ghost duplicate. 513/513 (net -1: consolidated 2 old
+`identity.test.js` tests whose premise - "already-live key is
+refused" - is now the opposite of correct behavior, into 1 new one).
+`lint-js` at the same 7-flagged-function baseline (one number grew
+further, 16->27, same already-flagged `roster` handler - not a new
+violation); `lint-style` clean.
+
+Files touched: `src/identity.js` (`resolvePlayer` signature+behavior),
+`src/session.js` (new `closePeer` method), `src/main.js` (roster
+reconciliation: two-pass disconnect cleanup + active eviction of a
+stale same-key connection + `beforeunload` handler + identity-handler
+re-render), `tests/identity.test.js`.
+
+Handed to Trin for `*qa uat`.
+
 ## Next Steps
 
 **Nothing in-flight - ready to commit.** Gate cleared (Neo->Trin->

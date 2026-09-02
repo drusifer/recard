@@ -87,6 +87,22 @@ let myName = '';
 let gameState = null; // authoritative, host only
 let latestView = null; // last view received from host, join only
 let isSessionEnded = false;
+
+// *fix (direct user report: rejoining as the "joiner" left them looking
+// at their own hand as if it were an opponent's). A guest's tab simply
+// closing (not a real network drop) leaves the host's transport with no
+// clean signal at all - PeerJS/WebRTC's own disconnect DETECTION can take
+// far longer than a quick reload/rejoin does, so the host still thinks
+// the old connection is live when the new one presents the same identity,
+// and `resolvePlayer`'s anti-hijack guard (identity.js, working exactly
+// as designed) mints a brand-new, empty one instead of resuming the real
+// one. `session.close()` already tears the peer down cleanly (used by the
+// join-retry loop) - just never got called on an ordinary tab close.
+// One listener for the page's lifetime, reading `session`/`role` live
+// (not captured), since both get reassigned across reconnect attempts.
+globalThis.addEventListener('beforeunload', () => {
+  if (role === 'join') session?.close();
+});
 let selectedPreset = null; // US-15: applied to cards-per-player once host-share is shown
 
 function describeDeckConfig({ type, numDecks, jokers }) {
@@ -260,16 +276,29 @@ document.querySelector('#show-join').addEventListener('click', () => showScreen(
  */
 function wireHostSession() {
 session.on('roster', (transportRoster) => {
+  // *fix (direct user report: rejoining as the "joiner" left them looking
+  // at their OWN hand as if it were an opponent's, labeled with a name
+  // that wasn't "You"). Root cause, confirmed live (held for 25s and
+  // never resolved on its own): PeerJS/WebRTC's own disconnect detection
+  // is unreliable enough that an abruptly closed tab's connection can
+  // still look "connected" indefinitely. `identity.js`'s `resolvePlayer`
+  // no longer refuses a returning key just because some OTHER peer id
+  // still maps to it (direct user decision, weighing this against the
+  // original anti-hijack intent: false-positived on ordinary reconnects
+  // far more often than it ever caught a real second tab) - the loop
+  // below actively evicts that other connection instead once it does.
+  //
+  // The two passes just below are `peerToKey`/`identityAnnounced` hygiene,
+  // independent of the above: a peer that vanishes without ever producing
+  // a `disconnected` roster entry would otherwise leak its mapping
+  // forever, and a `disconnected` entry sharing the same roster snapshot
+  // as a reconnecting one needs to be cleaned up before anything else
+  // resolves this tick, regardless of the roster's own array order.
+  const currentIds = new Set(transportRoster.map((r) => r.id));
+  for (const id of peerToKey.keys()) if (!currentIds.has(id)) forgetPeer(id);
+  for (const r of transportRoster) if (r.connection === 'disconnected') forgetPeer(r.id);
   for (const r of transportRoster) {
-    if (r.connection === 'disconnected') {
-      // Free the seat's address but keep the player (and their hand) in
-      // state, so the key they hold can bring them back to it.
-      const key = peerToKey.get(r.id);
-      peerToKey.delete(r.id);
-      identityAnnounced.delete(r.id);
-      if (key) gameState = reduce(gameState, { type: 'SET_CONNECTION', playerId: key, connection: 'disconnected' });
-      continue;
-    }
+    if (r.connection === 'disconnected') continue;
 
     // Don't seat a peer that is still `connecting`. D27 already refuses to
     // *announce* identity before the connection is open; seating them
@@ -282,8 +311,18 @@ session.on('roster', (transportRoster) => {
 
     let key = peerToKey.get(r.id);
     if (!key) {
-      const resolved = resolvePlayer(r.playerKey, gameState.players, peerToKey);
+      const resolved = resolvePlayer(r.playerKey, gameState.players);
       key = resolved.playerKey;
+      // A returning key always reclaims its seat now (identity.js's own
+      // comment) - if some OTHER peer id still holds it (a stale
+      // connection the transport hasn't reported as closed yet), evict
+      // that one for real rather than letting two peers share one key:
+      // `closePeer` tears down its underlying connection (no leak) and
+      // its own `close` handler drives the roster event that cleans up
+      // `peerToKey` for it the normal way.
+      for (const [otherId, otherKey] of peerToKey) {
+        if (otherKey === key && otherId !== r.id) session.closePeer(otherId);
+      }
       peerToKey.set(r.id, key);
     }
     // Tell the client which identity it is, so it can present the same one
@@ -762,6 +801,15 @@ function dispatch(action) {
 const peerToKey = new Map();
 const identityAnnounced = new Set();
 
+// Free the seat's address but keep the player (and their hand) in state,
+// so the key they hold can bring them back to it.
+function forgetPeer(id) {
+  const key = peerToKey.get(id);
+  peerToKey.delete(id);
+  identityAnnounced.delete(id);
+  if (key) gameState = reduce(gameState, { type: 'SET_CONNECTION', playerId: key, connection: 'disconnected' });
+}
+
 let saveTimer = null;
 function scheduleSave() {
   if (role !== 'host' || isSessionEnded) return;
@@ -922,6 +970,17 @@ function wireGuestSession() {
       // brings us back to this seat and hand rather than a new one.
       try { localStorage.setItem(CLIENT_KEY_STORAGE, message.playerKey); } catch { /* private mode */ }
       myId = message.playerKey;
+      // *nit (direct user request: "my hand is obscured and shows
+      // [the host's] name instead of You"): a `state` broadcast can
+      // legitimately race ahead of this `identity` message (both travel
+      // over the same connection, but from separate host-side code
+      // paths) - if it does, `renderGameFromView` runs once with the
+      // OLD `myId`, every `pile.ownerId === myId` check (own-hand
+      // visibility, the "You" zone title) comes out wrong, and nothing
+      // re-renders again until some unrelated future game action -
+      // same "re-render the cached view after a local-only change"
+      // pattern `finishRestore` already uses, above.
+      if (latestView) renderGameFromView(latestView);
       return;
     }
     if (message.type === 'motion') {
