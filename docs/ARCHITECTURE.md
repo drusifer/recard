@@ -5,7 +5,7 @@
 D21-D23) is historical - decisions are numbered continuously now and
 the highest number is always the current binding state, not a
 particular sprint's scope.
-**Last updated:** 2026-09-01 (D92-D99)
+**Last updated:** 2026-09-01 (D92-D100)
 
 ## Core invariant (direct user request, stated repeatedly - binding on every Pile type, present and future)
 
@@ -34,6 +34,68 @@ still: card identity REDACTION (D7) is gone too - a viewer sees every
 card's real identity, always, not just whether it can be moved. As of
 D85, the same removal reaches the three BULK/pile-level actions that
 still had their own separate authorization gate.
+
+### D100. A returning player's identity is trusted unconditionally; the old anti-hijack guard is gone
+Direct user report: rejoining as the "joiner" showed the player their
+own hand as if it were an opponent's, labeled with a name that wasn't
+"You." Live investigation (two real browser contexts, real WebRTC via
+PeerJS's public broker) traced this to `identity.js`'s `resolvePlayer`:
+it refused to hand a returning `playerKey` back to its owner whenever
+the host's `peerToKey` bookkeeping still showed that key mapped to
+*any* connection - a guard meant to stop two tabs from sharing one
+identity mid-game. Confirmed live that this false-positives on ordinary
+reconnects: WebRTC/PeerJS's own disconnect detection can lag
+indefinitely behind an abruptly-closed tab (held for 25 seconds in
+testing with no self-correction), so the host still believed the OLD
+connection was live the moment the guest's NEW one presented the same
+key - and silently minted a second, empty identity instead of resuming
+the real one. The player's actual hand stayed owned by the orphaned old
+key, permanently - not a race that eventually resolved itself.
+
+**The fix is a real, disclosed trade-off, not a bug patch alone** -
+asked of the user directly rather than assumed, since perfect
+disambiguation between "an old tab is still genuinely open" and
+"WebRTC just hasn't noticed it's gone yet" isn't possible from the
+information available. `resolvePlayer` (`identity.js`) now trusts a
+returning key unconditionally: any client presenting a known
+`playerKey` reclaims that identity, full stop, no liveness check. This
+REMOVES the original protection against two tabs deliberately sharing
+one identity while both are genuinely live - verified live that this
+scenario is no longer refused, it's now silently resolved by evicting
+the older connection.
+
+The user's own follow-up concern (resource leaks from an evicted-but-
+never-closed old connection) is addressed structurally, not just
+waved off: `Session.closePeer(peerId)` (`session.js`) is a new method
+that actively tears down a specific peer's underlying connection -
+`main.js`'s roster-reconciliation loop calls it on whatever OTHER peer
+id still maps to a key being reclaimed, so an evicted old tab is
+disconnected for real, not silently abandoned to leak.
+
+Two supplementary (not load-bearing on their own) fixes landed in the
+same pass, both real and harmless: (1) two `peerToKey`/
+`identityAnnounced` staleness races in the host's roster-reconciliation
+loop - a peer that vanishes without ever producing a `disconnected`
+roster entry used to leak its mapping forever, and a `disconnected`
+entry sharing a roster snapshot with a reconnecting one needed
+processing first, regardless of array order; (2) a `beforeunload`
+handler so an ordinary tab close notifies the host promptly instead of
+relying solely on WebRTC's own (unreliable) detection, plus a missing
+re-render when a guest's identity gets corrected mid-session (was
+previously silent - `main.js`'s `finishRestore` already established
+this "re-render the cached view after a local-only change" pattern,
+reused here).
+
+Live-verified 3x for the reconnect case (same pile id, correctly shows
+"You" + sort buttons every time, no ghost duplicate in the host's
+roster) and once for two genuinely-simultaneous tabs sharing one
+identity (the scenario the removed guard used to protect against) -
+the newer tab wins cleanly, the older one's connection closes without
+errors. Neo/Trin/Morpheus gate cleared: 513/513 (net -1: two
+`identity.test.js` tests whose premise - "an already-live key is
+refused" - was the opposite of correct behavior now, consolidated into
+one), `lint-js`/`lint-style` unchanged, `resolvePlayer`'s core logic
+mutation-tested.
 
 ### D99. Hand size default sourced from preset data, not two disagreeing hardcoded numbers
 Direct user request: "fix the hand size default by including that in

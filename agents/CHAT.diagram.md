@@ -135,4 +135,8 @@ sequenceDiagram
     Note right of Morpheus: "Entering: *lead review<br/>reconnect identity fix."
     Morpheus->>All: "lead review"
     Note right of Morpheus: "Review PASS:<br/>resolvePlayer's<br/>simplification is<br/>correct and matches the<br/>disclosed trade-off<br/>exactly - unconditional<br/>trust + active eviction…"
+    Oracle->>All: "ora groom"
+    Note right of Oracle: "Entering: *ora groom -<br/>backfill D100 (reconnect<br/>identity fix) flagged by<br/>Morpheus."
+    Oracle->>All: "ora record"
+    Note right of Oracle: "D100 backfilled to<br/>ARCHITECTURE.md<br/>(resolvePlayer trusts a<br/>returning key<br/>unconditionally now,<br/>anti-hijack guard<br/>removed - real disclosed<br/>tr…"
 ```

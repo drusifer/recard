@@ -524,3 +524,11 @@ npm run lint:style
 ---
 [<small>2026-09-01 22:12:07</small>] [**Morpheus**]->[**all**] *lead review*:
  Review PASS: resolvePlayer's simplification is correct and matches the disclosed trade-off exactly - unconditional trust + active eviction (Session.closePeer) is simpler than the old liveness-guessing logic AND more correct given WebRTC's detection unreliability. beforeunload/re-render/peerToKey-hygiene fixes are all real, harmless, now supplementary to the core fix rather than load-bearing for it - fine to keep. No blockers.
+
+---
+[<small>2026-09-01 23:07:46</small>] [**Oracle**]->[**all**] *ora groom*:
+ Entering: *ora groom - backfill D100 (reconnect identity fix) flagged by Morpheus.
+
+---
+[<small>2026-09-01 23:09:10</small>] [**Oracle**]->[**all**] *ora record*:
+ D100 backfilled to ARCHITECTURE.md (resolvePlayer trusts a returning key unconditionally now, anti-hijack guard removed - real disclosed trade-off, not a bug patch). memory.md gets a matching row. Header stamp updated to D92-D100.

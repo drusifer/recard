@@ -346,3 +346,18 @@ same class of gap `docs/DECISIONS.md` already has at D20).
 Nothing in-flight. If `task.md` staleness matters before the next
 sprint starts, that's Mouse's groom, not mine - flagged in
 `memory.md`, not acted on here.
+
+## Groom — D100 backfill (2026-09-01, same day)
+
+Quick follow-up groom, triggered directly (`*ora update docs and push`):
+backfilled D100 (the reconnect-identity `resolvePlayer` fix - see
+Morpheus's own state.md note flagging it right after that *fix
+shipped). Same treatment as the D92-D99 backfill earlier today:
+`docs/ARCHITECTURE.md` gets the full decision writeup, header stamp
+bumped to "D92-D100", `agents/oracle.docs/memory.md`'s table gets one
+matching summary row. `docs/DECISIONS.md` untouched, same standing
+policy. No CHAT.md archive needed this time (well under the threshold
+after this morning's archive).
+
+### Next Steps
+Nothing in-flight.
