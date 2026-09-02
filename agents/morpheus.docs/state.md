@@ -381,16 +381,21 @@ once this session.
 
 ## Next Steps
 
-1. **Item D done.** Two plan items remain, not currently assigned:
-   - Shell inlining (E): `<pile-panel>`/`renderPile`,
-     `<zone-panel>`/`renderZonePanel` collapsing into their own
-     `.render()` bodies - re-verify "zero other callers" still holds
-     first (D93's class-conversion may have added one).
-   - `zoneOptions` split into 3 layer-scoped objects (B) - re-measure
-     `main.js`'s current size/shape before assuming the original
-     3-object design still fits; do this one last per this file's
-     established sequencing.
-2. **Open, unresolved**: the ARCHITECTURE.md D92-D95 backfill question
-   above - waiting on User's call, don't assume either way.
-3. Post each step's completion as its own decision broadcast, same
-   discipline as this session.
+**Nothing in-flight.** `docs/ARCHITECTURE.md` D92-D100 backfill is
+done (Oracle, same day) - the "waiting on User's call" question below
+is resolved: user wanted it backfilled, it's backfilled. Everything
+committed and pushed to `main`/`dev` (`c791715`).
+
+Two plan items remain, not currently assigned:
+1. Shell inlining (E): `<pile-panel>`/`renderPile`,
+   `<zone-panel>`/`renderZonePanel` collapsing into their own
+   `.render()` bodies - re-verify "zero other callers" still holds
+   first (several sessions of class-conversion work since this was
+   scoped may have added one).
+2. `zoneOptions` split into 3 layer-scoped objects (B) - re-measure
+   `main.js`'s current size/shape before assuming the original
+   3-object design still fits; do this one last per this file's
+   established sequencing.
+
+Post each step's completion as its own decision broadcast, same
+discipline as every fix this session (D92-D100).

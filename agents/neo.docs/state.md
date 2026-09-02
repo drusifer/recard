@@ -274,56 +274,43 @@ Handed to Trin for `*qa uat`.
 
 ## Next Steps
 
-**Nothing in-flight - ready to commit.** Gate cleared (Neo->Trin->
-Morpheus, all PASS) for both the Deck exception strike and the HandPile
-split; not yet committed to git as of this note. Next per Morpheus's
-own sequencing (still open): shell inlining (`<pile-panel>`/
-`renderPile`, `<zone-panel>`/`renderZonePanel`) - re-verify "zero other
-callers" still holds first, this session's changes may have added one.
-`zoneOptions` split (B) is last, re-measure `main.js`'s current size
-first. Also open, from earlier this session: whether to backfill
-`docs/ARCHITECTURE.md`'s missing D92-D95 (+now D96/D97 for these two
-fixes) - flagged to User, awaiting a call, not decided either way.
-
-A YAML-backed pile-capabilities table was also scoped out mid-session
-(discussion only, nothing implemented) - author `content/piles/
-capabilities.yaml`, compile it via a new `tools/piles/compile.mjs`
-(same shell as `tools/rtg/compile.mjs`) into a committed `src/piles/
-capabilities.js`, covering only the UNCONDITIONAL per-kind baseline
-(gate vocabulary: open/owner/other/ownerOrShared/hostOnly) - genuinely
-dynamic logic (count thresholds, content-gated `canAccept`) stays in
-class code, explicitly to avoid rebuilding the "rules engine" this
-codebase has repeatedly rejected. Not started; revisit if asked.
+**Nothing in-flight.** Session ended clean: `docs/ARCHITECTURE.md` is
+current through D100 (Oracle backfilled D92-D100 same day), everything
+committed and pushed to both `main`/`dev` (`c791715`), 513/513 tests
+green, lint at the standing 7-function baseline.
 
 ### Known open items, not currently assigned
-1. **Morpheus's broader refactor plan** (`morpheus.docs/state.md`) has
-   two steps not yet started: narrowing `main.js`'s `zoneOptions` into
-   three layer-scoped objects (table/pile/card), and a universal-DnD
-   guarantee test (`Object.values(PILE_TYPES)` iteration asserting
-   `move`/`play` is always offered). Shell-component inlining
-   (`<pile-panel>`/`<zone-panel>`) was scoped but not yet executed
-   either - only the Deck-specific and viewFor pieces of that plan
-   actually shipped this session.
-2. **Layout Load/Save/Reset relabel** (direct user request, queued
-   mid-session, never picked back up): "Load - reset to a saved custom
+1. **Morpheus's refactor plan** (`morpheus.docs/state.md`): shell-
+   component inlining (`<pile-panel>`/`<zone-panel>`) and the
+   `zoneOptions` 3-way split are still the two unstarted items -
+   re-verify "zero other callers" and re-measure `main.js`'s current
+   size before assuming the original scoping still fits.
+2. A YAML-backed pile-capabilities table was scoped out (discussion
+   only, nothing implemented) - see this file's D92-era entry above for
+   the full design if picked up later.
+3. **Layout Load/Save/Reset relabel** (direct user request, queued
+   long ago, never picked back up): "Load - reset to a saved custom
    state, Save/Save As - the usual, Reset - restore preset layout."
    Check `performResetLayout`/`performSaveLayout`/`performSaveLayoutAs`
-   (main.js) against this framing before touching anything - the
-   user's own words say today's Reset conflates two different things.
-3. The UI offer layer's `isOwner`/`isShared` gate still hides some
+   (main.js) against this framing before touching anything.
+4. The UI offer layer's `isOwner`/`isShared` gate still hides some
    actions on another player's personal pile even though the reducer
-   permits them (flagged repeatedly since D85, never acted on
-   unprompted) - leave alone unless raised.
-4. `docs/DECISIONS.md` stops at D20 (pre-existing gap) - `docs/
-   ARCHITECTURE.md` is current through D95 and is the binding spec.
+   permits them (flagged repeatedly since D85) - leave alone unless
+   raised.
+5. `docs/DECISIONS.md` stops at D20 (standing, deliberate gap per
+   Oracle's own policy since Sprint 14) - `docs/ARCHITECTURE.md` is the
+   current binding spec, through D100.
 
 ### Resume instructions (cold start)
-1. `git log --oneline -3` should show `f9d410b` at HEAD on both
-   `main`/`dev` - if not, something changed since this note, don't
-   assume, check `git status`/`git log` fresh.
-2. `bobp make check`/`lint-js`/`lint-style` should all be green at
-   511/511 tests, 7-error baseline - confirm before touching anything.
-3. Read `docs/ARCHITECTURE.md`'s Core invariant + D91-D95 for full
-   current-state reasoning on anything touching Piles, card
-   visibility, split/sort actions, or the deck.
-4. Do NOT use `git stash` for anything in this repo, no exceptions.
+1. `git log --oneline -3` should show `c791715` at HEAD on both
+   `main`/`dev`, both in sync with origin - if not, something changed
+   since this note, check `git status`/`git log` fresh rather than
+   assume.
+2. `bobp make test`/`lint-js`/`lint-style` should be green at 513/513,
+   7-function baseline - confirm before touching anything.
+3. Read `docs/ARCHITECTURE.md`'s Core invariant + D92-D100 for current-
+   state reasoning on Piles, card visibility, split/sort/merge actions,
+   the deck, hand ownership perspective, or guest identity/reconnect.
+4. Do NOT use `git stash` for anything in this repo, no exceptions -
+   violated 3 times this session's history, the 3rd time genuinely
+   conflicted (see this file's earlier entries for the recovery).

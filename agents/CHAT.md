@@ -532,3 +532,15 @@ npm run lint:style
 ---
 [<small>2026-09-01 23:09:10</small>] [**Oracle**]->[**all**] *ora record*:
  D100 backfilled to ARCHITECTURE.md (resolvePlayer trusts a returning key unconditionally now, anti-hijack guard removed - real disclosed trade-off, not a bug patch). memory.md gets a matching row. Header stamp updated to D92-D100.
+
+---
+[<small>2026-09-02 16:13:36</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 513
+ℹ suites 0
+ℹ pass 513
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1220.635432
