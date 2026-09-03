@@ -1112,3 +1112,51 @@ intended under the condition it changes, not just that it doesn't
 crash.
 
 No blockers. **Verdict: PASS.** Handed to Morpheus for review.
+
+## *impl: D101 card right-click context menu (US-100) (2026-09-02) - PASSED
+
+**Baseline moved: 517/517, not 513.** 4 new tests, all in the new
+`tests/ui.test.js` — the first test file in this repo that imports
+`src/ui.js` at all.
+
+**What I verified:**
+- Full suite green both phases (`bobp make test`, exit 0), designLint
+  included — the menu reuses `.pile-action-menu-item`, which already
+  satisfies the 44px floor, so no new lint exemption was needed.
+- **Mutation check** on the one load-bearing pure guard: broke
+  `clampMenuPosition`'s x-clamp to a bare passthrough → the
+  "wider than viewport pins to origin" test failed as it should.
+  Restored and re-verified green. The guard is genuinely covered.
+- Hand-traced the DOM wiring (no automation available): escape
+  mid-pick, outside-click mid-pick, and opening a second context menu
+  while a target-pick is still armed. The last one self-heals — the
+  stray armed click misses `.pile-target`, so no move fires, no
+  `stopPropagation` happens, and the second menu's own button click
+  proceeds normally.
+
+**Coverage gap, disclosed not hidden:** the context-menu DOM wiring
+itself (`attachCardContextMenu`, `openCardContextMenu`,
+`beginCardTargetPick`) has no automated coverage. This is not a
+regression in standards — `ui.js` has zero automated DOM-wiring tests
+project-wide, and there is no jsdom/happy-dom dependency and no e2e
+suite (`e2e.smoke.mjs` was removed at D60 and never rebuilt). Only the
+extracted pure function is tested. I said so at the gate rather than
+implying the feature was test-covered.
+
+**Backlog I raised:** a jsdom or e2e harness for `ui.js` interaction
+wiring is worth scoping. Not blocking, but this sprint is the second
+time in a row the honest answer at a QA gate was "reviewed, not
+executed."
+
+### Note for next session
+Several older entries in this file and in `oracle.docs/memory.md` still
+reference `tests/e2e.smoke.mjs` as if it exists. It does not — removed
+at D60. Don't plan verification around it.
+
+**Queued sprint, not started:** `Pileable` (Chips/Tokens/Cards),
+`PileableActions` base extracted from `cardActions`, per-pile-type UX +
+sorting, no back-compat. When it starts: `tests/piles.test.js`,
+`tests/pileActions.test.js` and `tests/pileLevelActions.test.js` are
+the suites most likely to need real rewriting (not just extending), and
+"no back-compat" means stale tests get deleted outright rather than
+kept passing against an alias — that is this project's standing rule.

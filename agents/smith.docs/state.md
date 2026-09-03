@@ -648,3 +648,49 @@ pattern introduced.
 ## Next Steps
 Ready for `*user test` once Phase 86 lands - specifically confirm the
 auto-rename is visible/correct live, not just in the reducer.
+
+## Sprint: US-100 card right-click action menu (2026-09-02)
+
+Both planning gates run for real; both approved, neither rubber-stamped.
+
+**Gate 1 (stories) — approved with 2 conditions**, both delivered:
+1. Only `preventDefault()` the native context menu on a card that
+   actually has actions. A card with none keeps the OS menu — a custom
+   menu with nothing in it is a dead end, and suppressing the browser's
+   own menu everywhere on a game table costs the user a real escape
+   hatch for no benefit.
+2. Targeted actions (move/pickup/play) need a genuine destination-choice
+   step. Cypher's AC assumed a click-based targeting flow already
+   existed; it did not — D52's radial was retired for pile/zone actions
+   and cards only ever had native drag. Sent it to Morpheus to design
+   rather than letting it ship as an assumption. This was the highest-
+   value thing I did this sprint.
+
+**Gate 2 (architecture) — approved.** Reusing `highlightDragTargets`'
+existing lit-pile cue for the click flow is right: same affordance
+vocabulary as drag, no second visual language for the user to learn.
+One ask (delivered): clamp the menu to the viewport so a right-click
+near an edge doesn't render it off-screen.
+
+**`*user test` — I could not actually run it.** No browser-automation
+tool was connected this session, and standing up a real two-peer WebRTC
+session headless wasn't proportionate to the change. I approved on code
+review and **said so plainly to the user** rather than implying a live
+pass. Recommended they spend 30 seconds right-clicking a card.
+
+### Backlog I own
+Get browser automation wired up for this project. This is the second
+consecutive sprint where the honest answer at my own gate was
+"reviewed, not exercised" — and my gate is the one that is supposed to
+be about what the user actually experiences. Review-only `*user test`
+is a real weakness in this team's process, not a one-off.
+
+### Queued sprint, not started
+`Pileable` (Chips/Tokens/Cards), `PileableActions` base, per-pile-type
+UX + sorting, no back-compat. Nothing designed yet. UX angles I'd bring
+to Gate 1 when it starts: chips and cards are physically different
+objects and users will expect them to behave differently (stacks of
+chips have a *value*, cards have an *order*) — "same pile dynamics as
+cards" should be pressure-tested against that, not assumed. And any new
+sorting UX should reuse the existing action vocabulary rather than
+inventing a third control shape.

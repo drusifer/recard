@@ -428,3 +428,29 @@ calling it done.
 identical to `origin/main` at `0a4cff1`+ (0 ahead / 0 behind), working
 tree clean. 490 tests, lint baselines unchanged (7 js / 3 design), 15/15
 decks balanced. No background processes left running.
+
+## Sprint: US-100 card right-click action menu (2026-09-02) — CLOSED
+
+Two phases, both 1-3 tasks, both landed with no rework and no overflow:
+- **Phase 1** — in-place actions (rotate/reveal): contextmenu wiring
+  gated on having actions, menu render/position/dismiss, styles, tests.
+- **Phase 2** — targeted actions (move/pickup/play): highlight +
+  one-shot click-to-commit through the existing `onMoveCard`.
+
+The split was along the real seam (does this action need a destination
+or not?), which is why Phase 1 shipped as a working feature on its own
+rather than as scaffolding. Worth repeating: cut phases where the
+*mechanism* changes, not by file or by line count.
+
+Velocity note: full cycle (stories → 2 gates → arch → 2 phases → groom
+→ retro → launch) inside one session. Gates stayed real — Gate 2 sent a
+genuine design question back rather than waving it through.
+
+### Queued sprint, not started
+`Pileable` (Chips/Tokens/Cards), `PileableActions` base extracted from
+`cardActions`, per-pile-type UX + sorting, no back-compat. No stories
+or arch exist — Cypher moves first. Sizing instinct for when it reaches
+me: this one is a type-hierarchy refactor touching `src/piles/`,
+`pileActions.js` and the reducer, so it will want MORE phases than
+US-100 did, not fewer, and the first phase should be the interface
+extraction alone with the existing card behavior unchanged and green.

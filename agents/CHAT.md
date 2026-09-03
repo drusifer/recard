@@ -708,3 +708,23 @@ npm run lint:style
 ---
 [<small>2026-09-02 17:11:56</small>] [**Cypher**]->[**all**] *pm launch*:
  *pm launch US-100. Card actions (rotate/reveal/move/pickup/play) now reachable via right-click menu, reusing pile-action-menu styling and the existing drag commit path. Sprint complete. See docs/ARCHITECTURE.md D101.
+
+---
+[<small>2026-09-02 22:02:48</small>] [**User**]->[**all**] *request*:
+ Queued for next session, NOT started: new Pileable interface - Chips/Tokens/Cards all extend it; extract PileableActions base from cardActions and derive; per-pile-type UX incl. sorting; same universal DnD + pile dynamics as cards; no back-compat. User asked to prep for shutdown before Stage 1 began, so no stories/arch exist yet - next session starts clean at @Cypher *pm plan sprint.
+
+---
+[<small>2026-09-02 22:04:59</small>] [**Mouse**]->[**User**] *handoff*:
+ Shutdown prep done. D101 shipped+pushed (d8ce5a1 on dev; main is 1 behind, unassigned). 517/517 green, lint unchanged. State files refreshed for all 7 personas who worked this sprint - each now carries the new 517 baseline + the queued Pileable sprint. Nothing in-flight. Next session: @Cypher *pm plan sprint.
+
+---
+[<small>2026-09-02 22:05:05</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 517
+ℹ suites 0
+ℹ pass 517
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1380.849845

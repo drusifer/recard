@@ -314,3 +314,78 @@ green, lint at the standing 7-function baseline.
 4. Do NOT use `git stash` for anything in this repo, no exceptions -
    violated 3 times this session's history, the 3rd time genuinely
    conflicted (see this file's earlier entries for the recovery).
+
+---
+
+## Session update (2026-09-02): D101 card right-click context menu (US-100) — SHIPPED
+
+Full sprint cycle, all gates passed, launched and pushed. **This
+supersedes the "Next Steps" section above**: HEAD is now `d8ce5a1` on
+`dev` (pushed), not `c791715`, and the test baseline is **517/517**,
+not 513.
+
+**What I built** (`src/ui.js`, `style.css`, `tests/ui.test.js`):
+- `attachCardContextMenu` / `openCardContextMenu` — a card's
+  `contextmenu` opens a cursor-anchored menu of every id
+  `actionsForCard` offers it. Wired from `renderPileCards`, right after
+  the card face is appended. A card with zero actions never gets
+  `preventDefault()`, so the OS menu still works there (Smith Gate 1).
+- Deliberately a plain ui.js function, NOT a Web Component — this is
+  per-card interaction wiring, which follows `renderPileCards`'
+  own convention; the "new pile/zone UI goes in a Web Component" rule
+  doesn't reach it. Morpheus reviewed and agreed.
+- Menu look reuses `.pile-action-menu` / `.pile-action-menu-item`
+  verbatim (the same list `buildEnumActionMenu` already renders for the
+  pile header's `changePileType`). `.card-context-menu` in style.css
+  overrides ONLY the anchoring (fixed-at-cursor vs. absolute under a
+  `<details>`) and must stay declared AFTER `.pile-action-menu` in the
+  file — equal specificity, so source order is what makes the override
+  win. Don't reorder those rules.
+- `clampMenuPosition(x, y, size, viewport)` — new **exported pure**
+  function, the only new unit-testable logic (4 tests). Exported
+  specifically so `tests/ui.test.js` can import it without a DOM;
+  `src/ui.js` imports cleanly under bare Node, which is what makes that
+  test file possible at all (verified before writing it).
+- `beginCardTargetPick` — the destination-choice step for targeted
+  actions (`move`/`pickup`/`play`). Reuses `highlightDragTargets` (the
+  same one `dragstart` calls) and commits through the existing
+  `options.onMoveCard(cardId, pileId)`. **No new commit path, no new
+  reducer message.** In-place actions (`rotate`/`reveal`) call the same
+  handlers the existing tap gesture already calls.
+
+**Two implementation details worth not re-deriving:**
+1. Dismiss/commit listeners are attached inside `setTimeout(..., 0)` so
+   the click that opened/closed the menu can't immediately re-trigger
+   them.
+2. `beginCardTargetPick`'s commit listener runs in the **capture**
+   phase and calls `stopPropagation` *only* when the click actually
+   lands on a lit `.pile-target`. Without that, picking a destination
+   pile would also fire the tap gesture of whatever card sits under the
+   cursor inside it. A miss cancels silently.
+
+**Known limit, accepted:** `openCardContextMenu`'s dispatch is
+hardcoded to `reveal`/`rotate` for the in-place branch. That matches
+the existing `canReveal`/`canRotate` code directly above it — today
+those are the only card-level `target: null` actions in `ACTION_SPECS`.
+A future in-place card action needs a branch added in both places.
+
+### Resume instructions (cold start)
+1. `git log --oneline -3` should show `d8ce5a1` at HEAD on `dev`, in
+   sync with origin. `main` is still at `6c73f0c` — **`dev` is ahead of
+   `main` by this one commit**, which is new as of this session; the
+   previous close-out's "main/dev/origin all in sync" no longer holds.
+2. `bobp make test` should be green at **517/517**. Lint unchanged at
+   the 7-function cognitive-complexity baseline.
+3. Read `docs/ARCHITECTURE.md` D101 (top of file, above D100) before
+   touching card actions, the context menu, or `highlightDragTargets`.
+4. Still binding: do NOT use `git stash` in this repo, no exceptions.
+
+### Queued next sprint — NOT started
+User asked for a new sprint (chips/tokens, a `Pileable` interface that
+Cards/Chips/Tokens all extend, a `PileableActions` base extracted from
+`cardActions`, per-pile-type UX + sorting, same universal DnD; **no
+back-compat**) and then immediately asked to prep for shutdown. Nothing
+was written — no stories, no arch, no code. Next session starts clean
+at `@Cypher *pm plan sprint`. The user's own framing to keep in mind:
+"if you do this right the existing code shouldn't have to change too
+much."

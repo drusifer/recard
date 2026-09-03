@@ -527,3 +527,62 @@ Solitaire+Spit as concrete proof games. Gate 1 approved with 1 UX note
 (foundation lock affordance). Handed through Morpheus/Mouse; sprint now
 in implementation (task.md Phases 62-67). Nothing further for Cypher
 until close-out.
+
+## Launch — US-100 card right-click action menu (2026-09-02)
+
+Shipped and pushed (`d8ce5a1` on `dev`). Full sprint cycle, both Smith
+gates real, no rework at any gate.
+
+**US-100 as written:** a player right-clicks an actionable card and
+gets a context menu of the actions `actionsForCard` already offers it
+(rotate/reveal/move/pickup/play), reusing `ACTION_SPECS` and the
+existing confirm/destructive rules. Explicitly NOT a bar across the top
+the way PileActions works — that was the user's own framing, and it
+matters because a persistent per-card bar was already tried and removed
+(2026-08-26, "cards are Movable not Actionable"). The menu is additive:
+existing tap and drag gestures still work.
+
+Scoped OUT and shipped that way: touch/long-press (desktop-only per the
+standing UI-pass rule), and any change to the pile-level header bar.
+
+**Smith's two gate conditions, both honored in the delivered code:**
+(1) only suppress the native OS menu on a card that actually has
+actions — no dead-end empty menu; (2) targeted actions needed a real
+destination-choice step, since no click-based picker existed. Gate 2
+was the valuable one — it caught an assumption in my original AC that
+the targeting flow already existed. It did not.
+
+**Caveat carried to the user, not buried:** no live click-through
+happened. No browser-automation tool was connected and a real two-peer
+WebRTC session wasn't worth scripting headless for this size of change.
+Smith approved on code review with that disclosed. If the user reports
+this doesn't behave in the browser, that gap is the first suspect.
+
+### Backlog added this sprint
+1. Browser-automation tooling for this project, so `*user test` stops
+   being review-only on interaction-heavy stories (Smith).
+2. Grooming pass on stale `tests/e2e.smoke.mjs` references — removed at
+   D60, still cited as live in places (Oracle).
+3. A jsdom/e2e harness for `ui.js` interaction wiring (Trin).
+
+## Next Steps
+
+**Queued sprint — I own the first move. NOT started.**
+
+The user asked for it and then immediately asked to prep for shutdown,
+so Stage 1 never began. Nothing exists yet: no stories, no AC, no arch.
+Their request, close to verbatim:
+
+> new Objects representing chips and/or tokens. Make Chips, Tokens and
+> Cards extend a new interface: Pileable. Same deal as cardActions —
+> extract a base PileableActions and extend. New UX for different pile
+> types, sorting actions etc. Same universal drag and drop and pile
+> dynamics as cards. If you do this right the existing code shouldn't
+> have to change too much. **No back compat.**
+
+Start at `*pm plan sprint`. Two things to weigh while writing the AC:
+- "The existing code shouldn't have to change too much" is a stated
+  success criterion, not just an aside — worth an explicit AC, and
+  worth checking against reality early rather than discovering late.
+- "No back compat" is this project's standing rule and it is literal:
+  old interfaces and their tests get deleted, never kept as aliases.

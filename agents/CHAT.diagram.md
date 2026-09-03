@@ -219,4 +219,8 @@ sequenceDiagram
     Note right of Cypher: "Cypher retro: US-100 AC<br/>delivered in full<br/>(right-click menu,<br/>reuses *Actions classes<br/>as asked, no top bar).<br/>Backlog added: browser-<br/>automati…"
     Cypher->>All: "pm launch"
     Note right of Cypher: "*pm launch US-100. Card<br/>actions (rotate/reveal/m<br/>ove/pickup/play) now<br/>reachable via right-<br/>click menu, reusing<br/>pile-action-menu styling<br/>and t…"
+    User->>All: "request"
+    Note right of User: "Queued for next session,<br/>NOT started: new<br/>Pileable interface -<br/>Chips/Tokens/Cards all<br/>extend it, extract<br/>PileableActions base<br/>from cardActi…"
+    Mouse->>User: "handoff"
+    Note right of Mouse: "Shutdown prep done. D101<br/>shipped+pushed (d8ce5a1<br/>on dev, main is 1<br/>behind, unassigned).<br/>517/517 green, lint<br/>unchanged. State files<br/>refreshe…"
 ```

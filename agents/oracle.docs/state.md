@@ -361,3 +361,48 @@ after this morning's archive).
 
 ### Next Steps
 Nothing in-flight.
+
+## Groom — D101 card context menu (2026-09-02)
+
+**Recorded same-session as the work, not batched at close** — the
+decision-broadcast discipline held for this sprint with no drift.
+
+What I wrote:
+- `docs/ARCHITECTURE.md`: **D101** inserted at the top (above D100 —
+  this file is newest-first after the Core invariant section, not
+  appended at the bottom; worth remembering, it is easy to get wrong).
+  Header stamp `**Last updated:**` moved to `2026-09-02 (D92-D101)`.
+- `agents/oracle.docs/memory.md`: matching Major Decisions row.
+- Deleted `agents/morpheus.docs/D101_card_context_menu_arch.md`, the
+  interim scratch doc Morpheus wrote only because a chat post caps at
+  512 chars. Its content is now in ARCHITECTURE.md verbatim; leaving
+  both would have been exactly the duplicate-that-drifts problem this
+  project keeps hitting. No precedent for per-decision scratch files
+  living in `morpheus.docs/` — don't start one.
+
+**Not done, deliberately:** no `*ora report` / CHAT.md archive this
+sprint. CHAT.md is still well under the 50-100 message rolling
+threshold after the D100-era archive.
+
+### Documentation debt I flagged at retro (unassigned)
+`tests/e2e.smoke.mjs` was removed at D60 and never rebuilt, but at
+least two places still describe it as live: this repo's
+`oracle.docs/memory.md` Repository Structure section (which does say
+"removed 2026-08-27 (D60)" in the same entry, so that one is
+self-correcting) and the user's own cross-session memory note
+("Recard status 2026-08-25" lists "e2e.smoke.mjs pass" as an open
+item). Worth a grooming pass so nobody plans verification around a
+suite that does not exist.
+
+`docs/DECISIONS.md` still stops at D20. Standing, deliberate gap since
+Sprint 14 — `docs/ARCHITECTURE.md` is the binding spec, now through
+**D101**.
+
+### Queued sprint, not started
+`Pileable` interface (Chips/Tokens/Cards), `PileableActions` base
+extracted from `cardActions`, per-pile-type UX + sorting, universal DnD
+unchanged, **no back-compat**. Nothing written — no stories, no arch.
+When it lands it will almost certainly need the Core invariant section
+of ARCHITECTURE.md reworded (it says "cards/table objects" in places
+and "cards" in others), plus a D102. Next session starts at
+`@Cypher *pm plan sprint`.

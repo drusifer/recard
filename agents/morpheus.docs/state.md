@@ -399,3 +399,63 @@ Two plan items remain, not currently assigned:
 
 Post each step's completion as its own decision broadcast, same
 discipline as every fix this session (D92-D100).
+
+---
+
+## Session update (2026-09-02): D101 card context menu — arch owned, both phases reviewed, SHIPPED
+
+**Supersedes the "Next Steps" above** on repo state only: HEAD is
+`d8ce5a1` on `dev` (pushed), tests are 517/517. The two unstarted plan
+items (shell inlining E, `zoneOptions` split B) are untouched and still
+open.
+
+**D101 (mine, `docs/ARCHITECTURE.md`, inserted at top above D100).**
+Card actions get a right-click context menu; explicitly NOT a
+PileActions-style header bar, which would have reopened the 2026-08-26
+"cards are Movable not Actionable" nit. Design, and why:
+- New plain `ui.js` function, not a Web Component. Per-card interaction
+  wiring follows `renderPileCards`' convention; the Web-Component rule
+  is scoped to pile/zone UI.
+- Reuse `.pile-action-menu`/`-item` for the look — one visual
+  vocabulary for "a button offering action X", never a second one
+  invented for menus.
+- **Targeted actions were the real design question**, and the one I had
+  to check before assuming: there was NO click-based destination picker
+  in the codebase. D52's radial targeting was retired 2026-08-24 for
+  pile/zone actions and never existed for cards, which only ever had
+  native drag. A stale comment on `highlightDragTargets` still refers to
+  a `beginTargeting` function that does not exist — that comment misled
+  me at first; it is a leftover from the radial era. Treat it as
+  historical, not as a pointer to live code.
+- Resolution: reuse `highlightDragTargets` for lighting up targets and
+  the existing `onMoveCard(cardId, pileId)` for the commit, adding only
+  a one-shot click-to-commit step. **Rejected**: reviving a
+  radial/drag-simulation picker — more code for an identical result,
+  and D52's own retirement already settled that static highlighted
+  targets beat a pointer-follow mode here.
+
+Both phase reviews passed with no rework. The architecture held
+unchanged across both phases, which is the signal the "reuse existing
+commit paths, add only the missing step" framing was right.
+
+## Next Steps (current, supersedes every earlier Next Steps in this file)
+
+**Nothing in-flight.** D101 shipped and pushed on `dev` (`d8ce5a1`);
+`main` is one commit behind — merging that forward is unassigned and
+nobody has asked for it.
+
+Still open, unassigned, unchanged: (1) shell inlining (E), re-verify
+"zero other callers" first; (2) `zoneOptions` 3-way split (B),
+re-measure `main.js` first, do it last.
+
+**Queued sprint, not started** (user asked for shutdown prep before
+Stage 1): `Pileable` interface with Chips/Tokens/Cards extending it, a
+`PileableActions` base extracted from `cardActions`, per-pile-type UX +
+sorting, universal DnD unchanged, **no back-compat**. Arch is entirely
+undesigned — do not assume anything from this note beyond the user's
+words. Two things I'd want checked first when it starts: how much of
+`ACTION_SPECS`/`actionsForCard` is genuinely card-specific vs. already
+generic (D51 merged card and pile specs into one table once already —
+read D51 before splitting anything back apart), and whether the Core
+invariant's "all cards can be moved... no matter what" wording needs to
+become "all Pileables".
