@@ -152,14 +152,14 @@ test('a hand card offers exactly one action, Move - the retired play verb is rea
 // pick, and it is pure wiring - three layers have to agree.
 test('Move from hand: choosing Move then clicking the table really moves the card there', async () => {
   const before = await tableCards().count();
-  const cardId = await handCard().getAttribute('data-card-id');
+  const pileableId = await handCard().getAttribute('data-pileable-id');
 
   await chooseAction(handCard(), 'move');
   await fixture.page.locator('.pile-section.pile-target[data-pile-id="table"]').click();
 
   await fixture.page.waitForFunction(
-    (id) => document.querySelector(`.pile-section[data-pile-id="table"] .middle-card[data-card-id="${CSS.escape(id)}"]`) !== null,
-    cardId, { timeout: 5000 },
+    (id) => document.querySelector(`.pile-section[data-pile-id="table"] .middle-card[data-pileable-id="${CSS.escape(id)}"]`) !== null,
+    pileableId, { timeout: 5000 },
   );
   assert.equal(await tableCards().count(), before + 1);
 });
@@ -179,15 +179,15 @@ test('a card moved out of hand lands face-up on the table (D102 transform, throu
 // going, which is the whole reason there are two offer ids.
 test('Turn face down then Turn over: the menu offers the opposite direction each time (D103)', async () => {
   const card = tableCards().last();
-  const cardId = await card.getAttribute('data-card-id');
+  const pileableId = await card.getAttribute('data-pileable-id');
 
   const faceUpRows = await openMenu(card);
   assert.ok((await faceUpRows.evaluateAll((rows) => rows.map((element) => element.dataset.action))).includes('conceal'),
     'a face-up card offers conceal, never reveal');
   await fixture.page.locator('.card-context-menu [data-action="conceal"]').click();
   await fixture.page.waitForFunction(
-    (id) => document.querySelector(`.middle-card[data-card-id="${CSS.escape(id)}"] .card-back`) !== null,
-    cardId, { timeout: 5000 },
+    (id) => document.querySelector(`.middle-card[data-pileable-id="${CSS.escape(id)}"] .card-back`) !== null,
+    pileableId, { timeout: 5000 },
   );
 
   const faceDownRows = await openMenu(card);
@@ -196,8 +196,8 @@ test('Turn face down then Turn over: the menu offers the opposite direction each
   assert.ok(!ids.includes('conceal'), 'and no longer offers conceal - one direction at a time');
   await fixture.page.locator('.card-context-menu [data-action="reveal"]').click();
   await fixture.page.waitForFunction(
-    (id) => document.querySelector(`.middle-card[data-card-id="${CSS.escape(id)}"] .card-back`) === null,
-    cardId, { timeout: 5000 },
+    (id) => document.querySelector(`.middle-card[data-pileable-id="${CSS.escape(id)}"] .card-back`) === null,
+    pileableId, { timeout: 5000 },
   );
 });
 
@@ -205,7 +205,7 @@ test('Turn face down then Turn over: the menu offers the opposite direction each
 // by accident on any "clicking a row does something" behaviour.
 test('Rotate: an in-place action commits on click, with no destination step', async () => {
   const card = tableCards().last();
-  const cardId = await card.getAttribute('data-card-id');
+  const pileableId = await card.getAttribute('data-pileable-id');
   // Orientation is `data-orientation` on the card's WRAPPER, not a class
   // on the `.card` face (`ui.js` line ~652; style.css rotates off that
   // attribute). Asserting the wrong one is how this test first failed.
@@ -213,8 +213,8 @@ test('Rotate: an in-place action commits on click, with no destination step', as
 
   await chooseAction(card, 'rotate');
   await fixture.page.waitForFunction(
-    (id) => document.querySelector(`.middle-card[data-card-id="${CSS.escape(id)}"]`)?.dataset.orientation === 'landscape',
-    cardId, { timeout: 5000 },
+    (id) => document.querySelector(`.middle-card[data-pileable-id="${CSS.escape(id)}"]`)?.dataset.orientation === 'landscape',
+    pileableId, { timeout: 5000 },
   );
 });
 
@@ -286,4 +286,95 @@ test('Loosen disappears at minimum spread, and Tighten still works from there', 
 
   const tighten = fixture.page.locator('[data-kind="hand"] button[title="Tighten"]');
   assert.ok(await tighten.count() > 0 && !(await tighten.isDisabled()), 'the other direction is still open');
+});
+
+// --- Rendering actually reaches the face (sprint pileObjects) --------
+//
+// Added at Phase 97's UAT, from a mutation check, not from a plan:
+// breaking `CardPileable.render` so cards printed their id instead of
+// their rank and suit passed all 555 unit tests and all 10 browser
+// tests. Nothing anywhere asserted that a card shows its face at all -
+// so the whole D107 dispatch could have been rewired to nothing and
+// every gate would have been green.
+//
+// This is the assertion that makes the "faces are untouched" claim in
+// D107 and Smith's Gate 2 approval real rather than intended.
+test('a card really renders its rank and suit - the face dispatch is live, not just wired', async () => {
+  const text = await fixture.page.locator('[data-kind="hand"] .card').first().textContent();
+  assert.match(text, /[0-9JQKA]/, `a card must print a rank, got "${text}"`);
+  assert.match(text, /[♠♥♦♣]/, `and a suit, got "${text}"`);
+});
+
+test('every card in the hand renders a face, not an id', async () => {
+  const texts = await fixture.page.locator('[data-kind="hand"] .card').allTextContents();
+  assert.ok(texts.length > 0);
+  for (const text of texts) {
+    assert.ok(!/-\d+$/.test(text.trim()), `a card printing a card id would look like this: "${text}"`);
+    assert.match(text, /[♠♥♦♣]/, `card "${text}" shows no suit`);
+  }
+});
+
+// --- Chips and Tokens on a real table (Phase 102, US-102/105) -------
+//
+// The token-label assertion promised at Phase 100, where it could not
+// live: `render` builds DOM, so this is the layer that can see it.
+// Opens its own table on the Chips & Tokens preset rather than reusing
+// the shared fixture, which is dealt from a standard deck.
+test('the Chips & Tokens preset puts real chips and tokens on the table, rendered as chips and tokens', async () => {
+  const page = await (await fixture.browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+  try {
+    await page.goto(BASE);
+    await page.click('#show-host');
+    await page.fill('#host-name', 'Alice');
+    await page.selectOption('#host-preset', { label: 'Chips & Tokens' });
+    await page.click('#create-table');
+    await page.waitForSelector('#host-share:not([hidden])', { timeout: 20_000 });
+    await page.click('#deal-btn');
+    await page.waitForFunction(() => document.querySelectorAll('.card-chip').length > 0, undefined, { timeout: 15_000 });
+
+    assert.ok(await page.locator('.card-chip').count() > 1, 'a supply, not one chip');
+    assert.ok(await page.locator('.card-token').count() > 1, 'and tokens too');
+
+    // Smith Gate 1 condition A: a supply of identical discs is exactly
+    // what this condition existed to prevent.
+    const colours = await page.locator('.card-chip').evaluateAll(
+      (chips) => new Set(chips.map((chip) => chip.className)).size,
+    );
+    assert.ok(colours > 1, `chips must be tellable apart, found ${colours} distinct looks`);
+
+    // A token is a MARKED disc - the label is what makes it one.
+    const labels = await page.locator('.token-label').allTextContents();
+    assert.ok(labels.length > 0, 'tokens render their labels');
+    assert.ok(labels.some((label) => label.trim().length > 0));
+
+    // A chip is round; a card is not. Asserted as real geometry rather
+    // than as a class name, since the class only matters if CSS acts on it.
+    const box = await page.locator('.card-chip').last().boundingBox();
+    assert.ok(Math.abs(box.width - box.height) < 2, `a chip should be square-bounded (round), got ${box.width}x${box.height}`);
+
+    // US-104 / Gate 1 condition B, where a player would actually see it.
+    const chipPile = page.locator('.pile-section').filter({ has: page.locator('.card-chip') }).first();
+    const actions = await chipPile.locator('.pile-action-btn, button').evaluateAll(
+      (buttons) => buttons.map((button) => button.title),
+    );
+    assert.ok(actions.every((title) => !/sort/i.test(title ?? '')),
+      `a chip pile must offer no sort, got ${JSON.stringify(actions)}`);
+
+    // US-102 AC2, the story's real claim: a chip does everything a card
+    // does, THROUGH THE SAME PATH. Asserted by driving a chip's own
+    // right-click menu, not by inspecting classes.
+    // `.last()`, not `.first()`: the supply STACKS now (T102.2), so
+    // every chip but the last is covered at its centre point and
+    // Playwright correctly refuses to click it - the same reason
+    // `designLint.check.mjs` uses `.last()` on a fanned hand.
+    await page.locator('.card-chip').last().click({ button: 'right' });
+    await page.waitForSelector('.card-context-menu', { timeout: 5000 });
+    const chipActions = await page.locator('.card-context-menu .pile-action-menu-item')
+      .evaluateAll((rows) => rows.map((row) => row.dataset.action));
+    assert.ok(chipActions.includes('move'), `a chip must be movable like any card, got ${JSON.stringify(chipActions)}`);
+    assert.ok(chipActions.length > 1, 'and offers a real menu, not one lonely entry');
+    await page.keyboard.press('Escape');
+  } finally {
+    await page.close();
+  }
 });

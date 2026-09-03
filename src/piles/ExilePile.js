@@ -8,7 +8,7 @@
  * that particular bulk CONVENIENCE).
  *
  * *nit (direct user request, reversed): used to also override
- * `cardActions` to `[]` ("exile is one-way, by definition"), on top of
+ * `pileableActions` to `[]` ("exile is one-way, by definition"), on top of
  * dropping `take` - a real, repeated user correction: this app is a
  * table simulator, not a rules engine (`docs/ARCHITECTURE.md`'s "Core
  * invariant") - drag-and-drop is ALWAYS available on ANY card, no

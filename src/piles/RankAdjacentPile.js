@@ -3,7 +3,7 @@
  * `rankAdjacentPile.js`'s flat module). Spit's shared center pile:
  * either direction, any suit, wraps King<->Ace. Always shared
  * (`ownerId: null`) - no player ever owns a Spit center pile.
- * `cardActions`/`redactCard`/`removeCard`/`canRemoveCard` are identical
+ * `pileableActions`/`redactCard`/`removePileable`/`canRemove` are identical
  * to the base `Pile` rule and are inherited rather than duplicated.
  */
 import { Pile } from './Pile.js';
@@ -29,7 +29,7 @@ export class RankAdjacentPile extends Pile {
    * wrapping King<->Ace (Spit has no "ends" the way Foundation does). */
   canAccept(card) {
     if (this.cards.length === 0) return true;
-    // `insertCard` prepends (STACK convention) - index 0 is the top.
+    // `insertPileable` prepends (STACK convention) - index 0 is the top.
     const top = this.cards[0];
     const cardIndex = RANKS.indexOf(card.rank);
     const topIndex = RANKS.indexOf(top.rank);
@@ -48,8 +48,8 @@ export class RankAdjacentPile extends Pile {
   }
 
   /** Every drop lands on top, unconditionally - same STACK shape as
-   * `DiscardPile.insertCard`. */
-  insertCard(card) {
+   * `DiscardPile.insertPileable`. */
+  insertPileable(card) {
     return { ...this.toJSON(), cards: [card, ...this.cards] };
   }
 }

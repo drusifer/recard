@@ -18,8 +18,8 @@
  * `{owner, faceUp}` any pile's does (`state.js`'s `toHandCard` -
  * `owner: <hand's own player>, faceUp: false`, stamped on every card
  * the moment it ENTERS a hand: DEAL/DRAW/PICKUP/TAKE_PILE/PICKUP_SPLIT/
- * a plain MOVE_CARD, via `transferCard`'s own generic hand-stamping),
- * so `canAccept`/`resolveDropTarget`/`insertCard` are all inherited
+ * a plain MOVE, via `transferCard`'s own generic hand-stamping),
+ * so `canAccept`/`resolveDropTarget`/`insertPileable` are all inherited
  * from the base `Pile`, unmodified - no hand-specific logic left there.
  * `redactCard` isn't in that list any more for a bigger reason than
  * hand alone: it's gone entirely, everywhere (D84, "remove card
@@ -27,6 +27,7 @@
  * card's real identity, always, hands included).
  */
 import { Pile } from './Pile.js';
+import { sortActionsFor } from '../pileables/pileableTypes.js';
 
 export class HandPile extends Pile {
   static visibility = 'in-hand';
@@ -34,7 +35,7 @@ export class HandPile extends Pile {
   // A hand IS tableSide (D51: it renders at its owner's seat through
   // the same generic <zone-panel> machinery every other table-side pile
   // uses, and must appear in pilesOf()/view.piles for that). It is
-  // still never a generic MOVE_CARD drop DESTINATION - that's a
+  // still never a generic MOVE drop DESTINATION - that's a
   // separate rule, `pileActions.js`'s `targetsForAction` explicitly
   // excludes `kind === 'hand'` regardless of this flag.
   static tableSide = true;
@@ -50,7 +51,7 @@ export class HandPile extends Pile {
 
   /** Sorting/converting on someone else's behalf has never been possible
    * and isn't now either. This one stays here, shared, rather than
-   * splitting into the two subclasses below: unlike `cardActions`/
+   * splitting into the two subclasses below: unlike `pileableActions`/
    * `showsFace`/`contributeToView` (which used to compute `this.ownerId
    * === viewerId` themselves), `pileActions` has always taken a plain
    * `{isOwner}` CONTEXT flag pre-computed by the caller - the exact same
@@ -66,10 +67,20 @@ export class HandPile extends Pile {
    * subclass got picked. `changePileType` (D87, *nit "all pile types
    * must be convertible to any other pile type"): a hand is no longer
    * exempt from the picker - owner-gated, matching sort's own rule. */
-  pileActions({ isOwner } = {}) {
-    // *nit (Tighten/Loosen): a hand is the fan the request was actually
-    // about, and this method fully overrides the base one - so the two
-    // have to be listed here explicitly rather than inherited.
-    return isOwner ? ['sortRank', 'sortSuit', 'changePileType', 'tighten', 'loosen'] : [];
+  pileActions({ isOwner, cards = [] } = {}) {
+    if (!isOwner) return [];
+    // US-104 (sprint pileObjects, Smith Gate 1 condition B): the sorts
+    // come from what this pile HOLDS, not from it being a hand. The
+    // pair used to be hardcoded here, which was only ever correct
+    // because a hand could only contain cards - a hand of chips would
+    // have offered "Sort by rank" for something with no rank. No
+    // `pileableType === 'chip'` check anywhere: the Pileable type
+    // declares its own `sortActions`, and `sortActionsFor` takes the
+    // intersection so a mixed pile never offers an action that is
+    // wrong for something in it.
+    //
+    // *nit (Tighten/Loosen): those two are listed explicitly because
+    // this method fully overrides the base one rather than inheriting.
+    return [...sortActionsFor(cards), 'changePileType', 'tighten', 'loosen'];
   }
 }

@@ -500,3 +500,41 @@ baseline. Load-bearing guards mutation-checked in both features (4/3 and
 Plus the still-unstarted `Pileable` sprint (Chips/Tokens/Cards +
 `PileableActions` extracted from `cardActions`, per-type UX + sorting,
 no back-compat) - Cypher moves first, no stories or arch exist.
+
+---
+## Sprint pileObjects — CLOSED 2026-09-03
+
+6 phases (97-102), all shipped, both gates real, launched by Cypher.
+581 unit + 13 browser tests; lint baseline unchanged (8 js / 5 design).
+
+**Delivered:** `Pileable`/`PILEABLE_TYPES` (`src/pileables/`), the
+`cardActions` -> `pileableActions` rename with no shim anywhere,
+`MOVE_CARD` -> `MOVE` / `FLIP` / `ROTATE` and `cardId` -> `pileableId`
+(the user's own naming ruling at Gate 2, better than either option put
+to them), `ChipPileable`/`TokenPileable`, sorting derived from pile
+contents, and a `Chips & Tokens` preset stocked through a new `chips`
+DECK_TYPE with zero `state.js` change.
+
+**The sequencing lesson, with evidence.** Phase 97 shipped `Pileable`
+with `Card` as its ONLY subtype and zero behaviour change, purely to
+falsify the architecture cheaply. It immediately found two collisions
+invisible to review — an RtG card's `type` IS its MTG type line (so the
+discriminator is `pileableType`), and a Pileable is a view over its
+record, so the `face` field shadowed a `face()` method. Phase 102 found
+a third (the stamp was an override where it needed to be a default).
+Had the ~700-call-site rename phases run first, all three would have
+surfaced inside that diff.
+
+**Carry forward:**
+- Trin's backlog item, and the most important one: a mutation showed
+  NOTHING in a 555-test suite asserted that a card renders its face.
+  Mutation-check the long-standing guards, not only new ones.
+- Morpheus: write arch decisions that name identifiers with an explicit
+  "names to be confirmed against real fields" caveat — three of D107's
+  names were wrong until implementation corrected them.
+- Smith: a gate that reasons about one object should ask how the whole
+  SUPPLY looks; approving "a chip is distinguishable" did not catch
+  "40 chips flat across the table".
+- Oracle: e2e.smoke.mjs still referenced by 2+ memory files (stale).
+
+**Uncommitted** at close: the full sprint diff.

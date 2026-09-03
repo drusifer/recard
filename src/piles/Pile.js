@@ -4,9 +4,9 @@
  * decision... I'm trying to create a rich type hierarchy with domain
  * abstraction"). A Pile is a real object now: `new Pile(data)` (or
  * `revivePile(data)` (pileTypes.js), which picks the right subclass by `kind`) gives
- * you something with real INSTANCE methods (`pile.cardActions(card,
+ * you something with real INSTANCE methods (`pile.pileableActions(card,
  * viewerId)`), not a static method you pass the data into
- * (`PILE_TYPES[pile.kind].cardActions(pile, card, viewerId)`) - every
+ * (`PILE_TYPES[pile.kind].pileableActions(pile, card, viewerId)`) - every
  * `pile.kind` switch/case this codebase had is a real polymorphic
  * dispatch now, not a lookup table pretending to be one.
  *
@@ -22,7 +22,7 @@
  * back to here would break the module graph).
  *
  * `state.piles` in the reducer still holds PLAIN records at rest, not
- * live instances - `insertCard`/`removeCard` (the only two methods
+ * live instances - `insertPileable`/`removePileable` (the only two methods
  * that produce a NEW pile rather than just answering a question about
  * an existing one) return plain shapes, same as the reducer's own
  * `{...pile, field}` update style elsewhere, so the state tree stays
@@ -98,7 +98,7 @@ export class Pile {
    * property (a fact ABOUT the type, not about any one instance). */
   static visibility = 'mixed';
 
-  /** D45: a legal MOVE_CARD destination. True by default - kept
+  /** D45: a legal MOVE destination. True by default - kept
    * overridable so `CREATE_ZONE`'s eligibility guard stays meaningful
    * (`HandPile` overrides it `false`). */
   static tableSide = true;
@@ -141,7 +141,7 @@ export class Pile {
     // what lets `effectiveSpread`/the CSS fall back to the TYPE's own
     // default rather than freezing every pile at a number. Must be
     // carried here and in `toJSON` below, not just in `getView` -
-    // `insertCard`/`removeCard` rebuild a pile FROM `toJSON()`, so a
+    // `insertPileable`/`removePileable` rebuild a pile FROM `toJSON()`, so a
     // field missing from either one is silently wiped the next time a
     // card moves in or out of the pile.
     this.spread = spread;
@@ -241,14 +241,14 @@ export class Pile {
    * nothing to reveal" on a face-up card, and nothing to conceal on a
    * face-down one. *nit (direct user request): `conceal` is new, the
    * second half of "a show/hide cardAction to toggle an individual
-   * card's show/hide status"; both dispatch the same `FLIP_CARD`
+   * card's show/hide status"; both dispatch the same `FLIP`
    * reducer action, they differ only in the label the menu shows.
    * `redactCard` is gone entirely now
    * (D84: "remove card redaction entirely... TOTAL PERMISSIVE") -
    * `faceUp` is a plain game-state field with no privacy meaning left;
    * every viewer sees every card's real identity regardless of it.
    */
-  cardActions(card) {
+  pileableActions(card) {
     return card.faceUp === true
       ? ['conceal', 'pickup', 'move', 'rotate']
       : ['reveal', 'pickup', 'move', 'rotate'];
@@ -309,20 +309,20 @@ export class Pile {
   }
 
   /** D43: the write-side authorization check is the READ-side offer
-   * check - `cardActions` already states exactly which actions a card
+   * check - `pileableActions` already states exactly which actions a card
    * offers to a viewer. Real prototype dispatch: calling `this.
-   * cardActions(...)` on a subclass instance already resolves to that
+   * pileableActions(...)` on a subclass instance already resolves to that
    * subclass's own override, no explicit re-dispatch needed. */
-  canRemoveCard(card, viewerId, action) {
-    return this.cardActions(card, viewerId).includes(action);
+  canRemove(card, viewerId, action) {
+    return this.pileableActions(card, viewerId).includes(action);
   }
 
   /** Returns a plain NEW pile shape (not `this` mutated, not a new
    * instance) - the reducer stores plain records at rest; this result
    * re-enters `state.piles` exactly the same way a pre-D93 `{...pile,
    * cards: […]}` spread did. */
-  removeCard(cardId) {
-    return { ...this.toJSON(), cards: this.cards.filter((c) => c.id !== cardId) };
+  removePileable(pileableId) {
+    return { ...this.toJSON(), cards: this.cards.filter((c) => c.id !== pileableId) };
   }
 
   /**
@@ -331,9 +331,9 @@ export class Pile {
    * dropped card; dropping before it, the dropped card becomes the
    * target's new predecessor, so it is the TARGET that now sits second
    * and carries the layout. Returns a plain shape, same reasoning as
-   * `removeCard` above.
+   * `removePileable` above.
    */
-  insertCard(card, placement = {}) {
+  insertPileable(card, placement = {}) {
     const { targetCardId, side = 'after', layout } = placement;
     const base = this.toJSON();
     if (!targetCardId) return { ...base, cards: [...this.cards, withLayout(card, layout)] };

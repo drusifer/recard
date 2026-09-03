@@ -1,8 +1,8 @@
 /**
  * The Cascade pile type (D56 - real subclass, was `cascadePile.js`'s
  * flat module). Solitaire's tableau: alternating-color, strictly
- * descending. Reuses D21's `layout: 'overlap'` rendering. `cardActions`/
- * `redactCard`/`removeCard`/`canRemoveCard` are identical to the base
+ * descending. Reuses D21's `layout: 'overlap'` rendering. `pileableActions`/
+ * `redactCard`/`removePileable`/`canRemove` are identical to the base
  * `Pile` rule and are inherited rather than duplicated.
  */
 import { Pile } from './Pile.js';
@@ -47,7 +47,7 @@ export class CascadePile extends Pile {
   /** Always appends; every card after the first carries `layout:
    * 'overlap'` automatically - a cascade has no flat/stacked choice
    * like a general pile, it IS the overlap layout. */
-  insertCard(card) {
+  insertPileable(card) {
     const placed = this.cards.length === 0 ? card : { ...card, layout: 'overlap' };
     return { ...this.toJSON(), cards: [...this.cards, placed] };
   }

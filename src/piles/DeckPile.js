@@ -80,7 +80,7 @@ export class DeckPile extends Pile {
 
   /** A card moved/put back onto the deck lands on top, matching a
    * physical deck (index 0, unlike the base class's append). */
-  insertCard(card) {
+  insertPileable(card) {
     return { ...this.toJSON(), cards: [card, ...this.cards] };
   }
 
@@ -92,16 +92,16 @@ export class DeckPile extends Pile {
    * condition would never fire for one - a deck card is always
    * effectively hidden at the PILE level (`visibility: 'hidden'`), not
    * via a per-card flag. */
-  cardActions() {
+  pileableActions() {
     return ['reveal', 'pickup', 'move', 'rotate'];
   }
 
-  /** `draw` isn't a per-card action `cardActions` lists (it's a
+  /** `draw` isn't a per-card action `pileableActions` lists (it's a
    * pile-level button, `pileActions` above) - DRAW's own authorization
    * (`transferCard`, state.js) still routes through this same check, so
    * it needs an explicit yes here. Everything else defers to the base
    * Pile rule, which now reads the override above. */
-  canRemoveCard(card, viewerId, action) {
-    return action === 'draw' || super.canRemoveCard(card, viewerId, action);
+  canRemove(card, viewerId, action) {
+    return action === 'draw' || super.canRemove(card, viewerId, action);
   }
 }

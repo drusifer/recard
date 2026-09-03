@@ -19,8 +19,11 @@ test('buildDeck: standard 52, no jokers, single deck', () => {
 // kept exact rather than loosened to a `.includes` - knowing precisely
 // which deck types ship is the point of the guard, and a new one should
 // have to be added here deliberately.
-test('DECK_TYPES registry exposes standard, pinochle and rtg', () => {
-  assert.deepEqual(Object.keys(DECK_TYPES).toSorted(), ['pinochle', 'rtg', 'standard']);
+test('DECK_TYPES registry exposes standard, pinochle, rtg and chips', () => {
+  // `chips` joined in sprint pileObjects (US-105): a chip supply is a
+  // deck of chips, which is what lets a preset stock one through the
+  // existing pre-stocking path with no reducer change (D107).
+  assert.deepEqual(Object.keys(DECK_TYPES).toSorted(), ['chips', 'pinochle', 'rtg', 'standard']);
   assert.equal(DECK_TYPES.standard, standardDeck);
   assert.equal(DECK_TYPES.pinochle, pinochleDeck);
 });

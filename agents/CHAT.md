@@ -905,3 +905,215 @@ make: *** [Makefile:31: lint] Error 1
 ℹ skipped 0
 ℹ todo 0
 ℹ duration_ms 4448.843929
+
+---
+[<small>2026-09-02 23:22:57</small>] [**Mouse**]->[**User**] *handoff*:
+ Committed 7e86bed on dev: D102-D106 (retire play, FLIP_CARD toggle, browser test layer, card borders, pile spread/Tighten-Loosen). 25 files, 545 unit + 10 browser tests green. NOT pushed - user asked to commit only. main is now 1 behind dev.
+
+---
+[<small>2026-09-02 23:23:29</small>] [**User**]->[**all**] *request*:
+ /sprint pileObjects - starting the queued Pileable sprint. @Cypher *pm plan sprint
+
+---
+[<small>2026-09-02 23:24:10</small>] [**Cypher**]->[**User**] *pm plan*:
+ *pm plan sprint pileObjects - entering. Read the brief + the current model. Flagging one thing before writing stories: CARD_FACES (D76) already lets a card render ANY content - RtG cards prove it - so if Chips/Tokens differ only visually, they're a face, not a type. The brief asks for a Pileable type hierarchy, which is only justified if they differ BEHAVIOURALLY. Asking the user what a chip/token actually does before writing AC.
+
+---
+[<small>2026-09-02 23:26:22</small>] [**Cypher**]->[**Smith**] *pm handoff*:
+ *pm plan sprint pileObjects: US-101..105 written to docs/USER_STORIES.md. Framed honestly - user confirmed chips/tokens have NO new behaviour, so this is an architecture sprint with a demonstration, not a gameplay one; no story promises a player something new to do. Cost stated once: a large mechanical rename with no visible change, alternative (CARD_FACES) put to the user and declined. Out of scope: denominations, totals, counters, minting. @Smith *user review
+
+---
+[<small>2026-09-02 23:27:12</small>] [**Smith**]->[**Morpheus**] *user approve*:
+ *user approve WITH 2 CONDITIONS (full text: docs/USER_STORIES.md, Smith Gate 1). A: chips/tokens need a purely presentational distinguisher (colour; tokens also a label) - as specced a chip is an id and a face, so the supply renders as N identical discs and US-105's demo, this sprint's only visible output, reads as broken. B: US-104's 'or none' decided now - chips/tokens offer NO sort, derived from type, not a kind check. Open question resolved: no shell change needed. @Morpheus *lead arch sprint
+
+---
+[<small>2026-09-02 23:29:01</small>] [**Morpheus**]->[**Smith**] *lead handoff*:
+ *lead arch sprint pileObjects: D107 recorded. src/pileables/ mirrors src/piles/ (5th registry of the same shape); type=what it IS, face=how a card prints, kept separate so RtG is untouched; chip shape via the existing face className hook, no type-aware shell per Smith. Supply costs ZERO reducer change - declared piles already pre-stock via buildDeck (D81), so chips are a DECK_TYPE. ONE judgment call needs your ruling. @Smith *user feedback
+
+---
+[<small>2026-09-02 23:41:21</small>] [**Smith**]->[**Mouse**] *user approve*:
+ *user approve. Architecture D107 approved, no new conditions. Checked the three things that could bite a user: chip shape needs no type-aware shell (Gate 1 condition holds), RtG cards are structurally untouchable by this sprint (type and face stay separate axes), and the supply story needs no reducer change so the visible story is also the cheapest. Naming went to the user and their answer beat both options: actions DROP the noun (MOVE_CARD -> MOVE). @Mouse *sm plan sprint
+
+---
+[<small>2026-09-02 23:42:01</small>] [**Mouse**]->[**Morpheus**] *sm handoff*:
+ *sm plan sprint pileObjects: 6 phases (97-102) in task.md. No user-visible signal until 102, so every phase must leave the suite green and the table identical - a half-rename is unreviewable. 97 introduces Pileable with Card as its ONLY subtype and zero behaviour change, so we learn if the abstraction fits before spending rename cost. 98/99 split source-shaped from test-shaped (~500 sites) so the big mechanical diff can't bury the real one. @Morpheus *lead review sprint plan
+
+---
+[<small>2026-09-02 23:42:14</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ *lead review sprint plan: APPROVED. Phase 97's 'Card as the only subtype, zero behaviour change' is the cheapest possible falsification of D107 - if Pileable doesn't fit we learn it for one phase's cost, not four. Note for Neo: 98/99 are where a rename can silently DELETE a behaviour, so mutation-check a guard per phase - a rename that drops a call site still compiles and still goes green. @Neo *swe impl phase-97
+
+---
+[<small>2026-09-02 23:45:08</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 97 done, and it earned its sequencing immediately - TWO real collisions, both caught by tests, neither visible in review. (1) The discriminator can't be 'type': an RtG card's type IS its MTG type line, so type:'card' erased it on all 132. Now 'pileableType'. (2) A Pileable is a view over its record, so the record's 'face' field shadowed a face() method - now faceModule(). Both have regressions. 555/555. @Trin *qa uat phase-97
+
+---
+[<small>2026-09-02 23:48:06</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 555
+ℹ suites 0
+ℹ pass 555
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1472.23911
+
+---
+[<small>2026-09-02 23:48:22</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat phase-97: PASS, with a coverage gap found and closed. Gate met exactly - ZERO existing tests changed (only a new file added), browser suite green, lint back to 8. But Morpheus's warning was right and I mutation-checked it: breaking CardPileable.render so cards printed their id instead of rank/suit passed ALL 555 unit + 10 browser tests. Nothing asserted a card renders its face at all. Added 2 browser assertions; the same mutation now fails 4. @Morpheus *lead review phase-97
+
+---
+[<small>2026-09-02 23:48:29</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ *lead review phase-97: APPROVED. D107 survived contact, and the two collisions it hit are the phase paying for itself - both were invisible to review and would have been far more expensive found during the rename. The pileableType/type correction is recorded in D107 with the reason (RtG's type IS its MTG type line), and the view-over-record shadowing hazard is written down as a standing rule for anyone adding a Pileable method. Phase 98 next - the dispatch-layer rename. @Neo *swe impl phase-98
+
+---
+[<small>2026-09-02 23:52:27</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 555
+ℹ suites 0
+ℹ pass 555
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1398.237865
+
+---
+[<small>2026-09-02 23:52:45</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat phase-98: PASS. Gate met - grep for cardActions/canRemoveCard/insertCard/removeCard/actionsForCard/cardMenuItems returns ZERO across src and tests, no alias or re-export anywhere. 555 unit + 12 browser green, lint unchanged at 8. Mutation-checked per Morpheus: canRemove always-allow fails 2, actionsForPileable returning [] fails 5 - the renamed layer is load-bearing, not just compiling. @Morpheus *lead review phase-98
+
+---
+[<small>2026-09-02 23:52:45</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ *lead review phase-98: APPROVED. One deviation from D107 as written, and it's the right one: insertPileable/removePileable not the bare insert/remove I specified - 'remove' is already a pile-level action id meaning 'delete this pile', so Pile.remove(id) beside it is a real ambiguity. Recorded. The drag-ghost rename correctly applied the user's own Gate-2 principle (drop the noun) rather than asking again. @Neo *swe impl phase-99
+
+---
+[<small>2026-09-02 23:54:25</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat phase-99: PASS. MOVE_CARD->MOVE, FLIP_CARD->FLIP, ROTATE_CARD->ROTATE, cardId->pileableId, data-card-id->data-pileable-id. Zero leftovers across src/tests/css. 555 unit + 12 browser green, both lints unchanged. ONE real test change, and it's honest: a protocol assertion compared SORTED keys, and pileableId sorts after dx/dy where cardId sorted before - order, not behaviour. Mutation: MOVE as a no-op fails 52. @Morpheus *lead review phase-99
+
+---
+[<small>2026-09-02 23:54:25</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ *lead review phase-99: APPROVED. The user's naming call reads better in the diff than either option I put up: MOVE/FLIP/ROTATE beside MOVE_PILE/SPLIT_PILE/TAKE_PILE now says 'acts on a thing' vs 'acts on a pile' by the PRESENCE of a noun, which is information the old names didn't carry at all. Protocol test caught the one ordering change rather than it passing silently. @Neo *swe impl phase-100
+
+---
+[<small>2026-09-02 23:56:57</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat phase-100: PASS. Chip + Token registered, both with presentational colour (token also a label), both sortActions []. Smith's Gate 1 ruling verified structurally: grep of ui.js for pileableType/card-chip/card-token returns only the import - the shell never learned a type, shape is CSS reached through the same className hook card-red uses. 562 unit + 12 browser green, both lints back to baseline. @Morpheus *lead review phase-100
+
+---
+[<small>2026-09-02 23:56:58</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ *lead review phase-100: APPROVED. Note on a test that moved layers rather than being weakened: the token-label assertion was written against render() output, which builds DOM and can't run in node - correctly relocated to a field assertion here plus a browser assertion once Phase 102 puts tokens on a real table. That's D104's scope line being applied, not coverage being dropped. @Neo *swe impl phase-101
+
+---
+[<small>2026-09-02 23:58:40</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat phase-101: PASS. Sorting now derives from pile CONTENTS - no hardcoded pair left in HandPile, no pileableType check anywhere. Verified the UI already passes cards:pile.cards through pileLevelActions, so the derivation is live end to end, not just unit-true. Two pre-existing assertions changed and both changes are the STORY: an empty hand offers no sort (two dead buttons before). Mutation: intersection->first-wins fails 2. 570 unit + 12 browser green. @Morpheus *lead review phase-101
+
+---
+[<small>2026-09-02 23:58:55</small>] [**Trin**]->[**Morpheus**] *qa note*:
+ Correction to my phase-101 post: the intersection mutation fails ONE test, not two. One is thin for a guard that decides what a mixed pile offers, so I am adding a second case rather than letting the number stand.
+
+---
+[<small>2026-09-02 23:59:19</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ *lead review phase-101: APPROVED, and the correction is the right instinct - a guard with one test behind it is a guard you find out about later. @Neo *swe impl phase-102
+
+---
+[<small>2026-09-03 00:04:27</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 577
+ℹ suites 0
+ℹ pass 577
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1523.526705
+
+---
+[<small>2026-09-03 00:04:37</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat phase-102: PASS. D107's central claim held - the chip supply needed ZERO state.js change; a chip is a DECK_TYPE stocking through D81's existing path. 577 unit + 13 browser green. Live-verified: 40 chips in 5 colours, 20 labelled tokens, chip bounding box square (really round, not just classed), and the chip pile offers NO sort where a player sees it. Two preset invariants caught me and both were right to. @Morpheus *lead review phase-102
+
+---
+[<small>2026-09-03 00:04:37</small>] [**Morpheus**]->[**Oracle**] *lead handoff*:
+ *lead review phase-102: APPROVED. All 6 phases reviewed. Worth recording: buildDeck's Phase-97 stamp was written as an OVERRIDE and had to become a DEFAULT (spread order) - it turned every chip back into a card at construction. Caught by the new deck-type's own tests, which is the second time this sprint that a phase's tests caught something review would not have. @Oracle *ora groom
+
+---
+[<small>2026-09-03 00:04:53</small>] [**Oracle**]->[**Smith**] *ora handoff*:
+ *ora groom: task.md phases 97-102 marked done with the sprint outcome recorded. The thing worth keeping is the sequencing evidence: Phase 97 - deliberately the cheapest possible falsification of D107 - caught TWO naming collisions, and Phase 102 caught a third, all invisible to review. Had the rename phases run first, each would have surfaced inside a ~700-call-site mechanical diff. D107 already carries the corrections inline. @Smith *user test pileObjects
+
+---
+[<small>2026-09-03 00:05:53</small>] [**Smith**]->[**Neo**] *user bug*:
+ *user bug x2, both in the sprint's ONLY visible output. (1) 40 chips render FLAT across 3 wrapped rows, spanning the table - no real table lays chips out flat, and it reads as a layout fault rather than a feature. Fix uses this session's own new primitive: let a declared pile carry a starting spread (D106). (2) Both supply piles are named 'Pile' - nothing says which is chips and which is tokens; GameConfig.piles already supports a declared name (D81). Filed to T102.2. @Neo *swe fix
+
+---
+[<small>2026-09-03 00:07:37</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 581
+ℹ suites 0
+ℹ pass 581
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1556.689493
+
+---
+[<small>2026-09-03 00:08:34</small>] [**Neo**]->[**Smith**] *swe fix*:
+ T102.2 done, both bugs fixed + one found on re-test. Named the supplies (Chips/Tokens) and gave declared piles an optional starting spread, reusing D106 rather than adding a second layout mechanism. Re-test then showed stacking CLIPPED every token label - and a token's label is its identity - so the label is pinned to the left edge for the same reason .card-corner already gives for fanned cards. Same problem, same existing answer. @Smith *user test re-run
+
+---
+[<small>2026-09-03 00:11:21</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 581
+ℹ suites 0
+ℹ pass 581
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1627.145682
+
+---
+[<small>2026-09-03 00:11:44</small>] [**Smith**]->[**all**] *user approve*:
+ *user test re-run: PASS, *user approve. Both bugs fixed and verified live - supplies read CHIPS and TOKENS and fit one row instead of spanning the table. The re-test finding (stacking clipped every token label) is fixed with the same left-edge treatment .card-corner already uses for fanned cards. Notable: stacking then broke a browser test by covering the first chip - the suite caught its own environment change instead of being quietly loosened. @all *sprint retro
+
+---
+[<small>2026-09-03 00:11:44</small>] [**Neo**]->[**Cypher**] *retro*:
+ Neo retro: the abstraction cost far less than the rename did - Pileable itself is ~120 lines, the vocabulary change touched ~700 call sites. Worth remembering when sizing a 'small interface' next time: the interface is never the expensive part, the truth-telling is. Friction: none real; every surprise came from tests, which is the good kind.
+
+---
+[<small>2026-09-03 00:11:44</small>] [**Trin**]->[**Cypher**] *retro*:
+ Trin retro: three separate bugs this sprint were invisible to review and caught by tests (type collision, face shadowing, stamp-as-override). But the one that worries me is the coverage gap mutation found - nothing asserted a card renders its face at all, in a 555-test suite. Backlog: mutation-check the OTHER long-standing guards, not just new ones.
+
+---
+[<small>2026-09-03 00:11:44</small>] [**Morpheus**]->[**Cypher**] *retro*:
+ Morpheus retro: D107 needed three in-flight corrections (pileableType, faceModule, insertPileable) and all three came from implementation, not design. That is the phase plan working as intended, not architecture failing - but it argues for writing arch decisions with an explicit 'names to be confirmed against real fields' caveat rather than stating them as settled.
+
+---
+[<small>2026-09-03 00:11:44</small>] [**Oracle**]->[**Cypher**] *retro*:
+ Oracle retro: every correction landed in D107 inline, in the same turn, so the doc never drifted from the code. No backlog from me. Standing item unchanged: e2e.smoke.mjs is still referenced by 2+ memory files that predate its removal.
+
+---
+[<small>2026-09-03 00:11:44</small>] [**Mouse**]->[**Cypher**] *retro*:
+ Mouse retro: 6 phases was right and the 98/99 split was the single best call - separating the source-shaped rename from the ~500-site test-shaped one kept both reviewable. Reserved bug-fix phase used properly this time (Smith found 2 real defects), after going unused last sprint.
+
+---
+[<small>2026-09-03 00:11:44</small>] [**Smith**]->[**Cypher**] *retro*:
+ Smith retro: my Gate 1 conditions were the right two - without the colour distinguisher the demo would have been 40 identical discs. But I approved a preset design that put 40 chips flat on the table without asking how it would LOOK at 40; a gate that reasons about one chip should ask about the whole supply.
+
+---
+[<small>2026-09-03 00:11:44</small>] [**Cypher**]->[**Cypher**] *retro*:
+ Cypher retro: framing this as 'architecture sprint, no gameplay' up front meant nobody was surprised by thin user value at the end - Smith even said so at his gate. Kept AC honest by naming the cost once. Backlog: mutation-check older guards (Trin), and Morpheus's 'names unconfirmed' arch caveat.
+
+---
+[<small>2026-09-03 00:12:03</small>] [**Cypher**]->[**all**] *pm launch*:
+ *pm launch pileObjects. US-101..105 delivered: Pileable/PILEABLE_TYPES, the full cardActions->pileableActions rename with no shim, MOVE/FLIP/ROTATE per the user's own naming call, Chip+Token, contents-derived sorting, and a Chips & Tokens preset. 581 unit + 13 browser tests, lint at baseline. Sprint complete. See docs/ARCHITECTURE.md D107.
+
+---
+[<small>2026-09-03 16:45:52</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 581
+ℹ suites 0
+ℹ pass 581
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1543.80265

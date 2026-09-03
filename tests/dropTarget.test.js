@@ -4,7 +4,7 @@ import { resolveDropTarget } from '../src/dropTarget.js';
 
 // A row of three 40px-wide cards at y 0..60, with a 10px gap between:
 //   A [  0, 40]   B [ 50, 90]   C [100,140]
-const box = (cardId, left) => ({ cardId, left, right: left + 40, top: 0, bottom: 60, width: 40 });
+const box = (pileableId, left) => ({ pileableId, left, right: left + 40, top: 0, bottom: 60, width: 40 });
 const ROW = [box('A', 0), box('B', 50), box('C', 100)];
 
 test('a drop on a card body stacks onto that card', () => {

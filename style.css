@@ -402,6 +402,68 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
 }
 
+/* Chips and Tokens (sprint pileObjects, US-102, D107).
+
+   Reached ENTIRELY through the class a Pileable contributes to the card
+   shell - the same hook `card-red` and `card-rtg` already use. Smith's
+   Gate 1 ruling: `cardElement` does not learn about types, so shape
+   lives here and nowhere else.
+
+   A chip is round and card-height square, so it reads as a different
+   KIND of object at a glance rather than as a card with odd contents. */
+.card.card-chip {
+  min-width: var(--card-h);
+  width: var(--card-h);
+  border-radius: 50%;
+  border-width: 3px;
+  border-style: dashed;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45), inset 0 0 0 4px rgba(255, 255, 255, 0.35);
+}
+
+/* Smith Gate 1 condition A: a supply of identical discs gives a player
+   no way to tell whether their action did anything, and makes this
+   sprint's only visible output read as broken. Colour is the
+   distinguisher - PRESENTATIONAL only, nothing orders or sums it (the
+   Pileable's `sortActions` is empty, which is what enforces that). */
+.card-chip.chip-red { background: #b5342a; border-color: #7d211a; }
+.card-chip.chip-blue { background: #2f5fa8; border-color: #1d3d6e; }
+.card-chip.chip-green { background: #2f7d4f; border-color: #1c5133; }
+.card-chip.chip-black { background: #2b2b2b; border-color: #101010; }
+.card-chip.chip-white { background: #ececec; border-color: #a8a8a8; }
+
+/* A token is a marked disc - distinct from BOTH a card and a chip, so
+   the three are never confusable: rounded-square, not circular. */
+.card.card-token {
+  min-width: var(--card-h);
+  width: var(--card-h);
+  border-radius: 0.9rem;
+  border-width: 2px;
+  color: #f4f4f2;
+}
+
+.card-token.token-red { background: #8c2f28; border-color: #5e1c17; }
+.card-token.token-blue { background: #2a4a7d; border-color: #182d4d; }
+.card-token.token-green { background: #2a6340; border-color: #17402a; }
+.card-token.token-black { background: #23231f; border-color: #0c0c0a; }
+.card-token.token-white { background: #d8d8d2; border-color: #9d9d95; color: #1b1f24; }
+
+/* Smith re-test finding (T102.2): with the supply stacked, a CENTRED
+   label is covered by the next token, and a token's label is its whole
+   identity - a stack of tokens whose marks you can't read is worse than
+   no stacking. Pinned to the left edge for exactly the reason
+   `.card-corner` already gives above: "a fanned/overlapped card only
+   shows a narrow strip of its left edge, and the widest LINE in that
+   strip is what has to fit". A token is the same problem, and gets the
+   same answer rather than a new one. */
+.token-label {
+  position: absolute;
+  top: 0.25rem;
+  left: 0.3rem;
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+}
+
 /* Display-only cards (table/other players) are informational, not
    unavailable - don't dim them like a disabled action button. */
 .card:disabled { opacity: 1; cursor: default; }
@@ -727,7 +789,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 /* Drag cursor affordance (US-28, Smith Sprint 4 close-out finding #1):
    the only visual hint a mouse user has that a card is draggable at all
    - every `.middle-card` (hand cards included, now that they're plain
-   `.middle-card`s too) only where MOVE_CARD's own authorization allows
+   `.middle-card`s too) only where MOVE's own authorization allows
    it (the `[draggable="true"]` attribute selector already tracks that
    exactly, no separate condition needed). */
 .middle-card[draggable='true'] {

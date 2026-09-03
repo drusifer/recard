@@ -24,7 +24,7 @@ export class StackPile extends Pile {
 
   /** LIFO: prepend, matching `DiscardPile`/`DeckPile`'s "top of the pile
    * is index 0" convention. */
-  insertCard(card) {
+  insertPileable(card) {
     return { ...this.toJSON(), cards: [card, ...this.cards] };
   }
 

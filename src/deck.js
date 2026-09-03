@@ -22,7 +22,23 @@ export function buildDeck({ type = 'standard', numDecks: numberDecks = 1, jokers
   // deck type should build, and is simply ignored by every deck type
   // that doesn't have lists (standard, pinochle), so no existing caller
   // changes behaviour.
-  return deckType.build({ numDecks: numberDecks, jokers, deckList });
+  // D107 (sprint pileObjects): every card is stamped with its Pileable
+  // type at construction. Stamped HERE, once, rather than in each deck
+  // type's own `build`, so a new deck type cannot forget it - and at
+  // construction rather than inferred later, because it is what every
+  // dispatch reads.
+  //
+  // `pileableType`, never `type`: an RtG card's `type` is its MTG type
+  // line ("Creature"), so stamping `type` here erased it on all 132 of
+  // them - caught by `rtgDeckType.test.js` the first time this ran.
+  //
+  // The stamp is a DEFAULT, not an override - spread order matters, and
+  // it was the wrong way round when first written. A deck type that
+  // builds something other than cards (`chips`, US-105) sets its own
+  // `pileableType`, and stamping over it turned every chip into a card
+  // at the moment of construction. Caught by `chipDeck.test.js`.
+  return deckType.build({ numDecks: numberDecks, jokers, deckList })
+    .map((item) => ({ pileableType: 'card', ...item }));
 }
 
 /**

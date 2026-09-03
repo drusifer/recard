@@ -6,8 +6,8 @@
  * deck (face up or down)" - the original "drop-only, no card-level
  * action at all" rule is gone. A discard pile now offers full per-card
  * access (reveal/pickup/move/rotate), identical to the base `Pile` -
- * `cardActions` is inherited, not overridden, same as `canAccept`/
- * `redactCard`/`pileActions`. `resolveDropTarget`/`insertCard` below
+ * `pileableActions` is inherited, not overridden, same as `canAccept`/
+ * `redactCard`/`pileActions`. `resolveDropTarget`/`insertPileable` below
  * are the only real difference left from a plain zone: cards always
  * stack on top (a deck's own convention - hence "just a deck"), never
  * splice into a before/after halo position.
@@ -24,7 +24,7 @@ export class DiscardPile extends Pile {
   /** STACK means every drop lands on top, unconditionally - no
    * placement/halo splicing like the base class. Prepends (index 0),
    * matching `DeckPile`'s "top of the pile is index 0" convention. */
-  insertCard(card) {
+  insertPileable(card) {
     return { ...this.toJSON(), cards: [card, ...this.cards] };
   }
 }

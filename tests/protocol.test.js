@@ -44,15 +44,15 @@ test('createMotionThrottler: independent keys never overwrite each other', () =>
 });
 
 // --- cardDragPayload (D19, US-29): the live card-drag broadcast's
-// privacy rule - cardId is included iff the card is already public
+// privacy rule - pileableId is included iff the card is already public
 // (faceUp), since anything else could be visible to the dragger but
-// invisible to a receiver (MOVE_CARD's own authorization guarantees no
+// invisible to a receiver (MOVE's own authorization guarantees no
 // receiver could ever legitimately see a card the dragger can't). ---
 
 test('cardDragPayload: a face-up (public) card includes its real id', () => {
   const card = { id: 'card-1', faceUp: true, owner: null };
   const payload = cardDragPayload(card, 0.4, 0.6);
-  assert.equal(payload.cardId, 'card-1');
+  assert.equal(payload.pileableId, 'card-1');
   assert.equal(payload.dx, 0.4);
   assert.equal(payload.dy, 0.6);
 });
@@ -60,13 +60,13 @@ test('cardDragPayload: a face-up (public) card includes its real id', () => {
 test('cardDragPayload: a still-hidden private card (own hand or own private zone card) omits the id', () => {
   const card = { id: 'card-2', faceUp: false, owner: 'p1' };
   const payload = cardDragPayload(card, 0.1, 0.2);
-  assert.equal(payload.cardId, null, 'a receiver who cannot see this card must not learn its identity');
+  assert.equal(payload.pileableId, null, 'a receiver who cannot see this card must not learn its identity');
 });
 
 test('cardDragPayload: a still-hidden shared card (no owner yet) also omits the id', () => {
   const card = { id: 'card-3', faceUp: false, owner: null };
   const payload = cardDragPayload(card, 0.5, 0.5);
-  assert.equal(payload.cardId, null);
+  assert.equal(payload.pileableId, null);
 });
 
 test('cardDragPayload: a hand card (no faceUp/owner fields at all) omits the id', () => {
@@ -75,11 +75,13 @@ test('cardDragPayload: a hand card (no faceUp/owner fields at all) omits the id'
   // visibility from an absent field).
   const card = { id: 'card-4', rank: 'A', suit: 'spades' };
   const payload = cardDragPayload(card, 0.3, 0.3);
-  assert.equal(payload.cardId, null);
+  assert.equal(payload.pileableId, null);
 });
 
 test('cardDragPayload: never leaks rank/suit even for a face-up card - only the id crosses the wire', () => {
   const card = { id: 'card-5', rank: 'K', suit: 'hearts', faceUp: true, owner: null };
   const payload = cardDragPayload(card, 0.2, 0.8);
-  assert.deepEqual(Object.keys(payload).toSorted(), ['cardId', 'dx', 'dy']);
+  // Sorted, so the expected order is alphabetical: `pileableId` sorts
+  // after dx/dy where `cardId` sorted before them (sprint pileObjects).
+  assert.deepEqual(Object.keys(payload).toSorted(), ['dx', 'dy', 'pileableId']);
 });

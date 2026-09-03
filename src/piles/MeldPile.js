@@ -23,16 +23,16 @@ export class MeldPile extends Pile {
   static reparentable = false;
 
   /** *nit (direct user request, reversed): "no card is ever removable"
-   * used to be enforced here (`cardActions` always `[]`) as "the real
+   * used to be enforced here (`pileableActions` always `[]`) as "the real
    * Solitaire rule a foundation exists to enforce." Direct, repeated
    * user correction: this app is a table simulator, not a rules engine
    * (`docs/ARCHITECTURE.md`'s "Core invariant") - drag-and-drop is
    * ALWAYS available on ANY card, no pile-type override may remove it.
-   * `cardActions` is no longer overridden here at all - a meld's cards
+   * `pileableActions` is no longer overridden here at all - a meld's cards
    * get the exact same base `Pile` reveal/pickup/move/rotate rule
    * (privacy-filtered, D7) as any other pile's. `SPLIT_PILE`/
    * `PICKUP_SPLIT` (`state.js`'s `splitPileAt`) now derive their own
-   * eligibility straight from this - "cardActions are the more general
+   * eligibility straight from this - "pileableActions are the more general
    * case" (direct user request) - so a meld is bulk-splittable too, no
    * separate flag needed any more. */
 
@@ -71,7 +71,7 @@ export class MeldPile extends Pile {
 
   /** Append-only, same "top of the pile is the end of the array"
    * convention the base `Pile` open-ended case uses. */
-  insertCard(card) {
+  insertPileable(card) {
     return { ...this.toJSON(), cards: [...this.cards, card] };
   }
 }

@@ -13,12 +13,12 @@ export class OpponentHandPile extends HandPile {
    * and drop for all cards and piles... remove the older restrictions
    * from ALL pile and zone types... [including hand]." Used to be `[]`
    * here (nothing offered on someone else's hand card at all); now
-   * `['move']` - `MOVE_CARD` (`state.js`) finds a card by id across
+   * `['move']` - `MOVE` (`state.js`) finds a card by id across
    * every pile generically (`findPileAndCard`, not a fixed source), so
    * this genuinely works: any player can drag a card straight out of
    * anyone else's hand.
    */
-  cardActions() {
+  pileableActions() {
     return ['move'];
   }
 

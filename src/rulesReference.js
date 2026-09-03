@@ -51,6 +51,18 @@ export const RULES_REFERENCE = {
     turns:
       'Players bid for the right to name trump, then lay down and score their melds face-up. Play then proceeds in tricks: follow suit if you can, otherwise you may trump; highest card of the led suit (or highest trump) wins the trick and leads next.',
   },
+  // Sprint pileObjects (US-105). This entry exists because the preset
+  // test enforces that every preset is LINKED to a rules entry rather
+  // than shipped disconnected (an earlier Smith gate) - and the honest
+  // rules for this one are "there are no rules", which is worth saying
+  // plainly rather than inventing a poker variant the app cannot play.
+  'Chips & Tokens': {
+    goal: 'None - this is a table with chips and tokens on it, not a game.',
+    setup:
+      'A supply of coloured chips and a supply of marked tokens start on the table, alongside a normal deck and 5 cards each. Drag chips and tokens anywhere you would drag a card.',
+    turns:
+      'Whatever your group agrees. Chips carry no value and tokens count nothing - they are physical objects to push around, the same way a real table has chips on it before anyone decides what they are worth.',
+  },
   Solitaire: {
     goal: 'Build all 52 cards up onto the 4 foundations, one per suit, Ace to King.',
     setup:

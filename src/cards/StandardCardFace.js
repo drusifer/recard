@@ -23,7 +23,7 @@ export const StandardCardFace = {
 
   /**
    * Fill the card shell with this face's content. The shell itself
-   * (the `<button class="card">`, its `dataset.cardId`, and every drag
+   * (the `<button class="card">`, its `dataset.pileableId`, and every drag
    * / click / rotate behaviour attached to it) stays in `ui.js` — a
    * face renders CONTENT only, which is what keeps the table
    * simulation unchanged across face types.

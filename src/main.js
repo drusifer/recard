@@ -14,8 +14,8 @@ import {
   updateRemoteCursor,
   removeRemoteCursor,
   setCardLifted,
-  updateCardDragGhost,
-  removeCardDragGhost,
+  updateDragGhost,
+  removeDragGhost,
   pileDragFromDrop,
 } from './ui.js';
 import { PRESETS } from './presets.js';
@@ -1199,12 +1199,12 @@ function renderGameFromView(view) {
   const zoneOptions = {
     viewerId: myId,
     resolveOwnerName: (ownerId) => nameById.get(ownerId) ?? ownerId,
-    onReveal: (cardId) => revealCard(cardId),
-    onRotate: (cardId) => rotateCard(cardId),
-    onPickup: (cardId) => pickupCard(cardId),
-    onMoveCard: (cardId, toPileId) => moveCard(cardId, toPileId),
-    onCardLift: (cardId, active) => motionThrottler.schedule('card-lift', { cardId, active }),
-    onDropCard: (cardId, toPileId, placement) => dropCardOnPile(cardId, toPileId, placement),
+    onReveal: (pileableId) => revealCard(pileableId),
+    onRotate: (pileableId) => rotateCard(pileableId),
+    onPickup: (pileableId) => pickupCard(pileableId),
+    onMoveCard: (pileableId, toPileId) => moveCard(pileableId, toPileId),
+    onCardLift: (pileableId, active) => motionThrottler.schedule('card-lift', { pileableId, active }),
+    onDropCard: (pileableId, toPileId, placement) => dropCardOnPile(pileableId, toPileId, placement),
     // D91: `renderPile` (ui.js) checks `splitPicker?.pileId === pile.id`
     // to switch that one pile into the picker row; `onSplitCommit` is
     // only ever called FROM that row (a click on a chosen gap), so it
@@ -1234,7 +1234,7 @@ function renderGameFromView(view) {
     // left in place, not deleted - a real, tested, independently-useful
     // action, just without a live trigger since this was its only one).
     onMergePile: isSessionEnded ? null : (pileId, targetPileId) => performMergePile(pileId, targetPileId),
-    onDropCardOnZone: isSessionEnded ? null : (cardId, zoneId) => performCreatePileWithCard(cardId, zoneId),
+    onDropCardOnZone: isSessionEnded ? null : (pileableId, zoneId) => performCreatePileWithCard(pileableId, zoneId),
     isHost: role === 'host',
     // US-41/D29: dealing lives on the deck, where the cards are - the
     // whole point of the story. Read/written here since the deck now
@@ -1290,19 +1290,19 @@ function renderGameFromView(view) {
   renderRosterOnly();
 }
 
-// *nit (show/hide): one dispatcher for both directions - `FLIP_CARD`
+// *nit (show/hide): one dispatcher for both directions - `FLIP`
 // reads the card's current facing and toggles it, so the caller (a tap,
 // or the menu's `reveal`/`hide` entry) never has to say which way.
-function revealCard(cardId) {
+function revealCard(pileableId) {
   if (isSessionEnded) return;
-  if (role === 'host') dispatch({ type: 'FLIP_CARD', playerId: myId, cardId });
-  else session.send({ type: 'action', action: { type: 'FLIP_CARD', cardId } });
+  if (role === 'host') dispatch({ type: 'FLIP', playerId: myId, pileableId });
+  else session.send({ type: 'action', action: { type: 'FLIP', pileableId } });
 }
 
-function rotateCard(cardId) {
+function rotateCard(pileableId) {
   if (isSessionEnded) return;
-  if (role === 'host') dispatch({ type: 'ROTATE_CARD', playerId: myId, cardId });
-  else session.send({ type: 'action', action: { type: 'ROTATE_CARD', cardId } });
+  if (role === 'host') dispatch({ type: 'ROTATE', playerId: myId, pileableId });
+  else session.send({ type: 'action', action: { type: 'ROTATE', pileableId } });
 }
 
 // UX follow-up (direct user request): panel positions/sizes are LOCAL,
@@ -1327,17 +1327,17 @@ function resizePanel(id, w, h) {
   savePanelSize(localStorage, id, w, h);
 }
 
-function pickupCard(cardId) {
+function pickupCard(pileableId) {
   if (isSessionEnded) return;
-  if (role === 'host') dispatch({ type: 'PICKUP', playerId: myId, cardId });
-  else session.send({ type: 'action', action: { type: 'PICKUP', cardId } });
+  if (role === 'host') dispatch({ type: 'PICKUP', playerId: myId, pileableId });
+  else session.send({ type: 'action', action: { type: 'PICKUP', pileableId } });
 }
 
-function moveCard(cardId, toPileId, placement = {}) {
+function moveCard(pileableId, toPileId, placement = {}) {
   if (isSessionEnded) return;
   const { targetCardId, side, layout } = placement;
-  if (role === 'host') dispatch({ type: 'MOVE_CARD', playerId: myId, cardId, toPileId, targetCardId, side, layout });
-  else session.send({ type: 'action', action: { type: 'MOVE_CARD', cardId, toPileId, targetCardId, side, layout } });
+  if (role === 'host') dispatch({ type: 'MOVE', playerId: myId, pileableId, toPileId, targetCardId, side, layout });
+  else session.send({ type: 'action', action: { type: 'MOVE', pileableId, toPileId, targetCardId, side, layout } });
 }
 
 // US-28: dropping a dragged card on a pile moves it there - the drop
@@ -1350,26 +1350,26 @@ function moveCard(cardId, toPileId, placement = {}) {
 // D102: this used to branch on "did it come from my hand?" and dispatch
 // PLAY instead, because only PLAY applied the leaving-a-hand public/
 // face-up transform. `transferCard` (`state.js`) applies that from the
-// transition now, so a hand-sourced drag is an ordinary MOVE_CARD and
+// transition now, so a hand-sourced drag is an ordinary MOVE and
 // the branch is gone - including the same-hand reorder case, which the
 // reducer distinguishes structurally (a hand DESTINATION re-stamps the
 // card as a hand card and never reaches the leaving-a-hand rule).
-function dropCardOnPile(cardId, targetPileId, placement = {}) {
+function dropCardOnPile(pileableId, targetPileId, placement = {}) {
   if (isSessionEnded) return;
   const view = currentView();
   if (!view) return;
   // UX follow-up (direct user request): the hand pile is a real,
   // addressable pile now (`view.piles`), so a table card dropped onto
   // it needs PICKUP's own semantics (strips owner/faceUp/layout), not a
-  // generic MOVE_CARD - dropping this into the plain `moveCard` branch
+  // generic MOVE - dropping this into the plain `moveCard` branch
   // would leave those table-only fields sitting on a card that's
   // supposed to be a plain hand card.
   const targetPile = view.piles.find((p) => p.id === targetPileId);
   if (targetPile?.kind === 'hand' && targetPile.ownerId === myId) {
-    pickupCard(cardId);
+    pickupCard(pileableId);
     return;
   }
-  moveCard(cardId, targetPileId, placement);
+  moveCard(pileableId, targetPileId, placement);
 }
 
 // UX follow-up (direct user request): the Add Zone control (name input,
@@ -1533,7 +1533,7 @@ function performMergePile(pileId, targetPileId) {
 // `state.js`) rather than create-then-move as two separate actions,
 // which would race a guest's own relayed send against the host's
 // broadcast of the intermediate state.
-function performCreatePileWithCard(cardId, zoneId) {
+function performCreatePileWithCard(pileableId, zoneId) {
   if (isSessionEnded) return;
   const view = currentView();
   if (!view) return;
@@ -1542,12 +1542,12 @@ function performCreatePileWithCard(cardId, zoneId) {
   // decided PLAY-vs-MOVE. There is no such distinction any more, and a
   // hand IS one of `view.piles` (D84) with its real cards - so the
   // plain "which pile holds this card" lookup already covers both.
-  const fromPileId = view.piles.find((p) => p.cards.some((c) => c.id === cardId))?.id;
+  const fromPileId = view.piles.find((p) => p.cards.some((c) => c.id === pileableId))?.id;
   if (!fromPileId) return;
   if (role === 'host') {
-    try { dispatch({ type: 'CREATE_PILE', playerId: myId, zoneId, fromPileId, cardId }); }
+    try { dispatch({ type: 'CREATE_PILE', playerId: myId, zoneId, fromPileId, pileableId }); }
     catch (error) { globalThis.alert(error.message); }
-  } else session.send({ type: 'action', action: { type: 'CREATE_PILE', zoneId, fromPileId, cardId } });
+  } else session.send({ type: 'action', action: { type: 'CREATE_PILE', zoneId, fromPileId, pileableId } });
 }
 
 // D51/D67: a dragged table card (or, since D67, the deck's own exposed
@@ -1693,11 +1693,11 @@ function markCursorStale(playerId) {
 // pile, never a hand). Redacted placeholders (`card.faceDown: true`)
 // have no rank/suit and are skipped - only a real, renderable card is
 // ever returned.
-function resolveVisibleCard(cardId) {
+function resolveVisibleCard(pileableId) {
   const view = currentView();
   if (!view) return null;
   for (const pile of view.piles) {
-    const card = pile.cards.find((c) => c.id === cardId);
+    const card = pile.cards.find((c) => c.id === pileableId);
     if (card && !card.faceDown) return card;
   }
   return null;
@@ -1707,7 +1707,7 @@ function markCardDragStale(playerId) {
   clearTimeout(cardDragTimers.get(playerId));
   cardDragTimers.set(
     playerId,
-    setTimeout(() => removeCardDragGhost(gameScreenElement, playerId), MOTION_TTL_MS),
+    setTimeout(() => removeDragGhost(gameScreenElement, playerId), MOTION_TTL_MS),
   );
 }
 
@@ -1732,7 +1732,7 @@ function playerAnchorRect(playerId) {
 
 function broadcastCardDrag(card, clientX, clientY) {
   if (!card) {
-    motionThrottler.schedule('card-drag', { cardId: null, dx: 0, dy: 0, active: false });
+    motionThrottler.schedule('card-drag', { pileableId: null, dx: 0, dy: 0, active: false });
     return;
   }
   const rect = gameScreenElement.getBoundingClientRect();
@@ -1764,7 +1764,7 @@ function applyIncomingMotion(playerId, message) {
   break;
   }
   case 'card-lift': {
-    setCardLifted(message.data.cardId, message.data.active);
+    setCardLifted(message.data.pileableId, message.data.active);
   
   break;
   }
@@ -1772,10 +1772,10 @@ function applyIncomingMotion(playerId, message) {
     if (playerId === myId) return; // never render my own drag ghost back at me
     if (!message.data.active) {
       clearTimeout(cardDragTimers.get(playerId));
-      removeCardDragGhost(gameScreenElement, playerId);
+      removeDragGhost(gameScreenElement, playerId);
       return;
     }
-    const card = message.data.cardId ? resolveVisibleCard(message.data.cardId) : null;
+    const card = message.data.pileableId ? resolveVisibleCard(message.data.pileableId) : null;
     // D68: `message.data.dx/dy` is an offset from the SENDER's own
     // hand-panel center, as they saw it on their own screen - re-anchor
     // it against MY OWN rendering of that same player's hand panel
@@ -1800,7 +1800,7 @@ function applyIncomingMotion(playerId, message) {
     // requested, and left/right isn't mirrored the same way seats are.
     const x = Math.min(1, Math.max(0, anchorFracX + message.data.dx));
     const y = Math.min(1, Math.max(0, anchorFracY - message.data.dy));
-    updateCardDragGhost(gameScreenElement, playerId, card, x, y);
+    updateDragGhost(gameScreenElement, playerId, card, x, y);
     markCardDragStale(playerId);
   
   break;

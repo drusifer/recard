@@ -196,6 +196,30 @@ export const PRESETS = [
     tableZone: true,
     layout: SIMPLE_LAYOUT,
   },
+  // Sprint pileObjects (US-105): the demonstration that a Pileable which
+  // is not a card reaches a real table. A pile pre-stocked through the
+  // SAME `deckType`/`deckList` path a deck uses (D81), so `state.js` is
+  // untouched by this feature entirely.
+  //
+  // Deliberately plain: chips here have no denomination and no pot,
+  // because the user was asked and ruled that out of scope. This preset
+  // is a table with chips ON it, not a betting game - naming it after a
+  // real poker variant would promise rules that do not exist.
+  {
+    name: 'Chips & Tokens',
+    numDecks: 1,
+    jokers: 0,
+    cardsPerPlayer: 5,
+    tableZone: true,
+    piles: [
+      // Named and stacked per Smith's `*user test` findings: unnamed,
+      // both supplies read as "Pile" with no way to tell them apart;
+      // unstacked, 40 chips spanned the table and read as a layout
+      // fault rather than a feature.
+      { kind: 'plain', ownerId: null, count: 1, name: 'Chips', spread: 0.82, deckType: 'chips', deckList: 'standard-chips' },
+      { kind: 'plain', ownerId: null, count: 1, name: 'Tokens', spread: 0.75, deckType: 'chips', deckList: 'standard-tokens' },
+    ],
+  },
   {
     name: 'Solitaire',
     numDecks: 1,

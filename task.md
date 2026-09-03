@@ -1511,3 +1511,106 @@ review:
   Table Zone.
 - `buildPiles` derived ids from `kind`, collapsing 14 deck piles onto
   one id.
+
+---
+
+# Sprint pileObjects — Phases 97-102 (US-101..105, D107)
+
+Mouse, 2026-09-02. Six phases. This sprint is a type-hierarchy refactor
+plus a rename with no user-visible change until the very last phase, so
+the sizing rule that matters here is different from a feature sprint's:
+**every phase must leave the suite green and the table behaving exactly
+as it did**, because there is no user-facing signal to tell us
+otherwise. A phase that "half-renames" is unreviewable.
+
+Sequencing follows D107's own dependency order — the abstraction, then
+the vocabulary that depends on it, then the types that prove it, then
+the demonstration. Phase 97 deliberately introduces `Pileable` with
+`Card` as its ONLY subtype and zero behaviour change: if that phase is
+green, the abstraction fits the existing system, and if it isn't, we
+learn that before any of the rename cost is spent.
+
+- [x] **Phase 97** — `Pileable` + `PILEABLE_TYPES` registry + `CardPileable`
+      - T97.1 `src/pileables/Pileable.js` + `CardPileable.js` +
+        `pileableTypes.js` (`PILEABLE_TYPES`, `pileableFor`), mirroring
+        `src/piles/`'s own shape. `buildDeck` stamps `type: 'card'`.
+      - T97.2 `cardElement` dispatches render through `pileableFor`;
+        `CardPileable.render` delegates to `faceFor` so every existing
+        face (standard, rtg) is byte-identical.
+      - **Gate: full suite green, no behavioural test changed at all.**
+
+- [x] **Phase 98** — the rename, dispatch layer (US-103)
+      - T98.1 `Pile.cardActions` -> `pileableActions`, `canRemoveCard`
+        -> `canRemove`, `insertCard`/`removeCard` -> `insert`/`remove`
+        across `Pile` and every subclass.
+      - T98.2 `actionsForCard` -> `actionsForPileable`, `cardMenuItems`
+        -> `pileableMenuItems`, and their call sites in `ui.js`.
+      - **Gate: `grep -rn 'cardActions\|canRemoveCard\|actionsForCard'
+        src/ tests/` returns nothing. No alias, no re-export.**
+
+- [x] **Phase 99** — the rename, reducer actions (user's Gate 2 ruling)
+      - T99.1 `MOVE_CARD` -> `MOVE`, `FLIP_CARD` -> `FLIP`,
+        `ROTATE_CARD` -> `ROTATE`; `cardId` -> `pileableId`.
+        `DEAL`/`DRAW`/`SHUFFLE_DECK` and every `*_PILE` action unchanged.
+      - Split from 98 on purpose: 98 is source-shaped, 99 is
+        test-suite-shaped (~500 call sites) and is the one phase most
+        likely to produce a large mechanical diff that hides a real
+        change. Reviewing them together would bury 98.
+      - **Gate: suite green, and `protocol.test.js` still passes —
+        this is a wire-format change.**
+
+- [x] **Phase 100** — `ChipPileable` + `TokenPileable` (US-102, Gate 1 cond. A)
+      - T100.1 Both types, each with `colour` (Token also `label`),
+        purely presentational; `card-chip`/`card-token` shell classes.
+      - T100.2 CSS: a chip is round, a token is distinct from both.
+        No change to `cardElement`'s shell logic (Smith's Gate 1
+        ruling — a diff that makes the shell type-aware fails review).
+
+- [x] **Phase 101** — sorting derives from contents (US-104, cond. B)
+      - T101.1 `static sortActions` on each Pileable type
+        (`['sortRank','sortSuit']` on card, `[]` on chip/token);
+        `Pile.pileActions` reads it from its contents instead of
+        `HandPile` hardcoding the two. Mixed pile = intersection,
+        empty pile = none, neither throws.
+
+- [x] **Phase 102** — chip supply + preset (US-105) + reserved bug-fix
+      - T102.1 `chips` DECK_TYPE; a preset declaring a pre-stocked chip
+        pile. No `state.js` change (D107 — declared piles already
+        pre-stock through `buildDeck`).
+      - T102.2 Reserved for defects found in Smith's `*user test`.
+        Carried forward as a deliberate phase for the 5th sprint
+        running; unused in the RtG sprint, which is the point — it
+        costs nothing when empty.
+
+
+## Sprint pileObjects — outcome (2026-09-03)
+
+All 6 phases shipped. 577 unit + 13 browser tests, lint at its standing
+baseline (8 js / 5 design). Phase 102's reserved bug-fix slot went
+unused as a separate pass for the second sprint running — every defect
+was caught inside its own phase.
+
+**The sequencing paid for itself three times, all in ways review could
+not have caught:**
+
+1. **Phase 97** (Pileable with Card as its only subtype) found that the
+   discriminator could not be called `type`: an RtG card's `type` IS its
+   MTG type line, so stamping `type: 'card'` erased it on all 132 — the
+   exact breakage Smith's Gate 2 approval had called structurally
+   impossible. Caught by an existing test on the first run.
+2. **Phase 97** also found that a Pileable is a view over its record, so
+   the record's `face` field shadowed a `face()` method. Now
+   `faceModule()`, with the collision hazard written down as a standing
+   rule.
+3. **Phase 102** found that Phase 97's `pileableType` stamp was an
+   override where it should have been a default — it turned every chip
+   back into a card at construction.
+
+Had the rename phases (98/99) run first, every one of these would have
+surfaced inside a ~700-call-site mechanical diff.
+
+**Coverage gap found by mutation, not by plan:** breaking
+`CardPileable.render` so cards printed their id instead of rank and suit
+passed all 555 unit tests and all 10 browser tests. Nothing anywhere
+asserted that a card renders its face. Two browser assertions added; the
+same mutation now fails 4.

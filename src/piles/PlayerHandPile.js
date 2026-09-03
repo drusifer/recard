@@ -34,7 +34,7 @@ export class PlayerHandPile extends HandPile {
    * for a card in your own hand (it is already yours to see, already
    * picked up).
    */
-  cardActions() {
+  pileableActions() {
     return ['move'];
   }
 

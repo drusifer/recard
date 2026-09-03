@@ -16,16 +16,16 @@ export function makeMotionMessage(kind, data) {
 }
 
 /**
- * D19/US-29: builds the live card-drag broadcast payload. `cardId` is
+ * D19/US-29: builds the live card-drag broadcast payload. `pileableId` is
  * included iff `card.faceUp === true` - i.e. it's already public to
  * every possible receiver. This single condition is provably sufficient
- * given MOVE_CARD's own authorization (state.js/ARCHITECTURE.md D12): a
+ * given MOVE's own authorization (state.js/ARCHITECTURE.md D12): a
  * card a player is allowed to drag at all is either already face-up
  * (safe to name to everyone) or a still-hidden card owned by the
  * dragger themself (visible only to the dragger, so by construction
  * invisible to every other receiver of this broadcast) - there is no
  * third case where some receiver could legitimately see a card the
- * dragger cannot. When `cardId` is omitted, every receiver renders a
+ * dragger cannot. When `pileableId` is omitted, every receiver renders a
  * generic anonymous back at the broadcast position instead.
  *
  * *nit (D68, direct user request): `dx`/`dy` - NOT an absolute screen
@@ -40,7 +40,7 @@ export function makeMotionMessage(kind, data) {
  * against each receiver's own rendering of that same player's seat.
  */
 export function cardDragPayload(card, dx, dy) {
-  return { cardId: card.faceUp === true ? card.id : null, dx, dy };
+  return { pileableId: card.faceUp === true ? card.id : null, dx, dy };
 }
 
 /**

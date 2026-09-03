@@ -609,7 +609,7 @@ instead of tapping buttons and menus.
   a shared one) plays it there — same underlying action `PLAY` already
   performs today, just triggered by a drop instead of a tap.
 - Dragging a card already on the table from one zone to another performs
-  the existing `MOVE_CARD` action (US-19), same authorization rules
+  the existing `MOVE` action (US-19), same authorization rules
   (still-hidden private cards can only be moved by their owner).
 - Existing tap-to-play and the "Move to…" dropdown **still work
   unchanged** — drag is an additional gesture, not a replacement (Smith
@@ -626,7 +626,7 @@ alive instead of state just snapping between frames.
 - While another player is dragging a card, its live position broadcasts
   to everyone (best-effort, throttled/coalesced like today's cursor and
   hand-motion cues — dropped frames are fine, per PRD Principle 6; the
-  final committed state via `PLAY`/`MOVE_CARD` is always the source of
+  final committed state via `PLAY`/`MOVE` is always the source of
   truth regardless of what any intermediate frame showed).
 - **Privacy holds throughout the drag, not just at the end**: if the
   card isn't yet visible to a given viewer (still in the dragger's
@@ -719,7 +719,7 @@ row.
   unidentifiable at a glance, still readable via the corner index like
   every other card in this app).
 - The stacked card becomes adjacent to the target in the zone's
-  underlying card order (existing `MOVE_CARD` semantics extended, not
+  underlying card order (existing `MOVE` semantics extended, not
   replaced) — this is real, shared, authoritative state, synced to
   every player identically (a table layout is shared game state, unlike
   hand order which is private per player).
@@ -737,7 +737,7 @@ row.
   by *where* on the target card you drop, a spatial affordance, not a
   dialog.
 - Privacy/authorization is unchanged: stacking a card follows the exact
-  same `MOVE_CARD` authorization rule already in place (a still-hidden
+  same `MOVE` authorization rule already in place (a still-hidden
   card can only be moved/stacked by its owner; a shared face-down card
   by anyone).
 
@@ -862,7 +862,7 @@ piles, not just two.
   has followed since D3.
 - Each pile is a real zone like any other: any player can draw
   from/move cards into it afterward using existing zone mechanics
-  (`MOVE_CARD`/`PICKUP`) — Split is a one-time setup action, not a new
+  (`MOVE`/`PICKUP`) — Split is a one-time setup action, not a new
   ongoing game concept.
 - **Assumption, stated not silently decided** (user declined to answer
   the clarifying question directly and asked to proceed with
@@ -1701,7 +1701,7 @@ pile-type code, not another `case`.
   rendering.
 
 **Explicitly out of scope (deferred, see Morpheus D41 below):**
-- The reducer's actual mutation bodies (`PLAY`/`PICKUP`/`MOVE_CARD`/
+- The reducer's actual mutation bodies (`PLAY`/`PICKUP`/`MOVE`/
   `DRAW`/`DEAL` in `state.js`) are **not** rewritten to dispatch through
   `canAccept`/`insert`/`canRemove`/`remove` this sprint. Cypher's
   read, confirmed by Morpheus: D39 as written doesn't actually cover
@@ -1725,7 +1725,7 @@ for the full record.
 
 ### US-48: Tranche 2 (Pile write-side) — SHIPPED (2026-08-21)
 
-Resolved D41's deferred design question: `PLAY`/`PICKUP`/`MOVE_CARD`/
+Resolved D41's deferred design question: `PLAY`/`PICKUP`/`MOVE`/
 `DRAW` (the four actions that genuinely move a card between two piles)
 now dispatch through `canRemoveCard`/`removeCard`/`insertCard` on both
 the source and destination pile type (`src/piles/*.js`) instead of
@@ -2018,7 +2018,7 @@ a place cards can be dropped.
   is an Ace; else card matches top card's suit and `rank === top.rank +
   1`.
 - Rejected drop = card returns to its origin, same as any other
-  rejected `MOVE_CARD` today (no new rejection UX to invent).
+  rejected `MOVE` today (no new rejection UX to invent).
 - No card is ever removable from a foundation pile once placed (matches
   standard Klondike; `canRemoveCard` always `false`) — this is a stated
   simplification, not a bug: real Klondike allows taking a card back off
@@ -2038,7 +2038,7 @@ anything.
 - Reuses D21's existing `layout: 'overlap'` rendering — no new visual
   mechanic, just a new accept rule gating what can land there.
 - **Explicitly out of scope:** moving a bound sequence of cards together
-  (dragging a 3-card run as one unit). Single-card `MOVE_CARD` only this
+  (dragging a 3-card run as one unit). Single-card `MOVE` only this
   sprint — multi-card sequence moves are a real, separate feature
   (bulk transfer shape, doesn't fit D43's single-card dispatch) and
   Klondike is still playable card-by-card without it, just slower.
@@ -2056,7 +2056,7 @@ actual rule.
 - `tableSide: true`, `ownerId: null` always — it's shared, never a
   personal zone.
 - No turn-order enforcement — Spit is explicitly simultaneous/real-time;
-  the existing `MOVE_CARD` authorization (any player may move a card
+  the existing `MOVE` authorization (any player may move a card
   they can see/reach) already matches this, no new auth logic needed.
 
 ### US-59: `dropRule` retired; GameConfig declares a starting zone layout
@@ -2216,7 +2216,7 @@ a pile lives in without it being fixed forever at creation.
   the same way, not a local preference.
 - New reducer action (name TBD with Morpheus, e.g. `MOVE_PILE`)
   reparents a pile from its current Zone to a target Zone in host
-  state, analogous in shape to `MOVE_CARD` but at the pile level
+  state, analogous in shape to `MOVE` but at the pile level
   instead of the card level.
 - Drag handle is the pile's own `<header-actions>` title bar (D54) —
   not the whole pile body, so a title-bar drag can't be confused with
@@ -2725,3 +2725,256 @@ wrapping around; Gate 1's auto-rename condition implemented and
 unit-tested. TDD, 12 new tests, 408/408 total, lint baseline unchanged.
 Live-verified the cycle mechanism end to end against the real running
 app. See `docs/ARCHITECTURE.md` D71 for full reasoning.
+
+
+---
+
+# Sprint: pileObjects (US-101..US-105)
+
+**Cypher, 2026-09-02.** From the queued brief: "new Pileable interface -
+Chips/Tokens/Cards all extend it; extract PileableActions base from
+cardActions and derive; per-pile-type UX incl. sorting; same universal
+DnD + pile dynamics as cards; no back-compat."
+
+## Framing, stated plainly
+
+The user was asked directly what a Chip or Token does that a Card
+cannot, and answered: **nothing.** They drag, pile, flip, sort and
+target exactly like cards; they look different and they get their own
+per-type actions. Supply comes from a preset-declared pile, not from a
+mint-at-the-table action.
+
+That answer sets what this sprint is and is not:
+
+- **It is an architecture sprint with a demonstration.** The deliverable
+  is the `Pileable` abstraction and the honesty of the vocabulary that
+  follows it. Chips and Tokens are how we prove the abstraction holds
+  for something that is not a card.
+- **It is not a gameplay sprint.** No story below promises a player a
+  new thing they can DO. Nobody should expect the table to play
+  differently afterwards, and if a story starts growing chip values,
+  pot totals or counters, that is a different sprint and it needs its
+  own gate.
+
+**The cost, stated once so it can be judged.** `cardActions` and the
+`'card'` vocabulary run through `Pile` and every subclass, `state.js`,
+`pileActions.js`, `ui.js` and most of the test suite. Renaming with no
+back-compat shim is a large, mechanical diff with no user-visible
+change. That is the price of the abstraction being real rather than
+decorative, and the user has asked for it with the alternative
+(`CARD_FACES` already renders any content, so a purely visual chip needs
+no hierarchy at all) explicitly put to them and declined.
+
+## US-101 — A pile holds Pileables, not cards
+
+As a developer extending this table, I want the thing a pile contains to
+have a name that isn't "card", so that adding a non-card object doesn't
+mean lying in every signature I touch.
+
+**AC**
+1. A `Pileable` base type exists and is what `Pile.insertCard`/
+   `removeCard`/`canAccept` and `transferCard` operate on.
+2. `Card` is a `Pileable` subtype. Every existing preset, deck and saved
+   layout behaves exactly as before - same rendering, same drag, same
+   reducer results.
+3. The full unit suite passes with no behavioural test changed except
+   for renaming. A behavioural assertion that has to CHANGE is a defect
+   in this story, not an acceptable cost.
+
+## US-102 — Chips and Tokens are Pileable types
+
+As a player, I want chips and tokens on the table alongside cards, so
+the table can represent games that use them.
+
+**AC**
+1. `Chip` and `Token` are `Pileable` subtypes with their own faces,
+   visually distinct from a card at a glance.
+2. Both support every pile interaction a card supports, through the
+   SAME code path - drag, drop, move, pick up, flip, rotate, the
+   right-click action menu, split, take. No chip- or token-specific
+   branch in `ui.js` or `state.js`.
+3. A chip or token can be mixed into a pile with cards without error.
+   (Not a feature anyone asked for - an assertion that nothing
+   type-checks where it shouldn't.)
+
+## US-103 — `PileableActions` replaces `cardActions`
+
+As a developer, I want the action-offer vocabulary named for what it
+acts on, so a Chip's offer rule isn't reached through a method called
+`cardActions`.
+
+**AC**
+1. `cardActions` is renamed to `pileableActions` across `Pile` and every
+   subclass, `pileActions.js`, `state.js` and `ui.js`.
+2. NO alias, no deprecated shim, no re-export. `grep -r cardActions src/
+   tests/` returns nothing.
+3. `actionsForCard` and the `ACTION_SPECS` `from`/`target` vocabulary
+   are reviewed in the same pass - anything naming "card" where it means
+   "pileable" is renamed with it, or is deliberately left and SAID SO in
+   the arch doc.
+
+## US-104 — Per-type actions, including sorting
+
+As a player, I want a pile of chips to offer sorting that means
+something for chips, so the actions I'm offered are never nonsense for
+what I'm looking at.
+
+**AC**
+1. `sortRank`/`sortSuit` are no longer unconditional hand actions. What
+   sorting a pile offers derives from the Pileable type of its
+   CONTENTS.
+2. A hand of cards still offers Sort by rank and Sort by suit, exactly
+   as today.
+3. A pile of chips or tokens does NOT offer rank/suit sorting - it
+   offers its own type's sort, or none.
+4. A mixed or empty pile offers something defensible and never throws.
+
+## US-105 — A preset declares a chip supply
+
+As a player picking a preset, I want its chips already on the table, so
+I don't have to create them before playing.
+
+**AC**
+1. A preset can declare a pile pre-stocked with chips or tokens, reusing
+   the existing `GameConfig.piles` shape (`{kind, ownerId, count}` plus
+   D81's pre-stocking) - no new preset schema.
+2. One real preset demonstrates it end to end: pick it, and the chips
+   are on the table, draggable, with no manual setup.
+3. Every existing preset is unchanged.
+
+**Out of scope** (would each need their own story and gate):
+chip denominations, pile totals, a pot; token counters; minting
+chips/tokens at the table; any betting or scoring rule.
+
+**Open question for Gate 1** — US-102 AC1 says "visually distinct at a
+glance", which is the weakest AC here. A chip is round and a card is
+rectangular; the card shell (`<button class="card">`) currently owns
+shape, and only CONTENT is dispatched via `CARD_FACES`. Making a chip
+genuinely round may need the shell to become type-aware, which is a
+bigger change than a face. Smith should rule on whether "distinct" can
+be satisfied within the existing rectangular shell for this sprint.
+
+
+### Smith Gate 1 review (2026-09-02) — APPROVED WITH 2 CONDITIONS
+
+**Open question, resolved — no shell change needed.** A face already
+contributes a class to the card shell (`StandardCardFace.className`
+returns `card-red`; RtG's `card-rtg` changes size and background). A
+`Chip` face returning `card-chip`, plus CSS, makes a chip genuinely
+round without `cardElement` learning any types. US-102 AC1 is
+satisfiable as written. Making the shell type-aware is OUT of scope, and
+a diff that does it should be rejected at review.
+
+**Condition A — chips need something to tell them apart.**
+As specified, a Chip has an id and a face and nothing else, so a chip
+supply renders as N identical discs. A player looking at that cannot
+tell whether the feature works, whether they moved one, or whether they
+moved five - and "did my action do anything" is the first heuristic
+(Visibility of System Status), failed at rest rather than on an action.
+It also makes US-105's demonstration - the only user-visible output of
+this whole sprint - look broken.
+
+Chips and Tokens must carry a **purely presentational distinguishing
+attribute** (a colour, and for tokens a short label). It carries NO game
+meaning: nothing sums it, nothing compares it, no rule reads it. That
+keeps the user's "no new behaviour" ruling intact - this is rendering,
+the same category as a card's suit colour - while making the result
+legible. This is the condition for approval, not polish.
+
+**Condition B — US-104 AC3's "or none" is decided now, not later.**
+"Offers its own type's sort, or none" hands a product decision to
+whoever writes the code. Deciding it here: **chips and tokens offer NO
+sort action.** With no ordered attribute (Condition A's colour is a
+label, not a rank), any sort would be arbitrary, and an action that
+rearranges a pile unpredictably is worse than no action.
+
+AC3 is therefore: a chip or token pile offers no sort action at all, and
+that fact is DERIVED from the Pileable type rather than a `kind ===
+'chip'` check anywhere. AC4 stands: empty and mixed piles must not
+throw.
+
+**Noted, not blocking.** This sprint ships one visible thing: a preset
+with chips on the table that do nothing. That is what the user asked
+for with the alternative explained and declined, and Cypher's framing
+says so honestly rather than dressing it up. Flagging only so that
+nobody at retro is surprised that user-facing value was thin - it was
+thin by design, and the design was chosen deliberately.
+
+**Verdict: APPROVED WITH 2 CONDITIONS** (A: presentational distinguisher;
+B: no sort for chips/tokens, derived not branched). @Morpheus *lead arch
+sprint.
+
+
+### Smith Gate 2 review (2026-09-02) — APPROVED
+
+Architecture (D107) reviewed for user-facing impact. Three things
+checked, one ruling taken to the user.
+
+1. **Chip shape reaches the screen without a type-aware shell.** Gate
+   1's condition holds: `card-chip` plus CSS is the existing mechanism
+   (`card-red`, `card-rtg`). Approved as designed.
+2. **RtG is untouched.** Keeping `type` and `face` as separate axes
+   means every existing card renders through the identical path. A
+   sprint whose only visible output is a chip must not be able to
+   change how 132 existing cards look, and this design makes that
+   structurally impossible rather than merely intended.
+3. **Supply needs no reducer change**, so US-105 cannot destabilise the
+   table simulation. Good sequencing: the visible story is also the
+   cheapest one.
+
+**Naming ruled by the user, not by me** — the tension was between
+Morpheus's scope call and the user's own standing "no back-compat" rule,
+so it went to them. Their answer replaced both options on offer:
+actions lose the object from their name (`MOVE` -> `MOVE`) rather
+than keeping or correcting it. Recorded in D107.
+
+**No new UX conditions.** Gate 1's two conditions carry into
+implementation unchanged and are what I will test at `*user test`:
+chips must be visually distinguishable from each other at rest, and no
+chip or token pile may offer a sort action.
+
+**Verdict: APPROVED.** @Mouse *sm plan sprint.
+
+
+### Smith `*user test` — sprint pileObjects (2026-09-03)
+
+Tested the delivered sprint from a player's seat: picked the preset,
+looked at the table, and drove a chip the way a player would.
+
+**What works, verified rather than assumed.** Chips and tokens are on
+the table with no setup. A chip's right-click menu offers Move like any
+card's, through the same code path (asserted by driving the menu, not by
+reading classes). Chip bounding boxes are square, so they are genuinely
+round rather than merely classed as round. Both conditions from Gate 1
+hold: five distinguishable chip colours, and no sort action anywhere on
+a chip or token pile.
+
+**Two usability defects, both in the sprint's ONLY user-visible output.**
+
+**BUG 1 — the supply doesn't read as a supply.** 40 chips render as a
+flat row wrapping onto three lines, spanning most of the table and
+pushing everything else down. No real table lays chips out flat; they
+sit in stacks. As shipped, the demonstration looks less like "chips are
+supported" and more like "something has gone wrong with the layout" -
+which matters more than usual here, because this preset is the only
+thing a player can actually SEE from this sprint.
+
+The mechanism to fix it already shipped this session: pile spread
+(D106). A declared pile cannot currently carry a starting spread, so
+the fix is to let a `GameConfig.piles` declaration name one. Small, and
+it uses the sprint's own new primitive rather than adding another.
+
+**BUG 2 — both supply piles are called "Pile".** They fall back to the
+default name, so nothing on screen says which one is chips and which is
+tokens. `GameConfig.piles` already supports a declared `name` (D81), so
+this is a preset fix, not a code change. Nielsen #2, match between
+system and the real world - a player reads the label before the
+contents.
+
+Neither is a blocker for the abstraction, which is what this sprint
+actually delivered. Both are blockers for the demonstration being
+convincing, and the demonstration is the whole of what a user sees.
+
+**Filed for the reserved bug-fix slot (T102.2)** rather than backlogged:
+that slot exists precisely for defects found at this gate, and both fixes
+are small and well understood.

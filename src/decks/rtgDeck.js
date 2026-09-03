@@ -10,8 +10,8 @@
  * A deck runs four copies of the same printed card. `state.js` keys
  * every card on `card.id`, so four cards sharing one id would behave as
  * a single card (move one, move them all). Each physical card therefore
- * gets a unique instance id, and keeps its PRINTED id in `cardId` for
- * art lookup (`assets/cards/rtg/<cardId>.svg`) and catalog joins.
+ * gets a unique instance id, and keeps its PRINTED id in `pileableId` for
+ * art lookup (`assets/cards/rtg/<pileableId>.svg`) and catalog joins.
  *
  * The full printed data travels on the card, exactly as a standard card
  * carries its own `rank`/`suit`. That is deliberately the SAME shape the
@@ -40,7 +40,7 @@ export function build({ deckList } = {}) {
     const printed = BY_ID.get(id);
     if (!printed) throw new Error(`Deck "${list.id}" references unknown card "${id}"`);
     for (let copy = 0; copy < count; copy++) {
-      deck.push({ ...printed, id: `${id}#${copy}`, cardId: id });
+      deck.push({ ...printed, id: `${id}#${copy}`, pileableId: id });
     }
   }
   return deck;

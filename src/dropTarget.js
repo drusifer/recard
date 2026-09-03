@@ -24,7 +24,7 @@ How far above/below the row still counts as aiming at it.
 const VERTICAL_SLACK = 0.5;
 
 /**
- * @param {{cardId: string, left: number, right: number, top: number,
+ * @param {{pileableId: string, left: number, right: number, top: number,
  *          bottom: number, width: number}[]} cardBoxes cards currently
  *   rendered in the zone, in any order.
  * @param {{x: number, y: number}} point the drop/dragover point.
@@ -38,7 +38,7 @@ export function resolveDropTarget(cardBoxes, point) {
   for (const box of cardBoxes) {
     const isWithinRow = point.y >= box.top && point.y <= box.bottom;
     if (isWithinRow && point.x >= box.left && point.x <= box.right) {
-      return { targetCardId: box.cardId, side: 'after', layout: 'stack' };
+      return { targetCardId: box.pileableId, side: 'after', layout: 'stack' };
     }
 
     const slack = box.height ?? (box.bottom - box.top);
@@ -56,9 +56,9 @@ export function resolveDropTarget(cardBoxes, point) {
     const isBetter =
       nearest === null ||
       distance < nearest.distance ||
-      (distance === nearest.distance && box.cardId < nearest.targetCardId);
+      (distance === nearest.distance && box.pileableId < nearest.targetCardId);
     if (isBetter) {
-      nearest = { distance, targetCardId: box.cardId, side: isBefore ? 'before' : 'after' };
+      nearest = { distance, targetCardId: box.pileableId, side: isBefore ? 'before' : 'after' };
     }
   }
 

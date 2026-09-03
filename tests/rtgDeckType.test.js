@@ -24,9 +24,9 @@ test('buildDeck: every physical card gets a unique id', () => {
 
 test('buildDeck: each card keeps its printed id for art and catalog lookup', () => {
   const deck = buildDeck({ type: 'rtg', deckList: 'rtg-mono-white' });
-  const recruit = deck.find((card) => card.cardId === 'rtg-w-001');
+  const recruit = deck.find((card) => card.pileableId === 'rtg-w-001');
   assert.ok(recruit, 'printed id preserved separately from the instance id');
-  assert.notEqual(recruit.id, recruit.cardId, 'instance id is distinct');
+  assert.notEqual(recruit.id, recruit.pileableId, 'instance id is distinct');
   assert.equal(recruit.name, 'Dawnbreak Recruit');
 });
 

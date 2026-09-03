@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ACTION_SPECS, pileLevelActions, actionsForCard, targetsForAction } from '../src/pileActions.js';
+import { ACTION_SPECS, pileLevelActions, actionsForPileable, targetsForAction } from '../src/pileActions.js';
 import { PILE_TYPES } from '../src/piles/pileTypes.js';
 import { PlayerHandPile } from '../src/piles/PlayerHandPile.js';
+import { sortActionsFor } from '../src/pileables/pileableTypes.js';
 import { MIN_SPREAD, MAX_SPREAD } from '../src/piles/Pile.js';
 
 const deck = { id: 'deck', kind: 'deck', ownerId: null };
@@ -41,7 +42,7 @@ test('hands and plain piles have no pile-level actions', () => {
 // "put cards back on/take cards off the deck" correction - `deal`/
 // `reshuffleDeal`/`draw` still never belong to the per-card table
 // (D29's own point, still true), but the table is no longer empty: see
-// `tests/piles.test.js`'s `deck cardActions` test for the real list.
+// `tests/piles.test.js`'s `deck pileableActions` test for the real list.
 
 test('every pile-level action declares a label and whether it destroys the round', () => {
   for (const id of ['deal', 'reshuffleDeal']) {
@@ -63,12 +64,14 @@ test('reshuffleDeal is marked destructive and deal is not', () => {
 // --- Sprint 12 (US-46, D34/D36) ---------------------------------------
 
 test('D34/D87: the hand offers pile-level actions to its own owner - sort + changePileType (pass removed, direct user request)', () => {
-  assert.deepEqual(pileLevelActions('hand', { isHost: false, isOwner: true }), ['sortRank', 'sortSuit', 'changePileType', 'tighten', 'loosen']);
+  // US-104: `cards` now decides whether the sorts appear at all.
+  assert.deepEqual(pileLevelActions('hand', { isHost: false, isOwner: true, cards: [{ pileableType: 'card' }] }),
+    ['sortRank', 'sortSuit', 'changePileType', 'tighten', 'loosen']);
 });
 
 test('D34: a hand pile offers nothing to a viewer who does not own it', () => {
   // The hand toolbar being removed doesn't mean sorting someone ELSE's
-  // hand becomes possible - matches actionsForCard's existing rule that
+  // hand becomes possible - matches actionsForPileable's existing rule that
   // only a hand's own owner gets anything from it.
   assert.deepEqual(pileLevelActions('hand', { isHost: false, isOwner: false }), []);
   assert.deepEqual(pileLevelActions('hand', { isHost: true, isOwner: false }), []);
@@ -106,7 +109,7 @@ test('D36 BLOCKER: move and pickup never carry singleTarget, under any circumsta
 });
 
 test('D34: draw is never offered as a per-card action from the deck - it stays pile-level, even now the deck has real per-card actions', () => {
-  assert.ok(!actionsForCard(deck, { id: 'c' }, 'me').includes('draw'));
+  assert.ok(!actionsForPileable(deck, { id: 'c' }, 'me').includes('draw'));
 });
 
 // --- Phase 56 (Sprint 12, T56.1): shuffle joins the deck's pile-level
@@ -220,4 +223,64 @@ test('neither is disabled in the middle of the range', () => {
     .disabledActions(3, { spread: (MIN_SPREAD + MAX_SPREAD) / 2 });
   assert.ok(!disabled.includes('tighten'));
   assert.ok(!disabled.includes('loosen'));
+});
+
+
+// --- Sorting derives from contents (Phase 101, US-104, Gate 1 cond. B)
+//
+// `HandPile` hardcoded sortRank + sortSuit, which was only ever correct
+// because a hand could only hold cards. Now that a pile can hold a chip,
+// what sorting it offers has to come from what is IN it.
+
+test('sortActionsFor: a pile of cards offers rank and suit', () => {
+  assert.deepEqual(sortActionsFor([{ pileableType: 'card' }, { pileableType: 'card' }]),
+    ['sortRank', 'sortSuit']);
+});
+
+test('sortActionsFor: a pile of chips or tokens offers nothing to sort by', () => {
+  assert.deepEqual(sortActionsFor([{ pileableType: 'chip' }, { pileableType: 'chip' }]), []);
+  assert.deepEqual(sortActionsFor([{ pileableType: 'token' }]), []);
+});
+
+// The intersection, not the union: an action offered on a mixed pile
+// must be meaningful for EVERYTHING in it, or it reorders something by
+// an attribute it hasn't got.
+test('sortActionsFor: a mixed pile offers the intersection - nothing, not the card half', () => {
+  assert.deepEqual(sortActionsFor([{ pileableType: 'card' }, { pileableType: 'chip' }]), []);
+});
+
+test('sortActionsFor: an empty pile offers nothing, and neither case throws', () => {
+  assert.deepEqual(sortActionsFor([]), []);
+  assert.doesNotThrow(() => sortActionsFor());
+  assert.doesNotThrow(() => sortActionsFor([{}, null]));
+});
+
+// A card record with no explicit pileableType still sorts as a card -
+// the same default `pileableFor` makes.
+test('sortActionsFor: records with no pileableType are treated as cards', () => {
+  assert.deepEqual(sortActionsFor([{ rank: 'A' }]), ['sortRank', 'sortSuit']);
+});
+
+// The end-to-end version: the hand's own offer list must come from its
+// contents, with no hardcoded pair left in HandPile.
+test('a hand of cards still offers both sorts - unchanged for every existing game', () => {
+  const actions = new PlayerHandPile({ id: 'hand:me', kind: 'hand', ownerId: 'me' })
+    .pileActions({ isOwner: true, cards: [{ pileableType: 'card' }] });
+  assert.ok(actions.includes('sortRank'));
+  assert.ok(actions.includes('sortSuit'));
+});
+
+test('a hand holding chips offers NO sort, and no kind check produced that', () => {
+  const actions = new PlayerHandPile({ id: 'hand:me', kind: 'hand', ownerId: 'me' })
+    .pileActions({ isOwner: true, cards: [{ pileableType: 'chip' }] });
+  assert.ok(!actions.includes('sortRank'), `got ${JSON.stringify(actions)}`);
+  assert.ok(!actions.includes('sortSuit'), `got ${JSON.stringify(actions)}`);
+  assert.ok(actions.includes('changePileType'), 'its other actions are untouched');
+});
+
+test('an empty hand offers no sort rather than two dead buttons', () => {
+  const actions = new PlayerHandPile({ id: 'hand:me', kind: 'hand', ownerId: 'me' })
+    .pileActions({ isOwner: true, cards: [] });
+  assert.ok(!actions.includes('sortRank'));
+  assert.ok(!actions.includes('sortSuit'));
 });

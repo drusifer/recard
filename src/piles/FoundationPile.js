@@ -3,8 +3,8 @@
  * module). Solitaire's foundation: same-suit, strictly ascending,
  * append-only, starting at Ace. `extends RunPile` - the only rule that
  * differs from a general same-suit run is the empty-pile case (must be
- * an Ace, not "anything"); every other member (`cardActions`,
- * `canRemoveCard`, `pileActions`, `resolveDropTarget`, `insertCard`,
+ * an Ace, not "anything"); every other member (`pileableActions`,
+ * `canRemove`, `pileActions`, `resolveDropTarget`, `insertPileable`,
  * `redactCard`) is inherited from `RunPile`/`MeldPile`/`Pile` rather
  * than duplicated.
  */

@@ -19,9 +19,9 @@ import { PILE_TYPES, pileForKind, pileInstanceFor } from './piles/pileTypes.js';
  * presentation half; the reducer remains the source of truth.
  *
  * D42 (Sprint 13/US-47): `actionsForPileKind`'s per-kind switch and
- * `actionsForCard`'s per-kind + visibility/ownership filtering used to
+ * `actionsForPileable`'s per-kind + visibility/ownership filtering used to
  * live here as two functions. They're now `src/piles/*.js`'s
- * `cardActions(pile, card, viewerId)` - one function per type instead
+ * `pileableActions(pile, card, viewerId)` - one function per type instead
  * of a shared switch. `actionsForPileKind` had no real caller outside
  * its own tests (grepped first) - removed rather than kept as a second,
  * now-redundant table; its coverage moved to `tests/piles.test.js`.
@@ -37,7 +37,7 @@ import { PILE_TYPES, pileForKind, pileInstanceFor } from './piles/pileTypes.js';
  * question, not two, once you don't care which kind of actor is asking.
  * `ACTION_SPECS` below is that one table. What's still genuinely
  * separate, correctly so - this does NOT try to unify it - is
- * *offering* (`actionsForCard` vs. `pileLevelActions`: a card's
+ * *offering* (`actionsForPileable` vs. `pileLevelActions`: a card's
  * authorization and a pile's are real, different computations, not the
  * same rule wearing two names) and *rendering* (`ui.js`'s
  * `attachRadialMenu`/`openRadialMenu` (D52) is the shared piece both a
@@ -59,7 +59,7 @@ export const ACTION_SPECS = {
   reveal: { label: 'Turn over', target: null, from: 'table', icon: '👁' },
   // *nit (direct user request): "add a show/hide cardAction to toggle an
   // individual card's show/hide status." `reveal`'s other direction.
-  // Two spec entries, one reducer action (`FLIP_CARD`) - the split
+  // Two spec entries, one reducer action (`FLIP`) - the split
   // exists so the menu can name the direction the card is actually
   // going, which one entry labelled "Show/Hide" could not do.
   // `target: null`, in place, exactly like `reveal`.
@@ -95,7 +95,7 @@ export const ACTION_SPECS = {
     icon: '↻',
   },
   // D34/D35: Draw generalized from a per-card action (dead - deck's
-  // `cardActions` always returns []) to a pile-level one, matching how
+  // `pileableActions` always returns []) to a pile-level one, matching how
   // the user actually described it: hover the DECK, not a specific
   // hidden card. `target`/`from` mirror the card-level shape so
   // `targetsForAction` can drive drop-target highlighting for a dragged
@@ -234,7 +234,7 @@ export const ACTION_SPECS = {
  * @param {string} viewerId
  * @returns {string[]} action ids, in the order they should be offered.
  */
-export function actionsForCard(pile, card, viewerId) {
+export function actionsForPileable(pile, card, viewerId) {
   // An unrecognized `kind` offers nothing rather than silently falling
   // back to the base Pile's real actions (`revivePile`'s own fallback
   // is for reviving a KNOWN-valid state record, not for tolerating a
@@ -243,7 +243,7 @@ export function actionsForCard(pile, card, viewerId) {
   // safely, never grant real drag-and-drop to something the registry
   // doesn't recognize.
   if (!Object.hasOwn(PILE_TYPES, pile.kind)) return [];
-  return pileInstanceFor(pile, viewerId).cardActions(card, viewerId);
+  return pileInstanceFor(pile, viewerId).pileableActions(card, viewerId);
 }
 
 /**
@@ -275,11 +275,11 @@ export function actionsForCard(pile, card, viewerId) {
  * builder used to index `ACTION_SPECS` directly and would have thrown
  * on `spec.icon`.
  *
- * @param {string[]} actionIds ids from `actionsForCard`, in offer order
+ * @param {string[]} actionIds ids from `actionsForPileable`, in offer order
  * @returns {{id: string, text: string, label: string,
  *   destructive: boolean, targeted: boolean}[]}
  */
-export function cardMenuItems(actionIds) {
+export function pileableMenuItems(actionIds) {
   return actionIds.flatMap((id) => {
     const spec = ACTION_SPECS[id];
     if (!spec) return [];

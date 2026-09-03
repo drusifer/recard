@@ -5,7 +5,7 @@
 D21-D23) is historical - decisions are numbered continuously now and
 the highest number is always the current binding state, not a
 particular sprint's scope.
-**Last updated:** 2026-09-02 (D92-D106)
+**Last updated:** 2026-09-03 (D92-D107)
 
 ## Core invariant (direct user request, stated repeatedly - binding on every Pile type, present and future)
 
@@ -34,6 +34,132 @@ still: card identity REDACTION (D7) is gone too - a viewer sees every
 card's real identity, always, not just whether it can be moved. As of
 D85, the same removal reaches the three BULK/pile-level actions that
 still had their own separate authorization gate.
+
+### D107. `Pileable` — the type of a thing in a pile (sprint pileObjects)
+Sprint pileObjects, US-101..105. The user confirmed Chips and Tokens
+have NO behaviour a Card lacks, so this is an abstraction plus a
+demonstration; see `docs/USER_STORIES.md` for the framing and Smith's
+two Gate-1 conditions.
+
+**Shape: mirror `src/piles/` exactly.** `src/pileables/`, a
+`PILEABLE_TYPES` registry, plain records at rest and live instances on
+demand (`pileableFor(item)`), discriminated by a `type` field. This is
+the fifth registry of the same shape (`PILE_TYPES` D42, `ZONE_TYPES`
+D55, `DECK_TYPES` D47, `CARD_FACES` D76, `ACTIONS` D44) and it is chosen
+because the codebase already reads that way, not because a hierarchy is
+inherently better.
+
+`buildDeck` stamps `pileableType: 'card'`, and `pileableFor` defaults an
+absent value to `card` — the same defensive default `faceFor` already
+makes. That is not a compatibility shim: no old code path is kept alive
+alongside a new one, there is one path with a default.
+
+**The discriminator is `pileableType`, not `type`, and that correction
+came from Phase 97's own test run** — which is exactly what that phase
+was sequenced first to do. An RtG card ALREADY has a `type` field: its
+MTG type line, "Creature"/"Land"/"Instant". Stamping `type: 'card'`
+silently overwrote it on all 132 of them, the precise breakage Smith's
+Gate 2 approval said this design made structurally impossible. It was
+caught by an existing test, not by review.
+
+A second collision of the same family came with it: a Pileable is a VIEW
+over its record (`Object.assign(this, record)`), so every record field
+is an own property on the instance — and a card's `face` field shadowed
+a `face()` method, turning it into a string at the moment it was called.
+The method is `faceModule()`. **Any method on a Pileable subclass must
+avoid the record's own field names** (`id`, `type`, `rank`, `suit`,
+`face`, `faceUp`, `owner`, `layout`, `orientation`), which is the
+standing cost of the view-over-record shape and is worth paying for the
+plain-records-at-rest property it buys.
+
+**Two axes, deliberately kept separate.** `type` is what a thing IS and
+drives behaviour (actions, sorting). `face` is how a CARD prints and
+drives content only. `CardPileable.render` delegates to `faceFor`, so
+every RtG card is untouched by this sprint. Collapsing the two was
+considered and rejected: a standard card and an RtG card are the same
+kind of object rendering different content, which is exactly the
+distinction `face` already encodes.
+
+**Rendering reaches shape through the existing class hook.** A face
+already contributes a class to the shell (`card-red`, `card-rtg`), so
+`card-chip` plus CSS makes a chip round. Per Smith's Gate-1 ruling,
+`cardElement` does NOT become type-aware.
+
+**The rename rule** (US-103). Anything that dispatches on, or is a
+method of, the object in a pile is renamed; anything naming a genuinely
+card-specific concept — a face, a deck, dealing, drawing — keeps its
+name, because it genuinely means cards. So `Pile.cardActions` ->
+`pileableActions`, `canRemoveCard` -> `canRemove`, `insertCard`/
+`removeCard` -> `insertPileable`/`removePileable`, `actionsForCard` ->
+`actionsForPileable`, `cardMenuItems` -> `pileableMenuItems`; while
+`CARD_FACES`, `buildDeck`, `DEAL` and `DRAW` keep theirs. No alias, no
+re-export, no deprecated forwarder.
+
+`insertPileable`/`removePileable` rather than the bare `insert`/`remove`
+this entry originally specified — corrected during Phase 98. `'remove'`
+is ALREADY a pile-level action id in the same class, meaning "delete
+this pile" (`Pile.pileActions`, `disabledActions`). A `Pile.remove(id)`
+method meaning "take a thing out of this pile" beside it is a genuine
+ambiguity, not a stylistic one, so the noun earns its place here in a
+way it does not on a reducer action.
+
+`updateCardDragGhost`/`removeCardDragGhost` -> `updateDragGhost`/
+`removeDragGhost`, applying the user's own Gate-2 principle: the noun
+was carrying no information, and the ghost is the ghost of whatever is
+being dragged, which will include a chip.
+
+**Reducer actions drop the object from their name entirely — direct
+user ruling at Gate 2**, and a better answer than either option put to
+them (leave `MOVE`, or rename it `MOVE_PILEABLE`): "how about
+MOVE -> MOVE, FLIP, etc."
+
+`MOVE` -> `MOVE`, `FLIP` -> `FLIP`, `ROTATE` -> `ROTATE`.
+An action names the OPERATION; what it operates on is already in the
+payload, so the noun was never carrying information — which is why
+neither "keep the wrong noun" nor "rename to the right noun" was the
+right shape. `PICKUP` already reads this way and is unchanged, which is
+the precedent.
+
+This also keeps the pile-level actions legible by contrast: `MOVE` moves
+a pileable, `MOVE_PILE` moves a pile, and the distinction is now carried
+by the presence of a noun rather than by which noun. `SPLIT_PILE`,
+`TAKE_PILE` and `ADJUST_PILE_SPREAD` are unchanged for that reason.
+
+`DEAL`, `DRAW` and `SHUFFLE_DECK` keep their names under the same rule
+as the rest of D107: they name genuinely card-and-deck-specific
+operations. You deal cards; you do not deal a chip supply.
+
+The `pileableId` payload field becomes `pileableId`, not bare `id`: it sits
+beside `pileId`, `playerId` and `zoneId` in the same payloads, so a
+noun is doing real work there. Flagged as the one part of this ruling
+extrapolated rather than stated, and cheap to change.
+
+**Sorting derives from contents** (US-104, Smith Condition B). A
+`static sortActions` on the Pileable type — `['sortRank', 'sortSuit']`
+on `CardPileable`, `[]` on Chip and Token — and `Pile.pileActions` asks
+the type of what it holds. No `kind === 'chip'` anywhere. An empty pile
+offers no sort; a mixed pile offers the intersection, which is the only
+answer that is never wrong for something in the pile.
+
+**Distinguisher** (Smith Condition A): `colour` on a Chip, `colour` plus
+a short `label` on a Token. Presentational only — nothing sums,
+compares or orders them, and `sortActions` being empty is what enforces
+that.
+
+**Supply costs nothing in the reducer.** A preset's declared pile is
+already pre-stocked through `buildDeck` (D81), so a chip supply is a new
+DECK_TYPE (`chips`) and a preset entry — `state.js` is not touched at
+all. This is why the supply story is last and small rather than first
+and structural.
+
+**Older entries keep the old names on purpose.** The Phase 99 rename was
+applied with a sweep that initially rewrote `MOVE_CARD` -> `MOVE` inside
+`DECISIONS.md`, `PRD.md` and every historical entry of this file. That
+was reverted: those entries record what was decided AT THE TIME, and
+D12/D13/D19 genuinely said `MOVE_CARD`. A decision record that silently
+adopts today's vocabulary can no longer be trusted to say what was
+actually decided. This entry is the one place the rename lives, which is
+exactly the point of recording it.
 
 ### D106. Pile spread is replicated state, adjusted by Tighten/Loosen
 Direct user *nit: "pile actions for tighten/loosen to adjust the overlap

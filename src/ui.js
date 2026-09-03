@@ -1,17 +1,17 @@
 import { step as touchDragStep, HOLD_MS } from './touchDrag.js';
 import {
-  ACTION_SPECS, cardMenuItems, actionsForCard, pileLevelActions, targetsForAction, resolveDropTargetFor,
+  ACTION_SPECS, pileableMenuItems, actionsForPileable, pileLevelActions, targetsForAction, resolveDropTargetFor,
   disabledPileActionsFor, componentFor,
 } from './pileActions.js';
 import { seatPosition } from './seating.js';
 import { PILE_TYPES } from './piles/pileTypes.js';
 import { ZONE_TYPES } from './zones/zoneTypes.js';
-import { faceFor } from './cards/cardFaces.js';
+import { pileableFor } from './pileables/pileableTypes.js';
 import { CHANGE_PILE_TYPE_KINDS, pileKindLabel, pileInstanceFor } from './piles/pileTypes.js';
 
 /**
  * The card SHELL, shared by every card face (D76). The `<button>`, its
- * `dataset.cardId`, and the click/disabled wiring are identical for all
+ * `dataset.pileableId`, and the click/disabled wiring are identical for all
  * faces - only the CONTENT is dispatched, via `CARD_FACES`. That split
  * is what lets a new card type (Recard the Gathering) exist without the
  * table simulation changing: nothing about how a card is dragged,
@@ -24,13 +24,18 @@ import { CHANGE_PILE_TYPE_KINDS, pileKindLabel, pileInstanceFor } from './piles/
 function cardElement(card, { onClick, disabled, back = false } = {}) {
   const element = document.createElement('button');
   element.type = 'button';
-  const face = faceFor(card);
-  const extraClass = face.className?.(card) ?? '';
+  // D107: the shell dispatches on the Pileable TYPE now, not straight
+  // to a card face. `CardPileable` delegates to `faceFor`, so every
+  // existing face renders through the identical path - which is what
+  // makes it structurally impossible for this sprint to change how a
+  // card looks. The shell itself stays type-blind (Smith Gate 1).
+  const pileable = pileableFor(card);
+  const extraClass = pileable.className();
   element.className = 'card' + (back ? ' card-back' : '') + (extraClass ? ` ${extraClass}` : '');
-  element.dataset.cardId = card.id;
+  element.dataset.pileableId = card.id;
 
   if (back) element.textContent = '🂠';
-  else face.render(element, card);
+  else pileable.render(element);
 
   if (onClick && !disabled) element.addEventListener('click', () => onClick(card));
   else element.disabled = true;
@@ -45,15 +50,15 @@ function cardElement(card, { onClick, disabled, back = false } = {}) {
  * standard size next to its full-size, face-up siblings. `card` may be
  * the redacted `{id, face, faceDown}` shape (`Pile`/`HandPile`
  * `redactCard`) or `null` (a still-hidden card this viewer has no
- * information about at all, e.g. `updateCardDragGhost`'s drag ghost) -
+ * information about at all, e.g. `updateDragGhost`'s drag ghost) -
  * `faceFor` already defaults an absent/unknown `face` to `standard`.
  */
 function cardBackElement(card) {
   const element = document.createElement('div');
-  const extraClass = faceFor(card).className?.(card ?? {}) ?? '';
+  const extraClass = pileableFor(card).className();
   element.className = 'card card-back' + (extraClass ? ` ${extraClass}` : '');
   element.textContent = '🂠';
-  if (card?.id) element.dataset.cardId = card.id;
+  if (card?.id) element.dataset.pileableId = card.id;
   return element;
 }
 
@@ -94,7 +99,7 @@ function makeDragGhost(sourceElement) {
   const rect = face.getBoundingClientRect();
   const ghost = face.cloneNode(true);
   ghost.classList.add('touch-drag-ghost');
-  delete ghost.dataset.cardId; // never hit-testable, never queryable as the real card
+  delete ghost.dataset.pileableId; // never hit-testable, never queryable as the real card
   ghost.style.width = `${rect.width}px`;
   ghost.style.height = `${rect.height}px`;
   document.body.append(ghost);
@@ -662,12 +667,12 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
       const offset = index - center;
       wrapper.style.setProperty('--raise-base', `rotate(${offset * 5}deg) translateY(${offset * offset * 0.08}rem)`);
     }
-    // US-32/33: `data-card-id` makes the wrapper hit-testable for
+    // US-32/33: `data-pileable-id` makes the wrapper hit-testable for
     // drop-region detection; `data-layout` is what style.css keys the
     // stacked/overlapped rendering off, so the visual is driven straight
     // from authoritative state rather than a separate UI-side flag that
     // could drift out of sync with it.
-    wrapper.dataset.cardId = card.id;
+    wrapper.dataset.pileableId = card.id;
     if (card.layout) wrapper.dataset.layout = card.layout;
     // D48/D40: same "state drives the visual" reasoning as `layout` -
     // style.css rotates the card face when this is 'landscape'.
@@ -687,7 +692,7 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
       wrapper.addEventListener('pointerleave', (event) => { if (event.pointerType === 'mouse') onCardLift(card.id, false); });
     }
 
-    // US-28: draggable exactly where MOVE_CARD's own authorization would
+    // US-28: draggable exactly where MOVE's own authorization would
     // allow a drop to succeed - a visible card (already face-up, or my
     // own still-hidden private one) or a redacted-but-unowned card
     // (shared face-down, movable by anyone per US-19 "put or take").
@@ -696,21 +701,21 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
     //
     // D45: was the ad-hoc `!card.faceDown || card.owner === null` check
     // - equivalent for zone cards (verified case-by-case against
-    // `zonePile.cardActions` before changing this), but it never
+    // `zonePile.pileableActions` before changing this), but it never
     // consulted the pile TYPE, so a discard pile's cards (drop-only -
-    // `discardPile.cardActions` is always `[]`) would have shown as
+    // `discardPile.pileableActions` is always `[]`) would have shown as
     // draggable even though every resulting drop is rejected
     // server-side. Reading the real offer table instead is what D34/D42
     // already promised: "the hover affordances... can't drift apart"
     // from the reducer's own authorization.
-    const cardActions = actionsForCard(pile, card, options.viewerId);
+    const pileableActions = actionsForPileable(pile, card, options.viewerId);
     // UX follow-up (direct user request): a hand pile is a real,
     // addressable entry in `allPiles` now - no more synthetic
     // `HAND_PILE_ID` stand-in needed. Hoisted above the drag-only block
     // below so the context menu (US-100/D101) can reuse the same list for
     // its own targeted-action click-to-commit step.
     const piles = allPiles.map((p) => ({ id: p.id, kind: p.kind, ownerId: p.ownerId ?? null }));
-    if (onMoveCard && cardActions.length > 0) {
+    if (onMoveCard && pileableActions.length > 0) {
       wrapper.draggable = true;
       wrapper.addEventListener('dragstart', (event) => {
         event.dataTransfer.setData('text/plain', card.id);
@@ -723,7 +728,7 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
         // hand card offers plain 'move' now, so the hand needs no entry
         // of its own in this list at all.
         highlightDragTargets(
-          cardActions.filter((a) => ['move', 'pickup'].includes(a)),
+          pileableActions.filter((a) => ['move', 'pickup'].includes(a)),
           piles,
           { viewerId: options.viewerId, fromPileId: pileView.id },
         );
@@ -746,9 +751,9 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
     // "may this card do this" condition inline.
     // Phase 55 (T55.1): tap the card itself to reveal it - joining
     // tap-to-play's vocabulary instead of a separate hover button. Same
-    // authorization `actionMenuEl` already used (`actionsForCard`).
+    // authorization `actionMenuEl` already used (`actionsForPileable`).
     // `pile` is the one hoisted to the top of this function (D45).
-    const canReveal = Boolean(options.onReveal) && actionsForCard(pile, card, options.viewerId).includes('reveal');
+    const canReveal = Boolean(options.onReveal) && actionsForPileable(pile, card, options.viewerId).includes('reveal');
     // *nit (2026-08-26), direct user request: "cards are Movable not
     // Actionable" - the hover-popup action row (`attachActionRow`) is
     // gone entirely. `pickup`/`move` already had a real trigger
@@ -757,7 +762,7 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
     // established (Phase 55), applied to the FACE-UP case specifically
     // (`reveal` only ever offers on a still-hidden card, so the two
     // never compete for the same tap).
-    const canRotate = Boolean(options.onRotate) && actionsForCard(pile, card, options.viewerId).includes('rotate');
+    const canRotate = Boolean(options.onRotate) && actionsForPileable(pile, card, options.viewerId).includes('rotate');
 
     // *nit (real bug, found live, D84: "remove card redaction entirely
     // ... TOTAL PERMISSIVE"): the `card.faceDown` branch this used to
@@ -796,10 +801,10 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
 
     // US-100/D101: right-click menu, additive to (not a replacement for)
     // the tap/drag gestures already wired above. Lists every id
-    // `actionsForCard` offers - in-place ones (rotate/reveal/conceal) fire
+    // `actionsForPileable` offers - in-place ones (rotate/reveal/conceal) fire
     // directly; targeted ones (move/pickup) start the destination
     // pick (`beginCardTargetPick`).
-    attachCardContextMenu(wrapper, card, cardActions, piles, pileView.id, options);
+    attachCardContextMenu(wrapper, card, pileableActions, piles, pileView.id, options);
 
     container.append(wrapper);
   }
@@ -807,7 +812,7 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
 
 /**
  * US-100/D101: wires a card's right-click menu, covering every id
- * `actionsForCard` offers for it - in-place (rotate, reveal, conceal) and targeted
+ * `actionsForPileable` offers for it - in-place (rotate, reveal, conceal) and targeted
  * (move, pickup) alike. A card offering none of those keeps the
  * native OS context menu untouched (Smith Gate 1 condition 1 - no
  * dead-end custom menu on a card with nothing to offer at all).
@@ -820,12 +825,12 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
  * pile header's compact button row, where the icons sit in a labelled
  * row and space is tight. A popup menu is neither.
  */
-function attachCardContextMenu(wrapper, card, cardActions, piles, fromPileId, options) {
-  if (cardActions.length === 0) return;
+function attachCardContextMenu(wrapper, card, pileableActions, piles, fromPileId, options) {
+  if (pileableActions.length === 0) return;
 
   wrapper.addEventListener('contextmenu', (event) => {
     event.preventDefault();
-    openCardContextMenu(event.clientX, event.clientY, cardActions, card, piles, fromPileId, options);
+    openCardContextMenu(event.clientX, event.clientY, pileableActions, card, piles, fromPileId, options);
   });
 }
 
@@ -847,10 +852,10 @@ function openCardContextMenu(clientX, clientY, actionIds, card, piles, fromPileI
   const menu = document.createElement('div');
   menu.className = 'pile-action-menu card-context-menu';
   // Every decision about these rows - what each says, which ones need a
-  // destination picked, which need a confirm - is `cardMenuItems`
+  // destination picked, which need a confirm - is `pileableMenuItems`
   // (`pileActions.js`), unit-tested there. This loop is plumbing only:
   // turn each row into a `<button>` and wire its click.
-  for (const { id, text, label, destructive, targeted } of cardMenuItems(actionIds)) {
+  for (const { id, text, label, destructive, targeted } of pileableMenuItems(actionIds)) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'pile-action-menu-item' + (destructive ? ' btn-danger' : '');
@@ -871,7 +876,7 @@ function openCardContextMenu(clientX, clientY, actionIds, card, piles, fromPileI
       closeCardContextMenu();
       if (destructive && !globalThis.confirm(`${ACTION_SPECS[id].hint}\n\nContinue?`)) return;
       // *nit (show/hide): `conceal` dispatches the same `onReveal`
-      // callback - one `FLIP_CARD` reducer action, whichever direction
+      // callback - one `FLIP` reducer action, whichever direction
       // the card is going - but skips `performReveal`'s confirm, which
       // exists to warn before EXPOSING a card. Concealing exposes
       // nothing, so there is nothing to warn about.
@@ -927,7 +932,7 @@ function onContextMenuKeydown(event) {
  * and cards only ever had native drag). Reuses the SAME
  * `highlightDragTargets` a native drag already calls on `dragstart` -
  * one lit-pile vocabulary for "where can this go", not a second one for
- * clicks - and completes through `options.onMoveCard(cardId, pileId)`,
+ * clicks - and completes through `options.onMoveCard(pileableId, pileId)`,
  * the exact callback `dragstart`'s own presence-check already gates on.
  * No new reducer/commit path.
  *
@@ -978,12 +983,12 @@ function closeCardContextMenu() {
  * card body" region reach well under the card into its own buttons.
  */
 function cardBoxesIn(rowElement) {
-  return [...rowElement.querySelectorAll('.middle-card[data-card-id]')].flatMap((wrapper) => {
+  return [...rowElement.querySelectorAll('.middle-card[data-pileable-id]')].flatMap((wrapper) => {
     const face = wrapper.querySelector('.card');
     if (!face) return [];
     const r = face.getBoundingClientRect();
     return [{
-      cardId: wrapper.dataset.cardId,
+      pileableId: wrapper.dataset.pileableId,
       left: r.left, right: r.right, top: r.top, bottom: r.bottom,
       width: r.width, height: r.height,
     }];
@@ -1006,7 +1011,7 @@ function clearDropHints(rowElement) {
 function showDropHint(rowElement, placement) {
   clearDropHints(rowElement);
   if (!placement.targetCardId) return;
-  const target = rowElement.querySelector(`.middle-card[data-card-id="${CSS.escape(placement.targetCardId)}"]`);
+  const target = rowElement.querySelector(`.middle-card[data-pileable-id="${CSS.escape(placement.targetCardId)}"]`);
   if (!target) return;
   if (placement.layout === 'stack') target.classList.add('drop-onto');
   else target.classList.add(placement.side === 'before' ? 'drop-before' : 'drop-after');
@@ -1038,15 +1043,15 @@ function clearPileDragOver(pileElement, row) {
   clearDropHints(row);
 }
 
-function performPileDrop(pileElement, row, pileId, cardId, point, onDropCard, kind) {
+function performPileDrop(pileElement, row, pileId, pileableId, point, onDropCard, kind) {
   clearPileDragOver(pileElement, row);
-  if (!cardId) return;
+  if (!pileableId) return;
   // US-32/33: the drop point decides stack vs. overlap vs. plain
   // append. Aiming at the card being dragged itself is meaningless
   // (it's about to leave that position), so it's treated as open
   // space rather than a self-referential placement.
-  const placement = resolveDropTargetFor(kind, cardBoxesIn(row).filter((b) => b.cardId !== cardId), point);
-  onDropCard(cardId, pileId, placement);
+  const placement = resolveDropTargetFor(kind, cardBoxesIn(row).filter((b) => b.pileableId !== pileableId), point);
+  onDropCard(pileableId, pileId, placement);
 }
 
 /**
@@ -1055,8 +1060,8 @@ function performPileDrop(pileElement, row, pileId, cardId, point, onDropCard, ki
  * so the drop-target wiring below only needs to exist once.
  *
  * US-28: dropping a dragged card here plays it (from hand) or moves it
- * (from another pile) - `opts.onDropCard(cardId, pile.id)` does the
- * MOVE_CARD dispatch (main.js knows where the card currently
+ * (from another pile) - `opts.onDropCard(pileableId, pile.id)` does the
+ * MOVE dispatch (main.js knows where the card currently
  * lives, this file doesn't need to). Additive: tap-to-play and the
  * "Move to…" dropdown are untouched, this is one more way in, not a
  * replacement (Smith Gate 1). The zone highlights while a drag is over
@@ -1559,8 +1564,8 @@ export function renderZonePanel(zoneElement, id, title, piles, allPiles, options
       event.stopPropagation();
       const pileId = pileDragFromDrop(event.dataTransfer);
       if (pileId) { options.onMovePile?.(pileId, id); return; }
-      const cardId = event.dataTransfer.getData('text/plain');
-      if (cardId) options.onDropCardOnZone?.(cardId, id);
+      const pileableId = event.dataTransfer.getData('text/plain');
+      if (pileableId) options.onDropCardOnZone?.(pileableId, id);
     });
   }
 
@@ -1925,8 +1930,8 @@ export function renderDeckStack(container, count, options = {}) {
     // real card id in `dataTransfer`, the same `onDropCard`/
     // `onCardDrag`/`attachTouchDrag` plumbing every other pile's cards
     // already use. No new mechanism, no pile-specific special case -
-    // dropping this wherever it lands dispatches the ordinary MOVE_CARD/
-    // PICKUP/MOVE_CARD path (`dropCardOnPile`, main.js) unchanged, because
+    // dropping this wherever it lands dispatches the ordinary MOVE/
+    // PICKUP/MOVE path (`dropCardOnPile`, main.js) unchanged, because
     // it now carries a real, findable card id.
     if (options.topCard && options.onDropCard) {
       back.draggable = true;
@@ -2128,8 +2133,8 @@ export function renderRulesPanel(container, rulesReference) {
  * (a card can appear once per zone it's currently in - normally just
  * one place, but this stays correct regardless). Cosmetic only.
  */
-export function setCardLifted(cardId, active) {
-  const els = document.querySelectorAll(`[data-card-id="${CSS.escape(cardId)}"]`);
+export function setCardLifted(pileableId, active) {
+  const els = document.querySelectorAll(`[data-pileable-id="${CSS.escape(pileableId)}"]`);
   for (const element of els) element.classList.toggle('card-lifted', active);
 }
 
@@ -2167,7 +2172,7 @@ export function removeRemoteCursor(container, playerId) {
  * viewer - D19's privacy rule, enforced by the sender never including a
  * resolvable id in the first place, not by this function).
  */
-export function updateCardDragGhost(container, playerId, card, x, y) {
+export function updateDragGhost(container, playerId, card, x, y) {
   let element = container.querySelector(`[data-card-drag-id="${CSS.escape(playerId)}"]`);
   if (!element) {
     element = document.createElement('div');
@@ -2181,7 +2186,7 @@ export function updateCardDragGhost(container, playerId, card, x, y) {
   element.style.top = `${y * 100}%`;
 }
 
-export function removeCardDragGhost(container, playerId) {
+export function removeDragGhost(container, playerId) {
   container.querySelector(`[data-card-drag-id="${CSS.escape(playerId)}"]`)?.remove();
 }
 

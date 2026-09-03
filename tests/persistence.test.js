@@ -23,7 +23,7 @@ function playedGame() {
   state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 5 });
   state = reduce(state, { type: 'CREATE_ZONE', name: 'Discard' });
   state = reduce(state, { type: 'ADJUST_SCORE', targetPlayerId: 'g', delta: 1 });
-  state = reduce(state, { type: 'MOVE_CARD', playerId: 'h', cardId: state.piles.find((p) => p.kind === 'hand').cards[0].id , toPileId: 'table'});
+  state = reduce(state, { type: 'MOVE', playerId: 'h', pileableId: state.piles.find((p) => p.kind === 'hand').cards[0].id , toPileId: 'table'});
   return state;
 }
 

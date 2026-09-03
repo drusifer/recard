@@ -30,7 +30,7 @@ test('BattlefieldPile: a permanent can be tapped, moved and picked up', () => {
   // Tapping IS `rotate` (D76 note): the battlefield is the one pile
   // where it's the primary interaction, so it must stay offered.
   const card = { id: 'c1', faceUp: true, owner: null };
-  const actions = new BattlefieldPile({ kind: 'battlefield' }).cardActions(card, 'p1');
+  const actions = new BattlefieldPile({ kind: 'battlefield' }).pileableActions(card, 'p1');
   assert.ok(actions.includes('rotate'));
   assert.ok(actions.includes('move'));
   assert.ok(actions.includes('pickup'));
@@ -52,13 +52,13 @@ test('BattlefieldPile: a non-owner of a personal battlefield gets nothing', () =
 // --- ExilePile ---------------------------------------------------------
 
 // *nit (direct user request, reversed): "exile is one-way" used to mean
-// no card action at all (`cardActions` always `[]`). `docs/
+// no card action at all (`pileableActions` always `[]`). `docs/
 // ARCHITECTURE.md`'s "Core invariant" forbids that - drag-and-drop is
 // always available, exile included. Exiled cards ARE face-up, and now
 // get the same reveal/pickup/move/rotate as any other visible card.
 test('ExilePile: exiled cards are face-up and get the same card actions as any other pile', () => {
   const faceUp = { id: 'c1', faceUp: true, owner: null };
-  assert.deepEqual(new ExilePile({ kind: 'exile' }).cardActions(faceUp, 'p1'), ['conceal', 'pickup', 'move', 'rotate']);
+  assert.deepEqual(new ExilePile({ kind: 'exile' }).pileableActions(faceUp, 'p1'), ['conceal', 'pickup', 'move', 'rotate']);
 });
 
 test('ExilePile: never offers take — exile cannot be scooped back', () => {
@@ -71,12 +71,12 @@ test('ExilePile: never offers take — exile cannot be scooped back', () => {
 
 test('StackPile: is last-in-first-out — a new spell goes on top', () => {
   const pile = { id: 's', kind: 'stack', cards: [{ id: 'first' }] };
-  const after = new StackPile(pile).insertCard({ id: 'second' });
+  const after = new StackPile(pile).insertPileable({ id: 'second' });
   assert.equal(after.cards[0].id, 'second', 'most recent resolves first');
 });
 
 test('StackPile: the top item can be taken off to resolve it', () => {
-  const actions = new StackPile({ kind: 'stack' }).cardActions({ id: 'c', faceUp: true }, 'p1');
+  const actions = new StackPile({ kind: 'stack' }).pileableActions({ id: 'c', faceUp: true }, 'p1');
   assert.ok(actions.includes('move'), 'resolving = moving it to wherever it goes');
 });
 

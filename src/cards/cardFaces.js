@@ -16,7 +16,7 @@
  * preset's rendering literally the same code path it always used.
  *
  * A face renders CONTENT ONLY. The card shell (`<button class="card">`,
- * its `dataset.cardId`, and every drag/click/rotate behaviour bound to
+ * its `dataset.pileableId`, and every drag/click/rotate behaviour bound to
  * it) stays in `ui.js` and is identical for all faces — that's what
  * makes a new face incapable of breaking table interaction.
  */
