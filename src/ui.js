@@ -287,6 +287,28 @@ function attachTouchDrag(sourceElement, card, context) {
 // never disagree with the rule.
 
 /**
+ * US-100/D101: where a cursor-anchored popup (the card context menu) should
+ * actually render so it never spills off-screen - pure and DOM-free like
+ * `pileActions.js`, so it's directly testable without a browser
+ * (`tests/ui.test.js`). Shifts left/up just enough to fit; if the menu is
+ * bigger than the viewport itself, pins to the origin rather than going
+ * negative (a popup partly off the TOP-left is worse than one that simply
+ * can't fully fit).
+ *
+ * @param {number} x cursor x (where the menu would naively open)
+ * @param {number} y cursor y
+ * @param {{width: number, height: number}} size the menu's own footprint
+ * @param {{width: number, height: number}} viewport
+ * @returns {{x: number, y: number}}
+ */
+export function clampMenuPosition(x, y, size, viewport) {
+  return {
+    x: Math.max(0, Math.min(x, viewport.width - size.width)),
+    y: Math.max(0, Math.min(y, viewport.height - size.height)),
+  };
+}
+
+/**
 Drops any in-progress drag-target highlighting.
 */
 export function clearPileTargets() {
@@ -656,12 +678,14 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
     // already promised: "the hover affordances... can't drift apart"
     // from the reducer's own authorization.
     const cardActions = actionsForCard(pile, card, options.viewerId);
+    // UX follow-up (direct user request): a hand pile is a real,
+    // addressable entry in `allPiles` now - no more synthetic
+    // `HAND_PILE_ID` stand-in needed. Hoisted above the drag-only block
+    // below so the context menu (US-100/D101) can reuse the same list for
+    // its own targeted-action click-to-commit step.
+    const piles = allPiles.map((p) => ({ id: p.id, kind: p.kind, ownerId: p.ownerId ?? null }));
     if (onMoveCard && cardActions.length > 0) {
       wrapper.draggable = true;
-      // UX follow-up (direct user request): a hand pile is a real,
-      // addressable entry in `allPiles` now - no more synthetic
-      // `HAND_PILE_ID` stand-in needed.
-      const piles = allPiles.map((p) => ({ id: p.id, kind: p.kind, ownerId: p.ownerId ?? null }));
       wrapper.addEventListener('dragstart', (event) => {
         event.dataTransfer.setData('text/plain', card.id);
         // D51: every pile (and the hand, if this card is pickup-eligible)
@@ -735,8 +759,147 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
     if (canRotate) face.classList.add('rotatable');
     wrapper.append(face);
 
+    // US-100/D101: right-click menu, additive to (not a replacement for)
+    // the tap/drag gestures already wired above. Lists every id
+    // `actionsForCard` offers - in-place ones (rotate/reveal) fire
+    // directly; targeted ones (move/pickup/play) start the destination
+    // pick (`beginCardTargetPick`).
+    attachCardContextMenu(wrapper, card, cardActions, piles, pileView.id, options);
+
     container.append(wrapper);
   }
+}
+
+/**
+ * US-100/D101: wires a card's right-click menu, covering every id
+ * `actionsForCard` offers for it - in-place (rotate, reveal) and targeted
+ * (move, pickup, play) alike. A card offering none of those keeps the
+ * native OS context menu untouched (Smith Gate 1 condition 1 - no
+ * dead-end custom menu on a card with nothing to offer at all).
+ *
+ * Reuses `applyIconButton` so a menu item looks/behaves exactly like the
+ * same action's pile-header button (icon, tooltip, aria-label, and the
+ * same destructive-confirm gate `renderActionHeader` uses) - one visual
+ * contract for "here is a button for this action id", not a second one
+ * invented for menus.
+ */
+function attachCardContextMenu(wrapper, card, cardActions, piles, fromPileId, options) {
+  if (cardActions.length === 0) return;
+
+  wrapper.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    openCardContextMenu(event.clientX, event.clientY, cardActions, card, piles, fromPileId, options);
+  });
+}
+
+/**
+ * Builds and shows the actual popup, positioned at the cursor and clamped
+ * on-screen (`clampMenuPosition`). Appended to `document.body` rather than
+ * the card's own wrapper so it's never clipped by a pile's overflow, same
+ * reasoning `pileElement` lookups already rely on for cross-cutting UI.
+ */
+function openCardContextMenu(clientX, clientY, actionIds, card, piles, fromPileId, options) {
+  closeCardContextMenu();
+
+  // Reuses `.pile-action-menu`/`.pile-action-menu-item` (`style.css`) -
+  // the SAME visual list style.js already gives the EnumAction menu
+  // (`buildEnumActionMenu`) - and layers `.card-context-menu` on top only
+  // to override the anchoring (fixed at the cursor, not `absolute` under
+  // a `<details>`). Direct user ask: card actions should reuse existing
+  // *Actions classes, not invent a parallel look.
+  const menu = document.createElement('div');
+  menu.className = 'pile-action-menu card-context-menu';
+  for (const id of actionIds) {
+    const spec = ACTION_SPECS[id];
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'pile-action-menu-item' + (spec.destructive ? ' btn-danger' : '');
+    applyIconButton(button, spec);
+    button.addEventListener('click', (event) => {
+      event.stopPropagation();
+      closeCardContextMenu();
+      if (spec.destructive && !globalThis.confirm(`${spec.hint}\n\nContinue?`)) return;
+      if (id === 'reveal') performReveal(card, options.viewerId, options.onReveal);
+      else if (id === 'rotate') options.onRotate?.(card.id);
+      // Phase 2 (D101): a targeted action (move/pickup/play) has no
+      // in-place effect - it needs a destination, chosen next.
+      else if (spec.target !== null && spec.target !== undefined) {
+        beginCardTargetPick(id, card, piles, fromPileId, options);
+      }
+    });
+    menu.append(button);
+  }
+  document.body.append(menu);
+
+  const rect = menu.getBoundingClientRect();
+  const pos = clampMenuPosition(clientX, clientY, { width: rect.width, height: rect.height },
+    { width: globalThis.innerWidth, height: globalThis.innerHeight });
+  menu.style.left = `${pos.x}px`;
+  menu.style.top = `${pos.y}px`;
+
+  // Dismiss on Escape or a click anywhere outside the menu. Listeners are
+  // added on the NEXT tick (not synchronously) so the `contextmenu` event
+  // that opened this menu doesn't itself get read as the "outside click"
+  // that closes it.
+  setTimeout(() => {
+    document.addEventListener('click', closeCardContextMenu, { once: true });
+    document.addEventListener('keydown', onContextMenuKeydown);
+  }, 0);
+}
+
+function onContextMenuKeydown(event) {
+  if (event.key === 'Escape') closeCardContextMenu();
+}
+
+/**
+ * Phase 2 (D101): the destination-choice step a targeted menu action
+ * (move/pickup/play) needs, which no click-based mechanism provided
+ * before this (D52's radial targeting was retired for pile/zone actions,
+ * and cards only ever had native drag). Reuses the SAME
+ * `highlightDragTargets` a native drag already calls on `dragstart` -
+ * one lit-pile vocabulary for "where can this go", not a second one for
+ * clicks - and completes through `options.onMoveCard(cardId, pileId)`,
+ * the exact callback `dragstart`'s own presence-check already gates on.
+ * No new reducer/commit path.
+ *
+ * The commit listener runs in the CAPTURE phase and calls
+ * `stopPropagation` when the click lands on a lit pile - otherwise a
+ * click that both picks a destination AND happens to land on one of ITS
+ * cards would also fire that other card's own tap gesture (reveal/
+ * rotate) in the same click. A click that misses every lit pile just
+ * cancels silently, same as dismissing the menu by clicking outside it.
+ */
+function beginCardTargetPick(actionId, card, piles, fromPileId, options) {
+  highlightDragTargets([actionId], piles, { viewerId: options.viewerId, fromPileId });
+
+  const cancelOnEscape = (event) => {
+    if (event.key !== 'Escape') return;
+    document.removeEventListener('click', commit, true);
+    clearPileTargets();
+  };
+  const commit = (event) => {
+    document.removeEventListener('keydown', cancelOnEscape);
+    const pileEl = event.target.closest?.('.pile-section.pile-target[data-pile-id]');
+    if (pileEl) {
+      event.stopPropagation();
+      event.preventDefault();
+    }
+    clearPileTargets();
+    if (pileEl) options.onMoveCard?.(card.id, pileEl.dataset.pileId);
+  };
+  // Same next-tick deferral as the menu's own dismiss listener - the
+  // click that closed the menu (or the escape-hatch from a `contextmenu`
+  // event on some platforms) must not double as this pick's own commit.
+  setTimeout(() => {
+    document.addEventListener('click', commit, { once: true, capture: true });
+    document.addEventListener('keydown', cancelOnEscape, { once: true });
+  }, 0);
+}
+
+function closeCardContextMenu() {
+  document.querySelector('.card-context-menu')?.remove();
+  document.removeEventListener('click', closeCardContextMenu);
+  document.removeEventListener('keydown', onContextMenuKeydown);
 }
 
 /**

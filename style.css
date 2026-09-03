@@ -1965,6 +1965,20 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   content: ' ✓';
 }
 
+/* US-100/D101: the card right-click menu (`ui.js`'s `openCardContextMenu`)
+   reuses `.pile-action-menu`/`.pile-action-menu-item` above verbatim for
+   its look - this class only overrides the ANCHORING, from "absolute
+   under a `<details>` toggle" to "fixed at the cursor" (`menu.style.left`/
+   `.top` are set inline, in viewport px, per click - see
+   `clampMenuPosition`). */
+.card-context-menu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  margin-top: 0;
+}
+
 /* *nit (2026-08-26), direct user request ("cards are Movable not
    Actionable"): the card hover-popup (`.card-action-row`, `ui.js`'s
    `attachActionRow`) and its follow-mode label (`.radial-follow-ghost`,

@@ -544,3 +544,167 @@ npm run lint:style
 ℹ skipped 0
 ℹ todo 0
 ℹ duration_ms 1220.635432
+
+---
+[<small>2026-09-02 16:15:56</small>] [**User**]->[**all**] *close-out*:
+ Session close-out before /clear: nothing in-flight, 513/513 green, lint baseline unchanged, main/dev/origin all in sync at 6c73f0c. Fixed a real staleness gap found while prepping: Neo's and Morpheus's state files had stale terminal 'Next Steps' sections (pre-dating MERGE_PILE/reconnect-fix work) sitting after newer content - corrected. All 4 active personas' state files confirmed current.
+
+---
+[<small>2026-09-02 16:58:41</small>] [**User**]->[**all**] *request*:
+ *impl cardActions (rotate, move, hide/show etc use similar/existing *Actions classes) interface. Card actions invoked via right-click menu instead of a top bar like PileActions.
+
+---
+[<small>2026-09-02 16:59:30</small>] [**Cypher**]->[**all**] *pm plan sprint*:
+ Entering: *pm plan sprint - card actions context menu.
+
+---
+[<small>2026-09-02 16:59:51</small>] [**Cypher**]->[**Smith**] *pm handoff*:
+ US-100 Right-click card actions: player right-clicks an actionable card (per actionsForCard) to get a context menu of its actions (rotate/pickup/play/move/reveal), reusing ACTION_SPECS + existing confirm/destructive rules. In-place actions (rotate/reveal) fire on click; targeted actions (move/pickup/play) enter existing drag-target-highlight flow. Existing tap/drag gestures stay as-is (menu is additive). Desktop-only (mouse), no touch long-press. Pile-level header bar unchanged. @Smith *user review US-100
+
+---
+[<small>2026-09-02 17:00:12</small>] [**Smith**]->[**all**] *user review*:
+ Entering: *user review US-100.
+
+---
+[<small>2026-09-02 17:00:22</small>] [**Smith**]->[**Morpheus**] *user approve*:
+ *user approve US-100 with 2 conditions: (1) only preventDefault the native context menu on cards with 1+ actions - a card with none shows the OS menu as before, no dead-end custom menu; (2) selecting move/pickup/play needs a real destination-choice step since no click-based targeting exists today (D52's radial was retired, only native drag highlights targets) - Morpheus must design that, not assume it's free. Escape/click-elsewhere closes the menu. @Morpheus *lead arch sprint
+
+---
+[<small>2026-09-02 17:00:56</small>] [**Morpheus**]->[**all**] *lead arch sprint*:
+ Entering: *lead arch sprint - US-100 card context menu.
+
+---
+[<small>2026-09-02 17:01:25</small>] [**Morpheus**]->[**Smith**] *lead handoff*:
+ D101 recorded: card ctx-menu = new ui.js fn (attachCardContextMenu), not a component (per-card, not pile/zone). rotate/reveal fire in-place same handlers as tap. move/pickup/play reuse highlightDragTargets + a one-shot click-to-commit via existing onMoveCard - no new commit path. Rejected: reviving a radial/drag-sim picker (D52 already killed that pattern). Full text: agents/morpheus.docs/D101_card_context_menu_arch.md. @Smith *user feedback D101
+
+---
+[<small>2026-09-02 17:01:29</small>] [**Smith**]->[**all**] *user feedback*:
+ Entering: *user feedback D101.
+
+---
+[<small>2026-09-02 17:01:38</small>] [**Smith**]->[**Mouse**] *user approve*:
+ *user approve D101. Reusing highlightDragTargets' existing visual cue for the click-to-target step is right - same affordance vocabulary as drag, no new visual language to learn. One ask for Neo: clamp menu position to viewport (cursor near an edge). No blockers. @Mouse *sm plan sprint
+
+---
+[<small>2026-09-02 17:01:42</small>] [**Mouse**]->[**all**] *sm plan sprint*:
+ Entering: *sm plan sprint - US-100.
+
+---
+[<small>2026-09-02 17:01:50</small>] [**Mouse**]->[**Morpheus**] *sm handoff*:
+ Sprint plan: Phase 1 = in-place actions (rotate/reveal) via right-click menu: contextmenu wiring gated on cardActions.length>0, menu render/position/dismiss, styles, tests. Phase 2 = targeted actions (move/pickup/play): highlight+one-shot click-to-commit via onMoveCard, tests. @Morpheus *lead review sprint plan
+
+---
+[<small>2026-09-02 17:01:55</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Plan approved - two phases match D101 exactly, each small/testable. Phase 1 ready. @Neo *swe impl phase-1
+
+---
+[<small>2026-09-02 17:02:01</small>] [**Neo**]->[**all**] *swe impl phase-1*:
+ Entering: *swe impl phase-1 (card context menu, in-place actions).
+
+---
+[<small>2026-09-02 17:05:38</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 1 impl: attachCardContextMenu (ui.js) wired in renderPileCards, contextmenu gated on 1+ in-place actions (Smith cond.1). Menu reuses .pile-action-menu/-item verbatim (Cypher's literal ask: reuse *Actions classes), .card-context-menu just overrides anchoring to fixed@cursor via new pure clampMenuPosition (TDD, 4 new tests). 517/517 green. @Trin *qa uat phase-1
+
+---
+[<small>2026-09-02 17:06:13</small>] [**Trin**]->[**all**] *qa uat phase-1*:
+ Entering: *qa uat phase-1.
+
+---
+[<small>2026-09-02 17:06:53</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase-1: 517/517 (was 513+4 new). Mutation-killed clampMenuPosition's guard, restored clean. Reviewed attachCardContextMenu/openCardContextMenu by hand - correct: single-menu invariant, contextmenu-vs-click race avoided via setTimeout(0), item click stops propagation. Gap (same class as rest of ui.js): the DOM wiring itself has no jsdom coverage, only code review - consistent with project convention (pure logic tested, DOM wiring isn't). @Morpheus *lead review phase-1
+
+---
+[<small>2026-09-02 17:06:58</small>] [**Morpheus**]->[**all**] *lead review phase-1*:
+ Entering: *lead review phase-1.
+
+---
+[<small>2026-09-02 17:07:08</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Review phase-1 PASS: matches D101 exactly - new ui.js fn not a component, reuses pile-action-menu/-item verbatim, in-place dispatch identical to existing tap handlers, pure clamp math correctly isolated/tested. piles hoist is harmless prep for phase-2 (unused this phase). No blockers. @Neo *swe impl phase-2
+
+---
+[<small>2026-09-02 17:07:12</small>] [**Neo**]->[**all**] *swe impl phase-2*:
+ Entering: *swe impl phase-2 (targeted card actions: move/pickup/play via click-to-commit).
+
+---
+[<small>2026-09-02 17:08:45</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 2 impl: menu now lists ALL cardActions. Targeted ids (move/pickup/play) call new beginCardTargetPick - reuses highlightDragTargets, commits via existing onMoveCard(cardId,pileId) on a capture-phase click of a lit pile (stopPropagation only when it lands on one, so it doesn't also fire that pile's own card taps). Escape/outside-click cancels. 517/517 green. @Trin *qa uat phase-2
+
+---
+[<small>2026-09-02 17:08:51</small>] [**Trin**]->[**all**] *qa uat phase-2*:
+ Entering: *qa uat phase-2.
+
+---
+[<small>2026-09-02 17:09:10</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase-2: 517/517 green (no new pure logic to add tests for - beginCardTargetPick is DOM event wiring, same untested-by-convention class as the rest of ui.js, verified by hand). Traced escape-mid-pick, outside-click-mid-pick, and opening a 2nd menu mid-pick (self-heals: stray click misses .pile-target, no stopPropagation, 2nd menu behaves normally). No blockers. @Morpheus *lead review phase-2
+
+---
+[<small>2026-09-02 17:09:15</small>] [**Morpheus**]->[**all**] *lead review phase-2*:
+ Entering: *lead review phase-2 (last phase).
+
+---
+[<small>2026-09-02 17:09:21</small>] [**Morpheus**]->[**Oracle**] *lead handoff*:
+ Review phase-2 PASS: beginCardTargetPick matches D101 - reuses highlightDragTargets + existing onMoveCard, no new commit path, no radial revival. Capture-phase stopPropagation-only-on-hit is a sound, minimal fix for the double-fire edge Trin traced. Both phases done, matches Cypher's US-100 AC in full. @Oracle *ora groom
+
+---
+[<small>2026-09-02 17:09:27</small>] [**Oracle**]->[**all**] *ora groom*:
+ Entering: *ora groom - US-100 card context menu.
+
+---
+[<small>2026-09-02 17:10:51</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 517
+ℹ suites 0
+ℹ pass 517
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1306.865922
+
+---
+[<small>2026-09-02 17:10:57</small>] [**Oracle**]->[**Smith**] *ora handoff*:
+ D101 backfilled to ARCHITECTURE.md (right-click card menu, reuses pile-action-menu classes + highlightDragTargets/onMoveCard for targeted actions). memory.md row added. Header stamp -> D92-D101. Removed the interim morpheus.docs scratch file now that ARCHITECTURE.md has the real text. 517/517 via make test. @Smith *user test US-100
+
+---
+[<small>2026-09-02 17:11:18</small>] [**Smith**]->[**all**] *user test*:
+ Entering: *user test US-100.
+
+---
+[<small>2026-09-02 17:11:24</small>] [**Smith**]->[**User**] *user test*:
+ Disclosure: no browser-automation tool is connected this session, and a real 2-peer WebRTC session isn't worth scripting headless for this size of change - I could NOT click-test this live. Confidence is from code review: targeted actions commit through the exact onMoveCard/highlightDragTargets path native drag already exercises in prod. Recommend user do one 30s manual right-click check. @User
+
+---
+[<small>2026-09-02 17:11:31</small>] [**Smith**]->[**all**] *user approve*:
+ *user approve US-100 (with the live-click caveat above disclosed to the user). No UX blockers found in review. @all *sprint retro
+
+---
+[<small>2026-09-02 17:11:39</small>] [**Neo**]->[**Cypher**] *retro*:
+ Neo retro: reusing highlightDragTargets/onMoveCard for the click-flow avoided a second commit path entirely - phases stayed small (1-3 tasks) as planned. Friction: none real; the fromPileId threading was the only signature churn. Backlog: none from me.
+
+---
+[<small>2026-09-02 17:11:39</small>] [**Trin**]->[**Cypher**] *retro*:
+ Trin retro: coverage gap is real and disclosed, not hidden - ui.js DOM wiring has zero automated tests project-wide, this feature is no worse/better than that baseline. Backlog: an e2e/jsdom harness for ui.js interaction wiring is worth scoping someday (not blocking).
+
+---
+[<small>2026-09-02 17:11:49</small>] [**Morpheus**]->[**Cypher**] *retro*:
+ Morpheus retro: D101 held up unchanged through both phases - the 'reuse existing commit paths, add only the click-to-target step' framing was right. Nothing to revisit.
+
+---
+[<small>2026-09-02 17:11:49</small>] [**Oracle**]->[**Cypher**] *retro*:
+ Oracle retro: D101 recorded same-session as the work, not batched at close - no drift risk here. Backlog: e2e.smoke.mjs is still gone (D60) and 2+ memory files still cite it as if it exists - stale, worth a grooming pass.
+
+---
+[<small>2026-09-02 17:11:49</small>] [**Mouse**]->[**Cypher**] *retro*:
+ Mouse retro: 2-phase split (in-place / targeted) was the right cut - each phase shipped independently reviewable, no overflow. Backlog: none.
+
+---
+[<small>2026-09-02 17:11:49</small>] [**Smith**]->[**Cypher**] *retro*:
+ Smith retro: real UX gap - live click-testing wasn't possible this session (no browser tool connected). Backlog: get a browser-automation tool wired up for this project so *user test stops being review-only for interaction-heavy stories.
+
+---
+[<small>2026-09-02 17:11:56</small>] [**Cypher**]->[**all**] *retro*:
+ Cypher retro: US-100 AC delivered in full (right-click menu, reuses *Actions classes as asked, no top bar). Backlog added: browser-automation tooling for live UAT (Smith), stale e2e.smoke.mjs references cleanup (Oracle).
+
+---
+[<small>2026-09-02 17:11:56</small>] [**Cypher**]->[**all**] *pm launch*:
+ *pm launch US-100. Card actions (rotate/reveal/move/pickup/play) now reachable via right-click menu, reusing pile-action-menu styling and the existing drag commit path. Sprint complete. See docs/ARCHITECTURE.md D101.

@@ -5,7 +5,7 @@
 D21-D23) is historical - decisions are numbered continuously now and
 the highest number is always the current binding state, not a
 particular sprint's scope.
-**Last updated:** 2026-09-01 (D92-D100)
+**Last updated:** 2026-09-02 (D92-D101)
 
 ## Core invariant (direct user request, stated repeatedly - binding on every Pile type, present and future)
 
@@ -34,6 +34,58 @@ still: card identity REDACTION (D7) is gone too - a viewer sees every
 card's real identity, always, not just whether it can be moved. As of
 D85, the same removal reaches the three BULK/pile-level actions that
 still had their own separate authorization gate.
+
+### D101. Card actions are offered via a right-click context menu, reusing the pile header's own action classes/table
+Direct user request (US-100): card-level actions (rotate, move, pickup,
+play - whatever `actionsForCard`/`pileActions.js` already offers) should
+be reachable through a right-click context menu, explicitly NOT a
+permanent bar across the top of the card the way `HeaderActions`/
+`renderActionHeader` gives piles - the *nit that removed the old
+hover-popup action row (2026-08-26, "cards are Movable not Actionable")
+still stands; this is a click-triggered menu, not a persistent control.
+
+Implementation is a new `ui.js` function (`attachCardContextMenu`/
+`openCardContextMenu`), the same "bespoke DOM-building function"
+convention every other card-rendering piece in `renderPileCards` already
+uses - not a Web Component, since this is per-CARD interaction wiring,
+not pile/zone UI (the "new pile/zone UI goes in a Web Component" rule
+doesn't reach here). The menu's own look is `.pile-action-menu`/
+`.pile-action-menu-item` (`style.css`) reused verbatim - the same list
+style `buildEnumActionMenu` already gives the pile header's
+`changePileType` control - with one small `.card-context-menu` override
+for anchoring (fixed at the cursor, clamped on-screen by the new pure
+`clampMenuPosition`, instead of `absolute` under a `<details>`). One
+visual vocabulary for "a button offering action X," never a second one
+invented for menus specifically.
+
+Two action shapes, two dispatches:
+- **In-place** (`target: null` - rotate, reveal): fires immediately on
+  click, calling the exact same handler the existing tap gesture already
+  calls. Tap-to-rotate/tap-to-reveal stay reachable too - the menu is
+  additive, not a replacement.
+- **Targeted** (`target` set - move, pickup, play): no click-based
+  destination picker existed before this (D52's radial targeting mode
+  was retired 2026-08-24 for pile/zone actions, and cards only ever had
+  native drag). New minimal mechanism (`beginCardTargetPick`): reuses
+  the same `highlightDragTargets` a native `dragstart` already calls to
+  light up eligible piles, then a one-shot, capture-phase document click
+  either lands on a lit pile - calling the exact same
+  `options.onMoveCard(cardId, pileId)` callback `dragstart`'s own
+  presence-check already gates on, no new commit path - or misses,
+  which cancels silently (same as dismissing the menu by clicking
+  outside it). `Escape` cancels either way. The capture-phase
+  `stopPropagation` (only when the click actually lands on a lit pile)
+  exists so picking a destination pile doesn't ALSO fire a tap gesture
+  on whatever card happens to be under the cursor inside that pile.
+
+A card offering zero actions never gets `preventDefault()` on
+`contextmenu` - the OS menu still shows, rather than a dead custom menu
+with nothing in it (Smith Gate 1).
+
+Rejected: reviving a real drag-simulation/radial pointer-follow mode for
+the destination step - D52 already established a hover/radial mode is
+worse here than static highlighted targets once click-to-commit gives
+the same end result for less code.
 
 ### D100. A returning player's identity is trusted unconditionally; the old anti-hijack guard is gone
 Direct user report: rejoining as the "joiner" showed the player their
