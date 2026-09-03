@@ -53,6 +53,28 @@
  */
 import { resolveDropTarget as resolveHaloTarget } from '../dropTarget.js';
 
+/**
+ * How far a pile's cards overlap each other, as a fraction of a card's
+ * width - 0 is edge-to-edge with no overlap, 0.85 is a tight stack
+ * showing only a sliver of each covered card.
+ *
+ * *nit (direct user request): "pile actions for tighten/loosen to adjust
+ * the overlap on fan and meld piles or runs or whatever." This used to
+ * be a hardcoded CSS constant (`.fan-row .middle-card + .middle-card`'s
+ * `0.65`), the same for every pile and adjustable by nobody. Exported
+ * so `style.css`'s formula, the reducer's clamp and the tests all read
+ * one set of numbers.
+ *
+ * The MAXIMUM is not 1: at 1 a covered card is completely hidden, so a
+ * spread pile would look identical to a stack and its cards would stop
+ * being individually clickable. 0.85 keeps a sliver of every card, which
+ * is the whole point of laying them out rather than stacking them.
+ */
+export const MIN_SPREAD = 0;
+export const MAX_SPREAD = 0.85;
+export const SPREAD_STEP = 0.1;
+
+
 function withLayout(card, layout) {
   const { layout: _previous, ...rest } = card;
   return layout ? { ...rest, layout } : rest;
@@ -76,10 +98,20 @@ export class Pile {
    * property (a fact ABOUT the type, not about any one instance). */
   static visibility = 'mixed';
 
-  /** D45: a legal PLAY/MOVE_CARD destination. True by default - kept
+  /** D45: a legal MOVE_CARD destination. True by default - kept
    * overridable so `CREATE_ZONE`'s eligibility guard stays meaningful
    * (`HandPile` overrides it `false`). */
   static tableSide = true;
+
+  /** How far this KIND of pile overlaps its cards by default, as a
+   * fraction of a card's width (MIN_SPREAD/MAX_SPREAD above).
+   * A static fact about the type, same shape as `visibility`/
+   * `tableSide`/`component` above. The base default is 0 - a plain
+   * pile lays its cards out side by side with the row's own gap and no
+   * overlap, which is exactly how it rendered before Tighten/Loosen
+   * existed, so an unadjusted pile is unchanged. `HandPile` overrides
+   * it with the fan's own 0.65. */
+  static defaultSpread = 0;
 
   /** Which Web Component renders this pile's row - a component renders
    * a render SHAPE, not a 1:1 class mapping, so several classes may
@@ -98,13 +130,21 @@ export class Pile {
    * whatever the caller passes (matches the pre-D93 record shape
    * exactly, so `revivePile(existingPlainPile)` round-trips unchanged).
    */
-  constructor({ id, kind, name, ownerId = null, cards = [], zoneId } = {}) {
+  constructor({ id, kind, name, ownerId = null, cards = [], zoneId, spread } = {}) {
     this.id = id;
     this.kind = kind;
     this.name = name;
     this.ownerId = ownerId;
     this.cards = cards;
     this.zoneId = zoneId;
+    // *nit (Tighten/Loosen): `undefined` when never adjusted, which is
+    // what lets `effectiveSpread`/the CSS fall back to the TYPE's own
+    // default rather than freezing every pile at a number. Must be
+    // carried here and in `toJSON` below, not just in `getView` -
+    // `insertCard`/`removeCard` rebuild a pile FROM `toJSON()`, so a
+    // field missing from either one is silently wiped the next time a
+    // card moves in or out of the pile.
+    this.spread = spread;
   }
 
   /** Free serialization - `JSON.stringify` calls this automatically on
@@ -113,7 +153,10 @@ export class Pile {
    * needs zero changes. Plain fields only, same shape a pre-D93 pile
    * record always had. */
   toJSON() {
-    return { id: this.id, kind: this.kind, name: this.name, ownerId: this.ownerId, cards: this.cards, zoneId: this.zoneId };
+    return {
+      id: this.id, kind: this.kind, name: this.name, ownerId: this.ownerId,
+      cards: this.cards, zoneId: this.zoneId, spread: this.spread,
+    };
   }
 
   /**
@@ -130,7 +173,18 @@ export class Pile {
    * one real difference.
    */
   getView() {
-    return { id: this.id, name: this.name, ownerId: this.ownerId ?? null, kind: this.kind, zoneId: this.zoneId, cards: this.cards };
+    return {
+      id: this.id, name: this.name, ownerId: this.ownerId ?? null,
+      kind: this.kind, zoneId: this.zoneId, cards: this.cards,
+      // *nit (Tighten/Loosen): the view shape is an EXPLICIT field list,
+      // so a new pile-level field is invisible to every client until
+      // it's named here. `spread` was written correctly by the reducer
+      // and simply never crossed into the view - the reducer tests all
+      // passed while the feature did nothing on screen, which is
+      // precisely the wiring gap D104's browser layer exists to catch,
+      // and is how this was actually found.
+      spread: this.spread,
+    };
   }
 
   /**
@@ -182,15 +236,22 @@ export class Pile {
    * by ownership/visibility - unconditional now, for every viewer, on
    * every card (`docs/ARCHITECTURE.md`'s "Core invariant").
    *
-   * `reveal` is the one entry that keeps a condition (`faceUp === false`)
-   * - not an authorization restriction, "there is nothing to reveal" on
-   * a card that's already face-up. `redactCard` is gone entirely now
+   * `reveal`/`conceal` are the one conditional pair - not an authorization
+   * restriction, just which DIRECTION the flip is going: "there is
+   * nothing to reveal" on a face-up card, and nothing to conceal on a
+   * face-down one. *nit (direct user request): `conceal` is new, the
+   * second half of "a show/hide cardAction to toggle an individual
+   * card's show/hide status"; both dispatch the same `FLIP_CARD`
+   * reducer action, they differ only in the label the menu shows.
+   * `redactCard` is gone entirely now
    * (D84: "remove card redaction entirely... TOTAL PERMISSIVE") -
    * `faceUp` is a plain game-state field with no privacy meaning left;
    * every viewer sees every card's real identity regardless of it.
    */
   cardActions(card) {
-    return card.faceUp === false ? ['reveal', 'pickup', 'move', 'rotate'] : ['pickup', 'move', 'rotate'];
+    return card.faceUp === true
+      ? ['conceal', 'pickup', 'move', 'rotate']
+      : ['reveal', 'pickup', 'move', 'rotate'];
   }
 
   /**
@@ -213,7 +274,12 @@ export class Pile {
     // for every base-Pile-derived kind unconditionally; the reducer is
     // still the real authorization/empty-only gate (D43's standing
     // discipline - this decides what to OFFER, not what's ALLOWED).
-    return ['take', 'split', 'changePileType', 'remove', ...orientationActions(cards)];
+    // *nit (direct user request): tighten/loosen offered by the base
+    // class, so every pile that lays its cards out in a ROW gets them -
+    // melds, runs, sets, foundations, discards, plain piles. `DeckPile`
+    // fully overrides this method and so is excluded by construction,
+    // correctly: a deck is a STACK, there is no overlap to adjust.
+    return ['take', 'split', 'changePileType', 'remove', 'tighten', 'loosen', ...orientationActions(cards)];
   }
 
   /**
@@ -227,9 +293,18 @@ export class Pile {
    * D91: `split` disabled below 2 cards - `splitPileAt` (state.js)
    * throws under that minimum, same reasoning as `remove`.
    */
-  disabledActions(count) {
+  disabledActions(count, { spread } = {}) {
     const disabled = count > 0 ? ['remove'] : [];
     if (count < 2) disabled.push('split');
+    // *nit: a Tighten at maximum spread (or a Loosen at minimum) can't
+    // move anything, so it's a dead control - disabled for the same
+    // reason `split` is below 2 cards. `spread` is the pile's CURRENT
+    // effective value, resolved by the caller (`disabledPileActionsFor`)
+    // since only it knows whether the pile has been adjusted yet.
+    if (spread !== undefined) {
+      if (spread >= MAX_SPREAD) disabled.push('tighten');
+      if (spread <= MIN_SPREAD) disabled.push('loosen');
+    }
     return disabled;
   }
 

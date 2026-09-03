@@ -34,11 +34,19 @@ export class HandPile extends Pile {
   // A hand IS tableSide (D51: it renders at its owner's seat through
   // the same generic <zone-panel> machinery every other table-side pile
   // uses, and must appear in pilesOf()/view.piles for that). It is
-  // still never a generic PLAY/MOVE_CARD drop DESTINATION - that's a
+  // still never a generic MOVE_CARD drop DESTINATION - that's a
   // separate rule, `pileActions.js`'s `targetsForAction` explicitly
   // excludes `kind === 'hand'` regardless of this flag.
   static tableSide = true;
   static reparentable = false;
+  /** A hand FANS. This replaces the 0.65 that used to be hardcoded in
+   * `style.css` - 0.7, not 0.65, because the CSS formula changed with
+   * it: the old rule subtracted the row gap separately
+   * (`-(card-w * 0.65) - gap`), the single rule now measures overlap as
+   * a fraction of the full card+gap PITCH, which is what lets 0 mean
+   * "a plain gap-separated row" for every other pile type. 0.7 of the
+   * pitch is the same physical fan the 0.65 rule produced. */
+  static defaultSpread = 0.7;
 
   /** Sorting/converting on someone else's behalf has never been possible
    * and isn't now either. This one stays here, shared, rather than
@@ -59,6 +67,9 @@ export class HandPile extends Pile {
    * must be convertible to any other pile type"): a hand is no longer
    * exempt from the picker - owner-gated, matching sort's own rule. */
   pileActions({ isOwner } = {}) {
-    return isOwner ? ['sortRank', 'sortSuit', 'changePileType'] : [];
+    // *nit (Tighten/Loosen): a hand is the fan the request was actually
+    // about, and this method fully overrides the base one - so the two
+    // have to be listed here explicitly rather than inherited.
+    return isOwner ? ['sortRank', 'sortSuit', 'changePileType', 'tighten', 'loosen'] : [];
   }
 }

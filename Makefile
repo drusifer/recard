@@ -7,11 +7,12 @@
 #
 # Adding a task: add the npm script first, then a one-line target here.
 
-.PHONY: help test lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev
+.PHONY: help test test-ui lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev
 
 help:
 	@echo "Recard targets (all front npm scripts):"
 	@echo "  test         node --test tests/*.test.js"
+	@echo "  test-ui      browser tests for card actions via the context menu"
 	@echo "  lint         style + design + js"
 	@echo "  lint-js      eslint"
 	@echo "  lint-style   stylelint"
@@ -26,6 +27,9 @@ help:
 
 test:
 	npm test
+
+test-ui:
+	npm run test:ui
 
 lint:
 	npm run lint

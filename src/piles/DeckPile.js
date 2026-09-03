@@ -50,7 +50,8 @@ export class DeckPile extends Pile {
   /** D92 (direct user request: "split should always fan the pile to
    * allow the guided picker" - deck included, no instant-shortcut
    * carve-out). A real deck card never carries a `faceUp` field at all
-   * (only `toHandCard`/PLAY's transform ever set one) - the base
+   * (only `toHandCard` and `transferCard`'s leaving-a-hand rule ever
+   * set one) - the base
    * `Pile.showsFace` (`card.faceUp !== false`) would read that missing
    * field as "face-up" and show the real card. `visibility: 'hidden'`
    * already says nobody sees a deck's cards; this is what makes the

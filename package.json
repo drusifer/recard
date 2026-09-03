@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.test.js",
+    "test:ui": "node --test tests/uiActions.browser.mjs",
     "dev": "node tools/devserver.mjs",
     "cards:build": "node tools/rtg/compile.mjs",
     "cards:jobs": "node tools/rtg/genArtJobs.mjs",

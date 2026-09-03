@@ -5,7 +5,7 @@
 D21-D23) is historical - decisions are numbered continuously now and
 the highest number is always the current binding state, not a
 particular sprint's scope.
-**Last updated:** 2026-09-02 (D92-D101)
+**Last updated:** 2026-09-02 (D92-D106)
 
 ## Core invariant (direct user request, stated repeatedly - binding on every Pile type, present and future)
 
@@ -34,6 +34,219 @@ still: card identity REDACTION (D7) is gone too - a viewer sees every
 card's real identity, always, not just whether it can be moved. As of
 D85, the same removal reaches the three BULK/pile-level actions that
 still had their own separate authorization gate.
+
+### D106. Pile spread is replicated state, adjusted by Tighten/Loosen
+Direct user *nit: "pile actions for tighten/loosen to adjust the overlap
+on fan and meld piles or runs or whatever."
+
+How far a pile's cards overlapped was a hardcoded CSS constant
+(`.fan-row .middle-card + .middle-card`'s `0.65`), identical for every
+pile and adjustable by nobody.
+
+**Decided:** `spread` is a field on the pile record, adjusted by ONE
+reducer action taking a signed delta (`ADJUST_PILE_SPREAD`), clamped to
+`MIN_SPREAD`/`MAX_SPREAD` there rather than in the UI. Two `ACTION_SPECS`
+entries, one action - the same split D103 used for reveal/conceal: the
+direction belongs in the label, not in a second code path. Replicated,
+not a local view preference, because everyone is looking at the same
+cards.
+
+`MAX_SPREAD` is 0.85, not 1: at 1 a covered card is completely hidden,
+so a spread pile would look like a stack and its cards would stop being
+individually clickable.
+
+**Which piles offer it is per class**, as `pileActions` always has been:
+the base `Pile` (so every meld, run, set, foundation, discard and plain
+pile), plus explicit entries in `HandPile` and `MeldPile`, both of which
+fully override the base method. `DeckPile` also overrides it and so is
+excluded by construction, correctly - a deck is a stack, there is no
+overlap to adjust.
+
+**No back-compat path (direct user reminder, mid-implementation).** The
+first cut kept the CSS literal as a `var()` fallback and gated flat rows
+behind a `data-spread` attribute, so unadjusted piles took the old code
+path - two ways to lay out a row, the second being the one nobody would
+remember to update. Collapsed to one rule that every row uses, with
+`--pile-spread` written unconditionally from the pile's effective value.
+That required changing the formula's meaning: overlap is now a fraction
+of the card+gap PITCH, so `0` means a plain gap-separated row (the base
+default, unchanged rendering) and `HandPile.defaultSpread` is `0.7` -
+the same physical fan the old `0.65` produced under the old formula.
+`:not([data-layout])` keeps a card placed with explicit stack/overlap
+intent (US-32/33) owning its own margin: the pile's spread is the
+default for cards never given one, not an override of a real placement.
+
+**A field has to be named in three places or it is silently dropped.**
+`spread` was written correctly by the reducer while doing nothing on
+screen, because `Pile.getView()` builds the client's view from an
+explicit field list and did not mention it. `constructor` and `toJSON()`
+are two more such lists - and `insertCard`/`removeCard` rebuild a pile
+from `toJSON()`, so a field missing there is wiped the next time a card
+moves in or out. All three now carry it, with a regression test for the
+survival case and one asserting the field reaches the VIEW. This is the
+exact failure mode D104's browser layer exists for, and is how it was
+actually caught.
+
+### D105. Cards get a visible border
+Direct user *nit: "the cards need borders." They had one - `1px solid
+#d9d9d3` - which reads fine where a card sits against the dark felt and
+is nearly invisible where it matters most: card ON card. In a fan or an
+overlapped stack every internal edge is cream against cream, so seven
+cards read as one pale blob with pips on it.
+
+**Decided:** a `--card-border` token at `#6f6c60`, with real contrast
+against `--card-bg`. A card's edge is load-bearing here - it is the
+click target, and the only cue for how many cards are in a spread - so
+it is not a hairline that only works over felt. Verified by screenshot
+before and after, not by reading the CSS.
+
+### D104. Card actions get a browser-level test layer, because the menu made them drivable
+Direct user challenge, after a *nit shipped to `ui.js` with no test:
+"why not ui.js tests? what about the test pyramid" - then the insight
+that settles it: "it might be easier to test the ux actions now that we
+have the menu."
+
+**The honest diagnosis.** The pyramid here was never flat, it was
+BIMODAL. A thick pure-logic base (`state.js` and every helper pulled out
+of `ui.js` - `dropTarget`, `touchDrag`, `panelLayout`, `seating`,
+`layoutOverrides`, `pileActions`, `clampMenuPosition`), and a real
+browser layer that has been in the always-run gate since 2026-08-20
+(`lint:design` drives the actual app in Playwright at three viewports).
+What was missing was the middle: nothing tested that a rendered control
+is wired to the reducer action it claims.
+
+**Why it was missing, and why that reason expired.** Before D101 every
+card action was reachable only as a GESTURE - a native HTML5 drag, or a
+tap whose meaning depended on the card's facing. Playwright cannot
+meaningfully synthesise HTML5 drag-and-drop, so those actions were
+genuinely undrivable and only their pure helpers got tested. D101's
+context menu gave every action a named, clickable row; the constraint
+was gone and nobody noticed. That is the user's point, and it is right.
+
+**Decided, two layers:**
+
+1. **`cardMenuItems(actionIds)` in `pileActions.js`**, unit-tested -
+   what each row says, whether it is destructive, and whether it needs a
+   destination picked (`targeted`, read from `spec.target` rather than a
+   list kept in the UI). `ui.js` maps it to `<button>`s and does nothing
+   else. This follows the convention every other pure piece behind
+   `ui.js` already follows; the menu was the one that skipped it.
+2. **`tests/uiActions.browser.mjs`** - Playwright, discrete `test()`
+   cases (D60's lesson: a monolith hides every failure after the first),
+   reusing `designLint.check.mjs`'s static-server + system-chromium
+   fallback. Rows are clicked by `data-action`, not by their text, so a
+   future relabelling *nit does not break the suite.
+
+Not in `npm test` - it needs a browser and takes seconds rather than
+milliseconds. `npm run test:ui` / `make test-ui`.
+
+**Scope discipline for this layer:** it tests WIRING, the gap the other
+two layers structurally cannot reach - a row bound to the wrong
+callback, a dispatch that never reaches the reducer, an action offered
+but dead on click. What a row says belongs in `pileActions.test.js`;
+what the reducer does belongs in `state.test.js`. Keeping that line is
+what stops this becoming the slow, redundant e2e suite D60 deleted.
+
+It earned itself immediately: writing it caught a real bug in its own
+harness (serving `/` as `octet-stream`, because `extname('/')` is empty,
+so the browser downloaded `index.html` instead of rendering it), and the
+`rotate` case initially asserted the wrong DOM (orientation is
+`data-orientation` on the card WRAPPER, not a class on the face).
+
+### D103. `REVEAL` becomes `FLIP_CARD`, a real toggle - one reducer action, two offer ids
+Direct user *nit: "add a show/hide cardAction to toggle an individual
+card's show/hide status."
+
+`REVEAL` only ever went face-down -> face-up and no-op'd on a card that
+was already face-up, so there was no way to put a single card back
+face-down at all - and after D102 a card arriving from a hand is always
+face-up, which makes that the only route to a face-down table card.
+
+**Decided:** one reducer action, `FLIP_CARD`, which reads the card's
+current facing and toggles it. Renamed rather than widened in place,
+because `REVEAL` would be a lying name for something that also hides.
+
+Rejected: a `HIDE` action alongside `REVEAL`. That is two code paths for
+one operation, which D75 was an explicit correction for ("fix separate
+code paths for make zone... there can be only 1").
+
+**What IS legitimately two things is the OFFER.** `Pile.cardActions`
+names `'reveal'` on a face-down card and `'conceal'` on a face-up one.
+Both dispatch the same `FLIP_CARD`; the split exists so the menu can
+label the direction the card is actually going, which a single entry
+reading "Show/Hide" could not. Authorization reads whichever of the two
+ids applies, keeping the established read-the-offer-table pattern.
+
+**Why `conceal` and not `hide`:** `hide` was already taken, by the
+PILE-level action in the same flat `ACTION_SPECS` table ("Turn every
+card in this pile face-down", US-62). One table covers both scopes
+(D51), so the two would have collided silently - caught by
+`no-dupe-keys`, not by a test, which is worth remembering the next time
+an action id is added.
+
+**The tap gesture stays one-way, deliberately.** A face-up card's tap
+already belongs to `rotate`; `reveal` and `rotate` never competed only
+because reveal was offered on face-down cards alone. Making the tap a
+toggle would take that tap away from rotate. The *nit asked for a
+cardAction, and `conceal` is offered in the right-click menu, where card
+actions live.
+
+**Confirm copy changed.** Revealing your own private card warned "This
+cannot be undone", which is now false - `conceal` is the undo. The gate
+is kept, because the consequence it warns about is real and unchanged:
+everyone sees the card the moment you reveal it, and turning it back
+face-down does not unsee it. It now says so instead.
+
+### D102. The `play` verb is retired - a card leaving a hand is an ordinary `MOVE_CARD`
+Direct user *nit: "get rid of the 'Play' card action on the user hand.
+That's old kruft." Confirmed with the user as the FULL retire (the verb,
+the `PLAY` reducer action and `main.js`'s `playCard`), not merely
+dropping the entry D101 had just added to the card context menu.
+
+**Why it was ever a separate verb.** `transferCard` already stamped a
+card generically on the way INTO a hand (`toHandCard`, the D83/D84
+"a hand is just a regular pile" work). The mirror - a card leaving a
+hand becomes public and face-up - was never written, so a *verb* carried
+it instead: `PLAY` owned that `transform`, `PlayerHandPile.cardActions`
+had to return `['play']` so `canRemoveCard(pile, card, viewerId,
+'play')` would authorize it, and `main.js`/`CREATE_PILE` each branched
+on "did this come from a hand?" to choose which verb to dispatch. Every
+one of those was downstream of the one missing line.
+
+**Decided:** write the mirror in `transferCard` - if the destination is
+a hand, `toHandCard`; ELSE if the source is a hand, `{owner: null,
+faceUp: true}`. Then `MOVE_CARD` does everything `PLAY` did, and the
+verb, the reducer case, the `playCard` dispatcher, the dead `onPlay`
+option, `ACTION_SPECS.play` and `middleCardVisibility` are all deleted.
+`PlayerHandPile.cardActions()` returns `['move']`.
+
+Rejected: keeping `PLAY` as a thin `MOVE_CARD` alias. That is exactly
+the back-compat shim the user has ruled out repeatedly, and it would
+preserve the hand's private vocabulary - the actual complaint.
+
+Two things fall out that are worth naming:
+
+- **The `isReorder` special case disappears structurally.** `PLAY` had
+  to detect "am I targeting the hand I came from?" and skip its
+  transform, or a reordered hand card picked up `owner`/`faceUp` fields
+  it must never carry. The if/else ordering above makes a hand
+  DESTINATION win, so a reorder (and a hand-to-hand pass) never reaches
+  the leaving-a-hand rule at all. Tested directly, both cases.
+- **`PLAY`'s `visibility` parameter is gone**, and it was already dead:
+  the UI has passed nothing but `'public'` since "Hide as"/Play Hidden
+  was removed, so `'shared-facedown'`/`'private-facedown'` existed only
+  for tests. Those states are still reachable and still tested, seeded
+  directly rather than through a verb the product never dispatched.
+
+**Disclosed behavior change:** `splitPileAt` authorizes with
+`canRemoveCard(..., 'move')`, and a hand was excluded from `SPLIT_PILE`
+only *incidentally* - it was the one kind whose owner's cards didn't
+offer the literal string `'move'`. A hand is now splittable at the
+reducer level. Deliberately not patched back with a hand check: D92
+already settled that "which pile kinds actually OFFER an action is a
+presentation choice, not a reducer restriction", and the offer layer is
+unchanged - `HandPile.pileActions` still returns sort/convert only, so
+nothing in the UI exposes it. Both halves are tested.
 
 ### D101. Card actions are offered via a right-click context menu, reusing the pile header's own action classes/table
 Direct user request (US-100): card-level actions (rotate, move, pickup,

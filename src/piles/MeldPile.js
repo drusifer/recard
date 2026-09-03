@@ -54,7 +54,13 @@ export class MeldPile extends Pile {
    */
   pileActions({ isOwner, isShared } = {}) {
     if (!isOwner && !isShared) return [];
-    return ['split', 'changePileType'];
+    // *nit (direct user request): "pile actions for tighten/loosen to
+    // adjust the overlap on fan and MELD piles or RUNS or whatever."
+    // Named in the request, and this method fully overrides the base
+    // one, so they're listed here rather than inherited. A meld lays
+    // its cards out in a row like any other spread pile - the rule it
+    // enforces is about what may JOIN it, not how it's displayed.
+    return ['split', 'changePileType', 'tighten', 'loosen'];
   }
 
   /** No before/after halo - a meld has exactly one landing spot

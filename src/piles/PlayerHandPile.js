@@ -20,17 +20,22 @@ export class PlayerHandPile extends HandPile {
   }
 
   /**
-   * The owner gets `['play']`, not `['move']` - a naming necessity:
-   * `transferCard`'s own authorization for `PLAY` checks
-   * `canRemoveCard(pile, card, viewerId, 'play')`, which reuses THIS
-   * list, and the base `Pile` never produces the string `'play'` (its
-   * own vocabulary is reveal/pickup/move/rotate) - inheriting it would
-   * silently break every play from hand. `'play'` is also the ONLY verb
-   * that carries PLAY's own public-visibility transform (`{owner: null,
-   * faceUp: true}` on a real play).
+   * D102 (*nit, "get rid of the Play card action on the user hand -
+   * that's old kruft"): `['move']`, not the old `['play']`. `'play'`
+   * existed as a naming necessity - it was the one verb carrying the
+   * public/face-up transform a card gets when it leaves a hand, so
+   * `'move'` couldn't be used here. `transferCard` (`state.js`) now
+   * applies that transform generically, from the transition rather
+   * than from the verb, so the hand's vocabulary is the same one every
+   * other pile uses.
+   *
+   * Still an override rather than inheriting the base list: the base
+   * offers `reveal`/`pickup`/`rotate` too, none of which mean anything
+   * for a card in your own hand (it is already yours to see, already
+   * picked up).
    */
   cardActions() {
-    return ['play'];
+    return ['move'];
   }
 
   /**

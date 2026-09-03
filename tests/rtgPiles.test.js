@@ -58,7 +58,7 @@ test('BattlefieldPile: a non-owner of a personal battlefield gets nothing', () =
 // get the same reveal/pickup/move/rotate as any other visible card.
 test('ExilePile: exiled cards are face-up and get the same card actions as any other pile', () => {
   const faceUp = { id: 'c1', faceUp: true, owner: null };
-  assert.deepEqual(new ExilePile({ kind: 'exile' }).cardActions(faceUp, 'p1'), ['pickup', 'move', 'rotate']);
+  assert.deepEqual(new ExilePile({ kind: 'exile' }).cardActions(faceUp, 'p1'), ['conceal', 'pickup', 'move', 'rotate']);
 });
 
 test('ExilePile: never offers take — exile cannot be scooped back', () => {

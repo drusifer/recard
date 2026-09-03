@@ -1,5 +1,6 @@
 import { buildDeck, shuffle, RANKS, SUITS } from './deck.js';
 import { PILE_TYPES, revivePile, pileInstanceFor } from './piles/pileTypes.js';
+import { MIN_SPREAD, MAX_SPREAD } from './piles/Pile.js';
 
 const DEFAULT_PILE_ID = 'table';
 // Exported (only this one, of the three) - `main.js`'s `dealFromDeck`
@@ -515,10 +516,9 @@ function dealRoundRobin(deck, destinationCount, cardsPerDestination, describeSho
  * `cardActions` is the real, generic single-card authorization (no kind
  * empties it out for its own reason any more - `DiscardPile`/`MeldPile`/
  * `ExilePile` all reuse the base `Pile` rule), reusing `canRemoveCard`
- * for the cards being split OUT is correct again: it naturally excludes
- * `HandPile` (`cardActions` only ever offers `'play'`, never `'move'`)
- * with no separate flag needed, and it folds in per-card VISIBILITY for
- * free (`'move'`'s own predicate already requires `!isHidden ||
+ * for the cards being split OUT is correct again: it folds in per-card
+ * VISIBILITY for free (`'move'`'s own predicate already requires
+ * `!isHidden ||
  * !isOwned || isMine` - a split can't relocate a card you can't see).
  *
  * A deck's cards are still the one real exception: anonymous by
@@ -562,7 +562,7 @@ function placementOf(action) {
  * D12: card ids are globally unique (assigned once per physical card by
  * deck.js), so a card can be located across every pile without the
  * caller needing to know which one it's in. Deck and hand piles are
- * deliberately not searched — `REVEAL`/`PICKUP`/`MOVE_CARD` have only
+ * deliberately not searched — `FLIP_CARD`/`PICKUP`/`MOVE_CARD` have only
  * ever operated on table-side cards. D90: renamed from
  * `findZoneAndCard`/`{zoneId, card}` - it has only ever searched Piles
  * and returned a Pile's id, never a Zone's.
@@ -576,37 +576,17 @@ function findPileAndCard(state, cardId) {
 }
 
 /**
- * Maps a US-12 visibility choice to the `{owner, faceUp}` pair stored on
- * a zone-pile card, per ARCHITECTURE.md D7.
- */
-function middleCardVisibility(visibility, playerId) {
-  switch (visibility) {
-    case 'public': {
-      return { owner: null, faceUp: true };
-    }
-    case 'shared-facedown': {
-      return { owner: null, faceUp: false };
-    }
-    case 'private-facedown': {
-      return { owner: playerId, faceUp: false };
-    }
-    default: {
-      throw new Error(`Unknown visibility: ${visibility}`);
-    }
-  }
-}
-
-/**
- * D43 (Sprint 14/Tranche 2 of D39): the shared shape behind PLAY/
- * PICKUP/MOVE_CARD/DRAW - remove one card from a pile, run it through
+ * D43 (Sprint 14/Tranche 2 of D39): the shared shape behind
+ * PICKUP/MOVE_CARD/DRAW (and PLAY, until D102 retired it) - remove one
+ * card from a pile, run it through
  * pile-type dispatch on both ends, insert it into another. A new pile
  * type only has to implement `canRemoveCard`/`removeCard`/`insertCard`
  * (`src/piles/*.js`) to become a legal source or destination for these
  * four actions - this function, and therefore `state.js`, gains no new
  * `case` for it.
  *
- * Deliberately NOT used for REVEAL (mutates a card in place, never
- * moves it - see the REVEAL case, which reuses `canRemoveCard`'s
+ * Deliberately NOT used for FLIP_CARD (mutates a card in place, never
+ * moves it - see the FLIP_CARD case, which reuses `canRemoveCard`'s
  * read-the-offer-table pattern directly instead), SHUFFLE_DECK
  * (pile-level, no card actually changes pile), or DEAL/DEAL_MORE/
  * SPLIT_PILE/PICKUP_SPLIT (one source to one or many destinations, but
@@ -645,6 +625,23 @@ function transferCard(state, { fromPileId, toPileId, cardId, viewerId, action, p
   // the handful of actions (DRAW/PICKUP) that happened to remember to
   // stamp it themselves.
   if (toPile.kind === 'hand') movedCard = toHandCard(movedCard, toPile.ownerId);
+  // D102 (*nit, "get rid of the Play card action... that's old kruft"):
+  // the exact mirror of the line above, and the reason the `play` verb
+  // could be retired outright. A card LEAVING a hand for the table is
+  // public, face-up - that was never a property of a verb, it's the
+  // property of the transition, the same way hand-stamping is. It used
+  // to live in PLAY's own `transform` (plus a duplicate of the same
+  // branch in CREATE_PILE), which is why a hand needed its own private
+  // action string at all: `'move'` couldn't carry it. Written here
+  // once, generically, `MOVE_CARD` does everything PLAY did and the
+  // verb has no remaining job.
+  //
+  // Ordering matters: hand -> hand (a reorder, or handing a card to
+  // another player) takes the branch ABOVE and never reaches this one,
+  // so a reordered hand card still never picks up owner/faceUp fields
+  // it isn't supposed to carry. That was PLAY's `isReorder` special
+  // case; here it falls out of the structure instead of being checked.
+  else if (fromPile.kind === 'hand') movedCard = { ...movedCard, owner: null, faceUp: true };
 
   // D53: the destination pile gets a real say in whether it accepts the
   // card, not just whether it exists. Every pre-Sprint-22 kind accepts
@@ -884,25 +881,20 @@ const ACTIONS = {
     const withPile = { ...state, piles: [...state.piles, pile] };
     if (!action.cardId) return withPile;
 
-    // A card dragged FROM a hand is a PLAY (needs PLAY's own
-    // owner/faceUp transform - a hand card carries neither field) - a
-    // card dragged from anywhere else on the table is a MOVE (keeps its
-    // existing owner/faceUp as-is). Same source-kind branch
-    // `dropCardOnZone` (`main.js`) already makes at the UI layer, just
-    // made here too so a directly-dispatched action (a guest's own
-    // relayed send) gets it right without depending on the UI branch.
-    const fromPile = state.piles.find((p) => p.id === action.fromPileId);
-    if (!fromPile) throw new Error(`Pile ${action.fromPileId} does not exist`);
-    const isFromHand = fromPile.kind === 'hand';
+    // D102: this used to branch on `fromPile.kind === 'hand'` to pick
+    // between the `'play'` and `'move'` verbs and to apply PLAY's
+    // public transform - both jobs now belong to `transferCard`, which
+    // applies the leaving-a-hand rule generically for every action.
+    // One verb, no source-kind branch.
+    if (state.piles.every((p) => p.id !== action.fromPileId)) {
+      throw new Error(`Pile ${action.fromPileId} does not exist`);
+    }
     return transferCard(withPile, {
       fromPileId: action.fromPileId,
       toPileId: pile.id,
       cardId: action.cardId,
       viewerId: action.playerId,
-      action: isFromHand ? 'play' : 'move',
-      transform: isFromHand
-        ? (card) => ({ ...card, ...middleCardVisibility(action.visibility ?? 'public', action.playerId) })
-        : undefined,
+      action: 'move',
     });
   },
 
@@ -1072,11 +1064,14 @@ const ACTIONS = {
    * reusing `canRemoveCard(pile, card, playerId, 'move')`, the exact
    * predicate single-card drag-and-drop already uses (D43: write-side
    * re-checks, doesn't just trust the offer layer) - "cardActions are
-   * the more general case" (direct user request). `HandPile` is the
-   * only kind that ever excludes this (`cardActions` only offers
-   * `'play'`, never `'move'` - a hand's own per-player invariant); a
-   * Foundation is NOT excluded any more, per `docs/ARCHITECTURE.md`'s
-   * "Core invariant".
+   * the more general case" (direct user request). No kind excludes
+   * itself from this any more: a hand used to, incidentally, because
+   * its owner's cards spelled the capability `'play'` rather than
+   * `'move'` - D102 retired that verb, so a hand is as eligible as
+   * anything else at the reducer level (the offer layer,
+   * `HandPile.pileActions`, is what still doesn't show Split on a
+   * hand). A Foundation is NOT excluded either, per
+   * `docs/ARCHITECTURE.md`'s "Core invariant".
    */
   SPLIT_PILE(state, action) {
     const pile = state.piles.find((p) => p.id === action.pileId);
@@ -1184,6 +1179,38 @@ const ACTIONS = {
   },
 
   /**
+   * *nit (direct user request): "pile actions for tighten/loosen to
+   * adjust the overlap on fan and meld piles or runs or whatever."
+   *
+   * ONE action taking a signed `delta`, not a `TIGHTEN` and a `LOOSEN`
+   * - the same "there can be only 1" correction D75 made and D103
+   * followed, and the same shape `ADJUST_SCORE` already uses for its
+   * +/- steps. The two are one operation in opposite directions.
+   *
+   * Replicated state, not a local view preference: everyone at the
+   * table is looking at the same cards, so they must see the same
+   * spread. It is presentation, though - the cards themselves are
+   * untouched, and `spread` is written on the pile record exactly like
+   * `zoneId`/`layout` are.
+   *
+   * The starting point is the pile TYPE's own `defaultSpread` (a hand
+   * fans, a flat pile doesn't) rather than one global number, so the
+   * first adjustment moves from what the player is actually looking at.
+   * Clamped here rather than in the UI: the reducer is the authority,
+   * and a directly-dispatched action from a guest gets the same limits.
+   */
+  ADJUST_PILE_SPREAD(state, action) {
+    const pile = state.piles.find((p) => p.id === action.pileId);
+    if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
+    const current = pile.spread ?? PILE_TYPES[pile.kind]?.defaultSpread ?? MIN_SPREAD;
+    // Rounded to the step: floating-point addition of 0.1 otherwise
+    // drifts (0.65 + 0.1 + 0.1 = 0.8500000000000001), which would never
+    // compare equal to MAX_SPREAD and so never disable the button.
+    const next = Math.round(Math.min(MAX_SPREAD, Math.max(MIN_SPREAD, current + action.delta)) * 1000) / 1000;
+    return { ...state, piles: state.piles.map((p) => (p.id === action.pileId ? { ...p, spread: next } : p)) };
+  },
+
+  /**
    * D92 (direct user request, "THERE SHOULD BE NO CANONICAL PILES"):
    * shuffles whichever pile `action.pileId` names - no more hardcoded
    * `DECK_PILE_ID`. Reorders the pile and nothing else - the one thing
@@ -1199,60 +1226,53 @@ const ACTIONS = {
     return replacePile(state, action.pileId, (deck) => withCards(deck, shuffle(deck.cards, rng)));
   },
 
-  PLAY(state, action) {
-    const pileId = action.pileId ?? DEFAULT_PILE_ID;
-    if (pilesOf(state).every((p) => p.id !== pileId)) {
-      throw new Error(`Pile ${pileId} does not exist`);
-    }
-    const fromPileId = resolveHandPileId(state.piles, action.playerId);
-    // UX follow-up (real bug, found live): PLAY is the ONLY action a
-    // hand-sourced drag can ever dispatch (`HandPile.cardActions`,
-    // `HandPile.js`, offers `'play'` and nothing else while a card is
-    // still in hand) - including a same-hand drag, i.e. a plain reorder
-    // (`main.js`'s `dropCardOnPile`). Targeting the same hand it came
-    // from is not a real play - no visibility change, no card actually
-    // leaving hand - so it must not stamp the public/hidden transform a
-    // genuine play always applies; that would give a reordered hand
-    // card `owner`/`faceUp` fields it's never supposed to carry
-    // (`HandPile.redactCard`'s own comment on that invariant).
-    const isReorder = pileId === fromPileId;
-    const visibility = isReorder ? null : middleCardVisibility(action.visibility ?? 'public', action.playerId);
-    return transferCard(state, {
-      fromPileId,
-      toPileId: pileId,
-      cardId: action.cardId,
-      viewerId: action.playerId,
-      action: 'play',
-      placement: placementOf(action),
-      transform: visibility ? (card) => ({ ...card, ...visibility }) : undefined,
-    });
-  },
-
-  REVEAL(state, action) {
-    // Mutates a card in place (flips `faceUp`) rather than moving it
-    // between piles, so this is NOT `transferCard` (D43) - but the
-    // authorization check is the same reuse-the-offer-table pattern:
-    // `cardActions` already states whether 'reveal' is offered, no
-    // second copy of the rule inline.
+  /**
+   * *nit (direct user request): "add a show/hide cardAction to toggle an
+   * individual card's show/hide status." This was `REVEAL`, which only
+   * ever went face-down -> face-up and no-op'd on an already-face-up
+   * card. Renamed as well as widened, because `REVEAL` would now be a
+   * lying name: it flips, in whichever direction the card is currently
+   * facing.
+   *
+   * ONE reducer case for both directions, deliberately - a `HIDE`
+   * alongside `REVEAL` would be two code paths for one operation, the
+   * exact shape D75 was a correction for ("fix separate code paths for
+   * make zone... there can be only 1"). What IS two things, correctly,
+   * is the OFFER: `cardActions` names `'reveal'` on a face-down card
+   * and `'conceal'` on a face-up one, purely so the menu can label the
+   * direction the card is actually about to go. Authorization reads
+   * whichever of those two ids applies, keeping the established
+   * read-the-offer-table pattern rather than a second copy of the rule.
+   *
+   * Mutates a card in place rather than moving it between piles, so
+   * this is NOT `transferCard` (D43) - same as `ROTATE_CARD` below.
+   *
+   * A card with no `faceUp` field at all (a deck's cards never pass
+   * through anything that sets one) counts as face-down, so the first
+   * flip shows it. That's `!== false`'s complement, matching
+   * `Pile.showsFace`'s own reading of the same absent field.
+   */
+  FLIP_CARD(state, action) {
     const found = findPileAndCard(state, action.cardId);
     if (!found) {
       throw new Error(`Card ${action.cardId} is not in any pile`);
     }
     const { pileId, card } = found;
-    if (card.faceUp) return state;
+    const isFaceUp = card.faceUp === true;
+    const verb = isFaceUp ? 'conceal' : 'reveal';
     const pile = state.piles.find((p) => p.id === pileId);
-    if (!revivePile(pile).canRemoveCard(card, action.playerId, 'reveal')) {
-      throw new Error(`Player ${action.playerId} is not authorized to reveal ${action.cardId}`);
+    if (!revivePile(pile).canRemoveCard(card, action.playerId, verb)) {
+      throw new Error(`Player ${action.playerId} is not authorized to ${verb} ${action.cardId}`);
     }
     return replacePile(state, pileId, (p) =>
-      withCards(p, p.cards.map((c) => (c.id === action.cardId ? { ...c, faceUp: true } : c))),
+      withCards(p, p.cards.map((c) => (c.id === action.cardId ? { ...c, faceUp: !isFaceUp } : c))),
     );
   },
 
   // D48/D40 (Sprint 18): Card.orientation as replicated state. Same
-  // shape as REVEAL - an in-place mutation, not a `transferCard` (D43),
+  // shape as FLIP_CARD - an in-place mutation, not a `transferCard` (D43),
   // authorization read from `cardActions`'s offer table rather than a
-  // second copy of the rule. Unlike REVEAL, authorized by the same
+  // second copy of the rule. Unlike FLIP_CARD, authorized by the same
   // condition as `move` (a still-hidden card only by its owner,
   // anything visible or face-down-and-unowned by anyone) - orientation
   // doesn't reveal identity, so it follows `layout`'s own precedent

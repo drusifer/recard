@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ACTION_SPECS, actionsForCard, targetsForAction, resolveDropTargetFor } from '../src/pileActions.js';
+import { ACTION_SPECS, cardMenuItems, actionsForCard, targetsForAction, resolveDropTargetFor } from '../src/pileActions.js';
 
 const deck = { id: 'deck', kind: 'deck', ownerId: null };
 const myHand = { id: 'hand:me', kind: 'hand', ownerId: 'me' };
@@ -22,8 +22,8 @@ const cascade = { id: 'c:1', kind: 'cascade', ownerId: null };
 test('each pile type declares its own actions (D25/D34/D42)', () => {
   assert.deepEqual(actionsForCard(deck, { id: 'c' }, 'me'), ['reveal', 'pickup', 'move', 'rotate'],
     'D34\'s blanket [] struck - cards can be put back on/taken off the deck like any pile');
-  assert.deepEqual(actionsForCard(myHand, { id: 'c' }, 'me'), ['play']);
-  assert.deepEqual(actionsForCard(table, { faceUp: true, owner: null }, 'me'), ['pickup', 'move', 'rotate']);
+  assert.deepEqual(actionsForCard(myHand, { id: 'c' }, 'me'), ['move'], 'D102: was [\'play\']');
+  assert.deepEqual(actionsForCard(table, { faceUp: true, owner: null }, 'me'), ['conceal', 'pickup', 'move', 'rotate']);
   assert.deepEqual(actionsForCard({ id: 'x', kind: 'nonsense', ownerId: null }, { id: 'c' }, 'me'), [],
     'an unknown kind offers nothing, it does not throw');
 });
@@ -44,17 +44,18 @@ test('every action has an icon (UX follow-up: buttons are icon-only now, label/h
 // *nit (direct user request, D83, "fully permissive drag and drop...
 // including hand"): a non-owner used to get nothing on someone else's
 // hand card - now gets 'move' (MOVE_CARD finds a card in any pile by
-// id, so this genuinely works). The owner still gets 'play', not
-// 'move' - a naming necessity (PLAY's own authorization needs the
-// literal string 'play'), not a remaining restriction.
-test('a hand offers play to its own owner, move to anyone else', () => {
-  assert.deepEqual(actionsForCard(myHand, { id: 'c' }, 'me'), ['play']);
+// id, so this genuinely works). D102 (*nit): the owner's side says
+// 'move' now too - it said 'play' only because that verb carried the
+// leaving-a-hand transform, which `transferCard` applies generically
+// now. Both perspectives, one verb.
+test('a hand offers move on BOTH sides - its owner\'s cards and anyone else\'s (D102)', () => {
+  assert.deepEqual(actionsForCard(myHand, { id: 'c' }, 'me'), ['move']);
   assert.deepEqual(actionsForCard(theirHand, { id: 'c' }, 'me'), ['move'],
-    "another player's hand card can still be dragged away, just not 'played'");
+    "another player's hand card can still be dragged away, same verb");
 });
 
-test('a face-up zone card can be picked up or moved, but not turned over', () => {
-  assert.deepEqual(actionsForCard(table, { faceUp: true, owner: null }, 'me'), ['pickup', 'move', 'rotate']);
+test('a face-up zone card offers conceal, never reveal - one direction each, the *nit show/hide toggle', () => {
+  assert.deepEqual(actionsForCard(table, { faceUp: true, owner: null }, 'me'), ['conceal', 'pickup', 'move', 'rotate']);
 });
 
 test('a shared face-down card: anyone may turn it over, pick it up, or move it - no ownership to exclude anyone', () => {
@@ -75,8 +76,11 @@ test("someone else's still-hidden private card is fully actionable now, same as 
     'and its owner, same as ever');
 });
 
-test('targets: play and move light up every table-side pile (zones, discard AND deck - D45/UX follow-up), pickup lights up your own hand', () => {
-  assert.deepEqual(targetsForAction('play', ALL, { viewerId: 'me' }), ['deck', 'table', 'z:me', 'discard']);
+test('targets: move lights up every table-side pile (zones, discard AND deck - D45/UX follow-up), pickup lights up your own hand', () => {
+  assert.deepEqual(targetsForAction('move', ALL, { viewerId: 'me' }), ['deck', 'table', 'z:me', 'discard']);
+  // D102: `play` is not a known action id any more - an unknown id
+  // lights up nothing rather than throwing, same as it always did.
+  assert.deepEqual(targetsForAction('play', ALL, { viewerId: 'me' }), []);
   assert.deepEqual(targetsForAction('pickup', ALL, { viewerId: 'me' }), ['hand:me'],
     "never another player's hand");
 });
@@ -120,3 +124,52 @@ test('resolveDropTargetFor (D53): delegates to the pile module\'s own resolveDro
     { targetCardId: 'a', side: 'after', layout: 'stack' });
 });
 
+
+
+// --- cardMenuItems (the card context menu's row model) ---
+//
+// *nit ("put the name of the action in the card action menu") landed as
+// an untested edit to a DOM builder, which was the wrong shape for this
+// codebase: every other pure decision behind `ui.js` has been extracted
+// and unit-tested (`dropTarget`, `touchDrag`, `panelLayout`, `seating`,
+// `layoutOverrides`, `clampMenuPosition`). This is that extraction -
+// WHAT each row says and how it dispatches is pure data; only
+// `document.createElement` stays in `ui.js`.
+test('cardMenuItems: every row shows the action\'s icon AND its name - the *nit, as an assertion', () => {
+  const items = cardMenuItems(['move', 'reveal']);
+  assert.deepEqual(items.map((item) => item.text), ['⇄ Move', '👁 Turn over']);
+});
+
+test('cardMenuItems: the name is also kept as tooltip/aria label, not only in the visible text', () => {
+  const [item] = cardMenuItems(['pickup']);
+  assert.equal(item.label, 'Pick up');
+  assert.equal(item.id, 'pickup');
+});
+
+test('cardMenuItems: preserves the order it was given - the offer table decides ordering, not this function', () => {
+  assert.deepEqual(cardMenuItems(['rotate', 'conceal', 'move']).map((item) => item.id), ['rotate', 'conceal', 'move']);
+});
+
+// The dispatch split D101 introduced, as data: an in-place action fires
+// the moment it is clicked; a targeted one needs a destination picked
+// first. This was a `switch` buried inside a click handler.
+test('cardMenuItems: marks move/pickup as targeted, and the in-place actions as not', () => {
+  const byId = Object.fromEntries(cardMenuItems(['move', 'pickup', 'reveal', 'conceal', 'rotate'])
+    .map((item) => [item.id, item.targeted]));
+  assert.deepEqual(byId, { move: true, pickup: true, reveal: false, conceal: false, rotate: false });
+});
+
+test('cardMenuItems: carries the destructive flag through, so the confirm gate and danger styling have one source', () => {
+  assert.equal(cardMenuItems(['move'])[0].destructive, false);
+});
+
+// A card offering an id with no spec must not put a blank row in the
+// menu - `openCardContextMenu` used to index ACTION_SPECS directly and
+// would have thrown on `spec.icon`.
+test('cardMenuItems: skips an unknown action id rather than rendering a blank row or throwing', () => {
+  assert.deepEqual(cardMenuItems(['move', 'no-such-action']).map((item) => item.id), ['move']);
+});
+
+test('cardMenuItems: no actions in, no rows out', () => {
+  assert.deepEqual(cardMenuItems([]), []);
+});

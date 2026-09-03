@@ -12,7 +12,7 @@ function fakeStorage(initial = {}) {
     getItem: (k) => (map.has(k) ? map.get(k) : null),
     setItem: (k, v) => map.set(k, String(v)),
     removeItem: (k) => map.delete(k),
-    _raw: () => map.get(STORAGE_KEY),
+    _raw: () => map.get(STORAGE_KEY)
   };
 }
 
@@ -23,7 +23,7 @@ function playedGame() {
   state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 5 });
   state = reduce(state, { type: 'CREATE_ZONE', name: 'Discard' });
   state = reduce(state, { type: 'ADJUST_SCORE', targetPlayerId: 'g', delta: 1 });
-  state = reduce(state, { type: 'PLAY', playerId: 'h', cardId: state.piles.find((p) => p.kind === 'hand').cards[0].id });
+  state = reduce(state, { type: 'MOVE_CARD', playerId: 'h', cardId: state.piles.find((p) => p.kind === 'hand').cards[0].id , toPileId: 'table'});
   return state;
 }
 
@@ -141,7 +141,7 @@ test('a storage that throws (private mode, quota) never breaks the game', () => 
   const hostile = {
     getItem: () => { throw new Error('denied'); },
     setItem: () => { throw new Error('quota'); },
-    removeItem: () => { throw new Error('denied'); },
+    removeItem: () => { throw new Error('denied'); }
   };
   assert.doesNotThrow(() => save(hostile, playedGame(), 'ABC123'));
   assert.equal(load(hostile).ok, false, 'and offers nothing rather than crashing on load');
@@ -158,7 +158,7 @@ test('D31: hands ARE saved now - D26 stripped them because ids were unstable, an
       { id: 'deck', kind: 'deck', cards: [{ id: 'c1' }] },
       { id: 'hand:key-a', kind: 'hand', ownerId: 'key-a', cards: [{ id: 'ace-spades-0' }] },
     ],
-    scores: {},
+    scores: {}
   };
   const written = JSON.stringify(snapshot(state, 'CODE', 'Alice'));
   // Asserted on the serialized STRING, same as the Sprint 7 test that
@@ -190,7 +190,7 @@ test('D33: the wait list is only players who were CONNECTED when the game was sa
       { id: 'host-key', name: 'Alice', connection: 'connected' },
       { id: 'key-b', name: 'Bob', connection: 'connected' },
       { id: 'key-c', name: 'Cara', connection: 'disconnected' },
-    ],
+    ]
   };
   assert.deepEqual(expectedReturners(snap, 'host-key').map((p) => p.name), ['Bob'],
     'Cara had already left, and the host is not waiting for itself');

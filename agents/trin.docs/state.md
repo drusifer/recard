@@ -1160,3 +1160,50 @@ sorting, no back-compat. When it starts: `tests/piles.test.js`,
 the suites most likely to need real rewriting (not just extending), and
 "no back-compat" means stale tests get deleted outright rather than
 kept passing against an alias — that is this project's standing rule.
+
+---
+## Test-pyramid correction — 2026-09-02 (D104)
+
+User challenged "why not ui.js tests? what about the test pyramid" after
+a *nit shipped to `ui.js` untested, then gave the insight that resolved
+it: "it might be easier to test the ux actions now that we have the
+menu."
+
+**I had the diagnosis wrong and said so.** I'd called it "ui.js has zero
+automated tests project-wide" (D101 retro, and again this session).
+False: `tests/ui.test.js` exists and covers `clampMenuPosition`. The
+accurate statement is narrower - ui.js's DOM-BUILDING/WIRING code was
+untested, while every pure decision behind it had been extracted and
+tested (`dropTarget`, `touchDrag`, `panelLayout`, `seating`,
+`layoutOverrides`, `pileActions`, `clampMenuPosition`).
+
+**The shape was bimodal, not flat.** Thick pure base + a real Playwright
+browser layer that has been in the always-run gate since 2026-08-20
+(`lint:design` drives the app at 3 viewports). Missing middle: nothing
+asserted a rendered control is wired to the reducer action it claims.
+
+**Why it was missing, and why that expired:** pre-D101 every card action
+was a GESTURE (HTML5 drag, or a facing-dependent tap). Playwright can't
+meaningfully synthesise HTML5 drag-and-drop, so they were undrivable.
+The context menu gave every action a named, clickable row - the
+constraint lifted and nobody re-checked the assumption. Worth
+generalising: when a UI affordance changes, re-ask what became testable.
+
+### What now exists
+- `cardMenuItems()` in `pileActions.js` + 7 unit tests (row text,
+  ordering, targeted/destructive flags, unknown-id skip).
+- `tests/uiActions.browser.mjs` - 7 Playwright tests, discrete `test()`
+  cases per D60's lesson, own port (8212), rows clicked by
+  `data-action` not by text so a relabelling *nit can't break them.
+- `npm run test:ui` / `make test-ui`. NOT in `npm test` (needs a
+  browser, seconds not ms).
+
+### Verification standard applied
+3 consecutive clean runs (no-flakes rule) + 3 mutations, all caught:
+icon-only rows -> 1 fail; Move wiring removed -> 5 fails; conceal wired
+to rotate -> 2 fails. Restored 7/7.
+
+**Scope line to hold:** this layer tests WIRING only. Row content ->
+`pileActions.test.js`; reducer behavior -> `state.test.js`. Letting it
+drift into re-testing those is how it becomes the slow redundant e2e
+suite D60 deleted.

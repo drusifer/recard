@@ -13,6 +13,16 @@
   --card-bg: #f8f7f2;
   --card-text: #1b1f24;
   --card-red: #c0392b;
+  /* *nit (direct user request): "the cards need borders." They HAD one -
+     `1px solid #d9d9d3` - which reads fine where a card sits against the
+     dark felt, and is nearly invisible where it matters most: card ON
+     card. In a fan or an overlapped stack every internal edge is cream
+     against cream, so seven cards read as one pale blob with pips on it.
+     A card's edge is a real, load-bearing affordance here (it's the
+     click target, and the only cue for how many cards are in a spread),
+     so it gets a token and a colour with actual contrast against
+     `--card-bg`, not a hairline that only works over felt. */
+  --card-border: #6f6c60;
   /* Card geometry lives here so the stack/overlap offsets, the deck
      stack and the card itself can't drift apart. `--card-w` is a
      *minimum*: a card grows past it if the browser enlarges its text
@@ -381,7 +391,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   position: relative;
   background: var(--card-bg);
   color: var(--card-text);
-  border: 1px solid #d9d9d3;
+  border: 1px solid var(--card-border);
   border-radius: var(--radius-sm);
   min-width: var(--card-w);
   min-height: var(--card-h);
@@ -481,8 +491,27 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    ever changes again, unlike that rule's own fixed `1.7rem`. Reveals
    35% of each covered card - still enough for the corner rank/suit and
    an individual click target, just a tighter fan than the first pass. */
-.fan-row .middle-card + .middle-card {
-  margin-left: calc(-1 * (var(--card-w) * 0.65) - var(--card-gap));
+/* *nit (direct user request): "pile actions for tighten/loosen to adjust
+   the overlap on fan and meld piles or runs or whatever."
+
+   ONE rule for every row, with no literal in it. The 0.65 that used to
+   be hardcoded here is `HandPile.defaultSpread` now, and `--pile-spread`
+   is written on EVERY row by `renderPileCards` from the pile's own
+   effective value - there is no "unadjusted piles take the old path"
+   branch, because that would be two ways to lay out a row and the
+   second one would be the thing nobody remembers to update.
+
+   The pitch is `card-w + card-gap`, so `--pile-spread` reads as the
+   fraction of one card's stride that the next card covers: 0 is a plain
+   gap-separated row (the base `Pile` default - a meld or a plain pile,
+   unchanged), and 0.85 (MAX_SPREAD) still leaves a readable sliver.
+
+   `:not([data-layout])` because a card placed with an explicit
+   stack/overlap intent (US-32/33, dropped that way by a player) owns
+   its own margin below - the pile's spread is the default for cards
+   that were never given one, never an override of a real placement. */
+.card-row .middle-card + .middle-card:not([data-layout]) {
+  margin-left: calc(-1 * (var(--card-w) + var(--card-gap)) * var(--pile-spread, 0));
 }
 
 /* D91: the Split picker (`renderSplitPicker`, ui.js) - a `fan-row` used

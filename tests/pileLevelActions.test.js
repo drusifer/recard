@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ACTION_SPECS, pileLevelActions, actionsForCard, targetsForAction } from '../src/pileActions.js';
+import { PILE_TYPES } from '../src/piles/pileTypes.js';
+import { PlayerHandPile } from '../src/piles/PlayerHandPile.js';
+import { MIN_SPREAD, MAX_SPREAD } from '../src/piles/Pile.js';
 
 const deck = { id: 'deck', kind: 'deck', ownerId: null };
 
@@ -60,7 +63,7 @@ test('reshuffleDeal is marked destructive and deal is not', () => {
 // --- Sprint 12 (US-46, D34/D36) ---------------------------------------
 
 test('D34/D87: the hand offers pile-level actions to its own owner - sort + changePileType (pass removed, direct user request)', () => {
-  assert.deepEqual(pileLevelActions('hand', { isHost: false, isOwner: true }), ['sortRank', 'sortSuit', 'changePileType']);
+  assert.deepEqual(pileLevelActions('hand', { isHost: false, isOwner: true }), ['sortRank', 'sortSuit', 'changePileType', 'tighten', 'loosen']);
 });
 
 test('D34: a hand pile offers nothing to a viewer who does not own it', () => {
@@ -170,4 +173,51 @@ test('Phase 57: move stays unmarked even in that exact one-target shape - no sho
   // skip `beginTargeting`, no matter how few zones exist right now.
   assert.equal(ACTION_SPECS.move.singleTarget, undefined);
   assert.equal(ACTION_SPECS.pickup.singleTarget, undefined);
+});
+
+
+// *nit (direct user request): "pile actions for tighten/loosen to adjust
+// the overlap on fan and meld piles or runs or whatever." Which piles
+// OFFER it is a per-class fact, not a kind list kept somewhere central.
+test('tighten/loosen are offered by a hand - the fan the *nit was actually about', () => {
+  const actions = new PlayerHandPile({ id: 'hand:me', kind: 'hand', ownerId: 'me' })
+    .pileActions({ isOwner: true, isShared: false, cards: [] });
+  assert.ok(actions.includes('tighten'), `got ${JSON.stringify(actions)}`);
+  assert.ok(actions.includes('loosen'), `got ${JSON.stringify(actions)}`);
+});
+
+test('tighten/loosen are offered by melds and runs too - any pile that lays its cards out in a row', () => {
+  for (const kind of ['run', 'set', 'foundation', 'plain', 'discard']) {
+    const actions = new PILE_TYPES[kind]({ id: `p:${kind}`, kind, ownerId: null })
+      .pileActions({ isOwner: true, isShared: true, cards: [] });
+    assert.ok(actions.includes('tighten'), `${kind} should offer tighten, got ${JSON.stringify(actions)}`);
+    assert.ok(actions.includes('loosen'), `${kind} should offer loosen, got ${JSON.stringify(actions)}`);
+  }
+});
+
+// A deck is a STACK - its cards sit on top of each other by definition,
+// so there is no overlap to adjust. The exclusion is the class's own
+// (DeckPile fully overrides pileActions), not a check anywhere else.
+test('a deck offers neither - a stack has no spread to adjust', () => {
+  const actions = new PILE_TYPES.deck({ id: 'deck', kind: 'deck', ownerId: null })
+    .pileActions({ isHost: true, isOwner: true, isShared: true, cards: [] });
+  assert.ok(!actions.includes('tighten'), `got ${JSON.stringify(actions)}`);
+  assert.ok(!actions.includes('loosen'), `got ${JSON.stringify(actions)}`);
+});
+
+// Clicking an action that cannot move anything is a dead control - the
+// same reason `split` is disabled below 2 cards.
+test('tighten is disabled at maximum spread, loosen at minimum - no dead clicks at the limits', () => {
+  const pile = new PILE_TYPES.plain({ id: 'p', kind: 'plain', ownerId: null });
+  assert.ok(pile.disabledActions(3, { spread: MAX_SPREAD }).includes('tighten'));
+  assert.ok(!pile.disabledActions(3, { spread: MAX_SPREAD }).includes('loosen'));
+  assert.ok(pile.disabledActions(3, { spread: MIN_SPREAD }).includes('loosen'));
+  assert.ok(!pile.disabledActions(3, { spread: MIN_SPREAD }).includes('tighten'));
+});
+
+test('neither is disabled in the middle of the range', () => {
+  const disabled = new PILE_TYPES.plain({ id: 'p', kind: 'plain', ownerId: null })
+    .disabledActions(3, { spread: (MIN_SPREAD + MAX_SPREAD) / 2 });
+  assert.ok(!disabled.includes('tighten'));
+  assert.ok(!disabled.includes('loosen'));
 });

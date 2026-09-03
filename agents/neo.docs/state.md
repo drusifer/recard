@@ -389,3 +389,48 @@ was written — no stories, no arch, no code. Next session starts clean
 at `@Cypher *pm plan sprint`. The user's own framing to keep in mind:
 "if you do this right the existing code shouldn't have to change too
 much."
+
+---
+## Session 2026-09-02 (late): D102-D106, five *nits
+
+All five landed, all reviewed, all uncommitted at time of writing.
+
+- **D102** `play` verb retired. `transferCard` already stamped a card
+  ENTERING a hand; the mirror (leaving a hand -> public/face-up) was
+  never written, so a verb carried it. Wrote the mirror; PLAY, playCard,
+  ACTION_SPECS.play, a dead onPlay option and middleCardVisibility all
+  became dead. Disclosed: a hand is now splittable at the reducer level
+  (the old exclusion was incidental - it was the one kind not offering
+  the string 'move'); not patched back, per D92.
+- **D103** REVEAL -> FLIP_CARD, a real toggle. One reducer action, two
+  offer ids (reveal/conceal) so the menu labels the direction.
+  `conceal` not `hide` - `hide` is already the PILE-level action in the
+  same flat ACTION_SPECS table. That collision was caught by
+  `no-dupe-keys`, NOT by a test.
+- **D104** Browser test layer (`tests/uiActions.browser.mjs`,
+  `npm run test:ui`). See trin.docs/state.md for the full reasoning.
+- **D105** `--card-border` token. Old border vanished card-on-card.
+- **D106** Pile spread + Tighten/Loosen.
+
+### Two lessons worth carrying
+
+1. **A pile field must be named in THREE explicit lists or it is
+   silently dropped:** `Pile.constructor`, `Pile.toJSON()`,
+   `Pile.getView()`. `insertCard`/`removeCard` rebuild from `toJSON()`,
+   and `viewFor` sends `getView()`. `spread` was written correctly by
+   the reducer and did nothing on screen because only `getView` was
+   missing it - every reducer test passed. Check all three when adding
+   any pile-level field.
+2. **The user corrected me mid-implementation for back-compat scaffolding
+   again.** I had kept the old CSS constant as a `var()` fallback plus a
+   `data-spread` opt-in so unadjusted piles rendered by the old path. It
+   looked like caution; it was two code paths. The fix was to change the
+   FORMULA so the new single path expresses the old default naturally
+   (spread 0 = plain row, hand default 0.7 = the old fan). When a
+   migration seems to need a fallback, re-examine the formula first.
+
+### Verification standard used throughout
+TDD (tests first, confirmed red), mutation checks on every load-bearing
+guard, and - new this session - real screenshots for the visual *nits
+rather than reading the CSS. 545 unit + 10 browser tests. lint:js 8 /
+lint:design 5, both confirmed pre-existing against a stashed clean tree.

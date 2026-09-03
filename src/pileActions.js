@@ -49,18 +49,28 @@ export const ACTION_SPECS = {
   // Card-level: act on the card under the cursor, offered in its hover
   // row. `target: null` means it happens in place, with no destination
   // to pick.
-  // UX follow-up (direct user request): "Hide as"/Play Hidden removed
-  // entirely - `play` is the only hand-play action now, unconditionally
-  // public, the fast default gesture (tap or drag), matching Draw's own
-  // "highest-frequency action gets a shortcut" precedent (D36). Keeps
-  // `target: 'table'` because a native drag of the card itself DOES let
-  // the drop location choose a destination pile (`highlightDragTargets`
-  // in ui.js reads this). D90: `'table'`, not `'zone'` - this means "any
-  // table-side pile" (`tableSide`), never the real Zone entity.
-  play: { label: 'Play', target: 'table', from: 'hand', icon: '▶' },
   pickup: { label: 'Pick up', target: 'hand', from: 'table', icon: '↑' },
+  // D102 (*nit): `play` is gone - a hand card offers plain `move` like
+  // every other pile's card does. `from: 'table'` is not a restriction
+  // to non-hand sources: `targetsForAction` reads `from` only to decide
+  // which piles LIGHT UP as destinations, and a hand's own cards were
+  // already flowing through this same generic drag path.
   move: { label: 'Move', target: 'table', from: 'table', icon: '⇄' },
   reveal: { label: 'Turn over', target: null, from: 'table', icon: '👁' },
+  // *nit (direct user request): "add a show/hide cardAction to toggle an
+  // individual card's show/hide status." `reveal`'s other direction.
+  // Two spec entries, one reducer action (`FLIP_CARD`) - the split
+  // exists so the menu can name the direction the card is actually
+  // going, which one entry labelled "Show/Hide" could not do.
+  // `target: null`, in place, exactly like `reveal`.
+  //
+  // Named `conceal`, not `hide`: `hide` is ALREADY taken, by the
+  // PILE-level action further down this same table ("Turn every card in
+  // this pile face-down", US-62). One flat `ACTION_SPECS` covers both
+  // card- and pile-level actions (D51), so the two would silently
+  // collide - and they are genuinely different operations, one card
+  // versus a whole pile, not one rule at two scales.
+  conceal: { label: 'Turn face down', target: null, from: 'table', icon: '🙈' },
   // D48/D40: in-place like `reveal` (no destination to pick), but stays
   // a hover-row button rather than a tap gesture - `reveal`'s tap
   // conversion (Sprint 12/Phase 55) was its own dedicated Smith-gated
@@ -119,6 +129,15 @@ export const ACTION_SPECS = {
   // were never part of before (US-35/36 shipped as a standalone button
   // row, not through `pileLevelActions` at all).
   shuffle: { label: 'Shuffle', destructive: false, hint: 'Shuffle the deck stock in place.', icon: '⇌' },
+  // *nit (direct user request): "pile actions for tighten/loosen to
+  // adjust the overlap on fan and meld piles or runs or whatever."
+  // Pile-level and in place, same shape as `shuffle`/`hide`/`show` - no
+  // `target`, so never draggable. Two SPEC entries for one reducer
+  // action (`ADJUST_PILE_SPREAD`, a signed delta), the same split D103
+  // used for reveal/conceal: the direction belongs in the label, not in
+  // a second code path.
+  tighten: { label: 'Tighten', destructive: false, hint: 'Overlap this pile\'s cards more tightly.', icon: '⇥' },
+  loosen: { label: 'Loosen', destructive: false, hint: 'Spread this pile\'s cards further apart.', icon: '⇤' },
   // D91/D92 (direct user request: "we're missing... split pile", then
   // "split should always fan the pile to allow the guided picker" -
   // deck included, no exceptions): the old `'split'` (roughly-in-half,
@@ -228,6 +247,53 @@ export function actionsForCard(pile, card, viewerId) {
 }
 
 /**
+ * The card context menu's rows, as data (D101's menu, `ui.js`'s
+ * `openCardContextMenu`).
+ *
+ * Extracted here rather than left inline in the DOM builder because
+ * this is the same pure/DOM split every other piece behind `ui.js`
+ * already follows - `dropTarget`, `touchDrag`, `panelLayout`,
+ * `seating`, `layoutOverrides`, `clampMenuPosition` - and it was the
+ * one that got skipped. What a row SAYS and how it DISPATCHES are
+ * decisions; `document.createElement` is plumbing. Only the plumbing
+ * needs a browser.
+ *
+ * `text` is what the row shows: icon THEN name. *nit, direct user
+ * request: "put the name of the action in the card action menu" - these
+ * rows were icon-only, with the name reachable only as a tooltip,
+ * because they were built with `applyIconButton` (the pile header's
+ * compact button helper). `label` is kept separately for the tooltip
+ * and aria-label, which stay the name alone.
+ *
+ * `targeted` is D101's dispatch split as a field instead of a `switch`
+ * buried in a click handler: an in-place action (reveal/conceal/rotate)
+ * fires the moment it's clicked, a targeted one (move/pickup) has to
+ * pick a destination first. It reads `spec.target`, so a new action is
+ * classified by its own spec entry, never by a list kept in the UI.
+ *
+ * An id with no spec is skipped rather than rendered blank - the DOM
+ * builder used to index `ACTION_SPECS` directly and would have thrown
+ * on `spec.icon`.
+ *
+ * @param {string[]} actionIds ids from `actionsForCard`, in offer order
+ * @returns {{id: string, text: string, label: string,
+ *   destructive: boolean, targeted: boolean}[]}
+ */
+export function cardMenuItems(actionIds) {
+  return actionIds.flatMap((id) => {
+    const spec = ACTION_SPECS[id];
+    if (!spec) return [];
+    return [{
+      id,
+      text: `${spec.icon} ${spec.label}`,
+      label: spec.label,
+      destructive: Boolean(spec.destructive),
+      targeted: spec.target !== null && spec.target !== undefined,
+    }];
+  });
+}
+
+/**
  * Which of `piles` can receive `action` - i.e. what should light up as a
  * drop target once the user picks that action.
  *
@@ -306,8 +372,8 @@ export function pileLevelActions(kind, context = {}) {
  * @param {number} count
  * @returns {string[]} action ids currently disabled
  */
-export function disabledPileActionsFor(kind, count) {
-  return pileForKind(kind)?.disabledActions(count) ?? [];
+export function disabledPileActionsFor(kind, count, { spread } = {}) {
+  return pileForKind(kind)?.disabledActions(count, { spread }) ?? [];
 }
 
 /**

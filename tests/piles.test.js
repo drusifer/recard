@@ -51,13 +51,17 @@ test('every concrete pile class extends Pile', () => {
 // assertCardsConserved. No named exceptions: Deck's own former [] override
 // was struck (direct user correction), so this now covers every
 // registered kind with zero carve-outs.
-test('universal drag-and-drop guarantee: every concrete pile kind offers move or play on a visible card', () => {
+test('universal drag-and-drop guarantee: every concrete pile kind offers move on a visible card', () => {
   const card = { id: 'c1', faceUp: true };
   for (const [kind, PileClass] of Object.entries(PILE_TYPES)) {
     const pile = new PileClass({ kind, cards: [card], ownerId: 'someone-else' });
     const actions = pile.cardActions(card, 'viewer-id');
-    assert.ok(actions.includes('move') || actions.includes('play'),
-      `${kind} pile must offer move or play for drag-and-drop (Core invariant): got ${JSON.stringify(actions)}`);
+    // D102: this used to accept `move` OR `play` - the hand was the
+    // one kind that satisfied it with `play`. One verb now, so the
+    // guarantee is strictly stronger: every kind, `move`, no
+    // alternative spelling accepted.
+    assert.ok(actions.includes('move'),
+      `${kind} pile must offer move for drag-and-drop (Core invariant): got ${JSON.stringify(actions)}`);
   }
 });
 
@@ -161,9 +165,11 @@ test('deck showsFace: always false, regardless of faceUp - a deck is always hidd
 // all cards and piles... remove the older restrictions from ALL pile
 // and zone types", confirmed to include hand): a non-owner used to get
 // `[]` on someone else's hand card - now gets `['move']`, so any player
-// can drag a card straight out of anyone's hand. The owner still gets
-// `['play']`, not `['move']` - that's a naming necessity (PLAY's own
-// authorization needs the literal string `'play'`), not a restriction.
+// can drag a card straight out of anyone's hand. D102 (*nit, "get rid
+// of the Play card action on the user hand"): the owner gets `['move']`
+// too now - `['play']` was a naming necessity (PLAY's own authorization
+// needed the literal string), and retiring the verb removed the last
+// reason the two perspectives spelled the same capability differently.
 //
 // Direct user correction (later): "I don't like the special ownership
 // property for hand... make PlayerHand and OpponentHand as separate
@@ -171,8 +177,8 @@ test('deck showsFace: always false, regardless of faceUp - a deck is always hidd
 // used to compute `this.ownerId === viewerId` itself; now
 // `pileInstanceFor` picks the class, and each one's `cardActions` is an
 // unconditional fact about that class, not a runtime comparison.
-test('hand cardActions: PlayerHandPile always offers play, OpponentHandPile always offers move', () => {
-  assert.deepEqual(new PlayerHandPile(myHand).cardActions({ id: 'c' }, 'me'), ['play']);
+test('hand cardActions: both PlayerHandPile and OpponentHandPile offer move - one verb, D102', () => {
+  assert.deepEqual(new PlayerHandPile(myHand).cardActions({ id: 'c' }, 'me'), ['move']);
   assert.deepEqual(new OpponentHandPile(theirHand).cardActions({ id: 'c' }, 'me'), ['move']);
 });
 
@@ -191,8 +197,8 @@ test('hand cardActions: PlayerHandPile always offers play, OpponentHandPile alwa
 // `HandPile` override) no longer does. There is nothing left to test
 // here; a card is a card, full stop, for every viewer.
 
-test('zone (base Pile) cardActions: face-up card offers pickup/move, not reveal', () => {
-  assert.deepEqual(new Pile(table).cardActions({ faceUp: true, owner: null }, 'me'), ['pickup', 'move', 'rotate']);
+test('zone (base Pile) cardActions: a face-up card offers conceal (not reveal) - the *nit toggle\'s other direction', () => {
+  assert.deepEqual(new Pile(table).cardActions({ faceUp: true, owner: null }, 'me'), ['conceal', 'pickup', 'move', 'rotate']);
 });
 
 test('zone cardActions: face-down card offers reveal/pickup/move/rotate - all four, no ownership check left, D83/D84', () => {
@@ -203,8 +209,8 @@ test('zone cardActions: face-down card offers reveal/pickup/move/rotate - all fo
 
 test('cascade/rankAdjacent inherit the same cardActions rule as the base Pile, unmodified', () => {
   const faceUp = { faceUp: true, owner: null };
-  assert.deepEqual(new CascadePile(table).cardActions(faceUp, 'me'), ['pickup', 'move', 'rotate']);
-  assert.deepEqual(new RankAdjacentPile(table).cardActions(faceUp, 'me'), ['pickup', 'move', 'rotate']);
+  assert.deepEqual(new CascadePile(table).cardActions(faceUp, 'me'), ['conceal', 'pickup', 'move', 'rotate']);
+  assert.deepEqual(new RankAdjacentPile(table).cardActions(faceUp, 'me'), ['conceal', 'pickup', 'move', 'rotate']);
 });
 
 // --- pileActions: characterized against pileActions.js's pileLevelActions ---
@@ -221,7 +227,7 @@ test('deck disabledActions: deal disabled at 0 cards, split disabled below 2', (
 });
 
 test('hand pileActions: sort + changePileType, owner only - pass removed (direct user request, not a requirement)', () => {
-  assert.deepEqual(new HandPile(myHand).pileActions({ isOwner: true }), ['sortRank', 'sortSuit', 'changePileType']);
+  assert.deepEqual(new HandPile(myHand).pileActions({ isOwner: true }), ['sortRank', 'sortSuit', 'changePileType', 'tighten', 'loosen']);
   assert.deepEqual(new HandPile(myHand).pileActions({ isOwner: false }), []);
 });
 
@@ -272,9 +278,18 @@ test('plain pile insertCard: placement before/after a target, layout on the corr
   assert.equal(after.cards.find((c) => c.id === 'x').layout, 'stack');
 });
 
-test('hand canRemoveCard: PLAY authorized on PlayerHandPile (your own hand), never on OpponentHandPile (inherited from Pile, resolved via cardActions)', () => {
-  assert.equal(new PlayerHandPile(myHand).canRemoveCard({ id: 'c' }, 'me', 'play'), true);
-  assert.equal(new OpponentHandPile(theirHand).canRemoveCard({ id: 'c' }, 'me', 'play'), false, 'not your hand');
+// D102: was "PLAY authorized on PlayerHandPile, never on
+// OpponentHandPile". `'move'` is the verb on both sides now, and
+// OpponentHandPile authorizes it too - a non-owner has been able to
+// drag a card out of someone else's hand since D83 ("fully permissive
+// drag and drop... confirmed to include hand"), it just spelled that
+// capability `'move'` while the owner's spelled it `'play'`. Removing
+// the verb removed the asymmetry, not a restriction: nothing that was
+// forbidden became allowed here.
+test('hand canRemoveCard: move authorized on BOTH hand perspectives - the owner\'s and anyone else\'s (D102, resolved via cardActions)', () => {
+  assert.equal(new PlayerHandPile(myHand).canRemoveCard({ id: 'c' }, 'me', 'move'), true);
+  assert.equal(new OpponentHandPile(theirHand).canRemoveCard({ id: 'c' }, 'me', 'move'), true, 'permissive since D83');
+  assert.equal(new PlayerHandPile(myHand).canRemoveCard({ id: 'c' }, 'me', 'play'), false, 'the retired verb authorizes nothing');
 });
 
 test('hand removeCard/insertCard: pure, appends on insert (both inherited from Pile, unmodified)', () => {
@@ -307,11 +322,11 @@ const discard = { id: 'discard', kind: 'discard', ownerId: null };
 
 test('discard cardActions: inherited from Pile, unmodified - same as any other zone (D45 reversed)', () => {
   const faceUp = { id: 'c', faceUp: true, owner: null };
-  assert.deepEqual(new DiscardPile(discard).cardActions(faceUp, 'me'), ['pickup', 'move', 'rotate']);
+  assert.deepEqual(new DiscardPile(discard).cardActions(faceUp, 'me'), ['conceal', 'pickup', 'move', 'rotate']);
 });
 
 test('discard pileActions: take/split/hide/show, inherited from Pile unmodified - same shared/owner-open rule', () => {
-  assert.deepEqual(new DiscardPile(discard).pileActions({ isShared: true }), ['take', 'split', 'changePileType', 'remove']);
+  assert.deepEqual(new DiscardPile(discard).pileActions({ isShared: true }), ['take', 'split', 'changePileType', 'remove', 'tighten', 'loosen']);
   assert.deepEqual(new DiscardPile(discard).pileActions({}), []);
 });
 
@@ -332,7 +347,7 @@ test('exile cardActions: inherited from Pile via DiscardPile, unmodified - drag-
   const faceUp = { id: 'c', faceUp: true, owner: null };
   assert.deepEqual(
     new ExilePile({ id: 'exile', kind: 'exile', ownerId: null }).cardActions(faceUp, 'me'),
-    ['pickup', 'move', 'rotate'],
+    ['conceal', 'pickup', 'move', 'rotate'],
   );
 });
 
@@ -371,7 +386,7 @@ test('foundation canAccept: same suit, exactly rank+1 (RunPile\'s rule, inherite
 test('foundation: append-only insert; card actions are the SAME as any other pile\'s now (inherited from Pile, not locked by MeldPile)', () => {
   const faceUp = { id: 'c', faceUp: true, owner: null };
   const pile = { cards: [{ id: 'a' }] };
-  assert.deepEqual(new FoundationPile(pile).cardActions(faceUp, 'me'), ['pickup', 'move', 'rotate']);
+  assert.deepEqual(new FoundationPile(pile).cardActions(faceUp, 'me'), ['conceal', 'pickup', 'move', 'rotate']);
   assert.equal(new FoundationPile(pile).canRemoveCard(faceUp, 'me', 'move'), true);
   const inserted = new FoundationPile(pile).insertCard({ id: 'b' });
   assert.deepEqual(inserted.cards.map((c) => c.id), ['a', 'b']);
@@ -379,7 +394,7 @@ test('foundation: append-only insert; card actions are the SAME as any other pil
 
 test('foundation: split/changePileType are the pile-level actions offered, inherited from MeldPile (D71/US-74, D91)', () => {
   assert.deepEqual(new FoundationPile({}).pileActions({}), []);
-  assert.deepEqual(new FoundationPile({}).pileActions({ isShared: true }), ['split', 'changePileType']);
+  assert.deepEqual(new FoundationPile({}).pileActions({ isShared: true }), ['split', 'changePileType', 'tighten', 'loosen']);
 });
 
 test('foundation: tableSide true (inherited from Pile), resolveDropTarget always empty (no halo geometry, from MeldPile)', () => {
@@ -414,7 +429,7 @@ test('set: inherits MeldPile\'s append-only insert, single-slot drop target, and
   const inserted = new SetPile(pile).insertCard({ id: 'b', rank: 'K', suit: 'hearts' });
   assert.deepEqual(inserted.cards.map((c) => c.id), ['a', 'b']);
   assert.deepEqual(new SetPile(pile).resolveDropTarget([{ cardId: 'a' }], { x: 0, y: 0 }), {});
-  assert.deepEqual(new SetPile(pile).pileActions({ isShared: true }), ['split', 'changePileType']);
+  assert.deepEqual(new SetPile(pile).pileActions({ isShared: true }), ['split', 'changePileType', 'tighten', 'loosen']);
   assert.equal(SetPile.reparentable, false);
 });
 
@@ -485,7 +500,7 @@ test('rankAdjacent insertCard: STACK - lands on top (index 0), same convention a
 
 test('rankAdjacent: no turn-order/ownership restriction on move - matches Spit\'s simultaneous-play rule (inherited from Pile)', () => {
   const faceUp = { id: 'c', faceUp: true, owner: null };
-  assert.deepEqual(new RankAdjacentPile({}).cardActions(faceUp, 'anyone'), ['pickup', 'move', 'rotate']);
+  assert.deepEqual(new RankAdjacentPile({}).cardActions(faceUp, 'anyone'), ['conceal', 'pickup', 'move', 'rotate']);
 });
 
 // --- pileKindLabel (direct user request: change-type menu labels) -----

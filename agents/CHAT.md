@@ -732,3 +732,176 @@ npm run lint:style
 ---
 [<small>2026-09-02 22:06:17</small>] [**Mouse**]->[**User**] *handoff*:
  Correction to my close-out note: user asked for main too, so main was fast-forwarded to b7bb098 and pushed. Both branches + origin now identical, no divergence - the 'main is 1 behind' line in Neo's and Morpheus's state files was stale within the hour and has been fixed in place. Still nothing in-flight.
+
+---
+[<small>2026-09-02 22:09:27</small>] [**User**]->[**all**] *request*:
+ *chat init
+
+---
+[<small>2026-09-02 22:09:45</small>] [**Mouse**]->[**User**] *sm init*:
+ Bob Protocol initialized. Agent links synced. CHAT.md tail + mouse state reconciled: nothing in flight, dev==main==origin at 83e8d0c, 517/517 green, lint baseline unchanged (7 js / 3 design). Queued and unstarted: the Pileable sprint (Chips/Tokens/Cards extend Pileable, PileableActions extracted from cardActions, per-type UX+sorting, no back-compat) - no stories or arch exist yet. @Cypher *pm plan sprint is the next move. Awaiting user go-ahead.
+
+---
+[<small>2026-09-02 22:10:09</small>] [**User**]->[**all**] *request*:
+ *nit get rid of the 'Play' card action on the user hand. That's old kruft
+
+---
+[<small>2026-09-02 22:11:29</small>] [**Mouse**]->[**Morpheus**] *sm handoff*:
+ *nit escalated: user confirmed the FULL retire of the 'play' verb, not just the D101 menu entry - hand cards use the generic 'move' like every other pile, per the standing 'a hand is just a regular pile' direction. Not a one-liner: PLAY carries a {owner:null, faceUp:true} public transform MOVE doesn't, and 'play' is the authorization string canRemoveCard/draggable both read. @Morpheus *lead arch first, then Neo.
+
+---
+[<small>2026-09-02 22:12:16</small>] [**Morpheus**]->[**Neo**] *lead decision*:
+ D102: retire the 'play' verb entirely. transferCard already stamps toHandCard generically when a card ENTERS a hand; 'play' exists only because the mirror (leaving a hand -> {owner:null,faceUp:true}) was never written, so a verb carried it instead. Write the mirror, and PLAY/playCard/ACTION_SPECS.play/middleCardVisibility all become dead. Rejected: keep PLAY as a MOVE_CARD alias (back-compat shim, user said no). PlayerHandPile.cardActions -> ['move']. @Neo *swe impl, TDD.
+
+---
+[<small>2026-09-02 22:13:18</small>] [**Mouse**]->[**all**] *sm backlog*:
+ QUEUED, not started: *nit - pile-level 'Tighten'/'Loosen' actions to adjust the card overlap/spread on fan-style piles (hand, meld, run, and whatever else fans). Logged mid-flight during the D102 play-verb retire; pick it up after that lands. @Cypher/@Morpheus to size when it comes up.
+
+---
+[<small>2026-09-02 22:14:12</small>] [**Mouse**]->[**all**] *sm backlog*:
+ QUEUED, not started: *nit - cards need borders. Second queued item this session (after Tighten/Loosen fan overlap). Both wait on the D102 play-verb retire currently in flight. @Cypher/@Morpheus to size.
+
+---
+[<small>2026-09-02 22:18:46</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make lint | /home/drusifer/Projects/recard/build/build.out
+
+
+See ARCHITECTURE.md UI Conventions (44px floor) and D24 (zone overlap) for the invariants being checked.
+make: *** [Makefile:31: lint] Error 1
+
+---
+[<small>2026-09-02 22:20:24</small>] [**Morpheus**]->[**Trin**] *lead decision*:
+ D102 recorded: the 'play' verb is retired outright - PLAY, playCard, ACTION_SPECS.play, the dead onPlay option and middleCardVisibility all deleted; a hand card offers plain 'move'. Chose writing transferCard's missing mirror (leaving a hand -> public/face-up, the twin of the toHandCard stamp already there) over keeping PLAY as a MOVE_CARD alias, which would be a back-compat shim AND preserve the hand's private vocabulary. Full text: docs/ARCHITECTURE.md D102.
+
+---
+[<small>2026-09-02 22:20:34</small>] [**Mouse**]->[**Trin**] *sm handoff*:
+ *nit received: add a show/hide cardAction toggling an individual card's shown/hidden status. Not queued - starting it as soon as D102 (play-verb retire) clears Trin. Note for design: 'reveal' (Turn over) already exists but is one-way (face-down -> face-up, no-ops on a face-up card), so this is likely reveal becoming a real toggle rather than a second action.
+
+---
+[<small>2026-09-02 22:21:04</small>] [**Trin**]->[**Neo**] *qa handoff*:
+ *qa review D102: APPROVED. 520/520 (was 517 + 3 new D102 tests), lint:js 8 and lint:design 5 - both verified identical on a stashed clean tree, so those baselines are pre-existing, not this change (the 7/3 figures in state files were stale). Mutation-checked the new guard both ways: flipping the if/else order fails 4 tests, deleting the leaving-a-hand rule fails 3. Not a decorative branch. @Neo *swe impl the show/hide toggle next.
+
+---
+[<small>2026-09-02 22:25:22</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 523
+ℹ suites 0
+ℹ pass 523
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1255.512562
+
+---
+[<small>2026-09-02 22:25:54</small>] [**Morpheus**]->[**Trin**] *lead decision*:
+ D103 recorded: REVEAL -> FLIP_CARD, a real toggle. Chose ONE reducer action reading the card's current facing over a HIDE alongside REVEAL (two paths for one operation, the exact thing D75 corrected). The offer layer IS two ids - reveal/conceal - purely so the menu labels the direction; both dispatch FLIP_CARD. 'conceal' not 'hide': hide is already the PILE-level action in the same ACTION_SPECS table. Full text: docs/ARCHITECTURE.md D103.
+
+---
+[<small>2026-09-02 22:26:06</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 523
+ℹ suites 0
+ℹ pass 523
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1276.504766
+
+---
+[<small>2026-09-02 22:26:41</small>] [**Trin**]->[**User**] *qa handoff*:
+ *qa review D103: APPROVED. 523/523 (520 + 3 net new), lint:js back to the 8 pre-existing errors after fixing 3 I introduced - one was a REAL collision the tests could never have caught: a duplicate 'hide' key in ACTION_SPECS, since the pile-level Hide already owned that id. Renamed to 'conceal'. Mutation-checked FLIP_CARD both ways: hardcoding faceUp:true fails 3, treating an absent faceUp as face-up fails 2. @User both *nits done.
+
+---
+[<small>2026-09-02 22:27:02</small>] [**Mouse**]->[**User**] *handoff*:
+ Session state saved. D102+D103 shipped, 523/523, real lint baseline corrected to 8 js / 5 design (the 7/3 in state files was stale). Diff is UNCOMMITTED - user hasn't asked to commit. Queue: (1) Tighten/Loosen fan-overlap pile actions, (2) cards need borders, (3) the Pileable sprint, still needing @Cypher *pm plan sprint first.
+
+---
+[<small>2026-09-02 22:49:02</small>] [**User**]->[**all**] *request*:
+ *nit put the name of the action in the card action menu
+
+---
+[<small>2026-09-02 22:49:48</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 523
+ℹ suites 0
+ℹ pass 523
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1306.784684
+
+---
+[<small>2026-09-02 22:50:18</small>] [**Neo**]->[**User**] *swe impl*:
+ *nit done: card context-menu rows now read icon + action name ('▶ Move', '👁 Turn over'), not a bare glyph with the name hidden in a tooltip. Root cause: D101 built these rows with applyIconButton, the COMPACT PILE-HEADER helper (icon-only by design) - the menu's own sibling, buildEnumActionMenu, has always labelled its rows, and .pile-action-menu-item was already a left-aligned 44px/8rem row built for text. No CSS change needed. 523/523, lint baseline unchanged.
+
+---
+[<small>2026-09-02 22:56:00</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-ui | /home/drusifer/Projects/recard/build/build.out
+✔ a card menu never opens empty (52.199233ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3142.883299
+
+---
+[<small>2026-09-02 22:59:14</small>] [**Morpheus**]->[**Trin**] *lead decision*:
+ D104 recorded: card actions get a browser test layer. User's diagnosis was right - the pyramid was BIMODAL: thick pure base + a real Playwright layer already in the gate (lint:design), with the middle (is this control wired to that reducer action?) missing. It was missing because pre-D101 every card action was a GESTURE and Playwright can't synthesise HTML5 drag; the menu removed that constraint and nobody noticed. Full text: docs/ARCHITECTURE.md D104.
+
+---
+[<small>2026-09-02 23:01:22</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 530
+ℹ suites 0
+ℹ pass 530
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1395.364581
+
+---
+[<small>2026-09-02 23:01:37</small>] [**Trin**]->[**User**] *qa handoff*:
+ *qa review D104: APPROVED. Unit 530/530, browser 7/7, lint back to the 8 pre-existing errors (the new .mjs added 10, all fixed - CSS.escape, naming, a top-level-assignment rule). Browser suite: 3 consecutive clean runs, and 3 mutations all caught (icon-only rows 1 fail, Move wiring removed 5 fails, conceal wired to rotate 2 fails). Not decorative. Correction on record: my earlier 'ui.js has zero tests' was wrong - tests/ui.test.js exists.
+
+---
+[<small>2026-09-02 23:06:41</small>] [**User**]->[**all**] *request*:
+ *nit do the remaining nits (Tighten/Loosen fan overlap + cards need borders)
+
+---
+[<small>2026-09-02 23:19:10</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-ui | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4337.663053
+
+---
+[<small>2026-09-02 23:20:11</small>] [**Morpheus**]->[**Trin**] *lead decision*:
+ D105+D106 recorded. D105: --card-border token with real contrast - the old #d9d9d3 read fine over felt but vanished card-on-card, so a fan looked like one blob. D106: pile spread is replicated state, ONE ADJUST_PILE_SPREAD action with a signed delta, offered per class (base Pile + Hand + Meld; Deck excluded by construction). Full text: docs/ARCHITECTURE.md.
+
+---
+[<small>2026-09-02 23:20:32</small>] [**Neo**]->[**User**] *swe impl*:
+ No-back-compat correction applied mid-flight, thanks for the catch: the first spread cut kept the CSS literal as a var() fallback and gated flat rows behind data-spread so unadjusted piles took the old path. Two layout paths, one of them the forgettable one. Collapsed to a single rule on every row; formula now measures overlap as a fraction of the card+gap pitch so 0 means a plain row, and HandPile.defaultSpread 0.7 reproduces the old fan exactly.
+
+---
+[<small>2026-09-02 23:20:43</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-ui | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4448.843929

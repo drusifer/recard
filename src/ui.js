@@ -1,9 +1,10 @@
 import { step as touchDragStep, HOLD_MS } from './touchDrag.js';
 import {
-  ACTION_SPECS, actionsForCard, pileLevelActions, targetsForAction, resolveDropTargetFor,
+  ACTION_SPECS, cardMenuItems, actionsForCard, pileLevelActions, targetsForAction, resolveDropTargetFor,
   disabledPileActionsFor, componentFor,
 } from './pileActions.js';
 import { seatPosition } from './seating.js';
+import { PILE_TYPES } from './piles/pileTypes.js';
 import { ZONE_TYPES } from './zones/zoneTypes.js';
 import { faceFor } from './cards/cardFaces.js';
 import { CHANGE_PILE_TYPE_KINDS, pileKindLabel, pileInstanceFor } from './piles/pileTypes.js';
@@ -571,23 +572,48 @@ function buildEnumActionMenu(id, spec, { value, choices }, options) {
 
 /**
  * Reveal a still-hidden card (Sprint 12, Phase 55, T55.1): a direct tap
- * on the card itself, joining tap-to-play's existing vocabulary, rather
- * than a separate hover-revealed button. The confirm gate is unchanged
- * (Smith Gate 2 #2 - it's the actual safety net, not the AC this phase
- * touches): revealing your OWN private card is irreversible and only
- * you can undo the decision by not making it; a shared face-down card
- * is nobody's, so it stays a single tap.
+ * on the card itself, joining the existing tap vocabulary, rather than
+ * a separate hover-revealed button.
+ *
+ * The confirm gate (Smith Gate 2 #2) still fires for your OWN private
+ * card, but its copy changed with the show/hide *nit: "This cannot be
+ * undone" is no longer true - `hide` is exactly the undo. Kept rather
+ * than dropped because the consequence it warns about is real and
+ * unaffected: everyone at the table SEES the card in the moment you
+ * reveal it, and turning it back face-down does not unsee it. The
+ * wording now warns about that, not about permanence.
  */
 function performReveal(card, viewerId, onReveal) {
   clearPileTargets();
   const isMine = card.owner != undefined && card.owner === viewerId;
-  if (isMine && !globalThis.confirm('Reveal this card to everyone? This cannot be undone.')) return;
+  if (isMine && !globalThis.confirm('Show this card to everyone? They will see it even if you hide it again.')) return;
   onReveal?.(card.id);
+}
+
+/**
+ * A pile's current overlap factor: its own adjusted `spread` if a player
+ * has ever used Tighten/Loosen on it, otherwise its TYPE's default
+ * (`Pile.defaultSpread` - 0 for a plain row, 0.7 for a hand's fan).
+ *
+ * *nit (direct user request): "pile actions for tighten/loosen to adjust
+ * the overlap on fan and meld piles or runs or whatever." The 0.65 used
+ * to be a literal in `style.css`. It is a property of the pile TYPE
+ * now, and every row gets the property written from this one function -
+ * no second "unadjusted" rendering path anywhere.
+ */
+function effectiveSpread(pileView) {
+  return pileView.spread ?? PILE_TYPES[pileView.kind]?.defaultSpread ?? 0;
 }
 
 export function renderPileCards(container, pileView, allPiles, options = {}) {
   const { onMoveCard, onCardLift, onCardDrag } = options;
   container.replaceChildren();
+  // *nit (Tighten/Loosen): every row carries its pile's own spread, and
+  // `style.css`'s single overlap rule reads it. Written
+  // unconditionally, from `effectiveSpread` - an unadjusted pile gets
+  // its TYPE's default rather than a different rendering path, so there
+  // is exactly one way a row's overlap is decided.
+  container.style.setProperty('--pile-spread', String(effectiveSpread(pileView)));
   // D45: was hardcoded `kind: 'plain'` below - harmless while plain was
   // the only 'mixed'-visibility pile type, a real bug the moment a
   // second one (discard) exists: every card-level authorization check
@@ -693,10 +719,11 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
         // whole drag - not just whichever one the pointer happens to be
         // over mid-drag (`showPileDragOver`'s existing per-hover cue,
         // unchanged, still layers on top of this once you're over one).
-        // UX follow-up: 'play' joins 'move'/'pickup' here now that a
-        // hand pile's own cards flow through this same generic path.
+        // D102: 'play' used to be listed here alongside these two - a
+        // hand card offers plain 'move' now, so the hand needs no entry
+        // of its own in this list at all.
         highlightDragTargets(
-          cardActions.filter((a) => ['move', 'pickup', 'play'].includes(a)),
+          cardActions.filter((a) => ['move', 'pickup'].includes(a)),
           piles,
           { viewerId: options.viewerId, fromPileId: pileView.id },
         );
@@ -724,7 +751,7 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
     const canReveal = Boolean(options.onReveal) && actionsForCard(pile, card, options.viewerId).includes('reveal');
     // *nit (2026-08-26), direct user request: "cards are Movable not
     // Actionable" - the hover-popup action row (`attachActionRow`) is
-    // gone entirely. `pickup`/`move`/`play` already had a real trigger
+    // gone entirely. `pickup`/`move` already had a real trigger
     // beyond the popup (native drag, below) - `rotate` didn't, so it
     // gets the same "tap the card itself" pattern `reveal` already
     // established (Phase 55), applied to the FACE-UP case specifically
@@ -751,6 +778,14 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
     const pileInstance = pileInstanceFor(pile, options.viewerId);
     const isBack = !pileInstance.showsFace(card, options.viewerId);
     let cardOptions;
+    // *nit (show/hide): the TAP gesture stays one-way on purpose. A
+    // face-up card's tap is already spoken for by `rotate` (the *nit
+    // that removed the hover action row gave rotate this tap because it
+    // had no other trigger), and `reveal`/`rotate` never competed only
+    // because reveal was offered on face-down cards alone. Making the
+    // tap a toggle would take that tap away from rotate. `hide` gets
+    // the right-click menu, which is where the *nit asked for it - a
+    // cardAction, not a gesture.
     if (canReveal) cardOptions = { onClick: () => performReveal(card, options.viewerId, options.onReveal), back: isBack };
     else if (canRotate) cardOptions = { onClick: () => options.onRotate(card.id), back: isBack };
     else cardOptions = { disabled: true, back: isBack };
@@ -761,8 +796,8 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
 
     // US-100/D101: right-click menu, additive to (not a replacement for)
     // the tap/drag gestures already wired above. Lists every id
-    // `actionsForCard` offers - in-place ones (rotate/reveal) fire
-    // directly; targeted ones (move/pickup/play) start the destination
+    // `actionsForCard` offers - in-place ones (rotate/reveal/conceal) fire
+    // directly; targeted ones (move/pickup) start the destination
     // pick (`beginCardTargetPick`).
     attachCardContextMenu(wrapper, card, cardActions, piles, pileView.id, options);
 
@@ -772,16 +807,18 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
 
 /**
  * US-100/D101: wires a card's right-click menu, covering every id
- * `actionsForCard` offers for it - in-place (rotate, reveal) and targeted
- * (move, pickup, play) alike. A card offering none of those keeps the
+ * `actionsForCard` offers for it - in-place (rotate, reveal, conceal) and targeted
+ * (move, pickup) alike. A card offering none of those keeps the
  * native OS context menu untouched (Smith Gate 1 condition 1 - no
  * dead-end custom menu on a card with nothing to offer at all).
  *
- * Reuses `applyIconButton` so a menu item looks/behaves exactly like the
- * same action's pile-header button (icon, tooltip, aria-label, and the
- * same destructive-confirm gate `renderActionHeader` uses) - one visual
- * contract for "here is a button for this action id", not a second one
- * invented for menus.
+ * Each item carries the action's icon AND its name, plus the same
+ * tooltip/aria-label and destructive-confirm gate `renderActionHeader`
+ * uses - one contract for "here is a button for this action id", not a
+ * second one invented for menus. It used `applyIconButton` (icon only,
+ * name in the tooltip) until the *nit below; that helper is for the
+ * pile header's compact button row, where the icons sit in a labelled
+ * row and space is tight. A popup menu is neither.
  */
 function attachCardContextMenu(wrapper, card, cardActions, piles, fromPileId, options) {
   if (cardActions.length === 0) return;
@@ -809,22 +846,54 @@ function openCardContextMenu(clientX, clientY, actionIds, card, piles, fromPileI
   // *Actions classes, not invent a parallel look.
   const menu = document.createElement('div');
   menu.className = 'pile-action-menu card-context-menu';
-  for (const id of actionIds) {
-    const spec = ACTION_SPECS[id];
+  // Every decision about these rows - what each says, which ones need a
+  // destination picked, which need a confirm - is `cardMenuItems`
+  // (`pileActions.js`), unit-tested there. This loop is plumbing only:
+  // turn each row into a `<button>` and wire its click.
+  for (const { id, text, label, destructive, targeted } of cardMenuItems(actionIds)) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'pile-action-menu-item' + (spec.destructive ? ' btn-danger' : '');
-    applyIconButton(button, spec);
+    button.className = 'pile-action-menu-item' + (destructive ? ' btn-danger' : '');
+    // Icon THEN name. *nit (direct user request): "put the name of the
+    // action in the card action menu" - D101 built these with
+    // `applyIconButton`, the pile header's COMPACT button helper, so
+    // the name was only ever a tooltip. `title`/`aria-label` keep the
+    // bare name; the visible text carries both.
+    button.textContent = text;
+    button.title = label;
+    button.setAttribute('aria-label', label);
+    // `data-action` is what a browser test clicks by (`tests/
+    // uiActions.browser.mjs`) - the row's own identity, stable across
+    // relabelling, rather than matching on the text a *nit may change.
+    button.dataset.action = id;
     button.addEventListener('click', (event) => {
       event.stopPropagation();
       closeCardContextMenu();
-      if (spec.destructive && !globalThis.confirm(`${spec.hint}\n\nContinue?`)) return;
-      if (id === 'reveal') performReveal(card, options.viewerId, options.onReveal);
-      else if (id === 'rotate') options.onRotate?.(card.id);
-      // Phase 2 (D101): a targeted action (move/pickup/play) has no
-      // in-place effect - it needs a destination, chosen next.
-      else if (spec.target !== null && spec.target !== undefined) {
-        beginCardTargetPick(id, card, piles, fromPileId, options);
+      if (destructive && !globalThis.confirm(`${ACTION_SPECS[id].hint}\n\nContinue?`)) return;
+      // *nit (show/hide): `conceal` dispatches the same `onReveal`
+      // callback - one `FLIP_CARD` reducer action, whichever direction
+      // the card is going - but skips `performReveal`'s confirm, which
+      // exists to warn before EXPOSING a card. Concealing exposes
+      // nothing, so there is nothing to warn about.
+      switch (id) {
+        case 'reveal': {
+          performReveal(card, options.viewerId, options.onReveal);
+          break;
+        }
+        case 'conceal': {
+          clearPileTargets();
+          options.onReveal?.(card.id);
+          break;
+        }
+        case 'rotate': {
+          options.onRotate?.(card.id);
+          break;
+        }
+        // Phase 2 (D101): a targeted action (move/pickup) has no
+        // in-place effect - it needs a destination, chosen next.
+        default: {
+          if (targeted) beginCardTargetPick(id, card, piles, fromPileId, options);
+        }
       }
     });
     menu.append(button);
@@ -853,7 +922,7 @@ function onContextMenuKeydown(event) {
 
 /**
  * Phase 2 (D101): the destination-choice step a targeted menu action
- * (move/pickup/play) needs, which no click-based mechanism provided
+ * (move/pickup) needs, which no click-based mechanism provided
  * before this (D52's radial targeting was retired for pile/zone actions,
  * and cards only ever had native drag). Reuses the SAME
  * `highlightDragTargets` a native drag already calls on `dragstart` -
@@ -987,7 +1056,7 @@ function performPileDrop(pileElement, row, pileId, cardId, point, onDropCard, ki
  *
  * US-28: dropping a dragged card here plays it (from hand) or moves it
  * (from another pile) - `opts.onDropCard(cardId, pile.id)` does the
- * PLAY-vs-MOVE_CARD branching (main.js knows where the card currently
+ * MOVE_CARD dispatch (main.js knows where the card currently
  * lives, this file doesn't need to). Additive: tap-to-play and the
  * "Move to…" dropdown are untouched, this is one more way in, not a
  * replacement (Smith Gate 1). The zone highlights while a drag is over
@@ -1160,7 +1229,13 @@ export function renderPileShell(container, pile, allPiles, options, buildRow) {
       // at zero cards) is now read polymorphically per pile type
       // (`disabledPileActionsFor`), not a `pile.kind === 'deck'` check
       // hardcoded here.
-      disabled: disabledPileActionsFor(pile.kind, pile.count ?? pile.cards.length),
+      // *nit (Tighten/Loosen): the pile's CURRENT effective spread goes
+      // in too, so Tighten is disabled at maximum and Loosen at minimum
+      // rather than being a dead click there. `?? defaultSpread` is
+      // resolved here because only this layer knows whether this pile
+      // has ever been adjusted; the class only knows its type's default.
+      disabled: disabledPileActionsFor(pile.kind, pile.count ?? pile.cards.length,
+        { spread: effectiveSpread(pile) }),
       // US-61 (Sprint 23), Smith's ruling (Phase 70): `take` confirms
       // unconditionally EXCEPT a 1-card pile, where it's identical in
       // effect to that card's own un-confirmed single-card `pickup`.
@@ -1279,6 +1354,9 @@ export function renderSplitPicker(container, pile, options) {
   // formula for a second row shape.
   const row = document.createElement('div');
   row.className = 'card-row split-picker-row fan-row';
+  // Same single source as any other row - the picker fans the pile it is
+  // splitting, at that pile's own spread, not at a duplicated constant.
+  row.style.setProperty('--pile-spread', String(effectiveSpread(pile)));
   container.append(row);
 
   const pileInstance = pileInstanceFor(pile, options.viewerId);
@@ -1848,7 +1926,7 @@ export function renderDeckStack(container, count, options = {}) {
     // `onCardDrag`/`attachTouchDrag` plumbing every other pile's cards
     // already use. No new mechanism, no pile-specific special case -
     // dropping this wherever it lands dispatches the ordinary MOVE_CARD/
-    // PICKUP/PLAY path (`dropCardOnPile`, main.js) unchanged, because
+    // PICKUP/MOVE_CARD path (`dropCardOnPile`, main.js) unchanged, because
     // it now carries a real, findable card id.
     if (options.topCard && options.onDropCard) {
       back.draggable = true;

@@ -454,3 +454,49 @@ me: this one is a type-hierarchy refactor touching `src/piles/`,
 `pileActions.js` and the reducer, so it will want MORE phases than
 US-100 did, not fewer, and the first phase should be the interface
 extraction alone with the existing card behavior unchanged and green.
+
+---
+## Session — 2026-09-02, two *nits (D102, D103) + 2 queued
+
+**D102: the `play` verb retired.** User *nit "get rid of the 'Play' card
+action on the user hand - that's old kruft", confirmed with the user as
+the FULL retire (not just the D101 menu entry). Root insight:
+`transferCard` already stamped a card entering a hand (`toHandCard`);
+the mirror (leaving a hand -> `{owner:null, faceUp:true}`) was never
+written, so a VERB carried it. Wrote the mirror; `PLAY`, `playCard`,
+`ACTION_SPECS.play`, the already-dead `onPlay` option and
+`middleCardVisibility` all became dead and were deleted.
+`PlayerHandPile.cardActions()` -> `['move']`.
+- The `isReorder` special case disappeared structurally (a hand
+  DESTINATION takes the first branch and never reaches the second).
+- DISCLOSED: a hand is now splittable at the reducer level - it was
+  excluded only incidentally, by not offering the string `'move'`. Not
+  patched back (D92: offering is a presentation choice); the offer layer
+  is unchanged and shows no Split on a hand. Both halves tested.
+
+**D103: `REVEAL` -> `FLIP_CARD`, a real toggle.** User *nit "add a
+show/hide cardAction to toggle an individual card's show/hide status."
+One reducer action both directions; two OFFER ids (`reveal` /
+`conceal`) so the menu labels the direction. `conceal`, not `hide` -
+`hide` was already the PILE-level action in the same flat
+`ACTION_SPECS` table, and the collision was caught by `no-dupe-keys`,
+NOT by any test. Worth remembering when adding an action id.
+Tap gesture deliberately left one-way (a face-up card's tap belongs to
+`rotate`). Reveal's confirm copy fixed - "cannot be undone" was false
+once conceal exists; it now warns about exposure instead.
+
+**Verification:** 523/523 unit tests. lint:js 8 errors and lint:design 5
+- both confirmed IDENTICAL on a stashed clean tree, so the "7 js / 3
+design" figures carried in these state files were stale; 8/5 is the real
+baseline. Load-bearing guards mutation-checked in both features (4/3 and
+3/2 failures respectively).
+
+**Uncommitted** at time of writing: the full diff for both *nits.
+
+### Queued, NOT started (user said "*queue")
+1. Pile-level `Tighten`/`Loosen` actions to adjust card overlap/spread
+   on fan-style piles (hand, meld, run, anything that fans).
+2. Cards need borders.
+Plus the still-unstarted `Pileable` sprint (Chips/Tokens/Cards +
+`PileableActions` extracted from `cardActions`, per-type UX + sorting,
+no back-compat) - Cypher moves first, no stories or arch exist.

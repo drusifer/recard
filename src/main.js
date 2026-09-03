@@ -1,5 +1,6 @@
 import { Session } from './session.js';
 import { createInitialState, reduce, viewFor, DECK_PILE_ID } from './state.js';
+import { SPREAD_STEP } from './piles/Pile.js';
 import { makeStateMessage, makeMotionMessage, createMotionThrottler, cardDragPayload } from './protocol.js';
 import { renderShareCode, wireCopyCode } from './qrcode.js';
 import {
@@ -1155,6 +1156,12 @@ function handlePileAction(pileId, actionId, value) {
   if (actionId === 'show') return performSetPileOrientation(pileId, true);
   if (actionId === 'remove') return performRemovePile(pileId);
   if (actionId === 'untapAll') return performUntapAll(pileId);
+  // *nit (direct user request): "pile actions for tighten/loosen to
+  // adjust the overlap." Two ids, ONE dispatch and one reducer action
+  // taking a signed delta - the direction is the only difference, and
+  // it belongs in the argument, not in a second code path (D75/D103).
+  if (actionId === 'tighten') return performAdjustSpread(pileId, SPREAD_STEP);
+  if (actionId === 'loosen') return performAdjustSpread(pileId, -SPREAD_STEP);
   if (actionId === 'sortRank') return performSortPile(pileId, 'rank');
   if (actionId === 'sortSuit') return performSortPile(pileId, 'suit');
   // D92 (direct user request: "split should always fan the pile to
@@ -1181,10 +1188,9 @@ function renderGameFromView(view) {
   // pile's cards (as a `<pile-panel>` grouped into the owner's own
   // `<zone-panel>`, `src/components/PilePanel.js`/`ZonePanel.js`). No
   // separate `handOpts`/`own` object, no bespoke fan/reorder/motion/
-  // sort/pass wiring - `onPlay` below is the one new callback the
-  // generic per-card action menu needs (`play` was always in
-  // `cardActions` for a hand's owner, nothing dispatched it
-  // yet).
+  // sort/pass wiring - a hand's cards go through `onMoveCard` like
+  // every other pile's do (D102: `onPlay`, and the `play` verb behind
+  // it, are retired - nothing ever read this option).
   //
   // NOTE (flagged, not yet done): hand-order persistence (D14), sort/
   // pass, and the "organizing hand" motion cue are all temporarily gone
@@ -1193,7 +1199,6 @@ function renderGameFromView(view) {
   const zoneOptions = {
     viewerId: myId,
     resolveOwnerName: (ownerId) => nameById.get(ownerId) ?? ownerId,
-    onPlay: isSessionEnded ? null : (cardId, targetId) => playCard(cardId, 'public', targetId),
     onReveal: (cardId) => revealCard(cardId),
     onRotate: (cardId) => rotateCard(cardId),
     onPickup: (cardId) => pickupCard(cardId),
@@ -1285,17 +1290,13 @@ function renderGameFromView(view) {
   renderRosterOnly();
 }
 
-function playCard(cardId, visibility, pileId, placement = {}) {
-  if (isSessionEnded) return;
-  const { targetCardId, side, layout } = placement;
-  if (role === 'host') dispatch({ type: 'PLAY', playerId: myId, cardId, visibility, pileId, targetCardId, side, layout });
-  else session.send({ type: 'action', action: { type: 'PLAY', cardId, visibility, pileId, targetCardId, side, layout } });
-}
-
+// *nit (show/hide): one dispatcher for both directions - `FLIP_CARD`
+// reads the card's current facing and toggles it, so the caller (a tap,
+// or the menu's `reveal`/`hide` entry) never has to say which way.
 function revealCard(cardId) {
   if (isSessionEnded) return;
-  if (role === 'host') dispatch({ type: 'REVEAL', playerId: myId, cardId });
-  else session.send({ type: 'action', action: { type: 'REVEAL', cardId } });
+  if (role === 'host') dispatch({ type: 'FLIP_CARD', playerId: myId, cardId });
+  else session.send({ type: 'action', action: { type: 'FLIP_CARD', cardId } });
 }
 
 function rotateCard(cardId) {
@@ -1339,36 +1340,24 @@ function moveCard(cardId, toPileId, placement = {}) {
   else session.send({ type: 'action', action: { type: 'MOVE_CARD', cardId, toPileId, targetCardId, side, layout } });
 }
 
-// US-28: dropping a dragged card on a zone plays it (if it came from
-// hand) or moves it (if it was already on the table) - the drop target
-// itself doesn't know or care which, it just hands back a card id and a
-// destination zone. Always plays public on drop, matching the existing
-// "primary gesture = public play" precedent (US-12); face-down stays
-// button-only (Smith Gate 1: don't overload drag with a mid-drag choice).
+// US-28: dropping a dragged card on a pile moves it there - the drop
+// target doesn't know or care where it came from, it just hands back a
+// card id and a destination.
 // US-32/33: `placement` (from ui.js's drop-region hit test) carries the
 // stack/overlap intent through unchanged - this function still doesn't
 // need to know which mode was chosen, only to forward it.
 //
-// A card dragged FROM hand is ALWAYS dispatched as PLAY, even when it's
-// dropped back onto that same hand (a reorder) - `HandPile.cardActions`
-// (`HandPile.js`) only ever offers `'play'` as a way to remove a card
-// from hand, never `'move'`/`'pickup'`, so PLAY is the only authorized
-// dispatch for ANY hand-sourced drag. A same-pile "play" not being a
-// real play (no visibility change, no genuine card-leaves-hand game
-// event) is PLAY's own concern to recognize, not this function's - see
-// its `state.js` doc comment.
+// D102: this used to branch on "did it come from my hand?" and dispatch
+// PLAY instead, because only PLAY applied the leaving-a-hand public/
+// face-up transform. `transferCard` (`state.js`) applies that from the
+// transition now, so a hand-sourced drag is an ordinary MOVE_CARD and
+// the branch is gone - including the same-hand reorder case, which the
+// reducer distinguishes structurally (a hand DESTINATION re-stamps the
+// card as a hand card and never reaches the leaving-a-hand rule).
 function dropCardOnPile(cardId, targetPileId, placement = {}) {
   if (isSessionEnded) return;
   const view = currentView();
   if (!view) return;
-  if (view.myHand.some((c) => c.id === cardId)) {
-    // D51 follow-up: this now actually matches the comment above it -
-    // drag always plays public, same as a plain tap. "Play hidden" is
-    // its own explicit action (the hand card's hover row), never
-    // reachable by dragging.
-    playCard(cardId, 'public', targetPileId, placement);
-    return;
-  }
   // UX follow-up (direct user request): the hand pile is a real,
   // addressable pile now (`view.piles`), so a table card dropped onto
   // it needs PICKUP's own semantics (strips owner/faceUp/layout), not a
@@ -1393,6 +1382,12 @@ function dropCardOnPile(cardId, targetPileId, placement = {}) {
 // request, "THERE SHOULD BE NO CANONICAL PILES"): `pileId` is the real
 // target now - no host/guest branch needed, `shuffle` is host-only at
 // the offer layer (`DeckPile.pileActions`) already.
+function performAdjustSpread(pileId, delta) {
+  if (isSessionEnded) return;
+  if (role === 'host') dispatch({ type: 'ADJUST_PILE_SPREAD', playerId: myId, pileId, delta });
+  else session.send({ type: 'action', action: { type: 'ADJUST_PILE_SPREAD', pileId, delta } });
+}
+
 function performShuffle(pileId) {
   if (isSessionEnded) return;
   dispatch({ type: 'SHUFFLE_DECK', pileId });
@@ -1542,14 +1537,12 @@ function performCreatePileWithCard(cardId, zoneId) {
   if (isSessionEnded) return;
   const view = currentView();
   if (!view) return;
-  // Same hand-vs-table source distinction `dropCardOnPile` already
-  // makes - `state.js`'s own `CREATE_PILE` case re-derives it too
-  // (never trusts the client alone for the PLAY-vs-MOVE authorization
-  // shape), this just needs to know which existing pile to remove the
-  // card FROM.
-  const fromPileId = view.myHand.some((c) => c.id === cardId)
-    ? view.piles.find((p) => p.kind === 'hand' && p.ownerId === myId)?.id
-    : view.piles.find((p) => p.cards.some((c) => c.id === cardId))?.id;
+  // D102: this used to branch on `view.myHand` first to find a
+  // hand-sourced card's pile, because the hand-vs-table distinction
+  // decided PLAY-vs-MOVE. There is no such distinction any more, and a
+  // hand IS one of `view.piles` (D84) with its real cards - so the
+  // plain "which pile holds this card" lookup already covers both.
+  const fromPileId = view.piles.find((p) => p.cards.some((c) => c.id === cardId))?.id;
   if (!fromPileId) return;
   if (role === 'host') {
     try { dispatch({ type: 'CREATE_PILE', playerId: myId, zoneId, fromPileId, cardId }); }
