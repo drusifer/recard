@@ -370,10 +370,10 @@ those are the only card-level `target: null` actions in `ACTION_SPECS`.
 A future in-place card action needs a branch added in both places.
 
 ### Resume instructions (cold start)
-1. `git log --oneline -3` should show `d8ce5a1` at HEAD on `dev`, in
-   sync with origin. `main` is still at `6c73f0c` — **`dev` is ahead of
-   `main` by this one commit**, which is new as of this session; the
-   previous close-out's "main/dev/origin all in sync" no longer holds.
+1. `git log --oneline -3` should show `b7bb098` at HEAD on **both**
+   `main` and `dev`, both in sync with origin — the user asked for the
+   forward-merge at close-out, so the usual "everything in sync" state
+   holds. `d8ce5a1` (D101) is the commit below it.
 2. `bobp make test` should be green at **517/517**. Lint unchanged at
    the 7-function cognitive-complexity baseline.
 3. Read `docs/ARCHITECTURE.md` D101 (top of file, above D100) before

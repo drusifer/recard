@@ -440,9 +440,9 @@ commit paths, add only the missing step" framing was right.
 
 ## Next Steps (current, supersedes every earlier Next Steps in this file)
 
-**Nothing in-flight.** D101 shipped and pushed on `dev` (`d8ce5a1`);
-`main` is one commit behind — merging that forward is unassigned and
-nobody has asked for it.
+**Nothing in-flight.** D101 shipped (`d8ce5a1`), and at the user's
+request `main` was fast-forwarded to match `dev` at close-out — both
+branches and origin sit at `b7bb098`, no divergence.
 
 Still open, unassigned, unchanged: (1) shell inlining (E), re-verify
 "zero other callers" first; (2) `zoneOptions` 3-way split (B),

@@ -223,4 +223,6 @@ sequenceDiagram
     Note right of User: "Queued for next session,<br/>NOT started: new<br/>Pileable interface -<br/>Chips/Tokens/Cards all<br/>extend it, extract<br/>PileableActions base<br/>from cardActi…"
     Mouse->>User: "handoff"
     Note right of Mouse: "Shutdown prep done. D101<br/>shipped+pushed (d8ce5a1<br/>on dev, main is 1<br/>behind, unassigned).<br/>517/517 green, lint<br/>unchanged. State files<br/>refreshe…"
+    Mouse->>User: "handoff"
+    Note right of Mouse: "Correction to my close-<br/>out note: user asked for<br/>main too, so main was<br/>fast-forwarded to<br/>b7bb098 and pushed. Both<br/>branches + origin now<br/>iden…"
 ```
