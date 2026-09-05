@@ -809,3 +809,28 @@ Handing to Trin for UAT, then Morpheus review. Backlog item to file at
 close: RtG "Decks" zone panel doesn't shrink when fewer decks are
 chosen (US-110's own new feature exposed this) - needs its own product
 call on whether dynamic zone sizing is worth building, not a quick fix.
+
+## Nit: tokens look like gems, no denominations (2026-09-05)
+
+Direct user request: "make the tokens look like gems. they don't need
+denominations." Full removal, not just a visual reskin - `label` field
+deleted from `TOKEN_SETS`/`build()` (chipDeck.js), `TokenPileable`'s
+`render()` (which used to print the label into a `.token-label` span)
+is now an empty no-op (still required - `ui.js` calls
+`pileable.render(element)` unconditionally). `.card.card-token` CSS
+replaced: `clip-path` faceted hexagon silhouette + two-layer gradient
+(diagonal base colour + radial highlight) per colour, no border/radius
+disc styling left. `.token-label` CSS rule and its now-inapplicable
+"covered when stacked" comment both removed.
+
+Updated 3 tests that asserted the old label behavior
+(chipDeck.test.js, pileables.test.js, uiActions.browser.mjs) to assert
+colour-only identity instead - same "tellable apart" standard chips
+already have to meet, just via shape+colour instead of a printed value.
+
+673 unit + 8 RtG + 18 uiActions green, lint clean. Screenshotted the
+real render: 3 clearly gem-shaped, distinctly-coloured stones, no text.
+
+### Next Steps
+Handing to Trin for the *nit's abbreviated check (no Morpheus step -
+this is a nit, not a fix/impl).

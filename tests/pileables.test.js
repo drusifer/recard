@@ -146,15 +146,15 @@ test('a chip\'s colour maps to a denomination, for every colour a supply builds'
   assert.ok(chips.every((chip) => typeof chip.denom === 'number'), 'no chip is left without a value');
 });
 
-// A token carries a label as well as a colour. Asserted as a FIELD
-// here, not as rendered output: `render` builds DOM, and there is no
-// document in a node test - which is the same scope line D104 drew,
-// rendering belongs to the browser layer. `uiActions.browser.mjs`
-// asserts the label actually reaches the screen once Phase 102 puts
-// tokens on a real table.
-test('a token carries a short label as well as a colour', () => {
-  const token = pileableFor({ id: 'y', pileableType: 'token', colour: 'blue', label: '+1' });
-  assert.equal(token.label, '+1');
+// UPDATED by the gem *nit (direct user request: "tokens should look
+// like gems. they don't need denominations") - a token is colour alone
+// now, no label. `className()` is what a real table reads to render
+// the gem shape/colour (style.css); asserted as a FIELD here since
+// there is no document in a node test (D104's scope line - rendering
+// belongs to the browser layer, `uiActions.browser.mjs`).
+test('a token is identified by colour alone - no label', () => {
+  const token = pileableFor({ id: 'y', pileableType: 'token', colour: 'blue' });
+  assert.equal(token.label, undefined);
   assert.match(token.className(), /token-blue/);
 });
 

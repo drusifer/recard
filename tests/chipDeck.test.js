@@ -41,10 +41,20 @@ test('buildDeck: a chip supply spans more than one colour', () => {
   assert.ok(colours.size > 1, `a supply of one colour is the thing Gate 1 rejected: ${[...colours]}`);
 });
 
-test('buildDeck: the token list builds tokens carrying labels', () => {
+// UPDATED by the gem *nit (direct user request: "tokens should look
+// like gems. they don't need denominations") - a token no longer
+// carries a label at all, only a colour, same as a chip did before
+// "make change" needed a visible value.
+test('buildDeck: the token list builds tokens with a colour and no label', () => {
   const tokens = buildDeck({ type: 'chips', deckList: 'standard-tokens' });
   assert.ok(tokens.every((token) => token.pileableType === 'token'));
-  assert.ok(tokens.every((token) => token.label), 'a token is marked, that is what makes it a token');
+  assert.ok(tokens.every((token) => typeof token.colour === 'string'), 'every token is tellable apart by colour');
+  assert.ok(tokens.every((token) => token.label === undefined), 'a token carries no label any more');
+});
+
+test('buildDeck: a token supply spans more than one colour', () => {
+  const colours = new Set(buildDeck({ type: 'chips', deckList: 'standard-tokens' }).map((token) => token.colour));
+  assert.ok(colours.size > 1, `a supply of one colour reads as broken: ${[...colours]}`);
 });
 
 test('buildDeck: rejects an unknown chip list by name, rather than building an empty supply', () => {

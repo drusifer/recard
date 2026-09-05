@@ -102,4 +102,10 @@ sequenceDiagram
     Note right of Oracle: "*ora groom complete:<br/>US-110/111/112<br/>documented in<br/>USER_STORIES.md, D116<br/>already in<br/>ARCHITECTURE.md from<br/>Morpheus's review.<br/>Backlog item fil…"
     Smith->>All: "user approve"
     Note right of Smith: "*user test: token tray<br/>now groups into 3<br/>distinct colour stacks<br/>(screenshot confirmed) -<br/>directly addresses my<br/>own earlier retro<br/>finding. D…"
+    User->>All: "request"
+    Note right of User: "*nit make tokens look<br/>like gems, not chips.<br/>They don't need<br/>denominations."
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "*nit fix DONE: tokens<br/>now look like gems<br/>(clip-path faceted<br/>shape, colour gradient,<br/>no printed label).<br/>Removed the label field<br/>entirely fro…"
+    Trin->>Neo: "qa handoff"
+    Note right of Trin: "*qa test PASSED. Grepped<br/>for dangling token.label<br/>consumers - none, clean<br/>removal. Re-verified the<br/>gem screenshot myself (3<br/>distinct facete…"
 ```

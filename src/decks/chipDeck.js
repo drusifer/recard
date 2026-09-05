@@ -42,20 +42,25 @@ const CHIP_SETS = {
   ],
 };
 
-/** A token is a MARKED disc - the label is what distinguishes it from a
- * chip. Marks only: nothing increments them, and a counting token is a
- * different feature that was put to the user and ruled out of scope. */
+/** A token is a gem - a palette, not a value scale, same reasoning as
+ * `CHIP_SETS` above. *nit (direct user request): "tokens should look
+ * like gems. they don't need denominations" - reverses the earlier
+ * design (a token as a MARKED disc, distinguished by a printed label
+ * like a chip's own denomination) in favour of colour alone, matching
+ * how a chip was allowed to read before "make change" needed a visible
+ * value. Nothing increments or orders these - `TokenPileable.sortActions`
+ * stays empty, which is what enforces it. */
 const TOKEN_SETS = {
   'standard-tokens': [
-    { colour: 'green', label: '+1', count: 8 },
-    { colour: 'red', label: '-1', count: 8 },
-    { colour: 'black', label: '!', count: 4 },
+    { colour: 'green', count: 8 },
+    { colour: 'red', count: 8 },
+    { colour: 'black', count: 4 },
   ],
 };
 
 /**
  * @param {{deckList?: string}} options
- * @returns {{id: string, pileableType: string, colour: string, label?: string}[]}
+ * @returns {{id: string, pileableType: string, colour: string, denom?: number}[]}
  */
 export function build({ deckList } = {}) {
   const isTokens = Object.hasOwn(TOKEN_SETS, deckList);
@@ -81,18 +86,14 @@ export function build({ deckList } = {}) {
   // join by IP). The host builds and broadcasts, so nothing depends on
   // the token being reproducible across clients.
   const batch = batchToken();
-  return set.flatMap(({ colour, label, count }) => {
-    const marked = label ? `${label}-` : '';
-    return Array.from({ length: count }, (_, index) => ({
-      id: `${pileableType}-${batch}-${colour}-${marked}${index}`,
-      pileableType,
-      colour,
-      // A chip's denomination comes from its colour, one table
-      // (`CHIP_VALUES`) rather than repeated per set - a green chip is
-      // 25 wherever it was built. Tokens have no denomination: they are
-      // marks, and `TokenPileable.sortActions` stays empty because of it.
-      ...(pileableType === 'chip' && { denom: CHIP_VALUES[colour] }),
-      ...(label && { label }),
-    }));
-  });
+  return set.flatMap(({ colour, count }) => Array.from({ length: count }, (_, index) => ({
+    id: `${pileableType}-${batch}-${colour}-${index}`,
+    pileableType,
+    colour,
+    // A chip's denomination comes from its colour, one table
+    // (`CHIP_VALUES`) rather than repeated per set - a green chip is
+    // 25 wherever it was built. A token has no denomination at all - it
+    // is a gem, identified by colour alone.
+    ...(pileableType === 'chip' && { denom: CHIP_VALUES[colour] }),
+  })));
 }

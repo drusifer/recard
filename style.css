@@ -454,30 +454,46 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .card-chip.chip-black { background: #2b2b2b; border-color: #101010; }
 .card-chip.chip-white { background: #ececec; border-color: #a8a8a8; }
 
-/* A token is a marked disc - distinct from BOTH a card and a chip, so
-   the three are never confusable: rounded-square, not circular. */
+/* A token is a GEM - *nit (direct user request): "tokens should look
+   like gems. they don't need denominations". Reverses the original
+   "marked disc" design: no printed content at all now
+   (`TokenPileable.render` is a no-op), colour alone is the whole
+   identity, the same shape chips had before "make change" needed a
+   visible value on top of colour. An angular faceted silhouette
+   (`clip-path`) reads as a cut stone at a glance - distinct from both a
+   card (rectangular) and a chip (a plain circular disc), so the three
+   stay tellable apart by SHAPE, not just colour. */
 .card.card-token {
   min-width: var(--card-h);
   width: var(--card-h);
-  border-radius: 0.9rem;
-  border-width: 2px;
-  color: #f4f4f2;
+  min-height: var(--card-h);
+  padding: 0;
+  border: none;
+  clip-path: polygon(50% 0%, 85% 18%, 100% 55%, 74% 100%, 26% 100%, 0% 55%, 15% 18%);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
 }
 
-.card-token.token-red { background: #8c2f28; border-color: #5e1c17; }
-.card-token.token-blue { background: #2a4a7d; border-color: #182d4d; }
-.card-token.token-green { background: #2a6340; border-color: #17402a; }
-.card-token.token-black { background: #23231f; border-color: #0c0c0a; }
-.card-token.token-white { background: #d8d8d2; border-color: #9d9d95; color: #1b1f24; }
+/* Two gradients, not one: a diagonal base (the stone's own colour,
+   darker toward the lower-right facet) plus a small radial highlight
+   (the facet catching light, upper-left) - one flat fill read as a
+   coloured tile, not a cut gem. No extra DOM needed for the highlight
+   since `render()` no longer adds any child content to layer it on. */
+.card-token.token-red {
+  background:
+    radial-gradient(circle at 35% 22%, #ff9c8c 0%, transparent 45%),
+    linear-gradient(155deg, #d1483a 0%, #7a1f16 100%);
+}
+.card-token.token-green {
+  background:
+    radial-gradient(circle at 35% 22%, #a6e8ba 0%, transparent 45%),
+    linear-gradient(155deg, #3fa860 0%, #14421f 100%);
+}
+.card-token.token-black {
+  background:
+    radial-gradient(circle at 35% 22%, #7a7a7a 0%, transparent 45%),
+    linear-gradient(155deg, #2c2c2c 0%, #050505 100%);
+}
 
-/* Smith re-test finding (T102.2): with the supply stacked, a CENTRED
-   label is covered by the next token, and a token's label is its whole
-   identity - a stack of tokens whose marks you can't read is worse than
-   no stacking. Pinned to the left edge for exactly the reason
-   `.card-corner` already gives above: "a fanned/overlapped card only
-   shows a narrow strip of its left edge, and the widest LINE in that
-   strip is what has to fit". A token is the same problem, and gets the
-   same answer rather than a new one. */
 /* A chip tray (direct user correction: "stacked chips should be in
    separate piles by denomination. currently you are drawing them in an
    overlapping row which doesn't make sense with chips").
@@ -531,15 +547,6 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 
 .card-chip.chip-white .chip-denom { color: #1b1f24; text-shadow: none; }
-
-.token-label {
-  position: absolute;
-  top: 0.25rem;
-  left: 0.3rem;
-  font-weight: 700;
-  font-size: 0.85rem;
-  letter-spacing: 0.02em;
-}
 
 /* Display-only cards (table/other players) are informational, not
    unavailable - don't dim them like a disabled action button. */

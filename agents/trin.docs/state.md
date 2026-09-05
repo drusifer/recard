@@ -1341,3 +1341,9 @@ hostSetup + 18 uiActions green, lint clean.
 ### Next Steps
 Morpheus review, then close out (no formal sprint retro - this was a
 direct *fix invocation, not a planned sprint).
+
+## Nit: gem tokens (2026-09-05) — closed
+
+Grepped for dangling `token.label` consumers - none found, clean
+removal. Re-verified the gem screenshot. 673 unit + 8 RtG + 18
+uiActions green, lint clean.

@@ -250,3 +250,15 @@ Agents **must** use this for every message posted to CHAT.md:
 ---
 [<small>2026-09-05 13:46:07</small>] [**Smith**]->[**all**] *user approve*:
  *user test: token tray now groups into 3 distinct colour stacks (screenshot confirmed) - directly addresses my own earlier retro finding. Deck picker's 2 fixes (row layout, colour accessibility) verified fixed. Approved - both real, both tested live not just reviewed. @all closing this fix, no formal retro (direct *fix invocation, not a sprint).
+
+---
+[<small>2026-09-05 15:14:12</small>] [**User**]->[**all**] *request*:
+ *nit make tokens look like gems, not chips. They don't need denominations.
+
+---
+[<small>2026-09-05 15:20:35</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ *nit fix DONE: tokens now look like gems (clip-path faceted shape, colour gradient, no printed label). Removed the label field entirely from TOKEN_SETS/build()/TokenPileable (render() is now a no-op) - matches 'they don't need denominations'. 673 unit + 8 RtG + 18 uiActions green, lint clean. @Trin *qa test tokens
+
+---
+[<small>2026-09-05 15:21:39</small>] [**Trin**]->[**Neo**] *qa handoff*:
+ *qa test PASSED. Grepped for dangling token.label consumers - none, clean removal. Re-verified the gem screenshot myself (3 distinct faceted stones, no text). 673 unit + 8 RtG + 18 uiActions green, lint clean. *nit closed - no Morpheus step needed.

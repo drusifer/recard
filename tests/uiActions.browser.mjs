@@ -316,8 +316,6 @@ test('every card in the hand renders a face, not an id', async () => {
 
 // --- Chips and Tokens on a real table (Phase 102, US-102/105) -------
 //
-// The token-label assertion promised at Phase 100, where it could not
-// live: `render` builds DOM, so this is the layer that can see it.
 // Opens its own table on the Chips & Tokens preset rather than reusing
 // the shared fixture, which is dealt from a standard deck.
 test('the Chips & Tokens preset puts real chips and tokens on the table, rendered as chips and tokens', async () => {
@@ -342,10 +340,14 @@ test('the Chips & Tokens preset puts real chips and tokens on the table, rendere
     );
     assert.ok(colours > 1, `chips must be tellable apart, found ${colours} distinct looks`);
 
-    // A token is a MARKED disc - the label is what makes it one.
-    const labels = await page.locator('.token-label').allTextContents();
-    assert.ok(labels.length > 0, 'tokens render their labels');
-    assert.ok(labels.some((label) => label.trim().length > 0));
+    // UPDATED by the gem *nit (direct user request: "tokens should
+    // look like gems. they don't need denominations") - a token has no
+    // printed label any more; colour alone (same Gate 1 condition A
+    // reasoning as chips) is what has to tell them apart.
+    const tokenColours = await page.locator('.card-token').evaluateAll(
+      (tokens) => new Set(tokens.map((token) => token.className)).size,
+    );
+    assert.ok(tokenColours > 1, `tokens must be tellable apart by colour, found ${tokenColours} distinct looks`);
 
     // A chip is round; a card is not. Asserted as real geometry rather
     // than as a class name, since the class only matters if CSS acts on it.
