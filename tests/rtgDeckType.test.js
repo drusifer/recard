@@ -106,3 +106,36 @@ test('the printed id still repeats across copies and decks - that is what art ke
   assert.ok(copies.length > 1, 'copies of one printed card share a printedId');
   assert.equal(new Set(copies.map((card) => card.id)).size, copies.length, 'but each has its own instance id');
 });
+
+// --- deckLists().signatureCard (direct user request: "use an image
+// from one of the powerful cards in each deck and show the deck
+// colors") ---
+import { CARDS } from '../src/decks/rtg/catalog.js';
+
+test('every deck list carries a signatureCard - a real, non-land card actually IN that deck', () => {
+  const cardsById = new Map(CARDS.map((c) => [c.id, c]));
+  for (const list of deckLists()) {
+    assert.ok(list.signatureCard, `${list.id} has no signatureCard`);
+    assert.ok(list.signatureCard.name, `${list.id}'s signatureCard has no name`);
+    const printed = cardsById.get(list.signatureCard.printedId);
+    assert.ok(printed, `${list.id}'s signatureCard "${list.signatureCard.printedId}" is not a real catalog card`);
+    assert.notEqual(printed.type, 'Land', `${list.id}'s signatureCard must not be a land`);
+  }
+});
+
+test('signatureCard picks the highest-rarity card in the deck, highest cmc as the tiebreaker', () => {
+  const cardsById = new Map(CARDS.map((c) => [c.id, c]));
+  const RARITY_RANK = { common: 0, uncommon: 1, rare: 2, mythic: 3 };
+  for (const list of deckLists()) {
+    const signaturePrinted = cardsById.get(list.signatureCard.printedId);
+    const rawList = DECKS.find((d) => d.id === list.id);
+    const nonLandRanks = rawList.cards
+      .map(({ id }) => cardsById.get(id))
+      .filter((c) => c && c.type !== 'Land')
+      .map((c) => ({ rank: RARITY_RANK[c.rarity] ?? -1, cmc: c.cmc ?? 0 }));
+    const bestRank = Math.max(...nonLandRanks.map((c) => c.rank));
+    const bestCmc = Math.max(...nonLandRanks.filter((c) => c.rank === bestRank).map((c) => c.cmc));
+    assert.equal(RARITY_RANK[signaturePrinted.rarity] ?? -1, bestRank, `${list.id} did not pick the highest-rarity card`);
+    assert.equal(signaturePrinted.cmc ?? 0, bestCmc, `${list.id} did not break the rarity tie by highest cmc`);
+  }
+});

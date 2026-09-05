@@ -1329,3 +1329,15 @@ RtG-only in practice, every other preset's existing RESET behavior
 
 ### Next Steps
 Sprint close: Oracle groom, Smith end-to-end, retro.
+
+## Fix: US-110/111/112 (2026-09-05) — UAT PASSED
+
+Independently verified the GroupedPile private-static-method fix by
+calling insertPileable through a real subclass instance - confirmed
+working, would have thrown with the original private-method design.
+Re-ran the homePileKind mutation check myself. 672 unit + 8 RtG + 6
+hostSetup + 18 uiActions green, lint clean.
+
+### Next Steps
+Morpheus review, then close out (no formal sprint retro - this was a
+direct *fix invocation, not a planned sprint).

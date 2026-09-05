@@ -3140,3 +3140,50 @@ closed with a new host-only `reset` deck action, UX-specced by Smith.
 behavior change. Stale `e2e.smoke.mjs` references groomed. Reserved
 bug-fix slot caught and fixed a real `.deck-stack` duplicate
 `min-width` CSS bug. 654 unit + 18 browser tests green throughout.
+
+---
+
+## US-110/111: Deck selection + sticky host settings (2026-09-05)
+
+Direct user request: "add deck selection to the start menu if the game
+yaml has multiple decks... we don't need all the decks in every game.
+also the game params sticky so it remembers the previous session -
+just the last one." Then, follow-up: "use an image from one of the
+powerful cards in each deck and show the deck colors."
+
+A preset opts in by declaring `deckChoices` (RtG only, one entry per
+catalog deck via `deckLists()`); the host form renders one checkbox per
+choice - checked by default, art from the deck's own highest-rarity
+non-land `signatureCard`, colour dots with real text labels - and
+blocks table creation if none are checked. `filterDeckChoicePiles`
+(presets.js, pure/tested) keeps every non-deck-choice pile
+unconditionally, gating only the actual deck piles.
+
+New `hostSettings.js` remembers the host's last table setup (name,
+preset, allow-zones, expected-players, deck choices) by overwrite, not
+history - prefilled on the next page load.
+
+Smith caught 2 real defects on first render (not just approved): the
+checkbox/art/name were stacked vertically (a CSS `label` rule leak) and
+the colour dots had no accessible name (WCAG 1.4.1). Both fixed.
+
+## US-112: Token piles get the fixes chips already had (2026-09-05)
+
+Direct user report, found by actually testing rather than reading
+code: "token piles have a lot of the same issues as the CardPiles did.
+They share a parent class though so let's push some of that up so
+TokenPiles are more playable." See D116 (docs/ARCHITECTURE.md) for the
+full technical account: a new shared `GroupedPile` base for `ChipPile`
+and a new `TokenPile`, closing a real duplicate-pile-on-drop bug
+(`TokenPileable` had no `homePileKind`) and giving the token supply the
+same grouped-stack visual chips already had. A private-static-method
+JS footgun was caught and fixed before shipping.
+
+Swept every preset for "lots of preset problems too" - found none
+generically; found one real, different-severity, deliberately
+unfixed issue instead (RtG's Decks zone doesn't shrink with fewer
+decks chosen - cosmetic, user-resizable, filed to backlog, not built
+speculatively).
+
+672 unit + 8 RtG + 6 hostSetup + 18 uiActions green throughout both
+fixes, lint clean.

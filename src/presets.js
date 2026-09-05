@@ -135,6 +135,34 @@ const RTG_DECKS_ZONE_ID = 'rtg-decks';
 const RTG_TABLE_DECKS = deckLists()
   .map((deck) => ({ kind: 'deck', ownerId: null, count: 1, deckList: deck.id, name: deck.name, id: deck.id, zoneId: RTG_DECKS_ZONE_ID }));
 
+/**
+ * Filters a preset's declared `piles` down to only the CHOSEN deck
+ * choices (US-110, direct user request: "add deck selection to the
+ * start menu if the game yaml has multiple decks... we don't need all
+ * the decks in every game"). Pure and DOM-free, same reasoning as every
+ * other host-form-adjacent helper (`identity.js`'s session memory,
+ * `panelLayout.js`) - the host form itself just reads checked
+ * checkboxes and calls this.
+ *
+ * A pile that ISN'T one of the preset's own declared `deckChoices`
+ * (battlefield/discard/exile/stack/tokens, for RtG) passes through
+ * UNCONDITIONALLY - only a pile whose id names an actual deck choice is
+ * gated by the chosen set. `chosenIds: null` means "no selection was
+ * made" (either the preset offers no choices at all, or the host form
+ * hasn't rendered one yet) and returns every declared pile unchanged -
+ * the same "no behavior change until a preset actually uses this"
+ * shape every additive `GameConfig` field in this file already follows.
+ *
+ * @param {{piles?: object[], deckChoices?: {id: string, name: string}[]}} preset
+ * @param {string[]|null} chosenIds
+ * @returns {object[]}
+ */
+export function filterDeckChoicePiles(preset, chosenIds) {
+  if (!chosenIds || !preset.deckChoices?.length) return preset.piles ?? [];
+  const choiceIds = new Set(preset.deckChoices.map((d) => d.id));
+  return (preset.piles ?? []).filter((p) => !choiceIds.has(p.id) || chosenIds.includes(p.id));
+}
+
 export const PRESETS = [
   {
     name: 'War',
@@ -247,7 +275,10 @@ export const PRESETS = [
       // unstacked, 40 chips spanned the table and read as a layout
       // fault rather than a feature.
       { kind: 'chip', ownerId: null, count: 1, name: 'Chips', deckType: 'chips', deckList: 'standard-chips' },
-      { kind: 'plain', ownerId: null, count: 1, name: 'Tokens', spread: 0.75, deckType: 'chips', deckList: 'standard-tokens' },
+      // US-112: was `kind: 'plain'` with an explicit `spread: 0.75`
+      // override, same reasoning/fix as RtG's own token supply - see
+      // that entry's comment.
+      { kind: 'token', ownerId: null, count: 1, name: 'Tokens', deckType: 'chips', deckList: 'standard-tokens' },
     ],
   },
   {
@@ -321,6 +352,17 @@ export const PRESETS = [
     cardsPerPlayer: 0,
     tableZone: false,
     zones: [{ id: RTG_DECKS_ZONE_ID, name: 'Decks' }],
+    // US-110 (direct user request): "we don't need all the decks in
+    // every game" - the host form offers a checkbox per catalog deck
+    // and `filterDeckChoicePiles` keeps only the chosen ones at table
+    // creation. Matched against `piles` below by id (every
+    // `RTG_TABLE_DECKS` entry's own id IS its deck id, `configuredZoneId`'s
+    // declared-id path). `colors`/`signatureCard` (direct follow-up
+    // request: "use an image from one of the powerful cards in each
+    // deck and show the deck colors") pass straight through from
+    // `deckLists()` unchanged - the picker's own business, not
+    // re-derived here.
+    deckChoices: deckLists().map((deck) => ({ id: deck.id, name: deck.name, colors: deck.colors, signatureCard: deck.signatureCard })),
     piles: [
       // Fifteen decks, pre-stocked and face-down on the table, so
       // players can pick a deck by drawing from it.
@@ -337,7 +379,13 @@ export const PRESETS = [
       // created onto the battlefield by whoever needs one, so a common
       // supply matches how they're actually used. `standard-tokens`
       // (+1/-1/!) was modelled on this vocabulary in the first place.
-      { kind: 'plain', ownerId: null, count: 1, id: 'rtg-tokens', name: 'Tokens', spread: 0.75, deckType: 'chips', deckList: 'standard-tokens' },
+      // US-112: was `kind: 'plain'` (a token supply rendered as one
+      // overlapping row, like a hand of cards, with its own explicit
+      // `spread: 0.75` override to compensate) - `TokenPile`'s own
+      // `defaultSpread` (0.963, matching `ChipPile`'s tight stack) makes
+      // that override unnecessary, so it's dropped rather than left to
+      // fight the new kind's better default.
+      { kind: 'token', ownerId: null, count: 1, id: 'rtg-tokens', name: 'Tokens', deckType: 'chips', deckList: 'standard-tokens' },
     ],
     // NOTE (flagged, not solved): fifteen deck piles plus two players'
     // zones is a LOT of panels - Smith raised exactly this as Gate-1

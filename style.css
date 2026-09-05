@@ -1600,6 +1600,53 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .deck-config { color: var(--muted); font-size: 0.9rem; }
 .error-text { color: var(--danger); font-size: 0.9rem; margin-top: 0.5rem; }
 
+/* US-110: one checkbox per RtG catalog deck - a plain wrapping row, not
+   a scrollable list, since fifteen short labels fit a normal form width
+   without one. Border/padding match `.panel`'s own vocabulary rather
+   than inventing a second "grouped content" look. */
+.deck-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 0.75rem 1rem;
+  margin: 0.5rem 0;
+}
+/* Same fix as `.btn-row[hidden]` above, same reason: a class selector's
+   `display: flex` outranks the UA stylesheet's `[hidden] { display:
+   none }`, so a hidden `.deck-choices` (every preset but RtG) would
+   stay visible - caught live, not just by re-reading the other rule. */
+.deck-choices[hidden] { display: none; }
+.deck-choices legend { padding: 0 0.4rem; color: var(--muted); font-size: 0.85rem; }
+/* `flex-direction: row` is explicit, not the default, because the base
+   `label { flex-direction: column }` rule (this file, for stacked
+   form-field labels like "Your name" above) otherwise wins - `.deck-
+   choice` outranks it on SPECIFICITY for `display`/`gap`, but never
+   declared `flex-direction` itself, so nothing overrode that ONE
+   property and the checkbox/art/name stacked vertically instead of
+   forming one row. Caught live, not by the unit tests (which never
+   touch layout). */
+.deck-choice { display: flex; flex-direction: row; align-items: center; gap: 0.4rem; font-size: 0.9rem; white-space: nowrap; }
+
+/* Direct follow-up request: "use an image from one of the powerful
+   cards in each deck and show the deck colors" - the thumbnail's own
+   `rtg-c-*` classes (style.css, same ones a dealt card with missing art
+   falls back to) paint this gradient underneath the real art, so a
+   deck's colours show even before/if its signature card's image loads. */
+.deck-choice-art {
+  display: block;
+  flex: none;
+  width: 2.2rem;
+  height: 3rem;
+  border-radius: 0.2rem;
+  overflow: hidden;
+  background: linear-gradient(160deg, var(--rtg-fallback-a, #4a4a4a), var(--rtg-fallback-b, #1d1d1d));
+}
+.deck-choice-art img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.deck-choice-name { flex: none; }
+.deck-choice-colors { flex: none; }
+
 .rules-toggle {
   position: fixed;
   top: 0.75rem;

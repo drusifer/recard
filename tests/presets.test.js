@@ -102,3 +102,65 @@ test('Gin Rummy preset: no discard pile - the game does not use one', () => {
   assert.ok(preset);
   assert.equal(preset.piles, undefined);
 });
+
+// --- Deck selection at the host form (US-110, direct user request:
+// "add deck selection to the start menu if the game yaml has multiple
+// decks... we don't need all the decks in every game.") ---
+import { filterDeckChoicePiles } from '../src/presets.js';
+
+test('RtG declares deckChoices - one entry per catalog deck, matching its own table piles by id', () => {
+  const preset = PRESETS.find((p) => p.name === 'Recard the Gathering');
+  assert.ok(preset.deckChoices?.length > 1, 'RtG has more than one deck to choose from');
+  const deckPileIds = new Set(preset.piles.filter((p) => p.kind === 'deck').map((p) => p.id));
+  for (const choice of preset.deckChoices) {
+    assert.ok(choice.id && choice.name, 'a deck choice needs both an id and a display name');
+    assert.ok(deckPileIds.has(choice.id), `deckChoice "${choice.id}" must match a real declared deck pile`);
+  }
+});
+
+// Direct follow-up request: "use an image from one of the powerful
+// cards in each deck and show the deck colors".
+test('RtG deckChoices carry colors and a signatureCard - what the picker needs to show art and colors', () => {
+  const preset = PRESETS.find((p) => p.name === 'Recard the Gathering');
+  for (const choice of preset.deckChoices) {
+    assert.ok(choice.colors?.length > 0, `${choice.id} has no colors`);
+    assert.ok(choice.signatureCard?.printedId, `${choice.id} has no signatureCard`);
+  }
+});
+
+test('every OTHER preset declares no deckChoices - a preset opts in, it is never assumed', () => {
+  for (const preset of PRESETS) {
+    if (preset.name === 'Recard the Gathering') continue;
+    assert.equal(preset.deckChoices, undefined, `${preset.name} should not declare deckChoices`);
+  }
+});
+
+test('filterDeckChoicePiles: with no deckChoices on the preset, every pile passes through unfiltered', () => {
+  const preset = PRESETS.find((p) => p.name === 'Spit');
+  assert.deepEqual(filterDeckChoicePiles(preset, ['anything']), preset.piles);
+  assert.deepEqual(filterDeckChoicePiles(preset, null), preset.piles);
+});
+
+test('filterDeckChoicePiles: chosenIds null (no selection made) keeps every declared pile, decks included', () => {
+  const preset = PRESETS.find((p) => p.name === 'Recard the Gathering');
+  assert.deepEqual(filterDeckChoicePiles(preset, null), preset.piles);
+});
+
+test('filterDeckChoicePiles: only the CHOSEN deck piles survive - every non-deck pile (battlefield/stack/tokens) is untouched', () => {
+  const preset = PRESETS.find((p) => p.name === 'Recard the Gathering');
+  const chosen = [preset.deckChoices[0].id, preset.deckChoices[1].id];
+  const filtered = filterDeckChoicePiles(preset, chosen);
+
+  const deckIdsInFiltered = filtered.filter((p) => p.kind === 'deck').map((p) => p.id);
+  assert.deepEqual(deckIdsInFiltered.toSorted(), chosen.toSorted(), 'exactly the chosen decks, no others');
+
+  const nonDeckBefore = preset.piles.filter((p) => p.kind !== 'deck');
+  const nonDeckAfter = filtered.filter((p) => p.kind !== 'deck');
+  assert.deepEqual(nonDeckAfter, nonDeckBefore, 'battlefield/discard/exile/stack/tokens are never gated by deck choice');
+});
+
+test('filterDeckChoicePiles: choosing every deck reproduces the original piles exactly', () => {
+  const preset = PRESETS.find((p) => p.name === 'Recard the Gathering');
+  const allIds = preset.deckChoices.map((d) => d.id);
+  assert.deepEqual(filterDeckChoicePiles(preset, allIds), preset.piles);
+});

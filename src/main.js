@@ -20,11 +20,13 @@ import {
   removeDragGhost,
   pileDragFromDrop,
 } from './ui.js';
-import { PRESETS } from './presets.js';
+import { PRESETS, filterDeckChoicePiles } from './presets.js';
 import { RULES_REFERENCE } from './rulesReference.js';
 import { seatedOrder } from './seating.js';
 import { save as saveGame, load as loadGame, clear as clearGame, describeAge, expectedReturners } from './persistence.js';
 import { CLIENT_KEY_STORAGE, resolvePlayer, peerFor, rememberSession, recallSession, forgetSession } from './identity.js';
+import { rememberHostSettings, recallHostSettings } from './hostSettings.js';
+import { artUrl, rtgColorClasses, PIP_CLASS } from './cards/RtgCardFace.js';
 import { loadPanelLayout, savePanelPosition, savePanelSize, applyPresetLayout } from './panelLayout.js';
 import { saveLayoutOverride, deleteLayoutOverride, overridesForPreset, stableLayoutSubset } from './layoutOverrides.js';
 // UX follow-up (direct user request): Score is a native Web Component
@@ -164,6 +166,120 @@ for (const preset of PRESETS) {
   presetSelect.append(opt);
 }
 const layoutSelect = document.querySelector('#host-layout');
+const deckChoicesElement = document.querySelector('#host-deck-choices');
+
+// US-110/US-111 (direct user request: "make the game params sticky so
+// it remembers the previous session - just the last one"): read ONCE at
+// load, before the preset dropdown/deck-choice checkboxes render for the
+// first time, so their initial state can reflect it. Sticky by
+// overwrite (see `hostSettings.js`) - this is always the single most
+// recent host session, never a history to pick from.
+const rememberedHostSettings = recallHostSettings(localStorage);
+if (rememberedHostSettings) {
+  document.querySelector('#host-name').value = rememberedHostSettings.name;
+  // Only trust a remembered preset name that still names a REAL preset -
+  // one removed since the last session must fall back to the dropdown's
+  // own first option, never silently select nothing.
+  if (PRESETS.some((p) => p.name === rememberedHostSettings.presetName)) {
+    presetSelect.value = rememberedHostSettings.presetName;
+  }
+  document.querySelector('#host-allow-player-zones').checked = rememberedHostSettings.allowsPlayerZones;
+  if (rememberedHostSettings.expectedPlayers > 0) {
+    document.querySelector('#host-expected-players').value = String(rememberedHostSettings.expectedPlayers);
+  }
+}
+
+/** A small row of mana-colour dots (`.rtg-pip`, the same visual
+ * vocabulary `RtgCardFace.js`'s cost pips already use) - direct
+ * follow-up request: "show the deck colors". Shown regardless of
+ * whether the signature card's art actually loads, since art alone
+ * doesn't read as "these are this deck's colours" to someone who
+ * doesn't already know the set. */
+// Smith UX review: a bare colour dot conveys nothing to a screen reader,
+// and nothing to a player who doesn't already know MTG's letter-to-
+// colour convention (WCAG 1.4.1 - colour must never be the only carrier
+// of information). Every dot gets a real name via `title`/`aria-label`,
+// the same "colour is decoration, text is the real signal" pattern
+// `RtgCardFace.js`'s own mana pips already follow (they render the
+// letter as visible text; a color-only DOT has no such text of its own,
+// so this is where it has to live instead).
+const COLOR_NAME = { W: 'White', U: 'Blue', B: 'Black', R: 'Red', G: 'Green' };
+
+function deckColorDots(colors) {
+  const wrap = document.createElement('span');
+  wrap.className = 'rtg-cost deck-choice-colors';
+  const colorList = colors ?? [];
+  for (const color of colorList) {
+    const dot = document.createElement('span');
+    dot.className = `rtg-pip ${PIP_CLASS[color] ?? 'pip-generic'}`;
+    const name = COLOR_NAME[color] ?? color;
+    dot.title = name;
+    dot.setAttribute('aria-label', name);
+    wrap.append(dot);
+  }
+  return wrap;
+}
+
+// US-110: one checkbox per preset-declared `deckChoices` entry (RtG
+// today - "we don't need all the decks in every game"). A preset with
+// no `deckChoices` hides the fieldset entirely, exactly the pre-US-110
+// look for every other game. All checked by default; a REMEMBERED
+// selection (US-111) only applies when it was saved against THIS same
+// preset - switching presets mid-session and back doesn't try to carry
+// a choice list that might not even apply to the new preset's decks.
+//
+// Direct follow-up request: "use an image from one of the powerful
+// cards in each deck and show the deck colors" - each choice shows its
+// own `signatureCard`'s art (`deckLists()`'s own highest-rarity, highest-
+// cmc, non-land pick) plus a color-dot row. Reuses `RtgCardFace.js`'s
+// exact `artUrl`/fallback-class machinery rather than inventing a
+// second art-resolution path - a missing image degrades to the same
+// colour-keyed gradient a dealt card with no art falls back to.
+function renderDeckChoices(preset) {
+  deckChoicesElement.replaceChildren(deckChoicesElement.querySelector('legend'));
+  if (!preset.deckChoices?.length) {
+    deckChoicesElement.hidden = true;
+    return;
+  }
+  deckChoicesElement.hidden = false;
+  const remembered = rememberedHostSettings?.presetName === preset.name ? rememberedHostSettings.deckChoiceIds : null;
+  for (const deck of preset.deckChoices) {
+    const label = document.createElement('label');
+    label.className = 'deck-choice';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.value = deck.id;
+    checkbox.checked = remembered ? remembered.includes(deck.id) : true;
+
+    const thumb = document.createElement('span');
+    thumb.className = `deck-choice-art ${rtgColorClasses(deck.colors).join(' ')}`;
+    if (deck.signatureCard) {
+      const art = document.createElement('img');
+      art.src = artUrl(deck.signatureCard);
+      art.alt = '';
+      // Same "degrade to a colour panel, never a broken-image icon"
+      // rule `RtgCardFace.js`'s own resting face already follows - art
+      // generation is quota-limited and may legitimately be missing.
+      art.addEventListener('error', () => art.remove());
+      thumb.append(art);
+    }
+
+    const name = document.createElement('span');
+    name.className = 'deck-choice-name';
+    name.textContent = deck.name;
+
+    label.append(checkbox, thumb, name, deckColorDots(deck.colors));
+    deckChoicesElement.append(label);
+  }
+}
+
+/** The checked deck-choice ids for `preset`, or `null` when the preset
+ * offers no choices to make at all - `filterDeckChoicePiles`'s own
+ * "null means every declared pile" contract. */
+function chosenDeckIds(preset) {
+  if (!preset.deckChoices?.length) return null;
+  return [...deckChoicesElement.querySelectorAll('input:checked')].map((element) => element.value);
+}
 
 // US-70 (D61): repopulate the Layout picker with every saved override
 // recorded against THIS preset's name - `overridesForPreset` already
@@ -192,6 +308,7 @@ function onPresetSelected() {
   const preset = PRESETS.find((p) => p.name === presetSelect.value);
   selectedPreset = preset;
   refreshLayoutOptions(preset.name);
+  renderDeckChoices(preset);
   const previewElement = document.querySelector('#host-preset-preview');
   const cardsWord = preset.cardsPerPlayer === 1 ? 'card' : 'cards';
   // D53 (Smith Gate 2): a preset that declares a starting table layout
@@ -680,12 +797,26 @@ async function resumeHostedTable() {
 }
 
 document.querySelector('#create-table').addEventListener('click', async () => {
+  const createErrorElement = document.querySelector('#host-create-error');
+  // US-110: a preset that offers deck choices must have at least one
+  // checked - an empty table is never a valid game, and silently
+  // falling back to "every deck" would defeat the whole point of the
+  // control (the host unchecked them ON PURPOSE).
+  const deckIds = chosenDeckIds(selectedPreset);
+  if (deckIds && deckIds.length === 0) {
+    createErrorElement.textContent = 'Choose at least one deck.';
+    createErrorElement.hidden = false;
+    return;
+  }
+  createErrorElement.hidden = true;
+
   // A new table supersedes any save - clearing here (rather than on a
   // decline) means a mis-click on "no" never destroys the only copy.
   clearGame(localStorage);
   role = 'host';
   myName = document.querySelector('#host-name').value.trim() || 'Host';
   expectedPlayers = Number(document.querySelector('#host-expected-players').value) || 0;
+  const allowsPlayerZones = document.querySelector('#host-allow-player-zones').checked;
   // Direct user request: "every game should ONLY be based on preset" -
   // `deckConfig` is read entirely off the selected preset now (the
   // module-level `selectedPreset`, kept in sync by `onPresetSelected`),
@@ -703,23 +834,39 @@ document.querySelector('#create-table').addEventListener('click', async () => {
   };
   // D46: GameConfig's first real field. D53: `piles` (renamed from
   // `zones` - D55, that name now belongs to the real Zone-entity list)
-  // comes from the selected preset. `zones` carries any Zone entities
-  // the preset itself declares (e.g. none today reach beyond the
-  // always-present Table Zone - Gin Rummy's discard only ever references
-  // it, never declares a new one).
+  // comes from the selected preset - US-110: filtered down to only the
+  // chosen deck choices (`deckIds`), if the preset offers any at all;
+  // every other pile passes through unchanged (`filterDeckChoicePiles`'s
+  // own contract). `zones` carries any Zone entities the preset itself
+  // declares (e.g. none today reach beyond the always-present Table
+  // Zone - Gin Rummy's discard only ever references it, never declares
+  // a new one).
   const gameConfig = {
-    allowsPlayerZones: document.querySelector('#host-allow-player-zones').checked,
+    allowsPlayerZones,
     tableZone: selectedPreset.tableZone ?? true,
-    piles: selectedPreset.piles ?? [],
+    piles: filterDeckChoicePiles(selectedPreset, deckIds),
     zones: selectedPreset.zones ?? [],
     // Carried in the TABLE's config, not just this browser's
     // `lastDealCount` - see `createInitialState`. A restored table has
     // no share screen to re-seed that local value from.
     cardsPerPlayer: selectedPreset.cardsPerPlayer,
   };
+  // US-111 (direct user request: "make the game params sticky"):
+  // written on every successful table creation, overwriting whatever
+  // the last session left - see `hostSettings.js`'s own "last one wins"
+  // shape. Written here (before the session/table actually opens)
+  // rather than at the end of this handler so an early return above
+  // (no decks chosen) never gets this far and never overwrites a good
+  // memory with a table that was never created.
+  rememberHostSettings(localStorage, {
+    name: myName,
+    presetName: selectedPreset.name,
+    allowsPlayerZones,
+    expectedPlayers,
+    deckChoiceIds: deckIds,
+  });
 
   session = Session.host({ name: myName });
-  const createErrorElement = document.querySelector('#host-create-error');
   try {
     myId = await session.ready();
   } catch (error) {

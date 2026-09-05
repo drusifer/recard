@@ -185,8 +185,11 @@ test('a chip declares the pile kind it belongs in; a card declares none', () => 
   assert.equal(homePileKindFor({}), undefined, 'an unmarked record is a card, which has no home');
 });
 
-// A token is NOT a chip: it has no dedicated pile kind, so it keeps the
-// ordinary "drop on empty space makes a new pile" behaviour.
-test('a token has no home pile kind - only chips claim one', () => {
-  assert.equal(homePileKindFor({ pileableType: 'token' }), undefined);
+// US-112 (direct user request, found live): a token dropped on empty
+// zone space used to spawn a brand-new pile instead of rejoining its
+// own supply - the exact chip-duplication bug D110 already fixed,
+// simply never applied to tokens because nothing named a home for one.
+// Reversed from the original "only chips claim one" ruling.
+test('a token declares the pile kind it belongs in, same as a chip', () => {
+  assert.equal(homePileKindFor({ pileableType: 'token' }), 'token');
 });

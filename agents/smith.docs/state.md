@@ -773,3 +773,15 @@ D110's per-denomination stack grouping (declared `kind: 'plain'`, not
 
 ### Next Steps
 Retro, then Cypher launch.
+
+## Fix: US-110/111/112 (2026-09-05) — closed
+
+Token tray grouping fix directly resolves my own earlier retro finding
+(sprint RtG Spit & Polish backlog item: tokens never got D110's
+per-denomination grouping). Verified live via screenshot - 3 distinct
+colour stacks now, not one overlapping row. Deck picker's 2 real bugs I
+caught earlier this session (vertical stacking, colour accessibility)
+both fixed and reverified.
+
+### Next Steps
+Nothing pending. Standing backlog unchanged otherwise.

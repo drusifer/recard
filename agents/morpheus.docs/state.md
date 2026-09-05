@@ -507,3 +507,20 @@ Handed to Oracle for groom (Stage 3). Nothing architecturally open from
 this sprint. Standing backlog unchanged: reconnect-after-refresh, real
 QR image, 5+-player mobile density, builder screen, browser-automation
 tooling investment, jsdom/e2e harness for ui.js.
+
+## Fix: US-110/111/112 (2026-09-05) — D116, reviewed
+
+GroupedPile extraction reviewed and approved - real shared parent for
+ChipPile/TokenPile, one extension point (`sortValue`). Verified the
+private-static-method footgun claim independently before trusting it
+(private static methods are not inherited by subclasses in JS - a real,
+easy-to-miss bug the first draft would have shipped). D116 recorded.
+
+Backlog item from this fix, not yet acted on: RtG's "Decks" zone panel
+is a fixed pixel layout sized for 15 decks - doesn't shrink when fewer
+are chosen (US-110's own new picker feature exposed this). Deliberately
+left alone - panels are already user-resizable, and dynamic zone sizing
+by content is a real, separate architecture question.
+
+### Next Steps
+Nothing in-flight architecturally. Handed to Oracle for groom.

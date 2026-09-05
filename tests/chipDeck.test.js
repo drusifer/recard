@@ -4,6 +4,8 @@ import { buildDeck } from '../src/deck.js';
 import { createInitialState, pilesOf, reduce } from '../src/state.js';
 import { PRESETS } from '../src/presets.js';
 import { ChipPile } from '../src/piles/ChipPile.js';
+import { TokenPile } from '../src/piles/TokenPile.js';
+import { PILE_TYPES } from '../src/piles/pileTypes.js';
 
 /**
  * Sprint pileObjects, Phase 102 (US-105). A chip supply is a DECK_TYPE,
@@ -111,18 +113,27 @@ test('a declared pile with no spread is untouched - undefined, so its type defau
   assert.equal(pilesOf(state).find((pile) => pile.id === 'plain-one').spread, undefined);
 });
 
-// UPDATED by the chip-pile *fix: a chip supply no longer declares its
-// own spread, because `ChipPile.defaultSpread` stacks it - stacking is a
-// property of the KIND now, not something each preset repeats. A TOKEN
-// supply still declares one, since it sits in a plain pile.
-test('every supply stacks - chips by their pile kind, tokens by declaration', () => {
+// UPDATED by US-112 ("token piles have a lot of the same issues as the
+// CardPiles did... push some of that up"): a token supply no longer
+// declares its own spread override either - it has its own `TokenPile`
+// kind now (`GroupedPile`, shared with `ChipPile`), whose
+// `defaultSpread` stacks it the same way a chip tray's does. Neither
+// chip nor token supplies repeat this per-preset any more; it's a
+// property of the KIND.
+test('every supply stacks - by the KIND\'s own defaultSpread, never a per-preset override', () => {
   for (const preset of PRESETS) {
     const supplies = preset.piles?.filter((pile) => pile.deckType === 'chips') ?? [];
     for (const pile of supplies) {
-      const spread = pile.kind === 'chip' ? ChipPile.defaultSpread : pile.spread;
-      assert.ok(spread > 0.5, `${preset.name}/${pile.name} should stack (kind ${pile.kind}, spread ${spread})`);
+      assert.equal(pile.spread, undefined, `${preset.name}/${pile.name} should not need its own spread override any more`);
+      const spread = PILE_TYPES[pile.kind]?.defaultSpread;
+      assert.ok(spread > 0.5, `${preset.name}/${pile.name} should stack (kind ${pile.kind}, defaultSpread ${spread})`);
     }
   }
+});
+
+test('ChipPile and TokenPile share the exact same stacking spread, via GroupedPile', () => {
+  assert.equal(ChipPile.defaultSpread, TokenPile.defaultSpread);
+  assert.equal(ChipPile.maxSpread, TokenPile.maxSpread);
 });
 
 

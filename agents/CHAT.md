@@ -202,3 +202,51 @@ Agents **must** use this for every message posted to CHAT.md:
 ---
 [<small>2026-09-05 00:47:16</small>] [**Cypher**]->[**all**] *pm launch*:
  *pm launch RtG Spit & Polish (US-109, D115). Complete: real severe bug found by actually playing RtG - Restart Game destroyed the entire card pool - fixed and regression-tested at unit+live-UI level. New tests/rtgPlaythrough.browser.mjs (npm run test:rtg) added to the project's test inventory. 2 phases, zero rework. Backlog: token-supply colour grouping (Smith, HCI), test-instrument sanity-checking (Neo/Trin), match-by-shape-not-name as a standing principle (Morpheus).
+
+---
+[<small>2026-09-05 13:00:12</small>] [**User**]->[**all**] *request*:
+ *fix add deck selection to start menu when game yaml has multiple decks (avoid bundling all decks into every RtG game); make game params sticky - remember only the last session's settings
+
+---
+[<small>2026-09-05 13:14:54</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-hostsetup | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9070.385163
+
+---
+[<small>2026-09-05 13:15:54</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ *swe fix DONE (US-110/111): RtG start menu offers one checkbox per catalog deck (filterDeckChoicePiles, pure/tested), blocks creation if none checked. Host settings now sticky (hostSettings.js, last-session-wins). Found+fixed a real CSS bug along the way: .deck-choices flex outranked [hidden], same bug class as documented .btn-row. 668 unit + 6 new hostSetup browser + 6 RtG + 18 uiActions, lint clean. @Trin *qa uat deck selection + sticky settings
+
+---
+[<small>2026-09-05 13:26:43</small>] [**Smith**]->[**Neo**] *user feedback*:
+ *user feedback deck picker: found 2 real issues on the initial build, not just approving. (1) checkbox/art/name were stacked VERTICALLY per card, not one row - the base 'label{flex-direction:column}' rule leaked into .deck-choice since it never set its own direction. Fixed. (2) color dots carried NO text alternative - WCAG 1.4.1 violation, meaningless to screen readers or anyone who doesn't know MTG's W/U/B/R/G convention. Added title/aria-label per dot. Both verified live, not just re-read. @Neo *swe fix
+
+---
+[<small>2026-09-05 13:26:52</small>] [**User**]->[**all**] *request*:
+ *fix simulator issues: token piles share CardPile problems (same parent class - push fixes up); lots of preset problems even with new games
+
+---
+[<small>2026-09-05 13:42:07</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ *swe fix DONE (US-112): found+fixed the real bug - TokenPileable had no homePileKind, so dropping a token in its own zone spawned a duplicate pile, same bug D110 fixed for chips. Extracted shared GroupedPile (stacking/sort/insert), ChipPile+new TokenPile both extend it. ChipTray.js generalized to group by PILE_TYPES[kind].sortValue. Tokens now render as 3 color stacks not 1 row. 672 unit + 8 RtG + 6 hostSetup + 18 uiActions green. @Trin *qa uat
+
+---
+[<small>2026-09-05 13:44:24</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat PASSED. Independently reproduced the private-static-method footgun (called insertPileable via a real GroupedPile subclass - confirmed it works, would have thrown with the original #sorted design). Re-ran the homePileKind mutation check myself (forced undefined, test caught 22 vs 21). 672 unit + 8 RtG + 6 hostSetup + 18 uiActions green, lint clean. @Morpheus *lead review
+
+---
+[<small>2026-09-05 13:45:15</small>] [**Morpheus**]->[**Oracle**] *lead handoff*:
+ *lead review PASSED. GroupedPile is the right shape - one real extension point (sortValue), everything shared lives exactly once. Verified the private-static footgun claim myself (constructed a throwaway subclass) before trusting it. D116 recorded (docs/ARCHITECTURE.md): the fix, the shared-parent extraction, the caught JS footgun, and the deliberately-NOT-fixed Decks-zone-sizing backlog item. @Oracle *ora groom
+
+---
+[<small>2026-09-05 13:45:57</small>] [**Oracle**]->[**Smith**] *ora handoff*:
+ *ora groom complete: US-110/111/112 documented in USER_STORIES.md, D116 already in ARCHITECTURE.md from Morpheus's review. Backlog item filed: RtG Decks zone panel doesn't shrink with fewer decks chosen (cosmetic, not built). @Smith *user test deck picker + token fix
+
+---
+[<small>2026-09-05 13:46:07</small>] [**Smith**]->[**all**] *user approve*:
+ *user test: token tray now groups into 3 distinct colour stacks (screenshot confirmed) - directly addresses my own earlier retro finding. Deck picker's 2 fixes (row layout, colour accessibility) verified fixed. Approved - both real, both tested live not just reviewed. @all closing this fix, no formal retro (direct *fix invocation, not a sprint).

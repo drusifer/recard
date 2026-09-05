@@ -20,6 +20,15 @@ export class TokenPileable extends Pileable {
    */
   static survivesReset = true;
 
+  /**
+   * A token belongs in a token supply - see `Pileable.homePileKind`.
+   * Missing until US-112 (found live: dropping a token on empty zone
+   * space spawned a brand-new pile instead of rejoining the real
+   * supply, the exact chip-duplication bug D110 already fixed - just
+   * never applied here, since nothing named a home to return to).
+   */
+  static homePileKind = 'token';
+
   className() {
     return this.colour ? `card-token token-${this.colour}` : 'card-token';
   }

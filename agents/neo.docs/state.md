@@ -673,3 +673,139 @@ playthrough green. `npm run lint:js`/`lint:style` clean.
 
 ### Next Steps
 Handing to Trin for UAT, then Oracle groom/Smith close-out.
+
+## Fix: deck selection + sticky host settings (US-110/US-111, 2026-09-05)
+
+Direct user request: "add deck selection to the start menu if the game
+yaml has multiple decks... we don't need all the decks in every game.
+also the game params sticky so it remembers the previous session -
+just the last one."
+
+**US-110 (deck selection).** A preset opts in by declaring
+`deckChoices: {id, name}[]` - only RtG does today (`deckLists()`, one
+entry per catalog deck). `filterDeckChoicePiles(preset, chosenIds)`
+(presets.js, pure/unit-tested) keeps every non-deck-choice pile
+unconditionally and gates only piles whose id matches a choice - so
+battlefield/discard/exile/stack/tokens are never affected by the
+selection, only the actual deck piles. `chosenIds: null` (no choices
+offered, or none rendered yet) means "every declared pile," matching
+every other additive `GameConfig` field's own "no behavior change
+until a preset uses this" convention. Host form (`#host-deck-choices`,
+index.html) renders one checkbox per choice, all checked by default;
+creating a table with zero checked is blocked with a clear inline error
+(`#host-create-error`, reusing the existing error slot rather than
+inventing a second one).
+
+**US-111 (sticky settings).** New `hostSettings.js`, same pure/DOM-free
+shape as `identity.js`'s own session-remembering functions
+(`rememberHostSettings`/`recallHostSettings`, one `localStorage` key,
+overwrite not history - "just the last one" taken literally). Remembers
+name, preset, allow-player-zones, expected-players, and (when
+applicable) the exact deck-choice ids checked. Read ONCE at module
+load, before the preset dropdown/checkboxes first render, so the
+initial DOM state already reflects it - a remembered preset name that
+no longer exists falls back to the dropdown's own first option rather
+than selecting nothing.
+
+**Real bug found and fixed along the way, not just added feature
+code**: my own new `.deck-choices { display: flex }` rule silently
+overrode `[hidden]`'s UA-stylesheet `display: none` (equal specificity,
+later in the cascade) - the picker fieldset stayed VISIBLE for every
+non-RtG preset despite `hidden` being set correctly in JS. Caught by
+actually looking at the rendered page in a live browser check, not by
+the unit test (which only asserts on data, never touches layout).
+`.btn-row[hidden] { display: none; }` already documents this exact
+class of bug in style.css - added `.deck-choices[hidden]` the same way
+rather than treating it as a one-off.
+
+Also mutation-checked the "at least one deck" guard (forced the
+condition false) - the new browser test caught it, confirming the
+guard is load-bearing, not decorative.
+
+668 unit (662 + 6 hostSettings/presets tests) + 6 new
+`tests/hostSetup.browser.mjs` (`npm run test:hostsetup`) + 6 RtG + 18
+uiActions, all green. `npm run lint` clean except the unchanged 5-item
+design-lint baseline (pre-existing, unrelated).
+
+### Next Steps
+Handing to Trin for UAT, then Morpheus review per the `*fix` chain.
+
+## Fix: US-110/111 deck picker polish + US-112 token/pile architecture (2026-09-05)
+
+### US-110 follow-up: deck picker art + colors
+Direct follow-up request: "use an image from one of the powerful cards
+in each deck and show the deck colors." `deckLists()` (rtgDeck.js) now
+computes `signatureCard` per deck (highest rarity, then highest cmc,
+excluding lands) via a new `signatureCardFor` helper; `presets.js`
+passes `colors`/`signatureCard` through on `deckChoices`. Exported
+`artUrl`/`rtgColorClasses`/`PIP_CLASS` from `RtgCardFace.js` (previously
+private) so the picker reuses the exact same art-URL/fallback-colour
+machinery a dealt card already uses, rather than a second path.
+
+**Smith caught 2 real bugs on first render, not just approved:**
+1. Checkbox/art/name were stacked VERTICALLY per card - the global
+   `label { flex-direction: column }` rule (meant for stacked form
+   fields) leaked into `.deck-choice` since it never declared its own
+   `flex-direction`. Fixed with an explicit `row` + a comment explaining
+   why it has to be explicit.
+2. Colour dots had no accessible name (WCAG 1.4.1 - colour was the only
+   carrier of information, useless to a screen reader or anyone who
+   doesn't know MTG's W/U/B/R/G convention). Added `title`/`aria-label`
+   per dot via a small `COLOR_NAME` map.
+
+### US-112: token piles get the fixes chips already had
+Direct user report, found by actually testing: "token piles have a lot
+of the same issues as the CardPiles did. They share a parent class
+though so let's push some of that up." Investigated and confirmed live
+(21→22 piles) before touching code: `TokenPileable` never declared
+`homePileKind` (unlike `ChipPileable`'s `'chip'`), so dropping a token
+in its own supply's zone spawned a duplicate pile instead of rejoining
+it - the EXACT chip-duplication bug D110 fixed, never applied here.
+Also: the token supply was `kind: 'plain'`, rendering as one
+overlapping row (read like a hand of cards) instead of grouped stacks.
+
+**Real "push it up" refactor, not a copy-paste fix:** new
+`src/piles/GroupedPile.js` extracts what `ChipPile` and the new
+`TokenPile` (`src/piles/TokenPile.js`) actually share - stacking
+spread (0.963/0.97), arrive-pre-sorted, insert-re-sorts-and-strips-
+drop-layout - behind one abstract `static sortValue(pileable)` each
+subclass names (`chip.denom` vs `token.colour`). `ChipTray.js`
+(renders both now, kept its tag name to avoid an unrelated CSS rename
+sweep) generalized from a hardcoded `card.denom` grouping to
+`PILE_TYPES[pile.kind].sortValue`. `TokenPileable.homePileKind = 'token'`
+closes the actual bug. RtG's and "Chips & Tokens"' preset token
+declarations changed `kind: 'plain'` -> `'token'`, dropping their
+now-redundant `spread: 0.75` overrides (`TokenPile`'s own default
+supersedes them).
+
+**Real JS footgun caught before it shipped**: my first draft of
+`GroupedPile` used a private static method (`static #sorted`) called via
+`this.constructor.#sorted(...)` from an instance method - JS static
+private members are NOT inherited by subclasses even via
+`this.constructor`, so `ChipPile`/`TokenPile` calling it would have
+thrown at runtime the first time either was actually used, despite
+looking correct and passing a naive read-through. Caught before commit
+by tracing exactly how the private-brand check works, not by trusting
+the pattern; rewrote as a plain module-scoped function instead.
+
+**Investigated but explicitly NOT touched**: swept every preset
+solo+2-player for console errors (all clean) chasing "lots of preset
+problems too" - found none generically. Found ONE real, different-
+severity issue while screenshotting: RtG's "Decks" zone panel is a
+fixed captured-pixel layout sized for 15 decks, so choosing fewer
+leaves visible dead space. Deliberately NOT auto-sizing it - panels are
+already user-resizable (drag + Save Layout), this is cosmetic not
+broken, and building dynamic content-based zone sizing is a real
+separate architecture item nobody asked for. Flagged to backlog instead.
+
+672 unit (668 + 2 hostSetup-related earlier + 2 GroupedPile/registry
+updates) + 8 RtG (6 + 2 new token-duplication/grouping regression
+tests) + 6 hostSetup + 18 uiActions, all green. Mutation-checked the
+`homePileKind` fix (forced it back to `undefined`) - the new test
+caught it immediately (22 vs 21).
+
+### Next Steps
+Handing to Trin for UAT, then Morpheus review. Backlog item to file at
+close: RtG "Decks" zone panel doesn't shrink when fewer decks are
+chosen (US-110's own new feature exposed this) - needs its own product
+call on whether dynamic zone sizing is worth building, not a quick fix.

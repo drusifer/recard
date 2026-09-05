@@ -1,23 +1,29 @@
 import { renderPileShell, renderPileCards, renderSplitPicker } from '../ui.js';
+import { PILE_TYPES } from '../piles/pileTypes.js';
 
 /**
- * `<chip-tray>` — a chip pile, rendered the way a real tray looks
+ * `<chip-tray>` — a GROUPED pile, rendered the way a real tray looks
  * (direct user correction: "stacked chips should be in separate piles by
  * denomination. currently you are drawing them in an overlapping row
- * which doesn't make sense with chips").
+ * which doesn't make sense with chips"). Despite the tag name, this is
+ * no longer chip-specific (US-112, "push some of that up") - `TokenPile`
+ * renders through it too, grouped by colour instead of denomination.
+ * Kept as `chip-tray`/`.chip-tray`/`.chip-stack` rather than renamed:
+ * the tag/class names are cosmetic, and a rename sweep across style.css
+ * risked regressions this fix didn't need to take on.
  *
  * The first cut reused `<pile-panel>`, which lays every pileable out in
  * ONE overlapping row. That is right for cards, where the row IS the
- * pile, and wrong for chips: a tray of mixed denominations in a single
- * row reads as a smear, and the sorting `ChipPile` maintains buys
- * nothing you can see. Chips of a value belong in their OWN stack.
+ * pile, and wrong for a grouped supply: a tray of mixed groups in a
+ * single row reads as a smear, and the sorting `GroupedPile` maintains
+ * buys nothing you can see. Same-group pieces belong in their OWN stack.
  *
- * Each denomination gets a column, and each column is rendered by the
- * SAME `renderPileCards` every other pile kind uses - passed a view of
- * just that group. That is what keeps every chip individually
- * draggable, right-clickable and targetable with no chip-specific
- * interaction code: only the LAYOUT differs, which is exactly the split
- * `<fan-pile>` and `<deck-stack>` already make.
+ * Each group gets a column, and each column is rendered by the SAME
+ * `renderPileCards` every other pile kind uses - passed a view of just
+ * that group. That is what keeps every piece individually draggable,
+ * right-clickable and targetable with no kind-specific interaction
+ * code: only the LAYOUT differs, which is exactly the split `<fan-pile>`
+ * and `<deck-stack>` already make.
  */
 export class ChipTrayElement extends HTMLElement {
   render(pile, allPiles, options) {
@@ -33,12 +39,12 @@ export class ChipTrayElement extends HTMLElement {
       tray.className = 'chip-tray';
       container.append(tray);
 
-      for (const [denom, group] of groupByDenomination(pile.cards)) {
+      for (const [groupValue, group] of groupByValue(pile)) {
         const column = document.createElement('div');
         // `card-row` so every rule that styles a row of pileables still
         // applies; `chip-stack` only turns the direction vertical.
         column.className = 'card-row chip-stack';
-        if (denom !== undefined) column.dataset.denom = String(denom);
+        if (groupValue !== undefined) column.dataset.denom = String(groupValue);
         tray.append(column);
         renderPileCards(column, { ...pile, cards: group }, allPiles, options);
         // *nit ("a slight diagonal from lower left to upper right"):
@@ -57,28 +63,32 @@ export class ChipTrayElement extends HTMLElement {
 }
 
 /**
- * Chips grouped by denomination, highest first - and anything WITHOUT a
- * denomination in one final group of its own.
+ * A pile's own cards grouped by whatever `PILE_TYPES[pile.kind]`
+ * declares as its `sortValue` (`GroupedPile`, `src/piles/`) - denomination
+ * for a chip tray, colour for a token supply, generalized rather than
+ * hardcoded to `card.denom` (US-112: that hardcoding is exactly why
+ * adding a SECOND grouped kind meant duplicating this whole component
+ * instead of it just working). Anything with no group value (a card
+ * dropped onto a tray - the Core invariant means this pile accepts
+ * anything, `GroupedPile` doesn't override `canAccept`) lands in one
+ * final group of its own rather than vanishing.
  *
- * That last group is not a defensive nicety: a chip tray accepts any
- * pileable (the Core invariant - `ChipPile` deliberately does not
- * override `canAccept`), so a card really can be dropped on one, and it
- * has to render somewhere rather than vanish.
- *
- * @param {{denom?: number}[]} cards
- * @returns {[number|undefined, object[]][]}
+ * @param {{kind: string, cards: object[]}} pile
+ * @returns {[unknown, object[]][]}
  */
-function groupByDenomination(cards) {
+function groupByValue(pile) {
+  const sortValue = PILE_TYPES[pile.kind]?.sortValue ?? (() => {});
   const groups = new Map();
-  for (const card of cards) {
-    const key = card.denom;
+  for (const card of pile.cards) {
+    const key = sortValue(card);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(card);
   }
   return Iterator.from(groups).toArray().toSorted(([a], [b]) => {
+    if (a === b) return 0;
     if (a === undefined) return 1;
     if (b === undefined) return -1;
-    return b - a;
+    return a > b ? -1 : 1;
   });
 }
 

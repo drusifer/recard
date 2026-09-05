@@ -61,11 +61,44 @@ export function build({ deckList } = {}) {
   return deck;
 }
 
+// Direct user request ("use an image from one of the powerful cards in
+// each deck"): a deck picker needs ONE representative card, not the
+// full 60. Rarity first (the catalog only prints common/uncommon/rare
+// today, but this reads right the moment a mythic is ever added), then
+// highest mana cost as the tiebreaker within a rarity - the biggest,
+// splashiest thing the deck can cast is what a player recognizes a
+// deck BY. Lands are excluded outright; a land is never what makes a
+// deck feel like itself.
+const RARITY_RANK = { common: 0, uncommon: 1, rare: 2, mythic: 3 };
+
+function signatureCardFor(list) {
+  let best = null;
+  for (const { id } of list.cards) {
+    const card = BY_ID.get(id);
+    if (!card || card.type === 'Land') continue;
+    const rank = RARITY_RANK[card.rarity] ?? -1;
+    const bestRank = best ? RARITY_RANK[best.rarity] ?? -1 : -1;
+    if (rank > bestRank || (rank === bestRank && (card.cmc ?? 0) > (best?.cmc ?? 0))) best = card;
+  }
+  return best;
+}
+
 /**
  * The catalogued deck lists, for a preset or a picker to offer.
+ * `signatureCard` is `{id, printedId, name}` for the deck's own
+ * flashiest non-land card - `printedId` and `id` are the SAME value
+ * here (this is catalog data, not a physical dealt copy, so there is no
+ * per-copy instance id to distinguish, unlike `build()`'s output) but
+ * named to match `RtgCardFace.js`'s own `artUrl(card)` contract
+ * (`card.printedId ?? card.id`), so a picker can reuse that function
+ * directly instead of re-deriving the art path a second way.
  */
 export function deckLists() {
-  return DECKS.map(({ id, name, colors, archetype, description }) => ({
-    id, name, colors, archetype, description,
-  }));
+  return DECKS.map((list) => {
+    const signature = signatureCardFor(list);
+    return {
+      id: list.id, name: list.name, colors: list.colors, archetype: list.archetype, description: list.description,
+      signatureCard: signature ? { id: signature.id, printedId: signature.id, name: signature.name } : null,
+    };
+  });
 }

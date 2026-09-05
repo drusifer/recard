@@ -35,6 +35,67 @@ card's real identity, always, not just whether it can be moved. As of
 D85, the same removal reaches the three BULK/pile-level actions that
 still had their own separate authorization gate.
 
+### D116. GroupedPile — a shared parent for "a stacked, grouped community supply"
+
+Direct user request, found by actually testing rather than reading
+code: "token piles have a lot of the same issues as the CardPiles did.
+They share a parent class though so let's push some of that up so
+TokenPiles are more playable." Confirmed live before fixing anything:
+dropping a token onto empty space in its own supply's zone took the
+table's pile count from 21 to 22 - a duplicate pile, the exact bug
+D110 already fixed for chips (`ChipPileable.homePileKind = 'chip'`).
+`TokenPileable` never declared one, so nothing named a home for a
+token to return to.
+
+**Root cause was really two things sharing one shape.** RtG's Tokens
+supply was `kind: 'plain'` - the same generic pile every ordinary card
+zone uses - so it rendered as one overlapping row (read like a hand,
+not a tray) AND had no home-pile-kind to rejoin on drop. Both are
+D110's own fixes, just never applied here because tokens had no
+dedicated pile kind at all to carry them.
+
+**Fix: extracted `GroupedPile` (`src/piles/`), the actual shared parent
+`ChipPile` and a new `TokenPile` both extend.** A subclass names ONE
+thing - `static sortValue(pileable)` (chip: `chip.denom`; token:
+`token.colour`) - and gets, for free: the tight stacking spread
+(0.963/0.97, previously duplicated per-preset via a `spread: 0.75`
+override on every token declaration, now deleted), arriving pre-sorted,
+and an insert that re-sorts by group and strips a drop's `layout` hint
+rather than merely appending. `ChipTray.js` (still `<chip-tray>` -
+renamed CSS classes weren't worth the regression risk) generalized
+from a hardcoded `card.denom` group-by to `PILE_TYPES[pile.kind]
+.sortValue`, so it renders BOTH kinds with no chip-specific code left
+in it. `TokenPileable.homePileKind = 'token'` is the one-line fix that
+actually closes the duplicate-pile bug; the rest is what makes the fix
+generalize instead of being a second copy-paste.
+
+**A real JS footgun caught before shipping, not after.** The first
+draft implemented the shared sort/strip logic as a private static
+method (`static #sorted`), called via `this.constructor.#sorted(...)`
+from an instance method. Static private members are NOT inherited by
+subclasses in JS - `Subclass.#method()` throws even when the subclass
+correctly extends the class that defines it - so this would have
+thrown the moment `ChipPile` or `TokenPile` actually exercised it,
+despite reading correct on review. Verified the failure mode directly
+(constructed a throwaway subclass, called the method) before rewriting
+it as a plain module-scoped function, which has no such inheritance
+rule to violate.
+
+**Investigated, not found: "lots of preset problems too."** Swept
+every preset solo and 2-player for console errors and pile-count
+mismatches - all clean. Found one real but different-severity issue
+while screenshotting a deck-choice-filtered RtG table: the "Decks" zone
+is a fixed captured-pixel layout sized for all 15 decks, so choosing
+fewer leaves visible dead space. Deliberately NOT auto-sizing it here -
+panels are already user-resizable (drag + Save Layout, existing
+mechanism), this is cosmetic rather than broken, and dynamic
+content-based zone sizing is a real, separate architecture question
+nobody has actually asked for yet. Flagged to backlog rather than
+built speculatively.
+
+@Smith *user test — no new UX surface (a bug fix + an internal
+refactor), flagging for awareness rather than a gate.
+
 ### D115. RESET rebuilds every declared card deck, not just the canonical one
 
 Direct user request: "spit and polish - esp on the rotg game... see if

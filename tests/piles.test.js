@@ -25,9 +25,9 @@ import { SetPile } from '../src/piles/SetPile.js';
 // rather than relaxed to a subset check: knowing precisely which kinds
 // ship is the guard's whole value, so a new kind should have to be
 // added here on purpose.
-test('the registry exposes exactly the thirteen pile kinds', () => {
+test('the registry exposes exactly the fourteen pile kinds', () => {
   assert.deepEqual(Object.keys(PILE_TYPES).toSorted(),
-    ['battlefield', 'cascade', 'chip', 'deck', 'discard', 'exile', 'foundation', 'hand', 'plain', 'rankAdjacent', 'run', 'set', 'stack']);
+    ['battlefield', 'cascade', 'chip', 'deck', 'discard', 'exile', 'foundation', 'hand', 'plain', 'rankAdjacent', 'run', 'set', 'stack', 'token']);
   assert.equal(PILE_TYPES.deck, DeckPile);
   assert.equal(PILE_TYPES.hand, OpponentHandPile);
   assert.equal(PILE_TYPES.plain, Pile);

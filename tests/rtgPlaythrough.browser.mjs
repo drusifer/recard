@@ -168,6 +168,44 @@ test('game 1: cast a creature to the battlefield and tap it', async () => {
   );
 });
 
+// US-112 (direct user request, found by driving the real app): a token
+// dropped on empty space WITHIN THE SUPPLY'S OWN ZONE used to spawn a
+// brand-new pile beside the real one - the exact chip-duplication bug
+// D110 fixed, never applied to tokens because nothing named a home
+// pile kind for one. Same synthetic-DragEvent mechanism
+// `uiActions.browser.mjs`'s own chip-tray regression test uses -
+// Playwright cannot meaningfully synthesise a real HTML5 drag.
+test('game 1: a token dropped on empty space in its own zone joins the supply, not a new pile', async () => {
+  const page = fixture.page;
+  const pileCount = () => page.locator('.pile-section[data-pile-id]').count();
+  const before = await pileCount();
+
+  await page.evaluate(() => {
+    const tokenPile = document.querySelector('[data-pile-id="rtg-tokens"]');
+    const token = tokenPile.querySelector('.middle-card[data-pileable-id]');
+    const zone = tokenPile.closest('zone-panel');
+    const gutter = zone.querySelector('.zone-drop-gutter') ?? zone;
+    const box = gutter.getBoundingClientRect();
+    const transfer = new DataTransfer();
+    transfer.setData('text/plain', token.dataset.pileableId);
+    const at = { bubbles: true, cancelable: true, dataTransfer: transfer, clientX: box.x + 5, clientY: box.y + 5 };
+    gutter.dispatchEvent(new DragEvent('dragover', at));
+    gutter.dispatchEvent(new DragEvent('drop', at));
+  });
+  await page.waitForTimeout(500);
+
+  assert.equal(await pileCount(), before, 'no new pile - the token rejoined the supply it belongs in');
+});
+
+// US-112: the token supply now groups into one stack per colour
+// (`TokenPile`/`GroupedPile`, shared with chips) instead of one long
+// overlapping row.
+test('the token supply renders as separate colour stacks, not one overlapping row', async () => {
+  const page = fixture.page;
+  const stacks = await page.locator('[data-pile-id="rtg-tokens"] .chip-stack').count();
+  assert.ok(stacks >= 2, `expected multiple colour stacks, got ${stacks}`);
+});
+
 test('game 1: a token from the shared supply can mark a permanent and be returned', async () => {
   const page = fixture.page;
   const supplyBefore = await page.locator('[data-pile-id="rtg-tokens"] .card-token').count();

@@ -25,6 +25,7 @@ import { BattlefieldPile } from './BattlefieldPile.js';
 import { ExilePile } from './ExilePile.js';
 import { StackPile } from './StackPile.js';
 import { ChipPile } from './ChipPile.js';
+import { TokenPile } from './TokenPile.js';
 
 export const PILE_TYPES = {
   plain: Pile,
@@ -42,6 +43,11 @@ export const PILE_TYPES = {
   // *fix (direct user request): chips get their own default pile kind -
   // stacked, sorted by denomination, able to break a big chip down.
   chip: ChipPile,
+  // US-112 (direct user request, "token piles have a lot of the same
+  // issues as the CardPiles did"): tokens were sitting in `plain` piles
+  // (one overlapping row, no home to return to on drop) - now their own
+  // kind, grouped-by-colour, sharing `GroupedPile` with `ChipPile`.
+  token: TokenPile,
 };
 
 /**

@@ -43,6 +43,13 @@
         <select id="host-preset"></select>
       </label>
       <p id="host-preset-preview" class="deck-config"></p>
+      <!-- US-110: only rendered (and unhidden) for a preset that
+           declares `deckChoices` - RtG today, nothing else. Populated
+           by `renderDeckChoices` (main.js), one checkbox per catalog
+           deck, all checked by default. -->
+      <fieldset id="host-deck-choices" class="deck-choices" hidden>
+        <legend>Decks on the table</legend>
+      </fieldset>
       <!-- US-70 (D61): a preset is always selected now, so this is
            always meaningful - "Default" plus any layout the host has
            saved under this preset's name. -->

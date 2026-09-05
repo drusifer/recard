@@ -19,14 +19,21 @@
  */
 
 /**
- * Mana pip colours, matching the art generator's palettes.
+ * Mana pip colours, matching the art generator's palettes. Exported so
+ * the host form's deck picker (US-110 follow-up: "show the deck
+ * colors") can build the same colour dots this card face already uses
+ * for cost pips, rather than a second colour-to-swatch mapping.
  */
-const PIP_CLASS = {
+export const PIP_CLASS = {
   W: 'pip-w', U: 'pip-u', B: 'pip-b', R: 'pip-r', G: 'pip-g',
 };
 
 /**
  * The card's art, written by `make art` to `assets/cards/rtg/<id>.webp`.
+ * Exported so a caller with only catalog data (no dealt physical card) -
+ * the deck picker's own `signatureCard`, `{id, printedId, name}` - can
+ * still resolve the same URL this card face renders, rather than
+ * re-deriving the path a second way.
  *
  * Real generated illustration, not the procedural placeholder this
  * started as (US-79) - each card's `art:` prompt is painted by the `agy`
@@ -34,11 +41,22 @@ const PIP_CLASS = {
  * prompt-per-card design existed to allow, and it needed no change to
  * the card pool at all.
  */
-function artUrl(card) {
+export function artUrl(card) {
   // `printedId` is the PRINTED id; `id` is this physical copy's instance id
   // (D80 - four copies of one card need four distinct ids). Art is per
   // printed card, so it must key off `printedId` or all four copies 404.
   return `assets/cards/rtg/${card.printedId ?? card.id}.webp`;
+}
+
+/** Colour-to-CSS-class mapping (`.rtg-c-w` etc, style.css - each sets
+ * the `--rtg-fallback-a`/`-b` custom properties `.rtg-art-missing`'s
+ * gradient reads). Exported as `rtgColorClasses` so a caller that
+ * already has a plain colour-letter array (the deck picker's own
+ * `deck.colors`, catalog data) doesn't have to re-derive it from a
+ * dealt card's `text`/`colors` fields the way `colorClasses` below
+ * does. */
+export function rtgColorClasses(colors) {
+  return colors?.length > 0 ? colors.map((c) => `rtg-c-${c.toLowerCase()}`) : ['rtg-c-c'];
 }
 
 /** Colour classes for a card with no art yet, so the fallback panel
@@ -48,7 +66,7 @@ function colorClasses(card) {
   const colors = card.colors?.length > 0
     ? card.colors
     : ['W', 'U', 'B', 'R', 'G'].filter((c) => (card.text ?? '').includes(`{${c}}`));
-  return colors.length > 0 ? colors.map((c) => `rtg-c-${c.toLowerCase()}`) : ['rtg-c-c'];
+  return rtgColorClasses(colors);
 }
 
 function manaPips(symbols) {
