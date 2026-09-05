@@ -434,3 +434,162 @@ TDD (tests first, confirmed red), mutation checks on every load-bearing
 guard, and - new this session - real screenshots for the visual *nits
 rather than reading the CSS. 545 unit + 10 browser tests. lint:js 8 /
 lint:design 5, both confirmed pre-existing against a stashed clean tree.
+
+## Sprint: Tech Debt (2026-09-04) — Phase 103 DONE
+
+RESHUFFLE_DEAL (D114) implemented, TDD tests-first (2 new state.test.js
+cases, one builds a real 2-declared-deck RtG-shaped state to prove
+origin-based gathering rather than trusting a single-deck happy path).
+`originPileId` stamped in `makeDeckPile` and `applyDeclaration`, gated
+on `pileableType === 'card'` so chip/token declared piles are untouched.
+Reused `toDeckCard` for the owner/faceUp/layout strip, added an inline
+strip for `orientation` (ROTATE's field) rather than touching the
+shared helper - `toDeckCard` is also used by fresh `DEAL`'s reclaim
+path and changing its behavior there is out of this story's scope.
+654/654 green.
+
+### Next Steps
+Phase 104 (UI wiring: dealFromDeck dispatch, new `reset` deck action
+per Smith's exact label/icon/hint spec in smith.docs/state.md) is next,
+after Trin's UAT on this phase.
+
+## Sprint: Tech Debt (2026-09-04) — Phase 104 DONE
+
+UI wiring for D114 complete: `dealFromDeck`'s `reshuffleDeal` branch now
+dispatches `RESHUFFLE_DEAL` at the actual clicked pileId; new `reset`
+deck action (host-only) dispatches plain `RESET`. Updated the stale
+`dealFromDeck` doc comment and `DECK_PILE_ID`'s own export comment
+(both described the old RESET+DEAL coupling as current fact).
+
+**Deviated from Smith's literal hint text on purpose**: Smith's Gate 2
+spec text said RESET "clears every zone, hand, and score" - checked
+against the actual reducer (D111: RESET never touches `state.scores` or
+chips/tokens) and it doesn't. Wrote the accurate version instead of
+shipping a second truth-in-labeling bug in the same story that exists
+to fix one. Flagging to Trin/Smith rather than silently deviating.
+
+One pre-existing test hardcoded DeckPile's action list
+(`tests/piles.test.js:222`) - updated to include `reset`, not a new
+finding.
+
+654 unit + 18 browser (test:ui) green.
+
+### Next Steps
+Phase 105 (main.js cognitive-complexity, incl. the 65-complexity
+dispatch) is next, after Trin's UAT here.
+
+## Sprint: Tech Debt (2026-09-04) — Phase 105 DONE
+
+main.js's two findings fixed, pure extraction, no logic changes:
+- `renderGameFromView` (complexity 65): the `zoneOptions` object literal
+  moved into its own `buildZoneOptions(nameById)` function (still closes
+  over the same module-level session state - `isSessionEnded`, `role`,
+  `myId`, `splitPicker`, `lastDealCount`, `motionThrottler` - since it's
+  still a top-level function in the same module). That alone cut it to
+  45; the remaining complexity was 9 IDENTICAL `isSessionEnded ? null :
+  fn` ternaries, collapsed into one `whenLive(fn)` guard used 9 times
+  (10 counting the score-zone onAdjust/onSet pair I found using the same
+  pattern outside the flagged function - fixed for consistency, not
+  because lint required it there). Checked every wrapped function's
+  arity against its `perform*`/`handlePileAction` definition before
+  passing the bare reference instead of an arity-preserving arrow -
+  all matched exactly, no silent behavior change.
+- roster handler (complexity 27): extracted the per-entry loop body into
+  `seatRosterEntry(r, state)`, returning the updated state rather than
+  closing over a reassigned outer variable - the one thing that had to
+  thread through explicitly since everything else (`peerToKey`,
+  `identityAnnounced`) is still mutated in place exactly as before.
+
+main.js: `npx eslint src/main.js` fully clean. 654 unit + 18 browser
+green (test:ui run once, at this gate, not routinely).
+
+### Next Steps
+Phase 106 (remaining lint: dropTarget.js, touchDrag.js, ui.js x3, one
+naming fix) is next, after Trin's UAT here.
+
+## Sprint: Tech Debt (2026-09-04) — Phase 106 DONE, US-107 COMPLETE
+
+All 8 remaining lint findings fixed, all by extraction, zero behavior
+change:
+- `dropTarget.js` (18): `isStackHit`/`evaluateBox` pull all per-box
+  branching out of the loop in `resolveDropTarget`.
+- `touchDrag.js` (18): `step()` split into `stepPending`/`stepDragging`
+  by gesture phase - the natural seam, since the two phases already had
+  almost no shared logic.
+- `ui.js` (22, `renderPileCards`): `applyFanOffset`/`wireCardLiftCue`/
+  `wireCardDrag`/`faceOptionsFor` extracted from the per-card loop body.
+- `ui.js` (22, `renderZones`): `renderOneZone` extracted from the
+  per-zone-group loop body (its `continue` became a `return`).
+- `ui.js` (25, `renderRoster`): `renderRosterEntry` extracted from the
+  per-player loop body.
+- `ui.js` naming: `pileEl` -> `pileElement` (in `beginCardTargetPick`).
+
+`npm run lint` (js + design combined) confirmed FULLY CLEAN - 0 findings,
+down from the sprint's starting 8. 654 unit + 18 browser (test:ui) green
+throughout, run once at this gate per standing e2e-frugality guidance.
+Design lint's 5 findings are pre-existing (Table-Zone/seat overlaps,
+out of this sprint's scope) and unchanged.
+
+**Pattern used throughout this whole lint pass**: every one of the
+6 fixes was "extract the loop/branchy body into its own named function",
+never eslint's auto-fix, never suppression. Same shape sonarjs itself
+recommends for cognitive-complexity findings, and matches D114/US-106's
+own `buildZoneOptions`/`seatRosterEntry` precedent from phase 105.
+
+### Next Steps
+US-108 (stale e2e.smoke.mjs reference groom) is phase 107, next, after
+Trin's UAT here.
+
+## Sprint: Tech Debt (2026-09-04) — Phase 107 DONE (US-108)
+
+Grepped every `e2e.smoke.mjs` reference repo-wide (18 files). Most were
+ALREADY accurate (dated historical logs correctly describing what was
+true when written, or already self-correcting - e.g. mouse/oracle state
+files, DECISIONS.md, lessons.md, chat_archive, judge_tool_trace.md).
+Fixed the genuinely stale ones:
+- `tests/designLint.mjs` + `tests/designLint.check.mjs`: comments spoke
+  of `e2e.smoke.mjs` in the present tense as if it were still a live
+  suite something could run alongside or assert inside - rewritten to
+  past tense / removed the false "or in e2e.smoke.mjs" suggestion.
+- `docs/ARCHITECTURE.md`'s "Open Items Carried Forward" had a leftover
+  "`tests/e2e.smoke.mjs` is substantially out of date... needs its own
+  dedicated update pass" bullet - superseded by the Testing Strategy
+  section's own accurate D60 entry a few hundred lines above (which
+  already says it was deleted, not "out of date"). Removed the stale
+  duplicate rather than leaving two different stories in one document.
+- My own cross-session memory snapshot (`project_recard_status_2026_08_25.md`)
+  was fully superseded (not just its e2e line) - Oracle's own
+  `oracle.docs/state.md` retro note had already flagged this exact file
+  by name as needing a groom pass. Retired it and its MEMORY.md index
+  entry rather than patching one stale line in an otherwise-obsolete
+  snapshot.
+
+Explicitly did NOT touch: `agents/chat_archive/*` (excluded by AC),
+any dated `agents/*.docs/state.md`/`lessons.md`/`memory.md` entry that
+correctly describes what was true when written, `docs/DECISIONS.md`'s
+dated entry, or `trin.docs/judge_tool_trace.md` (a literal historical
+tool-call log - editing it would falsify the record).
+
+654/654 unit green (doc/comment-only changes, no source logic touched).
+
+### Next Steps
+Phase 108 (reserved bug-fix slot) is next - Trin's `.deck-stack` dup
+min-width finding from phase 106 UAT goes there.
+
+## Sprint: Tech Debt (2026-09-04) — Phase 108 DONE (reserved bug-fix)
+
+Fixed Trin's .deck-stack duplicate min-width finding (style.css): both
+declarations were real, independent constraints (depth-based drift room
+vs. flat badge-clearance room), so merged into one `min-width:
+max(calc(...), 5.2rem)` rather than deleting either. `npm run
+lint:style` clean. 654 unit + 18 browser green - specifically checked
+the 3 deck-stack browser tests (depth rendering, thinning, angle) since
+this touches the exact box they assert on.
+
+This closes out all planned phases (103-108) for the tech-debt sprint:
+US-106 (D114, RESET/reshuffle split), US-107 (all 8 lint findings),
+US-108 (stale reference groom), plus this reserved-slot fix.
+
+### Next Steps
+Handing to Trin for final UAT, then Morpheus's last review, then
+Oracle's groom (Stage 3 close).

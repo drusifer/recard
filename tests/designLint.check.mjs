@@ -6,12 +6,14 @@
 // `npm run lint:design`, alongside (not instead of) `npm run lint:style`
 // - see `npm run lint` for both together.
 //
-// Deliberately separate from `tests/e2e.smoke.mjs`: that suite drives one
-// specific, long, stateful play-through and takes ~5 minutes; this one
-// exists to be the fast, always-run gate that catches "did this CSS
-// change break the layout" without needing the full P2P flow. It boots a
-// single host+guest pair once and sweeps viewports/states against it,
-// rather than replaying the whole game per viewport.
+// Deliberately separate from a full P2P play-through suite (the
+// monolithic `tests/e2e.smoke.mjs` used to be one; deleted at D60,
+// 2026-08-27 - no such suite exists today, see the backlog item to
+// rebuild one): this one exists to be the fast, always-run gate that
+// catches "did this CSS change break the layout" without needing the
+// full P2P flow. It boots a single host+guest pair once and sweeps
+// viewports/states against it, rather than replaying the whole game
+// per viewport.
 //
 // Added 2026-08-20, at the user's request, straight out of the previous
 // session: three real UX regressions (seat-ring/pot overlap, forced page
@@ -44,8 +46,8 @@ const server = http.createServer(async (request, response) => {
 });
 await new Promise((resolve) => server.listen(PORT, resolve));
 
-// Same fallback as e2e.smoke.mjs: Playwright's bundled Chromium isn't
-// always installed, so a system browser is an acceptable substitute.
+// Playwright's bundled Chromium isn't always installed, so a system
+// browser is an acceptable substitute.
 const SYSTEM_CHROMIUM_PATHS = ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'];
 async function launchChromium() {
   try {

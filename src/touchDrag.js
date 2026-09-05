@@ -65,6 +65,46 @@ function beyondSlop(state, x, y, slopPx) {
 }
 
 /**
+ * The `pending` phase's own step (US-107, cognitive-complexity):
+ * extracted unchanged, since `state.phase === 'pending'` is the one
+ * branch of `step` with real internal branching of its own - the
+ * `dragging` phase barely has any (see `stepDragging` below).
+ *
+ * A tap. Tap-to-play is a deliberately-kept path (Smith Gate 1 on
+ * US-28), so the recognizer stays entirely out of its way.
+ */
+function stepPending(state, sample, holdMs, slopPx) {
+  const { type, t, x, y } = sample;
+  if (type === 'up') return IDLE;
+
+  const isHeld = t - state.downAt >= holdMs;
+  // Time is checked before distance: having held long enough, the
+  // gesture is a drag and the finger is free to move. Checking
+  // distance first would cancel a legitimate drag whose first sample
+  // happens to arrive late and far.
+  if (!isHeld) {
+    return type === 'move' && beyondSlop(state, x, y, slopPx)
+      ? IDLE
+      : { state, events: [] };
+  }
+
+  const lifted = { ...state, phase: 'dragging' };
+  const events = [emit(state, 'lift', state.originX, state.originY)];
+  if (type === 'move') events.push(emit(state, 'move', x, y));
+  return { state: lifted, events };
+}
+
+/** The `dragging` phase's own step (US-107) - extracted unchanged for
+ * symmetry with `stepPending` above, though it has little branching of
+ * its own to begin with. */
+function stepDragging(state, sample) {
+  const { type, x, y } = sample;
+  if (type === 'move') return { state, events: [emit(state, 'move', x, y)] };
+  if (type === 'up') return { state: null, events: [emit(state, 'drop', x, y)] };
+  return { state, events: [] }; // a tick while already dragging
+}
+
+/**
  * One step of the recognizer.
  *
  * @param {DragState|null} state previous state (`null` = idle).
@@ -73,10 +113,10 @@ function beyondSlop(state, x, y, slopPx) {
  * @returns {{state: DragState|null, events: DragEvent[]}}
  */
 export function step(state, sample, { holdMs = HOLD_MS, slopPx = SLOP_PX } = {}) {
-  const { type, t, x, y } = sample;
+  const { type, x, y } = sample;
 
   if (type === 'down') {
-    return { state: { phase: 'pending', originX: x, originY: y, downAt: t }, events: [] };
+    return { state: { phase: 'pending', originX: x, originY: y, downAt: sample.t }, events: [] };
   }
 
   // A stray move/up/cancel/tick with no gesture in flight. `tick`
@@ -95,29 +135,7 @@ export function step(state, sample, { holdMs = HOLD_MS, slopPx = SLOP_PX } = {})
       : IDLE;
   }
 
-  if (state.phase === 'pending') {
-    // A tap. Tap-to-play is a deliberately-kept path (Smith Gate 1 on
-    // US-28), so the recognizer stays entirely out of its way.
-    if (type === 'up') return IDLE;
-
-    const isHeld = t - state.downAt >= holdMs;
-    // Time is checked before distance: having held long enough, the
-    // gesture is a drag and the finger is free to move. Checking
-    // distance first would cancel a legitimate drag whose first sample
-    // happens to arrive late and far.
-    if (!isHeld) {
-      return type === 'move' && beyondSlop(state, x, y, slopPx)
-        ? IDLE
-        : { state, events: [] };
-    }
-
-    const lifted = { ...state, phase: 'dragging' };
-    const events = [emit(state, 'lift', state.originX, state.originY)];
-    if (type === 'move') events.push(emit(state, 'move', x, y));
-    return { state: lifted, events };
-  }
-
-  if (type === 'move') return { state, events: [emit(state, 'move', x, y)] };
-  if (type === 'up') return { state: null, events: [emit(state, 'drop', x, y)] };
-  return { state, events: [] }; // a tick while already dragging
+  return state.phase === 'pending'
+    ? stepPending(state, sample, holdMs, slopPx)
+    : stepDragging(state, sample);
 }

@@ -75,7 +75,11 @@ export class DeckPile extends Pile {
   host-gated, matching every other deck-management action here.
   */
   pileActions({ isHost } = {}) {
-    return isHost ? ['draw', 'deal', 'reshuffleDeal', 'shuffle', 'split', 'changePileType'] : ['draw'];
+    // D114 (US-106): `reset` restarts the whole game; `reshuffleDeal`
+    // only touches this deck's own cards. Two different consequences,
+    // so both stay reachable rather than one silently absorbing the
+    // other's job.
+    return isHost ? ['draw', 'deal', 'reshuffleDeal', 'reset', 'shuffle', 'split', 'changePileType'] : ['draw'];
   }
 
   /** A card moved/put back onto the deck lands on top, matching a

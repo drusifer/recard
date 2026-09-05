@@ -35,6 +35,70 @@ card's real identity, always, not just whether it can be moved. As of
 D85, the same removal reaches the three BULK/pile-level actions that
 still had their own separate authorization gate.
 
+### D114. Reshuffle & re-deal is its own action; RESET is no longer its delivery mechanism
+Direct user correction (2026-09-04, queued for this sprint): RESET
+("restart the entire game in its initial preset") and Reshuffle & re-deal
+("return every card to its original deck, shuffle, deal the configured
+count") were conflated - `dealFromDeck`'s `reshuffleDeal` branch dispatched
+`RESET` then `DEAL`. Smith's Gate 1 found the user-facing consequence:
+`reshuffleDeal`'s own confirm-dialog hint ("gather every card back,
+reshuffle, and deal a fresh hand") never promised to wipe zones, layout,
+or scores - the code broke its own label.
+
+**Found while designing this, not assumed:** there is currently no
+standalone control that dispatches `RESET` at all - `reshuffleDeal` was
+the ONLY path to it. Decoupling the two without adding anything back
+would silently delete "restart the game" as a reachable feature. Adding
+a `reset` deck action (host-only, destructive, same `DECK_ACTION_IDS`
+family as `draw`/`deal`/`reshuffleDeal`/`shuffle`) is therefore required
+by the story's own AC ("RESET... unchanged from today"), not a scope
+add-on - flagged to Smith for Gate 2 since it's a new visible button.
+
+**Per-card deck origin.** Every card gets `originPileId`, stamped where
+`buildDeck`'s result actually gets attached to a pile - `makeDeckPile`
+(the single canonical deck) and `applyDeclaration` (every declared
+`deckList` pile, including each of RtG's fifteen). `buildDeck` itself
+can't stamp it; it doesn't know which pile it's being built into.
+Matches D107/D108's precedent of stamping identity at construction,
+once, where the fact is actually known.
+
+**New reducer action `RESHUFFLE_DEAL(state, {pileId, cardsPerPlayer})`**,
+replacing the `RESET`+`DEAL` dispatch pair:
+- Gathers every `pileableType: 'card'` currently in play whose
+  `originPileId === pileId` back from wherever it sits (hand, discard,
+  battlefield, any zone) into that one pile, stripping transient
+  per-card state (`faceUp`, `orientation`) back to deck defaults - a
+  card returning to the deck is not still turned face-up in memory.
+  Non-card Pileables (chips, tokens) are untouched; they have no
+  `originPileId` to match.
+- Shuffles the gathered pile in place (reuses D92's `shuffle`, same as
+  `SHUFFLE_DECK`).
+- Deals `cardsPerPlayer` round-robin to hands, mirroring `DEAL`'s
+  existing logic. RtG's `cardsPerPlayer: 0` makes this a no-op deal, not
+  a special case - reshuffling RtG's shared token/tokens supply was
+  never on the table (tokens carry no `originPileId`).
+- Zones, layout, scores, chips, and every OTHER deck pile are untouched
+  by construction, not by a filter someone has to remember.
+
+**RESET's chip handling (D111) stands unchanged - deferred, not
+re-derived.** Smith's Gate 1 condition asked whether RESET should now
+restore the preset's opening chip stacks, since RESET is "a full
+restart." Decided NOT to fold that in here: it's a genuine product
+question (does the user want RESET to also zero out chip stacks?) with
+no signal either way in the original request, and this sprint's AC was
+scoped to the reshuffle/RESET *separation*, not a new RESET behavior.
+RESET keeps preserving chips exactly as D111 left it. Flagging this
+explicitly as a descoped question for Cypher/the user, not silently
+dropped.
+
+**Rejected: keeping `RESET`+`DEAL` and just skipping the pile-wipe for
+`reshuffleDeal`'s special case.** Would keep the two operations sharing
+one reducer case with a boolean flag threading through it - exactly the
+"two code paths pretending to be one" shape D75 already ruled against
+for other actions. A dedicated action is one operation, one meaning.
+
+@Smith *user feedback D114 - new `reset` button, `RESHUFFLE_DEAL`.
+
 ### D113. The deck looks like a deck again — inert depth, one real card
 Direct user *nit: "show the stacking for the deck of cards. right now it
 looks like there's only 1 card there."
@@ -4200,10 +4264,6 @@ again.
   added one more instance at `phone-390x844` (`lint:design` 14 → 15,
   confirmed new via `git stash`, not fixed there — same root cause/
   bucket as this item, not a distinct defect).
-- **`tests/e2e.smoke.mjs` is substantially out of date** relative to the
-  D53/D54 DOM (missing `#game-deck-area`, predates the Zone/Pile
-  component split) — deliberately deferred all of D54's session, needs
-  its own dedicated update pass.
 - **3+ players at ~1024px: a personal seat zone overlaps the shared pot.**
   Surfaced at Sprint 9 while adding touch coverage; D24's grown zone caps
   had only ever been measured against a two-player seat ring. Distinct

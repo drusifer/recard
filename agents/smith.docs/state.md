@@ -694,3 +694,65 @@ chips have a *value*, cards have an *order*) — "same pile dynamics as
 cards" should be pressure-tested against that, not assumed. And any new
 sorting UX should reuse the existing action vocabulary rather than
 inventing a third control shape.
+
+## Sprint: Tech Debt (2026-09-04) — Gate 1 APPROVED WITH 1 CONDITION
+
+Reviewed US-106 (RESET vs Reshuffle&redeal split), US-107 (cognitive-
+complexity fixes), US-108 (stale e2e.smoke.mjs reference cleanup).
+
+Checked the actual code before ruling (`pileActions.js:94`): the
+`reshuffleDeal` confirm-dialog hint already reads "gather every card
+back, reshuffle, and deal a fresh hand to each player" — it never
+promised to wipe zones/scores/chips. Today's behavior (full RESET)
+contradicts its own label. US-106 isn't just internal plumbing, it
+fixes a real Nielsen #9 truth-in-labeling defect.
+
+**Condition**: once Morpheus resolves whether RESET should restore the
+preset's opening chip stacks (US-106's open question), re-check RESET's
+own hint text for the same labeling problem — RESET's real consequence
+may be about to change too.
+
+US-107/108 approved as pure internal cleanup with no UX surface — no
+conditions.
+
+### Next Steps
+Waiting for Morpheus's architecture pass, then Gate 2 (`*user feedback`)
+on the arch — specifically want to see how per-card deck origin is
+represented and whether RESET's hint needs updating.
+
+## Gate 2 (D114) — APPROVED WITH 1 UX SPEC
+
+Full spec for the new `reset` deck action (Morpheus's D114 finding: a
+standalone RESET control doesn't exist today and is required by
+US-106's own AC):
+- **Label**: "Restart game" — not "Reset", which would read as a
+  synonym for the pre-existing separate "Reset Scores" control (#4
+  Consistency/#2 Match real world — two different-consequence buttons
+  must not share a name root).
+- **Icon**: distinct from `reshuffleDeal`'s `↻` — proposed `⟲` — so the
+  two destructive deck-header buttons are never visually confusable at
+  a glance.
+- **Hint** (shown in the existing destructive confirm dialog, same
+  mechanism as every other destructive action): "Restart the entire
+  game from scratch - clears every zone, hand, and score, and rebuilds
+  a fresh shuffled deck." States the real consequence plainly, matching
+  the standard this sprint's own US-106 exists to enforce.
+- Placement: same deck-header action group as draw/deal/reshuffleDeal/
+  shuffle (`DECK_ACTION_IDS` family) — no new UI surface invented.
+
+### Next Steps
+Handed to Mouse for phase breakdown. Want to see this UI spec (label/
+icon/hint) reach Neo's implementation verbatim, not paraphrased loosely
+- will check at `*qa`/close-out.
+
+## Sprint: Tech Debt (2026-09-04) — close-out APPROVED
+
+Reviewed both stories' delivered code. US-106's new 'Restart game'
+button matches my Gate 2 spec exactly (label/icon/hint). No live
+click-through again this gate - browser automation is still the
+standing #1 backlog item (now 3 sprints running: US-100, this one).
+Approved on code review with that disclosed, consistent with past
+practice.
+
+### Next Steps
+Sprint retro next.

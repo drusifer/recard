@@ -1231,3 +1231,77 @@ of these passed the unit suite and would have passed review:
 **Standing rule this produces:** assert GEOMETRY and BEHAVIOUR, never
 the presence of a class or a call. And when a bug depends on the
 environment, the test has to simulate the environment, not the code.
+
+## Sprint: Tech Debt (2026-09-04) — Phase 103 UAT PASSED
+
+RESHUFFLE_DEAL: re-ran suite (654/654), mutation-checked the
+`originPileId` guard (forced always-true) - caught immediately by the
+2-deck test (deckB gained deckA's cards). Real guard, not decorative.
+
+### Next Steps
+Phase 104 (UI wiring) next - want to independently verify at that gate
+that dealFromDeck passes the CLICKED pile's id, not a hardcoded one
+(the whole point of this story), and that the reset/reshuffle button
+hints/icons match Smith's exact spec.
+
+## Sprint: Tech Debt (2026-09-04) — Phase 104 UAT PASSED
+
+Diff-reviewed dealFromDeck wiring, confirmed lint baseline unchanged
+(8 js / 5 design, matches pre-sprint exactly). 654 unit + 18 browser
+(test:ui) green.
+
+### Next Steps
+Phase 105/106 (lint refactors) - the standard I'll check there is
+byte-identical dispatch/reducer behavior, not just green tests, since
+main.js:1207 is the reducer dispatch table itself (complexity 65).
+
+## Sprint: Tech Debt (2026-09-04) — Phase 105 UAT PASSED
+
+Line-by-line diff review of both main.js extractions (buildZoneOptions/
+whenLive, seatRosterEntry) - pure mechanical moves. Confirmed hoisting
+isn't a concern for the bare function references passed to whenLive().
+654 unit + 18 browser green, eslint down to the 6 pre-scoped remaining
+findings.
+
+### Next Steps
+Phase 106 next - the remaining 3 complexity findings + 1 naming fix.
+
+## Sprint: Tech Debt (2026-09-04) — Phase 106 UAT PASSED + 1 new finding
+
+US-107's actual scope (eslint) fully clean, 0/8 findings remain, 654
+unit + 18 browser green. Reviewed all 6 extractions for behavior
+preservation.
+
+**New finding, filed for Phase 108 (reserved bug-fix), not this
+phase**: running the FULL `npm run lint` pipeline (not just
+`npx eslint src/`) surfaces a pre-existing stylelint duplicate-property
+error - `.deck-stack` (style.css) declares `min-width` twice (line 1492,
+the depth-based calc from D113's own comment intent; line 1514, a flat
+`5.2rem` added later for badge clearance). The flat one wins per CSS
+cascade order, so the depth-based min-width is silently dead - a deep
+stack's diagonal drift may not get the room D113 says it should.
+Confirmed via `git log -L` this was introduced in commit 2776c05 (last
+session, D108-D113), not by this sprint's phase 105/106 work.
+
+### Next Steps
+Phase 107 (US-108) next. Phase 108 (reserved bug-fix) should pick up
+the `.deck-stack` duplicate min-width finding above.
+
+## Sprint: Tech Debt (2026-09-04) — Phase 107 UAT PASSED
+
+Re-grepped repo-wide, spot-checked remaining ARCHITECTURE.md hits (all
+dated D-entries, correctly past-tense). Confirmed the removed bullet
+was a genuine stale duplicate of D60's own entry. 654/654 green.
+
+### Next Steps
+Phase 108 (reserved bug-fix) - my own .deck-stack dup min-width finding
+from phase 106 goes here.
+
+## Sprint: Tech Debt (2026-09-04) — Phase 108 UAT PASSED, all phases complete
+
+Confirmed lint:style clean, design lint baseline unchanged (5 pre-
+existing). max() approach verified sound. 654 unit + 18 browser green.
+All 6 planned phases (103-108) done.
+
+### Next Steps
+Sprint close: Oracle groom next, then Smith end-to-end test.

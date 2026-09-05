@@ -610,8 +610,58 @@ function effectiveSpread(pileView) {
   return pileView.spread ?? PILE_TYPES[pileView.kind]?.defaultSpread ?? 0;
 }
 
-export function renderPileCards(container, pileView, allPiles, options = {}) {
+/** The fan's per-card rotate/droop offset (US-107, cognitive-complexity
+ * extraction) - same formula `renderPileCards` used inline, unchanged;
+ * see its own call site comment for why the droop is squared. */
+function applyFanOffset(wrapper, index, cardCount) {
+  const center = (cardCount - 1) / 2;
+  const offset = index - center;
+  wrapper.style.setProperty('--raise-base', `rotate(${offset * 5}deg) translateY(${offset * offset * 0.08}rem)`);
+}
+
+/** Card-lift cue wiring (US-22/D13, US-107 extraction) - mouse only,
+ * unchanged; see `renderPileCards`' own call site comment for why touch
+ * gets the cue from the drag recognizer instead. */
+function wireCardLiftCue(wrapper, card, onCardLift) {
+  if (!onCardLift) return;
+  wrapper.addEventListener('pointerdown', (event) => { if (event.pointerType === 'mouse') onCardLift(card.id, true); });
+  wrapper.addEventListener('pointerup', (event) => { if (event.pointerType === 'mouse') onCardLift(card.id, false); });
+  wrapper.addEventListener('pointerleave', (event) => { if (event.pointerType === 'mouse') onCardLift(card.id, false); });
+}
+
+/** Native-drag wiring (US-28/US-29/D19, US-107 extraction) - unchanged;
+ * see `renderPileCards`' own call site comment for the authorization
+ * reasoning behind when a card is draggable at all. */
+function wireCardDrag(wrapper, card, pileableActions, piles, pileView, options) {
   const { onMoveCard, onCardLift, onCardDrag } = options;
+  if (!onMoveCard || pileableActions.length === 0) return;
+  wrapper.draggable = true;
+  wrapper.addEventListener('dragstart', (event) => {
+    event.dataTransfer.setData('text/plain', card.id);
+    highlightDragTargets(
+      pileableActions.filter((a) => ['move', 'pickup'].includes(a)),
+      piles,
+      { viewerId: options.viewerId, fromPileId: pileView.id },
+    );
+  });
+  wrapper.addEventListener('dragend', clearPileTargets);
+  wrapper.addEventListener('drag', (event) => onCardDrag?.(card, event.clientX, event.clientY));
+  wrapper.addEventListener('dragend', () => onCardDrag?.(null, 0, 0));
+  attachTouchDrag(wrapper, card, { onDropCard: options.onDropCard, onCardDrag, onCardLift });
+}
+
+/** Which click behavior + face-down styling a card's face gets (US-107
+ * extraction) - same precedence `renderPileCards` used inline,
+ * unchanged: see its own call site comment for why the tap stays
+ * one-way between reveal and rotate. */
+function faceOptionsFor(canReveal, canRotate, isBack, card, options) {
+  if (canReveal) return { onClick: () => performReveal(card, options.viewerId, options.onReveal), back: isBack };
+  if (canRotate) return { onClick: () => options.onRotate(card.id), back: isBack };
+  return { disabled: true, back: isBack };
+}
+
+export function renderPileCards(container, pileView, allPiles, options = {}) {
+  const { onCardLift } = options;
   container.replaceChildren();
   // *nit (Tighten/Loosen): every row carries its pile's own spread, and
   // `style.css`'s single overlap rule reads it. Written
@@ -663,9 +713,7 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
       // padding (style.css) is sized to this exact formula's max droop,
       // not just eyeballed - see that rule's own comment if this changes
       // again.
-      const center = (pileView.cards.length - 1) / 2;
-      const offset = index - center;
-      wrapper.style.setProperty('--raise-base', `rotate(${offset * 5}deg) translateY(${offset * offset * 0.08}rem)`);
+      applyFanOffset(wrapper, index, pileView.cards.length);
     }
     // US-32/33: `data-pileable-id` makes the wrapper hit-testable for
     // drop-region detection; `data-layout` is what style.css keys the
@@ -686,11 +734,7 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
     // you saw it yourself, and a finger brushing past on its way to a
     // scroll broadcast a lift that never happened. Touch gets the cue
     // from the recognizer's `lift` instead - see `attachTouchDrag`.
-    if (onCardLift) {
-      wrapper.addEventListener('pointerdown', (event) => { if (event.pointerType === 'mouse') onCardLift(card.id, true); });
-      wrapper.addEventListener('pointerup', (event) => { if (event.pointerType === 'mouse') onCardLift(card.id, false); });
-      wrapper.addEventListener('pointerleave', (event) => { if (event.pointerType === 'mouse') onCardLift(card.id, false); });
-    }
+    wireCardLiftCue(wrapper, card, onCardLift);
 
     // US-28: draggable exactly where MOVE's own authorization would
     // allow a drop to succeed - a visible card (already face-up, or my
@@ -715,34 +759,18 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
     // below so the context menu (US-100/D101) can reuse the same list for
     // its own targeted-action click-to-commit step.
     const piles = allPiles.map((p) => ({ id: p.id, kind: p.kind, ownerId: p.ownerId ?? null }));
-    if (onMoveCard && pileableActions.length > 0) {
-      wrapper.draggable = true;
-      wrapper.addEventListener('dragstart', (event) => {
-        event.dataTransfer.setData('text/plain', card.id);
-        // D51: every pile (and the hand, if this card is pickup-eligible)
-        // that could legally receive this SPECIFIC card lights up for the
-        // whole drag - not just whichever one the pointer happens to be
-        // over mid-drag (`showPileDragOver`'s existing per-hover cue,
-        // unchanged, still layers on top of this once you're over one).
-        // D102: 'play' used to be listed here alongside these two - a
-        // hand card offers plain 'move' now, so the hand needs no entry
-        // of its own in this list at all.
-        highlightDragTargets(
-          pileableActions.filter((a) => ['move', 'pickup'].includes(a)),
-          piles,
-          { viewerId: options.viewerId, fromPileId: pileView.id },
-        );
-      });
-      wrapper.addEventListener('dragend', clearPileTargets);
-      // US-29/D19: live position while dragging. A redacted placeholder
-      // (`card.faceDown: true`) has no `faceUp` field either, so
-      // `cardDragPayload` correctly treats it the same as hidden - even
-      // a blind "put or take" move of a shared face-down card never
-      // reveals its identity mid-drag.
-      wrapper.addEventListener('drag', (event) => onCardDrag?.(card, event.clientX, event.clientY));
-      wrapper.addEventListener('dragend', () => onCardDrag?.(null, 0, 0));
-      attachTouchDrag(wrapper, card, { onDropCard: options.onDropCard, onCardDrag, onCardLift });
-    }
+    // D51: every pile (and the hand, if this card is pickup-eligible)
+    // that could legally receive this SPECIFIC card lights up for the
+    // whole drag - not just whichever one the pointer happens to be over
+    // mid-drag (`showPileDragOver`'s existing per-hover cue, unchanged,
+    // still layers on top of this once you're over one). D102: 'play'
+    // used to be listed here alongside these two - a hand card offers
+    // plain 'move' now, so the hand needs no entry of its own in this
+    // list at all. US-29/D19: live position while dragging - a redacted
+    // placeholder (`card.faceDown: true`) has no `faceUp` field either,
+    // so `cardDragPayload` correctly treats it the same as hidden, even
+    // for a blind "put or take" move of a shared face-down card.
+    wireCardDrag(wrapper, card, pileableActions, piles, pileView, options);
 
     // D25: one hover-revealed action row, built from `pileActions.js`,
     // replacing the per-card Turn over / Pick up / Move to… buttons that
@@ -782,7 +810,6 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
     // captioned "you shouldn't be able to see this").
     const pileInstance = pileInstanceFor(pile, options.viewerId);
     const isBack = !pileInstance.showsFace(card, options.viewerId);
-    let cardOptions;
     // *nit (show/hide): the TAP gesture stays one-way on purpose. A
     // face-up card's tap is already spoken for by `rotate` (the *nit
     // that removed the hover action row gave rotate this tap because it
@@ -791,10 +818,7 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
     // tap a toggle would take that tap away from rotate. `hide` gets
     // the right-click menu, which is where the *nit asked for it - a
     // cardAction, not a gesture.
-    if (canReveal) cardOptions = { onClick: () => performReveal(card, options.viewerId, options.onReveal), back: isBack };
-    else if (canRotate) cardOptions = { onClick: () => options.onRotate(card.id), back: isBack };
-    else cardOptions = { disabled: true, back: isBack };
-    const face = cardElement(card, cardOptions);
+    const face = cardElement(card, faceOptionsFor(canReveal, canRotate, isBack, card, options));
     if (canReveal) face.classList.add('revealable');
     if (canRotate) face.classList.add('rotatable');
     wrapper.append(face);
@@ -953,13 +977,13 @@ function beginCardTargetPick(actionId, card, piles, fromPileId, options) {
   };
   const commit = (event) => {
     document.removeEventListener('keydown', cancelOnEscape);
-    const pileEl = event.target.closest?.('.pile-section.pile-target[data-pile-id]');
-    if (pileEl) {
+    const pileElement = event.target.closest?.('.pile-section.pile-target[data-pile-id]');
+    if (pileElement) {
       event.stopPropagation();
       event.preventDefault();
     }
     clearPileTargets();
-    if (pileEl) options.onMoveCard?.(card.id, pileEl.dataset.pileId);
+    if (pileElement) options.onMoveCard?.(card.id, pileElement.dataset.pileId);
   };
   // Same next-tick deferral as the menu's own dismiss listener - the
   // click that closed the menu (or the escape-hatch from a `contextmenu`
@@ -1639,6 +1663,61 @@ export function renderZonePanel(zoneElement, id, title, piles, allPiles, options
  * seat its owner's roster entry is drawn at; one with no seated owner
  * (shouldn't happen) is skipped defensively.
  */
+/**
+ * One Zone group's own render (US-107, cognitive-complexity extraction
+ * from `renderZones` - unchanged, including its skip-defensively `return`
+ * where the loop used to `continue`).
+ *
+ * `zoneId`/`record` is a validated reference (`state.js`'s `buildPiles`
+ * throws at table-creation time on anything that isn't) - every group
+ * here has a real record, no defensive fallback needed.
+ */
+function renderOneZone(zoneId, pilesInZone, piles, zoneRecords, seatedPlayers, container, options) {
+  const record = zoneRecords.find((z) => z.id === zoneId);
+  const zoneType = ZONE_TYPES[record.type];
+
+  let seatIndex = -1;
+  if (record.ownerId) {
+    seatIndex = seatedPlayers.findIndex((p) => p.id === record.ownerId);
+    if (seatIndex === -1) return; // owner not in the current roster (shouldn't happen) - skip defensively
+  }
+
+  const zoneElement = document.createElement('zone-panel');
+  container.append(zoneElement);
+
+  if (!record.ownerId) {
+    // *nit fix (direct user request, "don't hide zone headings
+    // ever"): previously suppressed for a single-pile zone (the
+    // reasoning being "the lone pile's own heading already says the
+    // same thing") - reversed. The suppression is exactly what made
+    // an ungrouped pile (`MOVE_PILE`'s own "drop on open table space"
+    // case, `zoneId` freshly minted to the pile's own id) look
+    // parentless: no visible Zone heading at all, only the pile's -
+    // indistinguishable from a pile that was never grouped into a
+    // real Zone at all. Always render it now, `record.name` as-is.
+    zoneElement.render(record.id, record.name, pilesInZone, piles, options);
+    return;
+  }
+
+  const ownerName = options.resolveOwnerName?.(record.ownerId) ?? record.ownerId;
+  zoneElement.render(record.id, ownerName, pilesInZone, piles, options);
+  // AFTER `.render()`, not before - `renderZonePanel`'s own first
+  // line (`zoneEl.className = 'zone'`) would otherwise wipe this
+  // class out.
+  if (zoneType.className) zoneElement.classList.add(zoneType.className);
+  // `wirePanelLayout` (called inside `render` above) only ever sets
+  // `left`/`top` once a REAL stored position exists - a player zone
+  // with none yet still needs its ring-position default, same as it
+  // always has.
+  if (!zoneElement.classList.contains('panel-moved')) {
+    const pos = zoneType.defaultPosition(seatIndex, seatedPlayers.length);
+    if (pos) {
+      zoneElement.style.left = `${pos.leftPct}%`;
+      zoneElement.style.top = `${pos.topPct}%`;
+    }
+  }
+}
+
 export function renderZones(container, piles, seatedPlayers, zoneRecords, options = {}) {
   container.replaceChildren();
 
@@ -1649,51 +1728,7 @@ export function renderZones(container, piles, seatedPlayers, zoneRecords, option
   }
 
   for (const [zoneId, pilesInZone] of byZoneId) {
-    // `zoneId` is a validated reference (`state.js`'s `buildPiles`
-    // throws at table-creation time on anything that isn't) - every
-    // group here has a real record, no defensive fallback needed.
-    const record = zoneRecords.find((z) => z.id === zoneId);
-    const zoneType = ZONE_TYPES[record.type];
-
-    let seatIndex = -1;
-    if (record.ownerId) {
-      seatIndex = seatedPlayers.findIndex((p) => p.id === record.ownerId);
-      if (seatIndex === -1) continue; // owner not in the current roster (shouldn't happen) - skip defensively
-    }
-
-    const zoneElement = document.createElement('zone-panel');
-    container.append(zoneElement);
-
-    if (record.ownerId) {
-      const ownerName = options.resolveOwnerName?.(record.ownerId) ?? record.ownerId;
-      zoneElement.render(record.id, ownerName, pilesInZone, piles, options);
-      // AFTER `.render()`, not before - `renderZonePanel`'s own first
-      // line (`zoneEl.className = 'zone'`) would otherwise wipe this
-      // class out.
-      if (zoneType.className) zoneElement.classList.add(zoneType.className);
-      // `wirePanelLayout` (called inside `render` above) only ever sets
-      // `left`/`top` once a REAL stored position exists - a player zone
-      // with none yet still needs its ring-position default, same as it
-      // always has.
-      if (!zoneElement.classList.contains('panel-moved')) {
-        const pos = zoneType.defaultPosition(seatIndex, seatedPlayers.length);
-        if (pos) {
-          zoneElement.style.left = `${pos.leftPct}%`;
-          zoneElement.style.top = `${pos.topPct}%`;
-        }
-      }
-    } else {
-      // *nit fix (direct user request, "don't hide zone headings
-      // ever"): previously suppressed for a single-pile zone (the
-      // reasoning being "the lone pile's own heading already says the
-      // same thing") - reversed. The suppression is exactly what made
-      // an ungrouped pile (`MOVE_PILE`'s own "drop on open table space"
-      // case, `zoneId` freshly minted to the pile's own id) look
-      // parentless: no visible Zone heading at all, only the pile's -
-      // indistinguishable from a pile that was never grouped into a
-      // real Zone at all. Always render it now, `record.name` as-is.
-      zoneElement.render(record.id, record.name, pilesInZone, piles, options);
-    }
+    renderOneZone(zoneId, pilesInZone, piles, zoneRecords, seatedPlayers, container, options);
   }
 }
 
@@ -2076,7 +2111,69 @@ function renderMiniHand(container, count) {
  * viewer's own seat (Smith Gate 1: position alone is ambiguous).
  * `players` must already be in seat order (viewer first) when seated.
  */
-export function renderRoster(container, players, { movingIds, scores, onAdjustScore, myId, seated, hideId } = {}) {
+/**
+ * One roster row (US-107, cognitive-complexity extraction from
+ * `renderRoster` - unchanged). A seat is one horizontal row:
+ * [-] [who they are + score] [+]. The score buttons used to be appended
+ * *after* the text inside the card, which on a narrow seat pushed them
+ * out past its own edge and over whatever sat next to it. Flanking the
+ * info keeps both 44px targets inside the card and makes the seat
+ * wider-than-taller, which is what the table has room for.
+ */
+function renderRosterEntry(container, p, index, players, { movingIds, scores, onAdjustScore, myId, seated } = {}) {
+  const li = document.createElement('li');
+  li.className = `roster-player roster-${p.connection}`;
+  if (seated) {
+    const { leftPct, topPct } = seatPosition(index, players.length);
+    li.style.left = `${leftPct}%`;
+    li.style.top = `${topPct}%`;
+    li.classList.add('seat');
+    if (p.id === myId) li.classList.add('seat-you');
+  }
+  const count = typeof p.handCount === 'number' ? ` (${p.handCount} cards)` : '';
+  const moving = movingIds?.has(p.id) ? ' \u{270B} organizing hand' : '';
+  const youTag = seated && p.id === myId ? ' \u{1F9D1} You' : '';
+
+  const info = document.createElement('span');
+  info.className = 'seat-info';
+  info.append(`${p.name} - ${p.connection}${count}${moving}${youTag}`);
+
+  if (p.id !== myId && typeof p.handCount === 'number') {
+    const miniHandElement = document.createElement('div');
+    renderMiniHand(miniHandElement, p.handCount);
+    info.append(miniHandElement);
+  }
+
+  const hasScore = scores && Object.hasOwn(scores, p.id);
+  if (hasScore) {
+    const scoreElement = document.createElement('span');
+    scoreElement.className = 'score-row';
+    scoreElement.append(`Score: ${scores[p.id]}`);
+    info.append(scoreElement);
+  }
+
+  if (hasScore && onAdjustScore) {
+    const minusButton = document.createElement('button');
+    minusButton.type = 'button';
+    minusButton.className = 'score-btn';
+    minusButton.textContent = '-';
+    minusButton.addEventListener('click', () => onAdjustScore(p.id, -1));
+
+    const plusButton = document.createElement('button');
+    plusButton.type = 'button';
+    plusButton.className = 'score-btn';
+    plusButton.textContent = '+';
+    plusButton.addEventListener('click', () => onAdjustScore(p.id, 1));
+
+    li.append(minusButton, info, plusButton);
+  } else {
+    li.append(info);
+  }
+
+  container.append(li);
+}
+
+export function renderRoster(container, players, options = {}) {
   container.replaceChildren();
   for (const [index, p] of players.entries()) {
     // UX follow-up: the viewer's own seat now lives in the merged
@@ -2084,63 +2181,8 @@ export function renderRoster(container, players, { movingIds, scores, onAdjustSc
     // skipping the `<li>` here (not filtering `players` itself) keeps
     // everyone ELSE's seat index/angle math unchanged, since it's still
     // computed against the real roster length and position.
-    if (p.id === hideId) continue;
-    const li = document.createElement('li');
-    li.className = `roster-player roster-${p.connection}`;
-    if (seated) {
-      const { leftPct, topPct } = seatPosition(index, players.length);
-      li.style.left = `${leftPct}%`;
-      li.style.top = `${topPct}%`;
-      li.classList.add('seat');
-      if (p.id === myId) li.classList.add('seat-you');
-    }
-    const count = typeof p.handCount === 'number' ? ` (${p.handCount} cards)` : '';
-    const moving = movingIds?.has(p.id) ? ' \u{270B} organizing hand' : '';
-    const youTag = seated && p.id === myId ? ' \u{1F9D1} You' : '';
-
-    // A seat is one horizontal row: [-] [who they are + score] [+].
-    // The score buttons used to be appended *after* the text inside the
-    // card, which on a narrow seat pushed them out past its own edge and
-    // over whatever sat next to it. Flanking the info keeps both 44px
-    // targets inside the card and makes the seat wider-than-taller,
-    // which is what the table has room for.
-    const info = document.createElement('span');
-    info.className = 'seat-info';
-    info.append(`${p.name} - ${p.connection}${count}${moving}${youTag}`);
-
-    if (p.id !== myId && typeof p.handCount === 'number') {
-      const miniHandElement = document.createElement('div');
-      renderMiniHand(miniHandElement, p.handCount);
-      info.append(miniHandElement);
-    }
-
-    const hasScore = scores && Object.hasOwn(scores, p.id);
-    if (hasScore) {
-      const scoreElement = document.createElement('span');
-      scoreElement.className = 'score-row';
-      scoreElement.append(`Score: ${scores[p.id]}`);
-      info.append(scoreElement);
-    }
-
-    if (hasScore && onAdjustScore) {
-      const minusButton = document.createElement('button');
-      minusButton.type = 'button';
-      minusButton.className = 'score-btn';
-      minusButton.textContent = '-';
-      minusButton.addEventListener('click', () => onAdjustScore(p.id, -1));
-
-      const plusButton = document.createElement('button');
-      plusButton.type = 'button';
-      plusButton.className = 'score-btn';
-      plusButton.textContent = '+';
-      plusButton.addEventListener('click', () => onAdjustScore(p.id, 1));
-
-      li.append(minusButton, info, plusButton);
-    } else {
-      li.append(info);
-    }
-
-    container.append(li);
+    if (p.id === options.hideId) continue;
+    renderRosterEntry(container, p, index, players, options);
   }
 }
 

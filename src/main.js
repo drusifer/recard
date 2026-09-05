@@ -83,7 +83,7 @@ const SCORE_PANEL_ID = 'score';
 // Every id `deckPile.pileActions` can ever offer - `zoneOpts.onPileAction`
 // (below) uses this to route a click to `dealFromDeck` instead of the
 // hand's `pass`, without needing to know which pile kind is asking.
-const DECK_ACTION_IDS = new Set(['draw', 'deal', 'reshuffleDeal', 'shuffle']);
+const DECK_ACTION_IDS = new Set(['draw', 'deal', 'reshuffleDeal', 'reset', 'shuffle']);
 let role = null; // 'host' | 'join'
 let session = null;
 let myId = null;
@@ -274,6 +274,59 @@ document.querySelector('#show-join').addEventListener('click', () => showScreen(
 
 
 // --- Host flow ---
+
+/**
+ * US-107 (cognitive-complexity pass): the body of the `roster` handler's
+ * per-entry loop, extracted unchanged. Seats (or re-seats) exactly one
+ * transport roster entry and returns the resulting game state; the
+ * caller reassigns `gameState = seatRosterEntry(r, gameState)`. Mutates
+ * the module's `peerToKey`/`identityAnnounced` maps in place, same as
+ * before the extraction - only `gameState` threads through explicitly,
+ * since it's the one piece of this that has to flow back out.
+ *
+ * Don't seat a peer that is still `connecting`. D27 already refuses to
+ * *announce* identity before the connection is open; seating them
+ * earlier has the same defect one step upstream - the host can deal to
+ * a peer whose identity hasn't settled, and it re-seats a moment later
+ * as a stranger, stranding the dealt hand on a ghost. Sprint 10 fixed
+ * this for auto-start by counting connected players; this fixes the
+ * manual "Deal & Start" path too, at the source.
+ */
+function seatRosterEntry(r, state) {
+  if (r.connection === 'disconnected') return state;
+  if (r.connection !== 'connected' && !peerToKey.has(r.id)) return state;
+
+  let key = peerToKey.get(r.id);
+  if (!key) {
+    const resolved = resolvePlayer(r.playerKey, state.players);
+    key = resolved.playerKey;
+    // A returning key always reclaims its seat now (identity.js's own
+    // comment) - if some OTHER peer id still holds it (a stale
+    // connection the transport hasn't reported as closed yet), evict
+    // that one for real rather than letting two peers share one key:
+    // `closePeer` tears down its underlying connection (no leak) and
+    // its own `close` handler drives the roster event that cleans up
+    // `peerToKey` for it the normal way.
+    for (const [otherId, otherKey] of peerToKey) {
+      if (otherKey === key && otherId !== r.id) session.closePeer(otherId);
+    }
+    peerToKey.set(r.id, key);
+  }
+  // Tell the client which identity it is, so it can present the same one
+  // next time. Only once the connection is actually open - sending to a
+  // still-connecting peer is the documented way to hit PeerJS's
+  // "Maximum call stack size exceeded" (see backlog).
+  if (r.connection === 'connected' && !identityAnnounced.has(r.id)) {
+    identityAnnounced.add(r.id);
+    session.sendTo(r.id, { type: 'identity', playerKey: key });
+  }
+  let next = state;
+  if (next.players.every((p) => p.id !== key)) {
+    next = reduce(next, { type: 'JOIN', playerId: key, name: r.name });
+  }
+  return reduce(next, { type: 'SET_CONNECTION', playerId: key, connection: r.connection });
+}
+
 /**
  * Every host-side session handler, shared by creating a new table and
  * restoring a saved one - so the two paths can't drift apart.
@@ -289,8 +342,8 @@ session.on('roster', (transportRoster) => {
   // no longer refuses a returning key just because some OTHER peer id
   // still maps to it (direct user decision, weighing this against the
   // original anti-hijack intent: false-positived on ordinary reconnects
-  // far more often than it ever caught a real second tab) - the loop
-  // below actively evicts that other connection instead once it does.
+  // far more often than it ever caught a real second tab) - `seatRosterEntry`
+  // actively evicts that other connection instead once it does.
   //
   // The two passes just below are `peerToKey`/`identityAnnounced` hygiene,
   // independent of the above: a peer that vanishes without ever producing
@@ -301,47 +354,7 @@ session.on('roster', (transportRoster) => {
   const currentIds = new Set(transportRoster.map((r) => r.id));
   for (const id of peerToKey.keys()) if (!currentIds.has(id)) forgetPeer(id);
   for (const r of transportRoster) if (r.connection === 'disconnected') forgetPeer(r.id);
-  for (const r of transportRoster) {
-    if (r.connection === 'disconnected') continue;
-
-    // Don't seat a peer that is still `connecting`. D27 already refuses to
-    // *announce* identity before the connection is open; seating them
-    // earlier has the same defect one step upstream - the host can deal to
-    // a peer whose identity hasn't settled, and it re-seats a moment later
-    // as a stranger, stranding the dealt hand on a ghost. Sprint 10 fixed
-    // this for auto-start by counting connected players; this fixes the
-    // manual "Deal & Start" path too, at the source.
-    if (r.connection !== 'connected' && !peerToKey.has(r.id)) continue;
-
-    let key = peerToKey.get(r.id);
-    if (!key) {
-      const resolved = resolvePlayer(r.playerKey, gameState.players);
-      key = resolved.playerKey;
-      // A returning key always reclaims its seat now (identity.js's own
-      // comment) - if some OTHER peer id still holds it (a stale
-      // connection the transport hasn't reported as closed yet), evict
-      // that one for real rather than letting two peers share one key:
-      // `closePeer` tears down its underlying connection (no leak) and
-      // its own `close` handler drives the roster event that cleans up
-      // `peerToKey` for it the normal way.
-      for (const [otherId, otherKey] of peerToKey) {
-        if (otherKey === key && otherId !== r.id) session.closePeer(otherId);
-      }
-      peerToKey.set(r.id, key);
-    }
-    // Tell the client which identity it is, so it can present the same one
-    // next time. Only once the connection is actually open - sending to a
-    // still-connecting peer is the documented way to hit PeerJS's
-    // "Maximum call stack size exceeded" (see backlog).
-    if (r.connection === 'connected' && !identityAnnounced.has(r.id)) {
-      identityAnnounced.add(r.id);
-      session.sendTo(r.id, { type: 'identity', playerKey: key });
-    }
-    if (gameState.players.every((p) => p.id !== key)) {
-      gameState = reduce(gameState, { type: 'JOIN', playerId: key, name: r.name });
-    }
-    gameState = reduce(gameState, { type: 'SET_CONNECTION', playerId: key, connection: r.connection });
-  }
+  for (const r of transportRoster) gameState = seatRosterEntry(r, gameState);
   broadcastViews();
 });
 
@@ -1204,26 +1217,42 @@ function handlePileAction(pileId, actionId, value) {
   if (actionId === 'changePileType') return performChangePileType(pileId, value);
 }
 
-function renderGameFromView(view) {
-  updateLayoutControlsVisibility();
-  const nameById = new Map(view.players.map((p) => [p.id, p.id === myId ? 'You' : p.name]));
+// US-107 (D114-adjacent, cognitive-complexity pass): extracted straight
+// out of `renderGameFromView`, unchanged - just moved out from under it,
+// since sonarjs's dispatch-table false-positive read every callback
+// property and every isSessionEnded ternary in this object literal as
+// the SAME function's own branching. Zero behavior change: same object
+// shape, same closures over the module's session-state (`isSessionEnded`,
+// `role`, `myId`, `splitPicker`, `lastDealCount`, `motionThrottler`).
+//
+// UX follow-up (direct user request): "get rid of seat panel and
+// replace with a reg zone with a handpile" - the hand is a real
+// `hand`-kind pile now (`state.js`), rendered through the exact same
+// generic `renderPileCards`/`actionMenuEl` machinery as any other
+// pile's cards (as a `<pile-panel>` grouped into the owner's own
+// `<zone-panel>`, `src/components/PilePanel.js`/`ZonePanel.js`). No
+// separate `handOpts`/`own` object, no bespoke fan/reorder/motion/
+// sort/pass wiring - a hand's cards go through `onMoveCard` like
+// every other pile's do (D102: `onPlay`, and the `play` verb behind
+// it, are retired - nothing ever read this option).
+//
+// NOTE (flagged, not yet done): hand-order persistence (D14), sort/
+// pass, and the "organizing hand" motion cue are all temporarily gone
+// - direct instruction was to get the pile rendering working first,
+// parity/polish is a following step.
+// US-107: every `isSessionEnded ? null : fn` pair below shares one
+// condition - factored into a single guard so the object literal states
+// the rule once instead of nine times. Every wrapped function already
+// matched its property's call signature exactly (checked against each
+// `function perform*`/`handlePileAction` definition), so the guard can
+// hold the real function reference directly - no arity-preserving arrow
+// wrapper needed either.
+function whenLive(handler) {
+  return isSessionEnded ? null : handler;
+}
 
-  // UX follow-up (direct user request): "get rid of seat panel and
-  // replace with a reg zone with a handpile" - the hand is a real
-  // `hand`-kind pile now (`state.js`), rendered through the exact same
-  // generic `renderPileCards`/`actionMenuEl` machinery as any other
-  // pile's cards (as a `<pile-panel>` grouped into the owner's own
-  // `<zone-panel>`, `src/components/PilePanel.js`/`ZonePanel.js`). No
-  // separate `handOpts`/`own` object, no bespoke fan/reorder/motion/
-  // sort/pass wiring - a hand's cards go through `onMoveCard` like
-  // every other pile's do (D102: `onPlay`, and the `play` verb behind
-  // it, are retired - nothing ever read this option).
-  //
-  // NOTE (flagged, not yet done): hand-order persistence (D14), sort/
-  // pass, and the "organizing hand" motion cue are all temporarily gone
-  // - direct instruction was to get the pile rendering working first,
-  // parity/polish is a following step.
-  const zoneOptions = {
+function buildZoneOptions(nameById) {
+  return {
     viewerId: myId,
     resolveOwnerName: (ownerId) => nameById.get(ownerId) ?? ownerId,
     onReveal: (pileableId) => revealCard(pileableId),
@@ -1238,21 +1267,21 @@ function renderGameFromView(view) {
     // doesn't need its own pileId param - `splitPicker.pileId` already
     // says which pile.
     splitPicker,
-    onSplitCommit: isSessionEnded ? null : (index) => performSplitCommit(index),
+    onSplitCommit: whenLive(performSplitCommit),
     // UX follow-up (direct user request): "like zones, Piles are
     // Actionable and should have a title bar with action buttons for
     // that pile type" - every pile's heading is a real action header now
     // (`renderPile`, `ui.js`). Dispatch table itself is `handlePileAction`
     // above (its own doc comment has the rest).
-    onPileAction: isSessionEnded ? null : (pileId, actionId, value) => handlePileAction(pileId, actionId, value),
+    onPileAction: whenLive(handlePileAction),
     // *nit (2026-08-26): "allow user to rename zones and piles - any
     // user can edit - persisted by host." Same `sessionEnded` gate
     // every other dispatching handler in this object already uses.
-    onRenamePile: isSessionEnded ? null : (pileId, name) => performRenamePile(pileId, name),
-    onRenameZone: isSessionEnded ? null : (zoneId, name) => performRenameZone(zoneId, name),
-    onRemoveZone: isSessionEnded ? null : (zoneId) => performRemoveZone(zoneId),
+    onRenamePile: whenLive(performRenamePile),
+    onRenameZone: whenLive(performRenameZone),
+    onRemoveZone: whenLive(performRemoveZone),
     // (bloop: piles/zones/cards are all Movable)
-    onMovePile: isSessionEnded ? null : (pileId, targetZoneId) => performMovePile(pileId, targetZoneId),
+    onMovePile: whenLive(performMovePile),
     // (direct user request) - dropping a pile directly onto another pile
     // merges its cards into the target and removes it once empty, no
     // matter which zone either one is in ("remove the weird zone
@@ -1260,8 +1289,8 @@ function renderGameFromView(view) {
     // split; `REORDER_PILE`, state.js, is unused from the UI now but
     // left in place, not deleted - a real, tested, independently-useful
     // action, just without a live trigger since this was its only one).
-    onMergePile: isSessionEnded ? null : (pileId, targetPileId) => performMergePile(pileId, targetPileId),
-    onDropCardOnZone: isSessionEnded ? null : (pileableId, zoneId) => performCreatePileWithCard(pileableId, zoneId),
+    onMergePile: whenLive(performMergePile),
+    onDropCardOnZone: whenLive(performCreatePileWithCard),
     isHost: role === 'host',
     // US-41/D29: dealing lives on the deck, where the cards are - the
     // whole point of the story. Read/written here since the deck now
@@ -1269,7 +1298,7 @@ function renderGameFromView(view) {
     // stack>`, `renderPile`'s row) as any other pile, not a bespoke
     // `<deck-zone>` element with its own property surface any more.
     dealCount: lastDealCount,
-    onDealCountChange: isSessionEnded ? null : (value) => { lastDealCount = value; },
+    onDealCountChange: whenLive((value) => { lastDealCount = value; }),
     onCardDrag: broadcastCardDrag,
     // UX follow-up (direct user request): panel position/size is a
     // local, per-browser preference (`panelLayout.js`) - read fresh on
@@ -1286,6 +1315,12 @@ function renderGameFromView(view) {
     onMovePanel: movePanel,
     onResizePanel: resizePanel,
   };
+}
+
+function renderGameFromView(view) {
+  updateLayoutControlsVisibility();
+  const nameById = new Map(view.players.map((p) => [p.id, p.id === myId ? 'You' : p.name]));
+  const zoneOptions = buildZoneOptions(nameById);
   // UX follow-up (direct user request): "just have table-surface ->
   // zone" - one render call builds every pile/zone panel (shared AND
   // personal, D17/US-27's per-seat placement included) as a direct
@@ -1310,8 +1345,8 @@ function renderGameFromView(view) {
   // same as any other panel), the same default every shared/standalone
   // zone already gets - no more seat-ring math to fight for clearance.
   renderScoreZone(zonesElement, seatedOrder(view.players, myId), view.scores, {
-    onAdjust: isSessionEnded ? null : adjustScore,
-    onSet: isSessionEnded ? null : setScore,
+    onAdjust: whenLive(adjustScore),
+    onSet: whenLive(setScore),
     ...zoneOptions,
   });
   renderRosterOnly();
@@ -1675,28 +1710,31 @@ function toggleSplitPicker(pileId) {
  * US-41/D29, Phase 56 (T56.1): every deck pile-level action - the deck's
  * pile anchor is the ONE thing that calls this now, having absorbed
  * both the legacy strip's deal/reshuffleDeal and the legacy shuffle
- * row. "Reshuffle & deal" is RESET then DEAL - two existing dispatches
- * rather than a third code path that could drift from either.
+ * row.
+ *
+ * D114 (US-106, direct user correction): "reshuffle and re-deal" used to
+ * BE `RESET` then `DEAL` - a full game wipe wearing a smaller action's
+ * name. They are two genuinely different operations now, each its own
+ * reducer action, each targeting the pile that was actually clicked -
+ * no more hardcoded `DECK_PILE_ID` assumption for either (that
+ * assumption never held for a multi-deck preset like RtG anyway).
  */
-// D92 (direct user request, "THERE SHOULD BE NO CANONICAL PILES"):
-// `pileId` is the specific pile whose header button was clicked -
-// forwarded straight through for `draw`/`shuffle`/plain `deal`
-// (`DEAL_MORE`). `reshuffleDeal` is the one real exception, and not a
-// re-introduced canonical-pile assumption: `RESET` always rebuilds the
-// preset's own starting deck at `DECK_PILE_ID` (its own declared
-// contract, see state.js), wiping whatever pile structure existed
-// before - the `DEAL` that follows targets THAT id, not the pile that
-// was clicked, because after a reset that's genuinely where the fresh
-// deck landed, full stop.
 function dealFromDeck(pileId, action, count) {
   if (isSessionEnded) return;
   if (action === 'draw') return performDraw(pileId);
   if (action === 'shuffle') return performShuffle(pileId);
+  if (action === 'reset') {
+    try {
+      dispatch({ type: 'RESET' });
+    } catch (error) {
+      showDeckError(error.message);
+    }
+    return;
+  }
   lastDealCount = count;
   try {
     if (action === 'reshuffleDeal') {
-      dispatch({ type: 'RESET' });
-      dispatch({ type: 'DEAL', cardsPerPlayer: count, pileId: DECK_PILE_ID });
+      dispatch({ type: 'RESHUFFLE_DEAL', cardsPerPlayer: count, pileId });
     } else {
       dispatch({ type: 'DEAL_MORE', cardsPerPlayer: count, pileId });
     }

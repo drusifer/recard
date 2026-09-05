@@ -1614,3 +1614,68 @@ surfaced inside a ~700-call-site mechanical diff.
 passed all 555 unit tests and all 10 browser tests. Nothing anywhere
 asserted that a card renders its face. Two browser assertions added; the
 same mutation now fails 4.
+
+---
+
+## Sprint: Tech Debt (2026-09-04) — US-106..108, D114
+
+Second tech-debt sprint. Phases sized 1-3 tasks per bob-protocol
+guidance. US-106 gets 2 phases (reducer/data first, UI wiring second -
+each independently green) since it's the sprint's one real behavior
+change and needs its own reserved verification. US-107 splits by risk:
+the two worst offenders (main.js, including the 65-complexity reducer
+dispatch) get their own phase since a bad refactor there is the
+highest-blast-radius mistake possible in this sprint. Phase 108 is the
+reserved bug-fix slot, standing convention since it started paying off.
+
+- [ ] **Phase 103** — US-106 part 1: per-card deck origin + `RESHUFFLE_DEAL`
+      - T103.1 `originPileId` stamped in `makeDeckPile` and
+        `applyDeclaration` (not `buildDeck` — it doesn't know the pile id)
+      - T103.2 New reducer action `RESHUFFLE_DEAL(state, {pileId,
+        cardsPerPlayer})`: gather every card whose `originPileId` matches
+        back from any pile, strip `faceUp`/`orientation`, shuffle, deal
+        `cardsPerPlayer` round-robin. Zones/layout/scores/chips untouched.
+      - T103.3 New `RESET`-only-reachable-today gap closed: a `reset`
+        deck action dispatching plain `RESET` (host-only, destructive).
+      - Regression test: RtG (multi-deck) reshuffle on one deck pile
+        returns its cards to itself, not a pooled shuffle, and leaves
+        the other 14 decks + tokens + battlefields untouched.
+      - TDD: tests first, then the reducer/stamp code.
+
+- [ ] **Phase 104** — US-106 part 2: wire the UI
+      - T104.1 `dealFromDeck`'s `reshuffleDeal` branch dispatches
+        `RESHUFFLE_DEAL` with the CLICKED pile's id (not a hardcoded
+        `DECK_PILE_ID`) instead of `RESET`+`DEAL`.
+      - T104.2 New `reset` pile-action spec per Smith's Gate 2 spec:
+        label "Restart game", icon `⟲` (distinct from reshuffleDeal's
+        `↻`), hint "Restart the entire game from scratch - clears every
+        zone, hand, and score, and rebuilds a fresh shuffled deck."
+        Added to `DECK_ACTION_IDS` and the deck's action button group.
+      - Live/browser check: click Restart game on a table with chips +
+        custom layout, confirm zones/layout/chips gone, fresh deck up;
+        click Reshuffle & deal, confirm zones/layout/chips SURVIVE.
+
+- [ ] **Phase 105** — US-107 part 1: cognitive-complexity, `main.js`
+      - T105.1 Refactor `main.js:282` (complexity 27) by extraction.
+      - T105.2 Refactor `main.js:1207` (complexity 65 — the dispatch
+        table) by extraction. Highest-risk single item in this sprint;
+        byte-identical dispatch behavior is the bar, not just green tests.
+      - `npm test` + a live check after each function, not just at the
+        end of the phase.
+
+- [ ] **Phase 106** — US-107 part 2: remaining lint findings
+      - T106.1 `dropTarget.js:35` (18), `touchDrag.js:75` (18).
+      - T106.2 `ui.js:613`/`1642`/`2079` (22/22/25).
+      - T106.3 `ui.js:956` naming (`pileEl` -> descriptive name),
+        bundled in since it's the same sweep.
+      - `npm run lint` fully clean at the end of this phase (the actual
+        Definition of Done for US-107).
+
+- [ ] **Phase 107** — US-108: groom stale `e2e.smoke.mjs` references
+      - T107.1 grep every reference outside `agents/chat_archive/`,
+        delete or rewrite each to reflect current reality.
+      - No new suite built here (separate backlog item).
+
+- [ ] **Phase 108** — Reserved bug-fix slot
+      - Standing convention: catches whatever Trin/Smith find at UAT/
+        close-out that doesn't warrant reopening an earlier phase.

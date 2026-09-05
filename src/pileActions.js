@@ -94,6 +94,20 @@ export const ACTION_SPECS = {
     hint: 'Gather every card back, reshuffle, and deal a fresh hand to each player.',
     icon: '↻',
   },
+  // D114 (US-106, Smith's Gate 2 UX spec): distinct label/icon from
+  // `reshuffleDeal` on purpose - the two must never be visually
+  // confusable, since one wipes the whole table and the other doesn't.
+  reset: {
+    label: 'Restart game',
+    destructive: true,
+    // Accurate to what RESET actually does (D111): every zone and hand
+    // is cleared and a fresh deck is dealt, but scores and chips/tokens
+    // are NOT touched. Smith's Gate 1 condition on this whole story was
+    // "the label must match the real consequence" - this is the same
+    // check applied to the new button, not just the old one.
+    hint: 'Restart the round: clears every zone and hand, and rebuilds a fresh shuffled deck. Scores and chips are not affected.',
+    icon: '⟲',
+  },
   // D34/D35: Draw generalized from a per-card action (dead - deck's
   // `pileableActions` always returns []) to a pile-level one, matching how
   // the user actually described it: hover the DECK, not a specific

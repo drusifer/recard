@@ -218,8 +218,8 @@ test('cascade/rankAdjacent inherit the same pileableActions rule as the base Pil
 
 // --- pileActions: characterized against pileActions.js's pileLevelActions ---
 
-test('deck pileActions: draw open to everyone, deal/reshuffleDeal/shuffle/split/changePileType host-only (D91: split joins, instant/always-half at the ui.js/main.js layer)', () => {
-  assert.deepEqual(new DeckPile(deck).pileActions({ isHost: true }), ['draw', 'deal', 'reshuffleDeal', 'shuffle', 'split', 'changePileType']);
+test('deck pileActions: draw open to everyone, deal/reshuffleDeal/reset/shuffle/split/changePileType host-only (D91: split joins, instant/always-half at the ui.js/main.js layer; D114: reset joins, standalone from reshuffleDeal)', () => {
+  assert.deepEqual(new DeckPile(deck).pileActions({ isHost: true }), ['draw', 'deal', 'reshuffleDeal', 'reset', 'shuffle', 'split', 'changePileType']);
   assert.deepEqual(new DeckPile(deck).pileActions({ isHost: false }), ['draw']);
 });
 

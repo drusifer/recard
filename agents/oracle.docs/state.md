@@ -384,15 +384,16 @@ What I wrote:
 sprint. CHAT.md is still well under the 50-100 message rolling
 threshold after the D100-era archive.
 
-### Documentation debt I flagged at retro (unassigned)
-`tests/e2e.smoke.mjs` was removed at D60 and never rebuilt, but at
-least two places still describe it as live: this repo's
-`oracle.docs/memory.md` Repository Structure section (which does say
-"removed 2026-08-27 (D60)" in the same entry, so that one is
-self-correcting) and the user's own cross-session memory note
-("Recard status 2026-08-25" lists "e2e.smoke.mjs pass" as an open
-item). Worth a grooming pass so nobody plans verification around a
-suite that does not exist.
+### Documentation debt I flagged at retro — RESOLVED (tech-debt sprint 2, US-108, 2026-09-04)
+The `e2e.smoke.mjs` groom happened: `designLint.mjs`/`designLint.check.mjs`
+comments no longer imply it's a live suite, a stale duplicate
+"substantially out of date" bullet was cut from ARCHITECTURE.md's Open
+Items (superseded by D60's own accurate Testing Strategy entry), and
+the user's stale cross-session memory note ("Recard status 2026-08-25")
+was retired outright rather than patched, since the whole snapshot -
+not just its e2e line - was obsolete. Dated historical entries
+(state.md session logs, DECISIONS.md, lessons.md, chat_archive) were
+correctly left alone.
 
 `docs/DECISIONS.md` still stops at D20. Standing, deliberate gap since
 Sprint 14 — `docs/ARCHITECTURE.md` is the binding spec, now through

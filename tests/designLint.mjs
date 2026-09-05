@@ -9,8 +9,10 @@
  * bug, live, with throwaway scripts: a self-inflicted `min-height: 0`
  * silently zeroed a layout floor, and the only thing that had ever
  * caught the resulting seat-ring/pot collision was ONE hand-rolled
- * intersection check inlined in a single e2e test (see D24 in
- * `tests/e2e.smoke.mjs`). This module is that pattern, extracted once,
+ * intersection check inlined in a single e2e test (D24, in the
+ * monolithic `tests/e2e.smoke.mjs` - deleted at D60, 2026-08-27, since
+ * it asserted against DOM ids retired by then and never ran past its
+ * first failure). This module is that pattern, extracted once,
  * unit-tested, and reusable everywhere the same question comes up.
  *
  * Pure and DOM-free, like `dropTarget.js`/`seating.js`/`pileActions.js`:
@@ -18,9 +20,8 @@
  * `getBoundingClientRect()`, passed out of `page.evaluate()`), never
  * touches `document`/`window`. That is what makes it trivially
  * unit-testable in `tests/designLint.test.js` with no browser at all,
- * and reusable from any runner - a live-page check script
- * (`designLint.check.mjs`) here, or an assertion inside
- * `e2e.smoke.mjs`; nothing here cares which.
+ * and reusable from any runner - today, the live-page check script
+ * (`designLint.check.mjs`) here.
  */
 
 /**

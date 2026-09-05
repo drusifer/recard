@@ -6,12 +6,12 @@ import { breakInto, COLOUR_FOR_VALUE } from './pileables/ChipPileable.js';
 import { batchToken } from './decks/batchToken.js';
 
 const DEFAULT_PILE_ID = 'table';
-// Exported (only this one, of the three) - `main.js`'s `dealFromDeck`
-// needs it for `reshuffleDeal`: `RESET` always rebuilds the preset's
-// own starting deck at this well-known id (RESET's own contract, not a
-// runtime lookup assumption - see its own comment), so the `DEAL` that
-// follows a reshuffle targets this id specifically, not whichever pile
-// was originally clicked (`RESET` may have just wiped or replaced it).
+// Exported (only this one, of the three) - `RESET`'s own contract:
+// whenever a preset has a table zone at all, `RESET` always rebuilds
+// the preset's starting deck at this well-known id. D114: no longer
+// needed by `reshuffleDeal` (that now targets whichever pile was
+// clicked), but still the id a fresh `DEAL`/`startGame()` targets after
+// a real restart, and what `main.js`'s deck-panel lookup reads.
 export const DECK_PILE_ID = 'deck';
 const TABLE_ZONE_ID = 'table-zone';
 
@@ -155,7 +155,14 @@ function makeTableSidePile(kind, name, ownerId = null, id = null, zoneId = null)
 }
 
 function makeDeckPile(deckConfig, rng, zoneId) {
-  return makePile('deck', { id: DECK_PILE_ID, name: 'Deck', cards: shuffle(buildDeck(deckConfig), rng), zoneId });
+  // D114 (US-106): every card is stamped with the id of the deck pile it
+  // was built into, so RESHUFFLE_DEAL can return a card to its origin
+  // rather than whichever deck's button was clicked. Cards only - a
+  // deck-kind pile could in principle build chips/tokens (`buildDeck`'s
+  // own `pileableType` default), and those never take part in a reshuffle.
+  const cards = shuffle(buildDeck(deckConfig), rng)
+    .map((card) => (card.pileableType === 'card' ? { ...card, originPileId: DECK_PILE_ID } : card));
+  return makePile('deck', { id: DECK_PILE_ID, name: 'Deck', cards, zoneId });
 }
 
 /**
@@ -270,8 +277,12 @@ function applyDeclaration(pile, declaration, rng) {
   const stocked = declaration.deckList
     ? {
       ...pile,
+      // D114 (US-106): same origin stamp as `makeDeckPile`, so a
+      // multi-deck preset (RtG's fifteen) can tell which of its own
+      // declared piles each card belongs to at reshuffle time.
       cards: (PILE_TYPES[pile.kind] ?? PILE_TYPES.plain)
-        .stock(shuffle(buildDeck({ type: declaration.deckType ?? 'rtg', deckList: declaration.deckList }), rng)),
+        .stock(shuffle(buildDeck({ type: declaration.deckType ?? 'rtg', deckList: declaration.deckList }), rng)
+          .map((card) => (card.pileableType === 'card' ? { ...card, originPileId: pile.id } : card))),
     }
     : pile;
   return declaration.spread === undefined ? stocked : { ...stocked, spread: declaration.spread };
@@ -1320,6 +1331,64 @@ const ACTIONS = {
     }
     const rng = action.rng ?? Math.random;
     return replacePile(state, action.pileId, (deck) => withCards(deck, shuffle(deck.cards, rng)));
+  },
+
+  /**
+   * D114 (US-106, direct user correction): "reshuffle and re-deal" was
+   * conflated with `RESET` (`dealFromDeck` dispatched `RESET` then
+   * `DEAL`) - wiping zones/layout/scores/chips that a re-deal has no
+   * business touching. This is the real, standalone operation: gather
+   * every CARD whose `originPileId` matches `action.pileId` back from
+   * wherever it currently sits (a hand, another zone, mid-table -
+   * anywhere), no matter what pile that started in - shuffle just that
+   * pool, and deal `action.cardsPerPlayer` round-robin. A card belonging
+   * to a DIFFERENT origin deck (RtG's other fourteen) is never touched,
+   * because it never matches `action.pileId`. Non-card Pileables (chips,
+   * tokens) carry no `originPileId` and so never match either - a
+   * reshuffle has never been about them.
+   *
+   * Transient per-card state (`faceUp`, `orientation`) is stripped on
+   * the way back, same as `toDeckCard` already does for a fresh `DEAL` -
+   * a card returning to the deck is not still turned face-up in memory.
+   */
+  RESHUFFLE_DEAL(state, action) {
+    const pile = state.piles.find((p) => p.id === action.pileId);
+    if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
+    const rng = action.rng ?? Math.random;
+    const gathered = [];
+    const gatheredPiles = state.piles.map((p) => {
+      const kept = [];
+      for (const card of p.cards) {
+        if (card.originPileId === action.pileId) {
+          const { orientation: _orientation, ...deckCard } = toDeckCard(card);
+          gathered.push(deckCard);
+        } else {
+          kept.push(card);
+        }
+      }
+      return kept.length === p.cards.length ? p : withCards(p, kept);
+    });
+
+    const players = state.players;
+    const { remaining, dealt } = dealRoundRobin(
+      shuffle(gathered, rng),
+      players.length,
+      action.cardsPerPlayer ?? 0,
+      (left) =>
+        `Cannot deal ${action.cardsPerPlayer} cards to ${players.length} players: only ${left} left`,
+    );
+
+    let piles = gatheredPiles;
+    for (const player of players) piles = ensureHandPile(piles, player.id);
+    piles = piles.map((p) => {
+      if (p.id === action.pileId) return withCards(p, remaining);
+      if (p.kind !== 'hand') return p;
+      const index = players.findIndex((pl) => pl.id === p.ownerId);
+      if (index === -1) return p;
+      const newCards = dealt[index].map((card) => toHandCard(card, p.ownerId));
+      return withCards(p, [...p.cards, ...newCards]);
+    });
+    return { ...state, piles };
   },
 
   /**

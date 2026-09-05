@@ -2978,3 +2978,106 @@ convincing, and the demonstration is the whole of what a user sees.
 **Filed for the reserved bug-fix slot (T102.2)** rather than backlogged:
 that slot exists precisely for defects found at this gate, and both fixes
 are small and well understood.
+
+## Sprint: Tech Debt (2026-09-04)
+
+Second tech-debt sprint (first was US-64..68, 2026-08-27). Two sources:
+Mouse's queued item from the pileObjects session close-out (RESET vs
+Reshuffle & re-deal conflation), and the standing backlog carried since
+the last tech-debt sprint (cognitive-complexity findings, stale
+`e2e.smoke.mjs` references). Confirmed current lint state directly
+(`npx eslint src/`) rather than trusting the "7 findings" figure in
+state files — it's now 8: `dropTarget.js:35` (18), `main.js:282` (27),
+`main.js:1207` (65, the dispatch reducer), `touchDrag.js:75` (18),
+`ui.js:613`/`1642`/`2079` (22/22/25), plus one `unicorn/name-replacements`
+naming finding (`ui.js:956`, `pileEl`).
+
+### US-106: Separate RESET from Reshuffle & re-deal
+**As** a player, **I want** "reshuffle and re-deal" to only touch the
+deck and hands, **so that** I can re-deal a round without losing zone
+layout, scores, or chip stacks.
+
+**Note:** unlike US-107/108 below, this story is a deliberate
+user-visible **behavior change**, not a no-behavior-change refactor —
+the two operations are currently conflated (`reshuffleDeal` dispatches
+`RESET` then `DEAL`) and the fix necessarily changes what each button
+does. Flagged explicitly so Gate 1/2 review it as behavior, not as
+internal cleanup.
+
+**AC:**
+- RESET means: restart the entire game in its initial preset (unchanged
+  from today).
+- Reshuffle & re-deal means: return every card to its **original**
+  deck, shuffle that deck, deal `gameConfig.cardsPerPlayer` cards to
+  each player. It must NOT touch zones, layout, scores, or chips.
+- "Original deck" is per-card, not one global deck: presets with
+  multiple decks on the table (e.g. RtG's fifteen) must return each
+  card to the deck it actually came from. This requires recording deck
+  origin per card — there is no such record today; this is the
+  substantive work, not the plumbing around it.
+- Reshuffle & re-deal becomes its own reducer action, not a
+  `RESET`+`DEAL` dispatch pair.
+- D111's "RESET no longer confiscates chips" is re-derived from these
+  corrected definitions, not assumed to still apply as written: under
+  the corrected split, a reshuffle should never have touched chips in
+  the first place (chips are a RESET concern only, if any). Morpheus
+  to confirm whether RESET should now restore the preset's opening chip
+  stacks, given RESET is defined as a full restart.
+- `npm test` green; a regression test proves a reshuffle on a
+  multi-deck preset (RtG) returns cards to their origin deck, not a
+  pooled shuffle.
+
+### US-107: Fix remaining cognitive-complexity lint findings
+**As** the dev team, **I want** the 7 cognitive-complexity findings
+flagged (not fixed) in the last tech-debt sprint resolved, **so that**
+`npm run lint` is actually clean instead of carrying a standing
+exception.
+
+**AC:**
+- All cognitive-complexity findings in `dropTarget.js`, `main.js` (both
+  functions, including the reducer at complexity 65), `touchDrag.js`,
+  and `ui.js` (all three) are refactored below the threshold (15).
+- Zero behavior change: `npm test` and any live/browser check stay
+  green throughout, byte-identical `viewFor`/wire-format/reducer
+  behavior before and after each refactor.
+- Refactor by extraction (named helper functions for sub-branches), not
+  by suppression (`eslint-disable`) or by collapsing logic into a
+  harder-to-read one-liner.
+- If any single finding turns out to require an actual behavior change
+  to fix cleanly, it's flagged for Morpheus rather than silently
+  changed or silently left disabled.
+- Bonus, same sweep: fix the one `unicorn/name-replacements` finding
+  (`ui.js:956`, `pileEl`) so `npm run lint` is fully clean, not just
+  complexity-clean.
+
+### US-108: Groom stale `e2e.smoke.mjs` references
+**As** the dev team, **I want** every reference to the deleted
+`tests/e2e.smoke.mjs` (D60, 2026-08-27) removed from docs and memory
+files, **so that** nobody follows a pointer to a test suite that no
+longer exists.
+
+**AC:**
+- Grep every reference across `agents/*.docs/`, `docs/`, and any other
+  tracked file; each is either deleted or rewritten to reflect current
+  reality (no E2E suite exists; the standing backlog item to rebuild
+  one is `browser-automation tooling`, tracked separately).
+- Do not touch `agents/chat_archive/*` — those are historical logs and
+  correctly describe what was true at the time.
+- No new suite is built as part of this story — that's a separate,
+  larger backlog item (browser-automation tooling / jsdom harness for
+  `ui.js`), out of scope here.
+
+**Out of scope:** any refactor that changes user-visible behavior or
+wire format (US-106 is the sole, explicitly-flagged exception in this
+sprint). Building a new E2E/browser-automation suite — that's tracked
+separately in the standing backlog, not this sprint.
+
+### Sprint status: US-106..108 COMPLETE (2026-09-05), D114
+6 phases (103-108), no rework at any gate. RESHUFFLE_DEAL shipped as
+its own reducer action with per-card `originPileId`; a real gap (no
+standalone RESET control existed before this sprint) was found and
+closed with a new host-only `reset` deck action, UX-specced by Smith.
+`npm run lint` (js) went from 8 findings to 0, all by extraction, zero
+behavior change. Stale `e2e.smoke.mjs` references groomed. Reserved
+bug-fix slot caught and fixed a real `.deck-stack` duplicate
+`min-width` CSS bug. 654 unit + 18 browser tests green throughout.

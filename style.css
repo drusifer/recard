@@ -1489,7 +1489,6 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
      come off. */
   height: calc(var(--card-h) + var(--stack-max-depth) * var(--stack-step));
   min-height: calc(var(--card-h) + var(--stack-max-depth) * var(--stack-step));
-  min-width: calc(var(--card-w) + var(--stack-max-depth) * var(--stack-step-x));
   /* Clearance from the action header above, so the top card never sits
      against the buttons however deep the stack draws. */
   margin-top: 0.35rem;
@@ -1502,7 +1501,17 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
      6px away from the layer directly beneath it and broke the stack at
      exactly the point a player looks: "the top few deck cards are off".
      One coordinate system for both, and the deepest layer lands at 0. */
-  /* *nit fix, found live while widening `.pile-anchor-count`: the badge
+  /* US-107/Phase 108 (tech-debt sprint, direct fix of a real bug Trin
+     found running the full `npm run lint` pipeline): this used to be
+     TWO separate `min-width` declarations, a stylelint duplicate-
+     property error - the second (flat `5.2rem`, added later for the
+     badge-clearance fix below) silently won the cascade, leaving the
+     depth-based one dead. Both constraints are real and independent
+     (drift room grows with `--stack-max-depth`; badge room is a flat
+     card-relative constant), so `max()` keeps both alive instead of
+     one silently overriding the other - whichever is currently larger
+     wins, and that can change as either input does.
+     *nit fix, found live while widening `.pile-anchor-count`: the badge
      is `position: relative; left: 2.9rem` (a corner-badge stamped on
      the card, not a normal-flow sibling) - since the card itself is
      `position: absolute` (contributes 0 to auto-width), `.deck-stack`'s
@@ -1511,7 +1520,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
      right edge into whatever sits next in the row. Reserving real width
      here is what was missing - not something the input's own width
      caused, just what finally made it visible. */
-  min-width: 5.2rem;
+  min-width: max(calc(var(--card-w) + var(--stack-max-depth) * var(--stack-step-x)), 5.2rem);
 }
 
 /* Explicitly placed, not left to its static position - see

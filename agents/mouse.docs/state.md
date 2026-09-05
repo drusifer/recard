@@ -630,3 +630,16 @@ secure-context crash. Three separate fixes also had to be REVERSED after
 a user correction (chip layout honouring drops, the deck's single card,
 tighten/loosen ordering) - each was right for the design that existed at
 the time, so the reasoning is recorded, not just the outcome.
+
+## Sprint: Tech Debt (2026-09-04) — planned, 6 phases
+
+Phases 103-108 written to task.md, covering US-106 (2 phases - reducer/
+data then UI, since it's this sprint's one real behavior change and
+deserves independent verification each side), US-107 split by risk
+(main.js's two findings incl. the 65-complexity dispatch alone in
+phase 105, since a bad refactor there is the highest blast-radius
+mistake this sprint could make), US-108 (1 phase, mechanical), and the
+standing reserved bug-fix slot (108).
+
+### Next Steps
+Handed to Morpheus for plan review. On approval, Neo starts phase 103.

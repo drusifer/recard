@@ -1555,6 +1555,55 @@ test('SHUFFLE_DECK reorders the deck without touching anything else', () => {
   assert.equal(next.scores.p1, 1, 'scores untouched');
 });
 
+// --- RESHUFFLE_DEAL (D114, US-106): decoupled from RESET ---------------
+
+test('RESHUFFLE_DEAL: gathers only the named deck\'s cards, shuffles, deals - zones/layout/scores untouched', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1', 'p2']);
+  state = reduce(state, { type: 'ADJUST_SCORE', targetPlayerId: 'p1', delta: 1 });
+  state = reduce(state, { type: 'CREATE_ZONE', playerId: 'p1', name: 'My Zone' });
+  const zoneBefore = pilesOf(state).find((p) => p.name === 'My Zone');
+
+  let n = 0;
+  const next = reduce(state, {
+    type: 'RESHUFFLE_DEAL', pileId: 'deck', cardsPerPlayer: 3,
+    rng: () => ((n = (n * 9301 + 49_297) % 233_280), n / 233_280),
+  });
+
+  assert.equal(handOf(next, 'p1').length, 3, 'p1 dealt a fresh hand');
+  assert.equal(handOf(next, 'p2').length, 3, 'p2 dealt a fresh hand');
+  assert.equal(deckOf(next).length, 52 - 6, 'remainder stays in the deck pile');
+  assert.equal(next.scores.p1, 1, 'scores untouched - this is not a RESET');
+  assert.ok(pilesOf(next).some((p) => p.name === 'My Zone'), 'player-created zones survive');
+  assert.deepEqual(pilesOf(next).find((p) => p.id === zoneBefore.id).cards, [], 'zone had no cards to begin with, still none');
+});
+
+test('RESHUFFLE_DEAL: a card returns to its ORIGIN deck, not whichever deck was clicked (multi-deck preset)', () => {
+  let state = withPlayers(
+    createInitialState({}, () => 0.5, {
+      tableZone: false,
+      zones: [{ id: 'decks-zone', name: 'Decks' }],
+      piles: [
+        { kind: 'deck', id: 'deckA', zoneId: 'decks-zone', deckType: 'rtg', deckList: 'rtg-guild-wu' },
+        { kind: 'deck', id: 'deckB', zoneId: 'decks-zone', deckType: 'rtg', deckList: 'rtg-guild-wu' },
+      ],
+    }),
+    ['p1'],
+  );
+  const deckACountBefore = state.piles.find((p) => p.id === 'deckA').cards.length;
+  const deckBBefore = state.piles.find((p) => p.id === 'deckB').cards;
+
+  // Draw a card out of deckA into p1's hand, as if the player picked it up.
+  state = reduce(state, { type: 'DRAW', playerId: 'p1', pileId: 'deckA' });
+
+  const next = reduce(state, { type: 'RESHUFFLE_DEAL', pileId: 'deckA', cardsPerPlayer: 0 });
+
+  assert.equal(next.piles.find((p) => p.id === 'deckA').cards.length, deckACountBefore,
+    'deckA gets its own card back, including the one that had wandered into a hand');
+  assert.deepEqual(next.piles.find((p) => p.id === 'deckB').cards, deckBBefore,
+    'deckB - a completely different origin deck - is untouched');
+  assert.deepEqual(handOf(next, 'p1'), [], 'the wandered card left the hand, and cardsPerPlayer: 0 dealt nothing back');
+});
+
 // *nit (direct user request): "replaces deck specific split with this
 // more natural one" - `SPLIT_DECK` (round-robin into N piles) is gone;
 // a deck is just another `SPLIT_PILE`-eligible pile now, split at a

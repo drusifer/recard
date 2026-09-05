@@ -459,3 +459,51 @@ generic (D51 merged card and pile specs into one table once already —
 read D51 before splitting anything back apart), and whether the Core
 invariant's "all cards can be moved... no matter what" wording needs to
 become "all Pileables".
+
+## Sprint: Tech Debt (2026-09-04) — D114 recorded, arch complete for US-106
+
+**D114** (`docs/ARCHITECTURE.md`, inserted above D113): RESHUFFLE_DEAL
+becomes its own reducer action, decoupled from RESET. Per-card
+`originPileId` stamped at `makeDeckPile`/`applyDeclaration` (where
+`buildDeck`'s output actually attaches to a specific pile - confirmed
+RtG's 15 decks are genuinely 15 separate declared `deck`-kind piles via
+`GameConfig.piles`, not one big deck, by reading `presets.js` directly).
+
+**Real gap found while designing, not assumed**: grepped every RESET
+dispatch site - there is exactly one, inside `reshuffleDeal`'s branch.
+Decoupling without adding a replacement would delete "restart the game"
+as a reachable feature entirely. Added a `reset` deck action to the
+design (host-only, destructive, same family as draw/deal/shuffle) -
+required by US-106's own AC, flagged to Smith as a new visible control
+needing Gate 2 sign-off.
+
+**Deferred, not re-derived**: Smith's Gate 1 condition asked whether
+RESET should now restore opening chip stacks. Decided to leave D111's
+chip-preserving RESET untouched - out of this story's scope, no signal
+either way from the user, flagged as an open product question rather
+than silently deciding either way.
+
+US-107 (lint) and US-108 (stale refs) need no architecture - pure
+mechanical work for Neo, no design decisions to make.
+
+### Next Steps
+Waiting on Smith's Gate 2 feedback (specifically the new `reset` button
+- name/icon/confirm-text/placement are all still open, deliberately
+left to Smith rather than guessed here). On approval, hand to Mouse for
+phase breakdown.
+
+## Sprint: Tech Debt (2026-09-04) — COMPLETE, all phases reviewed
+
+D114 shipped (RESHUFFLE_DEAL decoupled from RESET, per-card originPileId,
+new host-only `reset` action). US-107 (all 8 lint findings, extraction
+pattern throughout) and US-108 (stale e2e.smoke.mjs reference groom)
+both complete. Phase 108's reserved-slot fix (`.deck-stack` dup
+min-width, merged via `max()`) closes it out. 654 unit + 18 browser
+green throughout, `npm run lint` fully clean except the unchanged
+5-item design-lint baseline (pre-existing, out of scope).
+
+### Next Steps
+Handed to Oracle for groom (Stage 3). Nothing architecturally open from
+this sprint. Standing backlog unchanged: reconnect-after-refresh, real
+QR image, 5+-player mobile density, builder screen, browser-automation
+tooling investment, jsdom/e2e harness for ui.js.

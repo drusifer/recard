@@ -561,9 +561,30 @@ this doesn't behave in the browser, that gap is the first suspect.
 ### Backlog added this sprint
 1. Browser-automation tooling for this project, so `*user test` stops
    being review-only on interaction-heavy stories (Smith).
-2. Grooming pass on stale `tests/e2e.smoke.mjs` references — removed at
-   D60, still cited as live in places (Oracle).
+2. ~~Grooming pass on stale `tests/e2e.smoke.mjs` references~~ — DONE,
+   tech-debt sprint 2 (US-108, 2026-09-05).
 3. A jsdom/e2e harness for `ui.js` interaction wiring (Trin).
+
+## Launch — Tech-debt sprint 2, US-106..108/D114 (2026-09-05)
+
+Full cycle, no rework at any gate: Gate 1 (US-106 flagged as the
+sprint's one deliberate behavior change) -> Morpheus's D114 (found and
+closed a real gap: no standalone RESET control existed before this)
+-> Gate 2 (Smith's UX spec for the new button, followed verbatim) ->
+Mouse's 6-phase plan -> all phases implemented/UAT'd/reviewed -> Oracle
+groom (CHAT.md archived at 237 msgs) -> Smith close-out (approved on
+code review, browser automation still not wired up) -> full retro.
+`npm run lint:js` 8 -> 0 findings. One live CSS bug (`.deck-stack` dup
+`min-width`) found and fixed at the reserved bug-fix slot.
+
+### Backlog added this sprint
+4. Standing process item: run the FULL `npm run lint` (not just
+   `npx eslint src/`) as the UAT/close gate command - this sprint's
+   `.deck-stack` finding was caught only because Trin ran the full
+   pipeline, not the narrower JS-only check (Neo/Trin).
+5. `*ora report` cadence: archive mid-sprint when CHAT.md nears the
+   50-100 rolling threshold, not only at sprint close - this sprint's
+   archive happened at 237 messages (Oracle).
 
 ## Next Steps
 
@@ -586,3 +607,36 @@ Start at `*pm plan sprint`. Two things to weigh while writing the AC:
   worth checking against reality early rather than discovering late.
 - "No back compat" is this project's standing rule and it is literal:
   old interfaces and their tests get deleted, never kept as aliases.
+
+## Sprint: Tech Debt (2026-09-04) — IN PROGRESS
+
+User invoked `*sprint tech debt` right after the previous session's
+close-out queued RESET vs Reshuffle & re-deal separation. Drafted
+US-106..108 in USER_STORIES.md, second tech-debt sprint after US-64..68
+(2026-08-27):
+- **US-106**: RESET vs Reshuffle & re-deal separation — the queued item,
+  per-card deck origin is the substantive work. **Flagged explicitly as
+  a deliberate user-visible behavior change**, not a no-behavior-change
+  refactor like the other two — the whole point is that reshuffle stops
+  wiping zones/scores/chips. Also flagged: D111's chip-on-RESET handling
+  needs re-deriving from the corrected definitions, left as a Morpheus
+  question rather than assumed.
+- **US-107**: fix the cognitive-complexity lint findings flagged (not
+  fixed) at the last tech-debt sprint. Checked live rather than trusting
+  the "7" in state files (`npx eslint src/`) — it's now 8: dropTarget.js
+  (18), main.js x2 (27, 65 — the reducer), touchDrag.js (18), ui.js x3
+  (22/22/25), plus one unrelated unicorn/name-replacements finding
+  bundled in as a bonus since it's in the same sweep.
+- **US-108**: groom stale `e2e.smoke.mjs` references out of docs/memory
+  (deleted at D60, still cited as live in several places per earlier
+  grep). Explicitly scoped OUT: building a new E2E suite (that's the
+  separate browser-automation-tooling backlog item).
+
+Deliberately did NOT bundle in: reconnect/host-handoff, real QR image,
+mobile density, builder screen — those are feature/product work, not
+tech debt, and stay on the standing backlog.
+
+### Waiting On
+@Smith: Gate 1 review of US-106..108. US-106 in particular needs Smith's
+read since it's not pure internal cleanup — reshuffle's actual behavior
+changes for the player.
