@@ -197,13 +197,19 @@ test('game 1: a token dropped on empty space in its own zone joins the supply, n
   assert.equal(await pileCount(), before, 'no new pile - the token rejoined the supply it belongs in');
 });
 
-// US-112: the token supply now groups into one stack per colour
-// (`TokenPile`/`GroupedPile`, shared with chips) instead of one long
-// overlapping row.
-test('the token supply renders as separate colour stacks, not one overlapping row', async () => {
+// REVERSED by direct user correction, follow-up *nit ("instead of a
+// stack it can be just a pile"): the token supply is an ordinary pile
+// again, not grouped columns - `TokenPile` no longer extends
+// `GroupedPile`. Tokens still have to be tellable apart, just by
+// colour+shape (the gem *nit) rather than by which column they sit in.
+test('the token supply renders as a plain pile, not grouped colour stacks', async () => {
   const page = fixture.page;
   const stacks = await page.locator('[data-pile-id="rtg-tokens"] .chip-stack').count();
-  assert.ok(stacks >= 2, `expected multiple colour stacks, got ${stacks}`);
+  assert.equal(stacks, 0, 'no grouped columns - a plain pile has none');
+  const colours = await page.locator('[data-pile-id="rtg-tokens"] .card-token').evaluateAll(
+    (tokens) => new Set(tokens.map((t) => t.className)).size,
+  );
+  assert.ok(colours > 1, `tokens must still be tellable apart by colour, found ${colours} distinct looks`);
 });
 
 test('game 1: a token from the shared supply can mark a permanent and be returned', async () => {

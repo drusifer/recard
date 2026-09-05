@@ -108,4 +108,12 @@ sequenceDiagram
     Note right of Neo: "*nit fix DONE: tokens<br/>now look like gems<br/>(clip-path faceted<br/>shape, colour gradient,<br/>no printed label).<br/>Removed the label field<br/>entirely fro…"
     Trin->>Neo: "qa handoff"
     Note right of Trin: "*qa test PASSED. Grepped<br/>for dangling token.label<br/>consumers - none, clean<br/>removal. Re-verified the<br/>gem screenshot myself (3<br/>distinct facete…"
+    User->>All: "request"
+    Note right of User: "*nit make gems smaller,<br/>revert stack->plain<br/>pile, add outline"
+    Neo->>Neo: "queue"
+    Note right of Neo: "*queue user correction:<br/>tokens should look like<br/>magical glass beads<br/>instead, round not<br/>faceted. User offered to<br/>generate art if wanted.<br/>Que…"
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "*nit fix DONE: gems<br/>smaller (0.6x card-<br/>height), reverted<br/>stack->plain pile<br/>(TokenPile extends Pile<br/>not GroupedPile,<br/>homePileKind fix preser…"
+    Trin->>Neo: "qa handoff"
+    Note right of Trin: "*qa quick check PASSED -<br/>re-ran full suite,<br/>verified setDragImage<br/>targets the real .card<br/>element (intercepted the<br/>call live). @Neo<br/>continue…"
 ```

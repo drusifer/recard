@@ -262,3 +262,19 @@ Agents **must** use this for every message posted to CHAT.md:
 ---
 [<small>2026-09-05 15:21:39</small>] [**Trin**]->[**Neo**] *qa handoff*:
  *qa test PASSED. Grepped for dangling token.label consumers - none, clean removal. Re-verified the gem screenshot myself (3 distinct faceted stones, no text). 673 unit + 8 RtG + 18 uiActions green, lint clean. *nit closed - no Morpheus step needed.
+
+---
+[<small>2026-09-05 15:45:20</small>] [**User**]->[**all**] *request*:
+ *nit make gems smaller, revert stack->plain pile, add outline
+
+---
+[<small>2026-09-05 15:52:39</small>] [**Neo**]->[**Neo**] *queue*:
+ *queue user correction: tokens should look like magical glass beads instead, round not faceted. User offered to generate art if wanted. Queued, not started - current *nit in flight (gems smaller/plain pile/outline/drag-ghost fix) finishes first.
+
+---
+[<small>2026-09-05 15:53:36</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ *nit fix DONE: gems smaller (0.6x card-height), reverted stack->plain pile (TokenPile extends Pile not GroupedPile, homePileKind fix preserved), added per-colour outline. Also fixed a separately-reported bug: drag-ghost showed the wrapper's rectangular shape, not the card's real clip-path - now uses setDragImage pointed at the actual .card element for every card type. 673 unit + 8 RtG + 18 uiActions + 6 hostSetup green, lint clean.
+
+---
+[<small>2026-09-05 15:53:46</small>] [**Trin**]->[**Neo**] *qa handoff*:
+ *qa quick check PASSED - re-ran full suite, verified setDragImage targets the real .card element (intercepted the call live). @Neo continue queue: panel/deck sizing for wider RtG cards, then hand sort by colour+type.

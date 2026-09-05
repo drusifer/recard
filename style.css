@@ -463,12 +463,22 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    (`clip-path`) reads as a cut stone at a glance - distinct from both a
    card (rectangular) and a chip (a plain circular disc), so the three
    stay tellable apart by SHAPE, not just colour. */
+/* *nit (direct user request): "make the gems smaller... they need an
+   outline or something". Shrunk from a full card-height square (same
+   footprint as a chip) to ~60% of it - a gem is a small accent piece,
+   not another card-sized object on the table. `border` still paints
+   (and is itself clipped to the same facet silhouette, same as any
+   other box - clip-path clips the border box, not just the fill) so
+   the gem reads as a real cut edge against the felt instead of the
+   flat colour blending into the dark background it originally had no
+   outline to separate from. */
 .card.card-token {
-  min-width: var(--card-h);
-  width: var(--card-h);
-  min-height: var(--card-h);
+  min-width: calc(var(--card-h) * 0.6);
+  width: calc(var(--card-h) * 0.6);
+  min-height: calc(var(--card-h) * 0.6);
   padding: 0;
-  border: none;
+  border-width: 2px;
+  border-style: solid;
   clip-path: polygon(50% 0%, 85% 18%, 100% 55%, 74% 100%, 26% 100%, 0% 55%, 15% 18%);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
 }
@@ -482,16 +492,19 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   background:
     radial-gradient(circle at 35% 22%, #ff9c8c 0%, transparent 45%),
     linear-gradient(155deg, #d1483a 0%, #7a1f16 100%);
+  border-color: #4a120c;
 }
 .card-token.token-green {
   background:
     radial-gradient(circle at 35% 22%, #a6e8ba 0%, transparent 45%),
     linear-gradient(155deg, #3fa860 0%, #14421f 100%);
+  border-color: #0c2814;
 }
 .card-token.token-black {
   background:
     radial-gradient(circle at 35% 22%, #7a7a7a 0%, transparent 45%),
     linear-gradient(155deg, #2c2c2c 0%, #050505 100%);
+  border-color: #6a6a6a;
 }
 
 /* A chip tray (direct user correction: "stacked chips should be in

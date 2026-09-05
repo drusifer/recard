@@ -638,6 +638,17 @@ function wireCardDrag(wrapper, card, pileableActions, piles, pileView, options) 
   wrapper.draggable = true;
   wrapper.addEventListener('dragstart', (event) => {
     event.dataTransfer.setData('text/plain', card.id);
+    // *nit (direct user report: "the tokens have a drag and drop shape
+    // of a card"): `wrapper` (`.middle-card`, a plain flex box with no
+    // shape of its own) is what `draggable` is set on, not the visual
+    // `.card` child - so the browser's DEFAULT drag image is a snapshot
+    // of the WRAPPER's own rectangular box, ignoring whatever shape the
+    // child actually paints (a token's clip-path gem). Pointing
+    // `setDragImage` at the real face directly is what makes the
+    // dragged image match what's actually on screen, for every card
+    // shape, not just rectangular ones.
+    const face = wrapper.querySelector('.card');
+    if (face) event.dataTransfer.setDragImage(face, face.offsetWidth / 2, face.offsetHeight / 2);
     highlightDragTargets(
       pileableActions.filter((a) => ['move', 'pickup'].includes(a)),
       piles,

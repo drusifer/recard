@@ -5,7 +5,6 @@ import { createInitialState, pilesOf, reduce } from '../src/state.js';
 import { PRESETS } from '../src/presets.js';
 import { ChipPile } from '../src/piles/ChipPile.js';
 import { TokenPile } from '../src/piles/TokenPile.js';
-import { PILE_TYPES } from '../src/piles/pileTypes.js';
 
 /**
  * Sprint pileObjects, Phase 102 (US-105). A chip supply is a DECK_TYPE,
@@ -123,27 +122,31 @@ test('a declared pile with no spread is untouched - undefined, so its type defau
   assert.equal(pilesOf(state).find((pile) => pile.id === 'plain-one').spread, undefined);
 });
 
-// UPDATED by US-112 ("token piles have a lot of the same issues as the
-// CardPiles did... push some of that up"): a token supply no longer
-// declares its own spread override either - it has its own `TokenPile`
-// kind now (`GroupedPile`, shared with `ChipPile`), whose
-// `defaultSpread` stacks it the same way a chip tray's does. Neither
-// chip nor token supplies repeat this per-preset any more; it's a
-// property of the KIND.
-test('every supply stacks - by the KIND\'s own defaultSpread, never a per-preset override', () => {
+// A chip supply never declares its own spread override - `ChipPile`'s
+// own `defaultSpread` (`GroupedPile`) stacks it, a property of the
+// KIND rather than something every preset repeats.
+test('every chip supply stacks via its own kind\'s defaultSpread, never a per-preset override', () => {
   for (const preset of PRESETS) {
-    const supplies = preset.piles?.filter((pile) => pile.deckType === 'chips') ?? [];
+    const supplies = preset.piles?.filter((pile) => pile.deckType === 'chips' && pile.kind === 'chip') ?? [];
     for (const pile of supplies) {
       assert.equal(pile.spread, undefined, `${preset.name}/${pile.name} should not need its own spread override any more`);
-      const spread = PILE_TYPES[pile.kind]?.defaultSpread;
-      assert.ok(spread > 0.5, `${preset.name}/${pile.name} should stack (kind ${pile.kind}, defaultSpread ${spread})`);
+      assert.ok(ChipPile.defaultSpread > 0.5, `${preset.name}/${pile.name} should stack (defaultSpread ${ChipPile.defaultSpread})`);
     }
   }
 });
 
-test('ChipPile and TokenPile share the exact same stacking spread, via GroupedPile', () => {
-  assert.equal(ChipPile.defaultSpread, TokenPile.defaultSpread);
-  assert.equal(ChipPile.maxSpread, TokenPile.maxSpread);
+// REVERSED by direct user correction, follow-up *nit ("instead of a
+// stack it can be just a pile"): a token supply is an ordinary `Pile`
+// now, not `GroupedPile` - no stacking spread, no per-preset override
+// needed either way.
+test('a token supply is a plain pile - no stacking spread of its own', () => {
+  assert.equal(TokenPile.defaultSpread, 0);
+  for (const preset of PRESETS) {
+    const supplies = preset.piles?.filter((pile) => pile.kind === 'token') ?? [];
+    for (const pile of supplies) {
+      assert.equal(pile.spread, undefined, `${preset.name}/${pile.name} should not need a spread override`);
+    }
+  }
 });
 
 
