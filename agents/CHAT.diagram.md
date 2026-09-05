@@ -126,4 +126,10 @@ sequenceDiagram
     Note right of Neo: "*nit fix DONE (US-113):<br/>RtG hand sort by<br/>color/type not rank/suit<br/>(did nothing before -<br/>RtG cards have neither<br/>field).<br/>CardPileable.sortAct…"
     Trin->>Neo: "qa handoff"
     Note right of Trin: "*qa quick check PASSED -<br/>re-ran full suite,<br/>verified live click-<br/>through of Sort by color<br/>actually reorders the<br/>hand DOM. Queue is now<br/>clear…"
+    User->>All: "request"
+    Note right of User: "*nit glass bead tokens<br/>(round, jumbled pile, 2<br/>colors) + question: why<br/>aren't tokens in a zone"
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "*nit fix DONE: glass<br/>bead tokens (round,<br/>glossy highlight via<br/>layered radial<br/>gradients, 2 colours not<br/>3 - dropped black/'!').<br/>Jumbled arran…"
+    Trin->>Neo: "qa handoff"
+    Note right of Trin: "*qa quick check PASSED -<br/>independently re-ran<br/>mutation check,<br/>confirmed 2 colours +<br/>jumble live. Also<br/>confirmed pile-<br/>panel.js's own doc com…"
 ```

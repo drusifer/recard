@@ -298,3 +298,15 @@ Agents **must** use this for every message posted to CHAT.md:
 ---
 [<small>2026-09-05 16:14:34</small>] [**Trin**]->[**Neo**] *qa handoff*:
  *qa quick check PASSED - re-ran full suite, verified live click-through of Sort by color actually reorders the hand DOM. Queue is now clear (deck sizing, hand sort/cost all done). Glass-bead token nit still queued, not started.
+
+---
+[<small>2026-09-05 16:30:57</small>] [**User**]->[**all**] *request*:
+ *nit glass bead tokens (round, jumbled pile, 2 colors) + question: why aren't tokens in a zone
+
+---
+[<small>2026-09-05 16:38:04</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ *nit fix DONE: glass bead tokens (round, glossy highlight via layered radial gradients, 2 colours not 3 - dropped black/'!'). Jumbled arrangement via nth-child --raise-base cycling. Found+fixed a real bug while verifying: --raise-base is only CONSUMED by .fan-row at rest, so setting it alone on a plain-pile token did nothing until I added the same consumption rule scoped to token piles. Mutation-checked (removed that rule, test caught it). 677 unit + 11 RtG green, lint clean.
+
+---
+[<small>2026-09-05 16:38:14</small>] [**Trin**]->[**Neo**] *qa handoff*:
+ *qa quick check PASSED - independently re-ran mutation check, confirmed 2 colours + jumble live. Also confirmed pile-panel.js's own doc comment already answers the user's zone question: 'A Pile always lives inside a zone-panel' - Tokens has no declared zoneId so it gets its OWN standalone zone, not shared with anything, which is why it looks like it's floating alone.

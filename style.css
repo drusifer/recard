@@ -454,58 +454,84 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .card-chip.chip-black { background: #2b2b2b; border-color: #101010; }
 .card-chip.chip-white { background: #ececec; border-color: #a8a8a8; }
 
-/* A token is a GEM - *nit (direct user request): "tokens should look
-   like gems. they don't need denominations". Reverses the original
-   "marked disc" design: no printed content at all now
-   (`TokenPileable.render` is a no-op), colour alone is the whole
-   identity, the same shape chips had before "make change" needed a
-   visible value on top of colour. An angular faceted silhouette
-   (`clip-path`) reads as a cut stone at a glance - distinct from both a
-   card (rectangular) and a chip (a plain circular disc), so the three
-   stay tellable apart by SHAPE, not just colour. */
-/* *nit (direct user request): "make the gems smaller... they need an
-   outline or something". Shrunk from a full card-height square (same
-   footprint as a chip) to ~60% of it - a gem is a small accent piece,
-   not another card-sized object on the table. `border` still paints
-   (and is itself clipped to the same facet silhouette, same as any
-   other box - clip-path clips the border box, not just the fill) so
-   the gem reads as a real cut edge against the felt instead of the
-   flat colour blending into the dark background it originally had no
-   outline to separate from. */
+/* A token is a magical glass BEAD - *nit (direct user request):
+   "tokens should look like magical glass beads. make them round"
+   (following up "they don't need denominations" / "make the gems
+   smaller"). Reverses the faceted-gem design: a real bead is round,
+   not cut, so `border-radius: 50%` replaces the earlier `clip-path`
+   polygon outright. Colour alone is still the whole identity - no
+   printed content (`TokenPileable.render` is a no-op) - and a token
+   stays tellable apart from both a card (rectangular) and a chip (also
+   round, but flat-coloured and dashed-bordered, see `.card-chip` above)
+   by its glassy, glowing finish rather than by shape alone. */
 .card.card-token {
   min-width: calc(var(--card-h) * 0.6);
   width: calc(var(--card-h) * 0.6);
   min-height: calc(var(--card-h) * 0.6);
   padding: 0;
-  border-width: 2px;
+  border-width: 1px;
   border-style: solid;
-  clip-path: polygon(50% 0%, 85% 18%, 100% 55%, 74% 100%, 26% 100%, 0% 55%, 15% 18%);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  border-radius: 50%;
+  /* Outer drop shadow (sits on the table like any other piece) plus an
+     INSET pair - a bright rim catching light at the top edge, a dark
+     rim receding at the bottom - which is what actually reads as
+     "glass", not just "a coloured circle". A flat fill never gets that
+     without a real 3D highlight system on top of it. */
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.5),
+    inset 0 1px 2px rgba(255, 255, 255, 0.55),
+    inset 0 -3px 4px rgba(0, 0, 0, 0.4);
 }
 
-/* Two gradients, not one: a diagonal base (the stone's own colour,
-   darker toward the lower-right facet) plus a small radial highlight
-   (the facet catching light, upper-left) - one flat fill read as a
-   coloured tile, not a cut gem. No extra DOM needed for the highlight
-   since `render()` no longer adds any child content to layer it on. */
+/* Three layers, not one flat fill: a tiny sharp SPECULAR glint (the
+   single bright point a real curved glass surface catches), a broader
+   soft highlight beneath it (light actually passing through the glass,
+   not just bouncing off it - what makes it read as translucent rather
+   than opaque and shiny), and the base colour as a radial gradient of
+   its own (glass is never one flat shade - it's palest at the "thin"
+   edge nearest the light and deepens toward the far side). */
 .card-token.token-red {
   background:
-    radial-gradient(circle at 35% 22%, #ff9c8c 0%, transparent 45%),
-    linear-gradient(155deg, #d1483a 0%, #7a1f16 100%);
-  border-color: #4a120c;
+    radial-gradient(circle at 32% 24%, #fff 0%, transparent 8%),
+    radial-gradient(circle at 38% 30%, #ffb3a3 0%, transparent 40%),
+    radial-gradient(circle at 55% 60%, #e8574a 0%, #7a1f16 85%);
+  border-color: rgba(255, 180, 160, 0.4);
 }
 .card-token.token-green {
   background:
-    radial-gradient(circle at 35% 22%, #a6e8ba 0%, transparent 45%),
-    linear-gradient(155deg, #3fa860 0%, #14421f 100%);
-  border-color: #0c2814;
+    radial-gradient(circle at 32% 24%, #fff 0%, transparent 8%),
+    radial-gradient(circle at 38% 30%, #b8f0c8 0%, transparent 40%),
+    radial-gradient(circle at 55% 60%, #4fb873 0%, #14421f 85%);
+  border-color: rgba(180, 240, 200, 0.4);
 }
-.card-token.token-black {
-  background:
-    radial-gradient(circle at 35% 22%, #7a7a7a 0%, transparent 45%),
-    linear-gradient(155deg, #2c2c2c 0%, #050505 100%);
-  border-color: #6a6a6a;
+
+/* *nit (direct user request, "jumble them up in a pile"): a scattered
+   handful of beads, not a neat aligned row - each position gets a
+   small fixed rotate+drift via `--raise-base` (the SAME composable
+   base transform `.fan-row`'s per-card rotation already uses, so
+   hover-raise still adds cleanly on top instead of replacing this).
+   `nth-child` cycling rather than a real per-card random value: fully
+   deterministic (same look every render, no test flakiness / no
+   layout jitter on re-render) while still reading as scattered rather
+   than mechanically repeating - 7 steps so a run of same-colour beads
+   never lands on the exact same offset twice in a row. */
+/* `--raise-base` is only CONSUMED by `.fan-row .middle-card` at rest
+   (below) - setting the custom property alone (the nth-child rules
+   under this one) does nothing outside a fan, since a plain `.card-row`
+   never reads it. Same pattern, scoped to a token pile specifically -
+   found live: the jumble offsets were computing correctly (confirmed
+   via `getComputedStyle`) but never painting, because nothing told a
+   plain row to apply them. */
+.pile-section[data-kind="token"] .middle-card {
+  transform: var(--raise-base, none);
 }
+.pile-section[data-kind="token"] .middle-card:nth-child(7n+1) { --raise-base: rotate(-9deg) translate(-2px, 1px); }
+.pile-section[data-kind="token"] .middle-card:nth-child(7n+2) { --raise-base: rotate(6deg) translate(2px, -2px); }
+.pile-section[data-kind="token"] .middle-card:nth-child(7n+3) { --raise-base: rotate(-4deg) translate(1px, 2px); }
+.pile-section[data-kind="token"] .middle-card:nth-child(7n+4) { --raise-base: rotate(11deg) translate(-1px, -1px); }
+.pile-section[data-kind="token"] .middle-card:nth-child(7n+5) { --raise-base: rotate(-13deg) translate(2px, 1px); }
+.pile-section[data-kind="token"] .middle-card:nth-child(7n+6) { --raise-base: rotate(3deg) translate(-2px, -1px); }
+.pile-section[data-kind="token"] .middle-card:nth-child(7n+7) { --raise-base: rotate(-6deg) translate(1px, 2px); }
 
 /* A chip tray (direct user correction: "stacked chips should be in
    separate piles by denomination. currently you are drawing them in an

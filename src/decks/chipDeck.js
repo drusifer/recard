@@ -42,19 +42,24 @@ const CHIP_SETS = {
   ],
 };
 
-/** A token is a gem - a palette, not a value scale, same reasoning as
- * `CHIP_SETS` above. *nit (direct user request): "tokens should look
- * like gems. they don't need denominations" - reverses the earlier
- * design (a token as a MARKED disc, distinguished by a printed label
- * like a chip's own denomination) in favour of colour alone, matching
- * how a chip was allowed to read before "make change" needed a visible
+/** A token is a glass bead - a palette, not a value scale, same
+ * reasoning as `CHIP_SETS` above. *nit (direct user request): "tokens
+ * should look like magical glass beads. make them round" (following up
+ * "they don't need denominations") - reverses the earlier design (a
+ * token as a MARKED disc, distinguished by a printed label like a
+ * chip's own denomination) in favour of colour alone, matching how a
+ * chip was allowed to read before "make change" needed a visible
  * value. Nothing increments or orders these - `TokenPileable.sortActions`
- * stays empty, which is what enforces it. */
+ * stays empty, which is what enforces it.
+ *
+ * *nit (direct user request): "only 2 colors needed" - green (+1) and
+ * red (-1) are the classic paired MTG counter colours; a third
+ * (previously black, marking "!") wasn't carrying its weight as a
+ * distinct concept and is cut rather than kept unused. */
 const TOKEN_SETS = {
   'standard-tokens': [
     { colour: 'green', count: 8 },
     { colour: 'red', count: 8 },
-    { colour: 'black', count: 4 },
   ],
 };
 

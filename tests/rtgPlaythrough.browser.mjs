@@ -261,6 +261,33 @@ test('the token supply renders as a plain pile, not grouped colour stacks', asyn
   assert.ok(colours > 1, `tokens must still be tellable apart by colour, found ${colours} distinct looks`);
 });
 
+// *nit (direct user request: "do the glass bead nit now and jumble
+// them up in a pile only 2 colors needed"). Round shape, a scattered
+// (not perfectly aligned) arrangement, and exactly 2 colours.
+test('tokens are round glass beads, jumbled (not perfectly aligned), and only 2 colours', async () => {
+  const page = fixture.page;
+  const tokens = page.locator('[data-pile-id="rtg-tokens"] .card-token');
+  const box = await tokens.first().boundingBox();
+  assert.ok(Math.abs(box.width - box.height) < 2, `a bead should be round (square-bounded), got ${box.width}x${box.height}`);
+
+  const colours = await tokens.evaluateAll((elements) => [...new Set(elements.map((element) => element.className))]);
+  assert.equal(colours.length, 2, `expected exactly 2 token colours, got ${colours.length}: ${colours}`);
+
+  // "Jumbled" = not every bead sits at the identical rotation/offset -
+  // asserted via the real computed transform on the WRAPPER (`.middle-
+  // card`, where `--raise-base` is actually consumed - `.card-token`
+  // itself never has a transform of its own), not just that a CSS rule
+  // exists (a rule that never actually applies would still pass a
+  // weaker check). `.fan-row`'s own resting-state consumption of
+  // `--raise-base` doesn't reach a plain `.card-row` by default - this
+  // pile needed its own copy of that rule, found live when the first
+  // draft set the custom property correctly but nothing painted it.
+  const wrappers = page.locator('[data-pile-id="rtg-tokens"] .middle-card');
+  const transforms = await wrappers.evaluateAll((elements) => elements.map((element) => getComputedStyle(element).transform));
+  assert.ok(new Set(transforms).size > 1, `expected varied per-bead transforms, got all identical: ${transforms[0]}`);
+  assert.ok(transforms.every((t) => t !== 'none'), 'every bead should have SOME jumble transform, not the identity');
+});
+
 test('game 1: a token from the shared supply can mark a permanent and be returned', async () => {
   const page = fixture.page;
   const supplyBefore = await page.locator('[data-pile-id="rtg-tokens"] .card-token').count();
