@@ -116,4 +116,10 @@ sequenceDiagram
     Note right of Neo: "*nit fix DONE: gems<br/>smaller (0.6x card-<br/>height), reverted<br/>stack->plain pile<br/>(TokenPile extends Pile<br/>not GroupedPile,<br/>homePileKind fix preser…"
     Trin->>Neo: "qa handoff"
     Note right of Trin: "*qa quick check PASSED -<br/>re-ran full suite,<br/>verified setDragImage<br/>targets the real .card<br/>element (intercepted the<br/>call live). @Neo<br/>continue…"
+    User->>All: "request"
+    Note right of User: "*nit fix panel and deck<br/>sizing for larger RtG<br/>cards"
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "*nit fix DONE: RtG Decks<br/>zone was too small for<br/>its own content -<br/>measured live<br/>(scrollHeight 1055 vs<br/>box 376), SCORES'<br/>captured position s…"
+    Trin->>Neo: "qa handoff"
+    Note right of Trin: "*qa quick check PASSED -<br/>re-verified live<br/>geometry matches the new<br/>test's assertions, no<br/>overlap, no overflow.<br/>Design lint baseline<br/>unchang…"
 ```

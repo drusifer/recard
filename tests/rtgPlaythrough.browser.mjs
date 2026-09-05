@@ -142,6 +142,34 @@ after(async () => {
   await new Promise((resolve) => server.close(resolve));
 });
 
+// *nit (direct user request: "fix panel and deck sizing for the larger
+// rtg cards"): the Decks zone's captured layout box used to be sized
+// for a card width that predates RtG's own wider `.card-rtg` deck
+// backs - real content needed ~1055px of height the box never grew to
+// hold, and SCORES' own captured position sat inside the Decks zone's
+// box regardless. Both confirmed by measuring live bounding rects, not
+// by reading the preset's numbers.
+test('the Decks zone fits every deck panel with no overflow and no overlap with SCORES/STACK/TOKENS', async () => {
+  const page = fixture.page;
+  const isOverlapping = (a, b) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+  const info = await page.evaluate(() => {
+    const rect = (element) => element.getBoundingClientRect();
+    const decks = document.querySelector('zone-panel[data-group-id="rtg-decks"]');
+    return {
+      decksRect: rect(decks).toJSON(),
+      scrollHeight: decks.scrollHeight,
+      clientHeight: decks.clientHeight,
+      scoresRect: rect(document.querySelector('score-zone')).toJSON(),
+      stackRect: rect(document.querySelector('[data-pile-id="stack"]').closest('zone-panel')).toJSON(),
+      tokensRect: rect(document.querySelector('[data-pile-id="rtg-tokens"]').closest('zone-panel')).toJSON(),
+    };
+  });
+  assert.ok(info.scrollHeight <= info.clientHeight + 1, `Decks zone overflows: needs ${info.scrollHeight}px, has ${info.clientHeight}px`);
+  assert.ok(!isOverlapping(info.decksRect, info.scoresRect), 'Decks zone overlaps SCORES');
+  assert.ok(!isOverlapping(info.decksRect, info.stackRect), 'Decks zone overlaps STACK');
+  assert.ok(!isOverlapping(info.decksRect, info.tokensRect), 'Decks zone overlaps TOKENS');
+});
+
 test('game 1: draw an opening hand from a real deck pile', async () => {
   const page = fixture.page;
   const before = await deckCount(page, DECK_ID);

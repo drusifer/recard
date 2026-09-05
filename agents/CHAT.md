@@ -278,3 +278,15 @@ Agents **must** use this for every message posted to CHAT.md:
 ---
 [<small>2026-09-05 15:53:46</small>] [**Trin**]->[**Neo**] *qa handoff*:
  *qa quick check PASSED - re-ran full suite, verified setDragImage targets the real .card element (intercepted the call live). @Neo continue queue: panel/deck sizing for wider RtG cards, then hand sort by colour+type.
+
+---
+[<small>2026-09-05 15:54:11</small>] [**User**]->[**all**] *request*:
+ *nit fix panel and deck sizing for larger RtG cards
+
+---
+[<small>2026-09-05 16:03:22</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ *nit fix DONE: RtG Decks zone was too small for its own content - measured live (scrollHeight 1055 vs box 376), SCORES' captured position sat inside the Decks zone regardless. Root cause: RtG deck backs use .card-rtg's wider size, only 2 fit/row not 4. Re-measured empirically until scrollHeight===clientHeight: 1400x570 fits all 15 in 4 cols, 0 overflow. New regression test. 9 RtG + 673 unit green, lint clean.
+
+---
+[<small>2026-09-05 16:03:32</small>] [**Trin**]->[**Neo**] *qa handoff*:
+ *qa quick check PASSED - re-verified live geometry matches the new test's assertions, no overlap, no overflow. Design lint baseline unchanged. @Neo continue queue: hand sort by colour+type, cost to upper-left.

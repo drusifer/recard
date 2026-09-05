@@ -392,25 +392,35 @@ export const PRESETS = [
     // condition C3. Grouping all fifteen table decks into one "Decks"
     // Zone (below) collapses that into a single panel; still worth a
     // real UX pass on the table as a whole.
-    // Direct user request: captured from an actual arranged table
-    // (devtools -> `recard:panel-layout:v1`) rather than calibrated
-    // like the rows above - kept verbatim, same convention as the War
-    // preset's captured layout. `stack` isn't in the captured set, so
-    // it keeps its prior calibrated position. The individual decks used
-    // to be separately-positioned panels here; now that they're one
-    // Zone (`RTG_DECKS_ZONE_ID`, see `zones` above) they get one panel
-    // entry, sized to the bounding box the captured per-deck positions
-    // covered. No `table-zone` entry - `tableZone: false` above means
-    // nothing ever renders there.
+    //
+    // *nit (direct user request, "fix panel and deck sizing for the
+    // larger rtg cards"): the Decks zone's box was captured back when
+    // 15 deck-stack panels fit in 2 columns/376px tall - a face-down
+    // RtG deck also renders its `.card-rtg` back at RtG's wider card
+    // size (D76), which grows every deck panel wide enough that only 2
+    // fit per row, needing ~1055px of real content height the box never
+    // grew to hold. `overflow-y: auto` (`wirePanelLayout`) hid the
+    // symptom as a scrollbar rather than visible clipping, but SCORES'
+    // own captured position (`x:590`) sat WELL INSIDE the Decks zone's
+    // own box either way - a real, visible overlap, confirmed by
+    // measuring both elements' live bounding rects, not by eyeballing a
+    // screenshot. Re-measured empirically (grew the zone step by step
+    // in a live browser until `scrollHeight === clientHeight`): 1400px
+    // wide fits 4 panels per row without adding a useless 5th column
+    // (going wider never reduced the row count further), and 570px
+    // tall is exactly enough for the resulting 4 rows. SCORES/STACK/
+    // TOKENS moved to a column starting at x:1460, clear of the wider
+    // Decks zone. No `table-zone` entry - `tableZone: false` above
+    // means nothing ever renders there.
     layout: {
-      score: { x: 590.3828125, y: 230.00390625, w: 250, h: 120 },
-      [RTG_DECKS_ZONE_ID]: { x: 30, y: 16, w: 782, h: 376 },
-      stack: { x: 850, y: 186, w: 250, h: 130 },
+      score: { x: 1460, y: 16, w: 250, h: 120 },
+      [RTG_DECKS_ZONE_ID]: { x: 30, y: 16, w: 1400, h: 570 },
+      stack: { x: 1460, y: 156, w: 250, h: 130 },
       // Placed explicitly rather than left to land wherever: Smith's
       // Gate-1 condition C3 on the RtG sprint was that this is already
       // the most crowded table the app builds. Sits under the stack,
       // in the same right-hand column, clear of the Decks zone.
-      'rtg-tokens': { x: 850, y: 330, w: 250, h: 120 },
+      'rtg-tokens': { x: 1460, y: 306, w: 250, h: 120 },
     },
   },
 ];
