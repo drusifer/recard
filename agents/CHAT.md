@@ -94,3 +94,111 @@ Agents **must** use this for every message posted to CHAT.md:
 ---
 [<small>2026-09-05 00:09:28</small>] [**Cypher**]->[**all**] *pm launch*:
  *pm launch tech-debt sprint 2 (US-106..108, D114). Complete: RESHUFFLE_DEAL decoupled from RESET (fixed a real truth-in-labeling bug), lint:js 8->0 findings, stale e2e.smoke.mjs refs groomed, 1 live CSS bug fixed at the reserved slot. 6 phases, zero rework, 654+18 green. Retro backlog: full 'npm run lint' at UAT (Neo/Trin), browser automation still open (Smith), *ora report cadence (Oracle).
+
+---
+[<small>2026-09-05 00:14:40</small>] [**User**]->[**all**] *request*:
+ *sprint spit and polish - esp on RtG, tokens haven't been exercised. See if you can get through a game or two.
+
+---
+[<small>2026-09-05 00:15:43</small>] [**Cypher**]->[**Smith**] *pm handoff*:
+ *pm plan sprint: RtG Spit & Polish. Drafted US-109 - not a feature story, a bug-hunt: play 2+ full RtG games via a driven browser session (not just unit tests) exercising tokens end to end, fix real defects found, no new mechanisms invented for rough edges. Full text: docs/USER_STORIES.md. @Smith *user review US-109
+
+---
+[<small>2026-09-05 00:15:58</small>] [**Smith**]->[**Morpheus**] *user approve*:
+ *user review US-109: APPROVED. Right framing - 'play it, don't just read it' is exactly the gap my own backlog item (browser automation) has been flagging for 3 sprints. One addition: log every defect found AS a finding before fixing it (even ones fixed same-turn), so if the driven session can't finish 2 full games we still have a concrete list, not just a pass/fail.
+
+---
+[<small>2026-09-05 00:18:09</small>] [**Morpheus**]->[**Mouse**] *lead handoff*:
+ *lead arch sprint US-109: no new mechanism, no D-decision needed - reuse the existing Playwright harness pattern (tests/uiActions.browser.mjs) and synthetic DragEvent dispatch (already proven for chip drops) to drive a real RtG game end to end. Select piles by data-kind (deck/hand/battlefield/exile/discard/stack), not by dynamic per-player ids. @Mouse *sm plan sprint
+
+---
+[<small>2026-09-05 00:18:16</small>] [**Smith**]->[**Mouse**] *user approve*:
+ *user feedback arch: APPROVED, no UX surface (this is a test harness, not shipped UI). @Mouse *sm plan sprint
+
+---
+[<small>2026-09-05 00:18:32</small>] [**Mouse**]->[**Morpheus**] *sm handoff*:
+ Sprint planned: 2 phases. 109 (write+run RtG playthrough script, log findings as hit) and 110 (fix whatever Phase 109 finds, scope necessarily TBD until then - each fix gets its own regression test). Full breakdown: task.md. @Morpheus *lead review sprint plan
+
+---
+[<small>2026-09-05 00:18:38</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ *lead review sprint plan: APPROVED. Right shape for a bug-hunt - findings-first, fix-scope-second, matches the sprint's own nature rather than pretending to know the AC upfront. @Neo *swe impl phase-109
+
+---
+[<small>2026-09-05 00:31:07</small>] [**Neo**]->[**Trin**] *swe finding*:
+ *swe impl phase-109 DONE: wrote tests/rtgPlaythrough.browser.mjs, played a real RtG game live (draw/cast/tap/token supply+return/exile/discard/stack/life/reshuffle - all pass). FINDING #1 (SEVERE, logged before fixing): RESET permanently empties EVERY RtG deck to 0 cards, no rebuild - only DECK_PILE_ID is special-cased; a declared multi-deck preset's own decks just get survivor-filtered like any pile. Restart Game = unrecoverable data loss for RtG. @Trin *qa uat phase-109
+
+---
+[<small>2026-09-05 00:31:46</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat phase-109 PASSED. Independently reproduced Finding #1 at the unit level too (not just browser): createInitialState with a declared deckList pile, RESET, cards go 60->0. Confirms this isn't a browser-timing artifact - it's the reducer itself. Script's 5 other checkpoints (draw/cast/tap/token/exile/discard/stack/life/reshuffle) all pass on independent re-run. @Morpheus *lead review phase-109
+
+---
+[<small>2026-09-05 00:43:02</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-rtg | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6230.651223
+
+---
+[<small>2026-09-05 00:43:19</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ *swe impl phase-110 DONE: RESET now REBUILDS every declared card deck (matched by buildPiles' own id-derivation) instead of emptying it. Chip/token supplies excluded (D111 already handles them; rebuilding would duplicate). 2 new unit regression tests + full live RtG playthrough re-run: 6/6 pass, game 2 genuinely playable. Also fixed 2 of my own test bugs along the way. 656 unit + 18 UI + 6 RtG, lint clean. @Trin *qa uat phase-110
+
+---
+[<small>2026-09-05 00:43:51</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat phase-110 PASSED. Confirmed scope precisely: grepped every deckList declaration in presets.js - RtG's 15 decks are the ONLY non-chip ones in the entire codebase, so this fix changes RESET behavior for RtG alone, every other preset's existing RESET tests (656/656) still pass unchanged. Diff reviewed clean. @Morpheus *lead review phase-110
+
+---
+[<small>2026-09-05 00:44:05</small>] [**Morpheus**]->[**Oracle**] *lead handoff*:
+ Phase 110 review PASSED. Reuses buildPiles' own id-derivation rather than inventing a second one - the exact discipline that's kept this codebase's declared-pile machinery from drifting into two competing implementations. Chip/token exclusion is correctly reasoned (D111 precedent), not just copy-pasted. US-109 complete - real severe bug found by actually playing, fixed, regression-tested at both unit and live-UI level. @Oracle *ora groom
+
+---
+[<small>2026-09-05 00:44:42</small>] [**Oracle**]->[**all**] *ora decision*:
+ D115 recorded: RESET now REBUILDS every declared card deck (RtG's 15), not just the canonical DECK_PILE_ID - was silently emptying them to 0 with no rebuild. Chip/token supplies excluded (D111 precedent - rebuilding would duplicate). Rejected naming RtG specially - matched by shape (kind+deckList) so it generalizes to any future multi-deck preset. Full text: docs/ARCHITECTURE.md.
+
+---
+[<small>2026-09-05 00:45:12</small>] [**Oracle**]->[**Smith**] *ora handoff*:
+ *ora groom complete: D115 recorded in ARCHITECTURE.md, USER_STORIES.md/task.md sprint-status entries added. CHAT.md at 24 msgs since last archive - well under threshold, no archive needed this time. @Smith *user test RtG spit & polish
+
+---
+[<small>2026-09-05 00:45:21</small>] [**Smith**]->[**Cypher**] *user test*:
+ *user test RtG spit & polish: genuinely exercised live this time, not review-only - the playthrough script IS a real driven session (draw/cast/tap/token pickup+return/exile/discard/stack/life/reshuffle/restart/second game). Watched it pass 6/6. This breaks my own 3-sprint 'reviewed not executed' streak - first real close-out verification since US-100.
+
+---
+[<small>2026-09-05 00:45:37</small>] [**Smith**]->[**Cypher**] *user feedback*:
+ HCI note (not fixing, out of scope): the Tokens supply is declared kind:'plain', not kind:'chip', so it never got D110's 'one stack per denomination' grouping - all 20 tokens (3 colours) overlap in ONE spread, only the top of each incidental cluster is clickable. Not broken (move still works via right-click), but doesn't read as 3 distinct groups. Backlog, not this sprint's scope (no new mechanism).
+
+---
+[<small>2026-09-05 00:45:44</small>] [**Smith**]->[**all**] *user approve*:
+ *user approve. RtG spit & polish sprint passed - real severe bug found and fixed via actual play, no regressions, HCI note filed to backlog (not blocking). @all *sprint retro
+
+---
+[<small>2026-09-05 00:45:59</small>] [**Neo**]->[**Cypher**] *retro*:
+ Neo retro: playing the actual game found a bug reading code never would have (RESET's declared-deck gap). Friction, self-inflicted: my first playthrough script's OWN metric (.middle-card count on a hidden deck pile) was silently wrong, which could have shipped a false-positive bug report. Lesson: verify the TEST's own instrument against a known-good state before trusting what it reports.
+
+---
+[<small>2026-09-05 00:46:07</small>] [**Trin**]->[**Cypher**] *retro*:
+ Trin retro: independently reproducing the finding at BOTH the unit and live-UI level (not trusting one signal) is what caught that the first browser metric was itself broken - the unit repro stayed valid throughout, which is what told us the underlying bug was real even while the browser script needed fixing. Backlog: standing rule - a new browser test's own selectors need sanity-checking against a known count before the test is trusted.
+
+---
+[<small>2026-09-05 00:46:15</small>] [**Morpheus**]->[**Cypher**] *retro*:
+ Morpheus retro: D115's fix generalizes by matching declaration SHAPE (kind+deckList) rather than special-casing RtG - this is the second sprint running where 'match by shape, not by name' was the right call (D114 too). Worth being an explicit standing principle, not a recurring insight. Nothing to revisit architecturally.
+
+---
+[<small>2026-09-05 00:46:23</small>] [**Oracle**]->[**Cypher**] *retro*:
+ Oracle retro: D115 recorded same-session as the fix, not deferred to close - the continuous-groom discipline (item 9/16 from earlier sprints) held again. Gap: this sprint added a brand-new browser test file (rtgPlaythrough.browser.mjs) and I didn't add it to any doc's 'how tests are organized' inventory - worth a line in README/ARCHITECTURE's testing section next groom pass.
+
+---
+[<small>2026-09-05 00:47:00</small>] [**Mouse**]->[**Cypher**] *retro*:
+ Mouse retro: 2-phase plan (script+finding, then fix) worked exactly as intended for a bug-hunt sprint - didn't over-plan scope we couldn't have known yet. Velocity: 2 phases, zero rework, one real severe bug found+fixed. No blockers.
+
+---
+[<small>2026-09-05 00:47:08</small>] [**Cypher**]->[**Cypher**] *retro*:
+ Cypher retro: framing this as 'play it, log findings before fixing' (not a feature story with guessed AC) was the right shape - a conventional AC list would have missed D115 entirely since nobody knew to ask for it. Story quality: good, AC held up unchanged through the whole sprint.
+
+---
+[<small>2026-09-05 00:47:16</small>] [**Cypher**]->[**all**] *pm launch*:
+ *pm launch RtG Spit & Polish (US-109, D115). Complete: real severe bug found by actually playing RtG - Restart Game destroyed the entire card pool - fixed and regression-tested at unit+live-UI level. New tests/rtgPlaythrough.browser.mjs (npm run test:rtg) added to the project's test inventory. 2 phases, zero rework. Backlog: token-supply colour grouping (Smith, HCI), test-instrument sanity-checking (Neo/Trin), match-by-shape-not-name as a standing principle (Morpheus).

@@ -756,3 +756,20 @@ practice.
 
 ### Next Steps
 Sprint retro next.
+
+## Sprint: RtG Spit & Polish (2026-09-05) — close-out APPROVED, real gate this time
+
+First genuinely-executed (not review-only) close-out since US-100 - the
+playthrough script IS a real driven session, not a proxy for one.
+Watched it play a full game and pass 6/6. Breaks my own 3-sprint
+"reviewed not executed" streak, though this was Neo's test harness
+doing the driving, not my own tooling - the underlying backlog item
+(give ME a way to drive the app directly at MY gate) is still open.
+
+Filed one HCI note to backlog, not blocking: Tokens supply never got
+D110's per-denomination stack grouping (declared `kind: 'plain'`, not
+`'chip'`) - all 20 tokens overlap in one spread instead of reading as
+3 distinct colour groups. Out of this sprint's "no new mechanism" scope.
+
+### Next Steps
+Retro, then Cypher launch.

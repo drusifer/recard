@@ -593,3 +593,83 @@ US-108 (stale reference groom), plus this reserved-slot fix.
 ### Next Steps
 Handing to Trin for final UAT, then Morpheus's last review, then
 Oracle's groom (Stage 3 close).
+
+## Sprint: RtG Spit & Polish (2026-09-05) — Phase 109 DONE
+
+Wrote `tests/rtgPlaythrough.browser.mjs` (port 8213, follows
+`uiActions.browser.mjs`'s shared-page convention). Played a full RtG
+game live via the click-to-target flow (right-click -> Move -> click a
+lit `.pile-target`, D101) - no synthetic DragEvents needed for ordinary
+moves, only for the empty-zone-space case (unused here).
+
+**Harness quirks found and worked around (NOT app bugs, noted for the
+record)**:
+- `.pile-hover-host:hover`'s CSS raise transform made Playwright's
+  click-stability check spin for the full 30s timeout on cards/tokens -
+  `{ force: true }` on the right-click resolves it. A real user's mouse
+  doesn't retrigger this the way Playwright's actionability polling
+  does; not treating this as a defect.
+- My own test bug: `hasText: '-1'`/`'+1'` substring-matched `-10`/`+10`
+  too, and DOM order (ScoreZone.js) puts the `±10` buttons first -
+  fixed with exact-match regexes.
+- Overlapping pile items only leave the LAST DOM sibling clickable -
+  same fact `uiActions.browser.mjs`'s own `handCard()` comment already
+  documents; used `.last()` for tokens too.
+
+**FINDING #1 (SEVERE) - RESET destroys RtG's entire card pool,
+irrecoverably.** `state.js`'s `RESET` only ever rebuilds the ONE
+canonical `DECK_PILE_ID` pile (`hasTableZone` gate). RtG opts out of
+`tableZone` entirely and declares its own 15 real decks as ordinary
+`kind: 'deck'` piles via `GameConfig.piles` - each one is still
+`pilesOf(state)`-visible and gets `survivorsOfReset` filtering like any
+other table-side pile, which strips every card (cards never survive a
+reset) with nothing to rebuild them. Confirmed live: drew, restarted,
+deck pile count went from >0 to 0 and never recovers - the "second
+game" the user asked to play through is currently IMPOSSIBLE to start
+via Restart Game. `RESHUFFLE_DEAL`/reshuffle-per-deck (D114, this
+session's earlier sprint) is unaffected - it doesn't go through RESET.
+
+5/6 script tests pass; the one failure IS this bug, caught by actually
+playing rather than reading code.
+
+### Next Steps
+Phase 110: fix the RESET/declared-deck rebuild gap, with a regression
+test, then re-run the full playthrough script to confirm "game 2" is
+actually playable.
+
+## Sprint: RtG Spit & Polish (2026-09-05) — Phase 110 DONE
+
+Fixed Finding #1 (`state.js`): added `declaredCardDeckDeclarations` (a
+`GameConfig.piles` -> id map, using the exact same id-derivation
+`buildPiles` uses so a lookup by a live pile's id finds the declaration
+that built it) and wired it into `RESET` - a pile whose declaration has
+a real `deckList` gets REBUILT via `applyDeclaration`, everything else
+keeps the old survivor-filter behavior unchanged. Explicitly excluded
+`deckType: 'chips'` declarations (chip/token supplies) - they already
+survive via D111's `survivesReset`, and rebuilding would spawn a
+duplicate fresh set alongside pieces already in play elsewhere.
+
+**Methodology note, worth remembering**: my FIRST version of the
+browser playthrough script "confirmed" this bug using `.middle-card`
+element counts under the deck's own pile-section - which is ALWAYS 0
+for a deck, since `DeckPile` is hidden and renders through
+`<deck-stack>` (depth layers + one real card), never one `.middle-card`
+per card (D113). The finding itself was still real (independently
+confirmed at the unit/reducer level, unaffected by this), but the
+browser script needed fixing to read the pile's `.pile-count-badge`
+text instead - now it does, and actually proves the fix works through
+the real UI, not just the reducer.
+
+Also, while re-running the full playthrough after the fix, my
+"Reshuffle & deal doesn't touch the battlefield" assertion started
+failing - turned out to be MY test's wrong assumption, not a bug:
+D114's own spec (the user's exact words, prior sprint) is "putting ALL
+cards back in their original deck" REGARDLESS of where they currently
+sit, so recalling battlefield cards on reshuffle is correct, intended
+behavior. Fixed the test's expectation instead of the app.
+
+656 unit (654 + 2 new RESET regression tests) + 18 UI + 6/6 RtG
+playthrough green. `npm run lint:js`/`lint:style` clean.
+
+### Next Steps
+Handing to Trin for UAT, then Oracle groom/Smith close-out.

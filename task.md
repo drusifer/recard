@@ -1679,3 +1679,33 @@ reserved bug-fix slot, standing convention since it started paying off.
 - [ ] **Phase 108** — Reserved bug-fix slot
       - Standing convention: catches whatever Trin/Smith find at UAT/
         close-out that doesn't warrant reopening an earlier phase.
+
+---
+
+## Sprint: RtG Spit & Polish (2026-09-05) — US-109
+
+Bug-hunt sprint, not feature work. Phase 109 is the harness + first
+full playthrough (findings logged as they're hit, per Smith's Gate 1
+condition); Phase 110 fixes whatever real defects Phase 109 found, with
+a regression test per fix. Phase 110's scope is necessarily written
+after Phase 109's findings are in, matching the sprint's own nature.
+
+- [ ] **Phase 109** — Write and run an RtG playthrough script
+      - T109.1 `tests/rtgPlaythrough.browser.mjs`: boot host (solo
+        play, US-17), pick RtG preset, draw from a real deck pile,
+        cast to battlefield, tap (rotate), move a token from the
+        shared Tokens supply onto the battlefield and back, use
+        exile/discard, use the shared stack pile, adjust life/score -
+        twice (2 full "games", second via Restart game per D114).
+      - Log every real defect hit as a numbered finding in CHAT.md
+        BEFORE fixing anything (Smith's Gate 1 condition).
+
+- [ ] **Phase 110** — Fix findings from Phase 109
+      - Scope defined by what Phase 109 actually finds. Each fix ships
+        with its own regression test, same standard as every other bug
+        fix in this project - no new mechanisms invented for a rough
+        edge a player could already route around.
+
+### Sprint status: US-109 COMPLETE (2026-09-05), D115
+Both phases (109-110) done, no rework. Real severe bug found by
+actually playing RtG, not by reading code - see D115.

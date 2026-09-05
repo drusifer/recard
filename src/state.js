@@ -288,6 +288,28 @@ function applyDeclaration(pile, declaration, rng) {
   return declaration.spread === undefined ? stocked : { ...stocked, spread: declaration.spread };
 }
 
+/**
+ * Every `GameConfig.piles` declaration with a real card `deckList`
+ * (i.e. NOT a chip/token supply), keyed by the exact id its built pile
+ * lands at - the same `declaredId ?? configuredZoneId(...)` derivation
+ * `buildPiles` itself uses, so a lookup by a live pile's `id` finds the
+ * declaration that built it. Used by `RESET` (US-109) to tell "a
+ * starting deck that needs rebuilding" apart from "an ordinary declared
+ * pile that just needs its cards survivor-filtered."
+ */
+function declaredCardDeckDeclarations(pileDeclarations) {
+  const byId = new Map();
+  for (const declaration of pileDeclarations) {
+    if (declaration.ownerId === 'perPlayer' || !declaration.deckList) continue;
+    if ((declaration.deckType ?? 'rtg') === 'chips') continue;
+    const count = declaration.count ?? 1;
+    for (let index = 0; index < count; index++) {
+      byId.set(declaration.id ?? configuredZoneId(declaration.kind, index, count), declaration);
+    }
+  }
+  return byId;
+}
+
 function buildPiles(pileDeclarations, zoneRegistry, rng = Math.random) {
   const piles = [];
   let zones = zoneRegistry;
@@ -1833,6 +1855,26 @@ const ACTIONS = {
     // `createInitialState`'s own default for every preset that doesn't
     // set the field.
     const hasTableZone = state.gameConfig.tableZone ?? true;
+    // *fix (US-109, "spit and polish" - found by actually playing RtG,
+    // not by reading the reducer): a `tableZone: false` preset has NO
+    // canonical `DECK_PILE_ID` for the branch above to rebuild - its
+    // own declared decks (RtG's fifteen, `GameConfig.piles`) were the
+    // only starting-deck piles in the game, and the survivor-filter
+    // pass below empties every one of them (cards never survive a
+    // reset) with nothing to ever rebuild them from. Restart Game
+    // permanently destroyed RtG's entire card pool. `declaredDeckLists`
+    // finds every declaration with a real card `deckList` (explicitly
+    // NOT a chip/token one - `applyDeclaration`'s own `deckType`
+    // default is `'rtg'`, so only `deckType: 'chips'` is excluded here,
+    // matching that same default) so those specific piles get REBUILT
+    // via `applyDeclaration`, identically to how they were built at
+    // table creation, instead of merely survivor-filtered like an
+    // ordinary pile. A chip/token supply is excluded on purpose: it
+    // already survives via `survivorsOfReset` below (D111), and
+    // rebuilding it fresh would spawn a brand-new set ALONGSIDE
+    // whatever tokens already wandered onto a battlefield mid-game,
+    // duplicating them.
+    const declaredDeckLists = declaredCardDeckDeclarations(state.gameConfig.piles ?? []);
     return {
       ...state,
       piles: [
@@ -1871,7 +1913,10 @@ const ACTIONS = {
         // this.
         ...pilesOf(state)
           .filter((p) => p.id !== DECK_PILE_ID && p.kind !== 'hand')
-          .map((p) => withCards(p, survivorsOfReset(p.cards))),
+          .map((p) => {
+            const declaration = declaredDeckLists.get(p.id);
+            return declaration ? applyDeclaration(p, declaration, rng) : withCards(p, survivorsOfReset(p.cards));
+          }),
         // A hand is still DROPPED, not emptied (`handsOf()` must be `{}`
         // again) - unless the player was holding something a reset does
         // not destroy, in which case the pile stays with just that. The

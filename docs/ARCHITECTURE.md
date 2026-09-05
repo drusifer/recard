@@ -35,6 +35,60 @@ card's real identity, always, not just whether it can be moved. As of
 D85, the same removal reaches the three BULK/pile-level actions that
 still had their own separate authorization gate.
 
+### D115. RESET rebuilds every declared card deck, not just the canonical one
+
+Direct user request: "spit and polish - esp on the rotg game... see if
+you can get through a game or two." US-109 was a bug hunt, not a
+feature ask, and this is what it found by actually playing rather than
+reading the code: **Restart Game permanently destroyed RtG's entire
+card pool.**
+
+**Root cause.** `RESET` only ever special-cased ONE pile - the
+canonical `DECK_PILE_ID`, rebuilt via `makeDeckPile` when
+`gameConfig.tableZone` is true. RtG opts out of `tableZone` entirely
+(D40s era) and declares its own fifteen real decks as ordinary
+`kind: 'deck'` piles via `GameConfig.piles` instead. Those declared
+decks are still `pilesOf(state)`-visible, so they fell through to the
+generic survivor-filter pass every other table-side pile gets - and
+cards never survive a reset (D111's own rule), so every one of RtG's
+fifteen decks emptied to zero with nothing to ever rebuild them from.
+Confirmed at both layers: a synthetic multi-deck `state.js` unit test
+(60 cards -> 0) and a live browser playthrough (drew, clicked Restart
+Game, the deck badge read 0 and drawing failed from then on).
+
+**Fix: `declaredCardDeckDeclarations`** (`state.js`) maps every
+`GameConfig.piles` declaration with a real card `deckList` to the exact
+id its built pile lands at - reusing `buildPiles`'s own
+`declaredId ?? configuredZoneId(...)` derivation rather than inventing
+a second one that could drift from it. `RESET`'s survivor-filter pass
+now checks this map first: a match gets REBUILT via `applyDeclaration`
+(identical to how it was built at table creation - fresh shuffle,
+same deck list), everything else keeps the unchanged survivor-filter
+behavior.
+
+**Chip/token supplies are explicitly excluded**, checked by the same
+`deckType !== 'chips'` test `applyDeclaration` itself uses for its
+default. They already survive a reset via D111's `survivesReset` -
+rebuilding one fresh would spawn a brand-new set of tokens ALONGSIDE
+whatever already wandered onto a battlefield mid-game, duplicating
+them. Verified this distinction with its own regression test, not
+just reasoned about.
+
+**Blast radius, checked, not assumed:** grepped every `deckList`
+declaration in `presets.js` - RtG's fifteen decks are the ONLY
+non-chip ones anywhere in the project, so this fix changes RESET's
+behavior for RtG alone. Every other preset's existing RESET tests
+(War, Gin Rummy, Poker, Solitaire, Chips & Tokens) pass unchanged.
+
+**Rejected: special-casing RtG by name or by `tableZone: false`.**
+Both would silently break the moment a SECOND `tableZone: false`,
+multi-deck preset is ever added - matching declarations by their own
+actual shape (`kind: 'deck'` + a real card `deckList`) is what makes
+this general rather than a one-off patch for the one preset that
+happened to expose it.
+
+@Smith *user test D115.
+
 ### D114. Reshuffle & re-deal is its own action; RESET is no longer its delivery mechanism
 Direct user correction (2026-09-04, queued for this sprint): RESET
 ("restart the entire game in its initial preset") and Reshuffle & re-deal
@@ -4236,6 +4290,16 @@ real viewports) using the same real-browser approach. Playwright remains
 a devDependency for that script. Smith/Trin should lean more on manual
 two-tab testing for functional correctness until a real E2E suite exists
 again.
+
+Two more targeted single-player browser suites exist in the same gap,
+both driven by real Playwright, neither part of `npm test`:
+`npm run test:ui` (`tests/uiActions.browser.mjs`) covers card-action
+wiring through the right-click context menu; `npm run test:rtg`
+(`tests/rtgPlaythrough.browser.mjs`, added US-109/D115) plays a full
+RtG game end to end (draw, cast, tap, the shared token supply, exile/
+discard, the stack, life total, a reshuffle, and a full Restart) - the
+bug-hunt pattern that found D115. Both are `bobp make test-ui`/
+`test-rtg`.
 
 ## UI Conventions
 - **Interactive elements are ≥44×44px** (iOS HIG / Material minimum),

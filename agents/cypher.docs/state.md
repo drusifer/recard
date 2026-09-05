@@ -640,3 +640,48 @@ tech debt, and stay on the standing backlog.
 @Smith: Gate 1 review of US-106..108. US-106 in particular needs Smith's
 read since it's not pure internal cleanup — reshuffle's actual behavior
 changes for the player.
+
+## Sprint: RtG Spit & Polish (2026-09-05) — IN PROGRESS
+
+Drafted US-109 per direct user request: not a new-feature story, a bug
+hunt driven by actually playing RtG (2+ full games via a driven browser
+session) with focus on tokens, which have existed since D107 but never
+been exercised in real play. Explicitly scoped OUT: any new attach/
+stacking mechanic - US-102's "tokens carry no value" ruling stands,
+this sprint fixes real defects only, doesn't scope-creep into new rules
+content.
+
+### Waiting On
+@Smith: Gate 1 on US-109.
+
+## Launch — RtG Spit & Polish (2026-09-05), D115
+
+Full cycle, no rework: US-109 (bug-hunt framing, not a feature story) ->
+Smith Gate 1 (1 addition: log findings before fixing) -> Morpheus (no
+D-decision needed at planning time - the actual decision, D115, only
+existed once the bug was found) -> Mouse's 2-phase plan -> Neo wrote a
+real driven-browser playthrough, found Restart Game destroying RtG's
+entire card pool, fixed it -> Trin independently reproduced at both
+unit and live-UI level -> Oracle groom (D115) -> Smith close-out
+(genuinely executed this time, not review-only - first since US-100) ->
+full retro -> launched.
+
+### Backlog added this sprint
+6. Token-supply colour grouping - `rtg-tokens` never got D110's
+   per-denomination stack treatment (declared `kind: 'plain'`, not
+   `'chip'`) - all 20 tokens overlap in one spread (Smith, HCI, not
+   blocking).
+7. A new browser test's own selectors/metrics need sanity-checking
+   against a known-good count before the test is trusted - this
+   sprint's own first-draft playthrough script "confirmed" a real bug
+   using a metric (`.middle-card` count on a hidden deck) that would
+   have read 0 either way (Neo/Trin).
+8. "Match by declaration SHAPE, not by preset name" - worked for both
+   D114 and D115 now, worth being an explicit standing principle
+   (Morpheus).
+
+## Next Steps
+None pending. Standing backlog carries forward: reconnect-after-refresh
+and real QR (now 6 sprints running), 5+-player mobile density, builder
+screen, browser-automation tooling for Smith's OWN gate (distinct from
+Neo's test scripts), jsdom/e2e harness for ui.js, items 6-8 above.

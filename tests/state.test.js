@@ -221,6 +221,50 @@ test('RESET: a game with gameConfig.tableZone: false stays deckless - no deck pi
   assert.ok(state.piles.every((p) => p.id !== 'deck'), 'no deck pile should exist');
 });
 
+// US-109 ("spit and polish", found by actually playing RtG): a
+// `tableZone: false` preset's own DECLARED decks are the only starting-
+// deck piles in the game - before this fix, RESET emptied them like any
+// ordinary pile (cards never survive a reset) with nothing to rebuild
+// them from. Restart Game permanently destroyed RtG's entire card pool.
+test('RESET: a declared card deck (tableZone: false, e.g. RtG) is REBUILT, not just emptied', () => {
+  let state = createInitialState({}, () => 0.5, {
+    tableZone: false,
+    zones: [{ id: 'decks-zone', name: 'Decks' }],
+    piles: [
+      { kind: 'deck', id: 'deckA', zoneId: 'decks-zone', deckType: 'rtg', deckList: 'rtg-guild-wu' },
+      { kind: 'deck', id: 'deckB', zoneId: 'decks-zone', deckType: 'rtg', deckList: 'rtg-guild-wu' },
+    ],
+  });
+  state = withPlayers(state, ['p1']);
+  // Simulate real play: draw from deckA, so it's not just sitting untouched.
+  state = reduce(state, { type: 'DRAW', playerId: 'p1', pileId: 'deckA' });
+
+  const next = reduce(state, { type: 'RESET' });
+
+  assert.equal(next.piles.find((p) => p.id === 'deckA').cards.length, 60, 'deckA is rebuilt to its full declared size, not left at 59 or emptied to 0');
+  assert.equal(next.piles.find((p) => p.id === 'deckB').cards.length, 60, 'deckB (never touched) is still a real, full deck after RESET');
+  assert.deepEqual(handOf(next, 'p1'), [], 'the drawn card is gone - RESET is a real restart, not a no-op');
+});
+
+// A chip/token supply must NOT be rebuilt the same way: it already
+// survives RESET via `survivorsOfReset` (D111), and rebuilding it fresh
+// would spawn a brand-new set ALONGSIDE whatever already wandered onto
+// a battlefield mid-game, duplicating them.
+test('RESET: a declared chip/token supply keeps its EXISTING pieces (D111), not a freshly rebuilt duplicate set', () => {
+  let state = createInitialState({}, () => 0.5, {
+    tableZone: false,
+    zones: [{ id: 'decks-zone', name: 'Decks' }],
+    piles: [{ kind: 'plain', id: 'tokens', zoneId: 'decks-zone', deckType: 'chips', deckList: 'standard-tokens' }],
+  });
+  state = withPlayers(state, ['p1']);
+  const before = state.piles.find((p) => p.id === 'tokens').cards.map((c) => c.id).toSorted();
+
+  const next = reduce(state, { type: 'RESET' });
+
+  assert.deepEqual(next.piles.find((p) => p.id === 'tokens').cards.map((c) => c.id).toSorted(), before,
+    'the exact same tokens, not a second freshly-built set');
+});
+
 // *nit (direct user request, D84: "remove card redaction entirely...
 // TOTAL PERMISSIVE"): another player's hand used to be identity-
 // redacted in `zones[]` (rank/suit stripped) - it's the real, full hand

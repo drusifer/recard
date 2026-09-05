@@ -3072,6 +3072,65 @@ wire format (US-106 is the sole, explicitly-flagged exception in this
 sprint). Building a new E2E/browser-automation suite — that's tracked
 separately in the standing backlog, not this sprint.
 
+## Sprint: RtG Spit & Polish (2026-09-05)
+
+Direct user request: "spit and polish - esp on the rotg game - we
+haven't given tokens a good shake yet. see if you can get through a
+game or two." Not a new-feature sprint - a bug hunt, driven by actually
+playing RtG rather than reading code. Tokens (`TokenPileable`, D107)
+have existed since the pileObjects sprint but have never been exercised
+in a real game: they're a shared, unowned "Tokens" pile
+(`presets.js`'s `rtg-tokens`) a player drags onto their own board like
+any other Pileable - no attach/stack-to-a-specific-card mechanic was
+ever built (deliberately - "table simulator, not a rules engine"), so
+the open question is simply whether that plain drag-and-drop actually
+works end to end once real play puts it under load: multiple tokens on
+a crowded battlefield, returning one to the shared supply mid-game,
+tapping/rotating a token the same as a creature, etc.
+
+### US-109: RtG token flow shakeout
+**As** a player, **I want** RtG's token supply to hold up through a
+real game, **so that** marking creatures with +1/-1/poison counters
+actually works the way every other Pileable already does.
+
+**AC:**
+- Play at least 2 full RtG games start-to-finish (deck pick, opening
+  hand, draws, casting to battlefield, tapping, at least one stack
+  resolution, at least one exile and one discard, token pickup/
+  placement/return, life total changes) via a driven browser session -
+  not read-the-code, not unit tests alone.
+- Every real defect found (crash, stuck state, wrong visual, a token
+  that can't be moved/returned, life/score drift, anything the Core
+  invariant promises but doesn't deliver) gets fixed, not just noted.
+- No new mechanism invented to "solve" a rough edge that a real player
+  could route around with the tools that already exist (e.g. don't
+  build a card-attach feature just because a token drifting away from
+  its creature looks untidy) - fixes stay corrective, per this sprint's
+  "spit and polish" framing, not an excuse to scope-creep into US-102's
+  already-settled "tokens carry no value, no attach mechanic" ruling.
+- `npm test`/`npm run lint` stay green throughout; any fix ships with a
+  regression test the same way every other bug fix in this project has.
+
+**Out of scope:** new RtG rules content (more token types, new card
+mechanics), a card-attach/stacking feature, anything already tracked in
+the standing backlog (5+-player mobile density, reconnect, real QR).
+
+### Sprint status: US-109 COMPLETE (2026-09-05), D115
+`tests/rtgPlaythrough.browser.mjs` (also `npm run test:rtg` /
+`bobp make test-rtg`) plays a full RtG game live: draw, cast to
+battlefield, tap, a token from the shared supply marks a permanent and
+returns, exile, discard, the shared stack resolves, life total, a
+mid-deck reshuffle, then a full Restart and a genuinely playable second
+game. Found ONE severe defect by actually playing rather than reading
+code (D115): Restart Game permanently destroyed RtG's entire card
+pool - fixed, regression-tested at both the reducer and live-UI level.
+Two of the script's own early drafts were themselves wrong (a hidden
+deck pile's true size only ever shows in its badge, never as
+`.middle-card` elements; reshuffle correctly recalls battlefield cards
+per D114's own spec) - corrected rather than shipped as false
+confidence. 656 unit + 18 UI + 6 RtG browser tests green, no new
+mechanism invented for any rough edge along the way.
+
 ### Sprint status: US-106..108 COMPLETE (2026-09-05), D114
 6 phases (103-108), no rework at any gate. RESHUFFLE_DEAL shipped as
 its own reducer action with per-card `originPileId`; a real gap (no

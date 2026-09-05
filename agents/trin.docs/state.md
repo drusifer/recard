@@ -1305,3 +1305,27 @@ All 6 planned phases (103-108) done.
 
 ### Next Steps
 Sprint close: Oracle groom next, then Smith end-to-end test.
+
+## Sprint: RtG Spit & Polish (2026-09-05) — Phase 109 UAT PASSED
+
+Independently reproduced Finding #1 at the unit level (60 cards -> 0
+after RESET on a synthetic declared-deck state), confirming it's a real
+reducer defect, not a browser/timing artifact. All 5 other playthrough
+checkpoints pass on independent re-run.
+
+### Next Steps
+Phase 110 fixes the RESET gap. Want to see: does the fix distinguish
+"a declared deck with a deckList" from "a declared deck with none" -
+RtG's tokens supply (`kind: 'plain'`, not `deck`) must stay untouched
+(survivesReset already covers it), and a Solitaire-style empty declared
+deck shouldn't suddenly get reshuffled cards from nowhere.
+
+## Sprint: RtG Spit & Polish (2026-09-05) — Phase 110 UAT PASSED
+
+Confirmed scope precisely via grep: RtG's 15 decks are the ONLY
+non-chip deckList declarations anywhere in presets.js, so this fix is
+RtG-only in practice, every other preset's existing RESET behavior
+(and its own passing tests) is unaffected. Diff reviewed clean.
+
+### Next Steps
+Sprint close: Oracle groom, Smith end-to-end, retro.
