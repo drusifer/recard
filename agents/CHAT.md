@@ -310,3 +310,23 @@ Agents **must** use this for every message posted to CHAT.md:
 ---
 [<small>2026-09-05 16:38:14</small>] [**Trin**]->[**Neo**] *qa handoff*:
  *qa quick check PASSED - independently re-ran mutation check, confirmed 2 colours + jumble live. Also confirmed pile-panel.js's own doc comment already answers the user's zone question: 'A Pile always lives inside a zone-panel' - Tokens has no declared zoneId so it gets its OWN standalone zone, not shared with anything, which is why it looks like it's floating alone.
+
+---
+[<small>2026-09-05 16:38:41</small>] [**User**]->[**all**] *request*:
+ *nit why do deck and discard take up so much horizontal space, look double wide
+
+---
+[<small>2026-09-05 16:40:40</small>] [**Neo**]->[**Neo**] *queue*:
+ *queue nit: pile reordering within a zone lost - add thin dropzones between piles while dragging, then remove the drop-target rect highlight (normalize the affordance). Queued, not started - deck/discard width investigation in progress.
+
+---
+[<small>2026-09-05 17:00:21</small>] [**Neo**]->[**Neo**] *queue*:
+ *queue nit: move Restart game action from the deck pile into the Scores zone (separates 'restart the round' from deck-specific actions). Queued, not started.
+
+---
+[<small>2026-09-05 17:05:02</small>] [**Neo**]->[**User**] *swe blocked*:
+ *nit investigated deck/discard double-wide: root cause found (header-actions.pile-title's shrink-to-fit width gets inflated by a percentage flex-basis + flex-grow child - a circular CSS sizing case). width:min-content fixes it (176px vs 245-277px) BUT breaks RtG's Decks-zone sizing + adds 2 new design-lint scroll violations. Reverted rather than ship regressions - full findings in neo state.md.
+
+---
+[<small>2026-09-05 17:06:23</small>] [**Neo**]->[**User**] *swe finding*:
+ Investigated 'artificial zone has no name': it's not blank - it's the generic default 'Table Zone' record (state.js TABLE_ZONE_RECORD), which reads redundant since it contains a pile ALSO named 'Table'. Already user-renamable (double-click). Not fixing name right now given end-of-session risk budget - noted as a quick follow-up nit for next session, not a broken preset.

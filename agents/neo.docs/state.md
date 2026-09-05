@@ -834,3 +834,67 @@ real render: 3 clearly gem-shaped, distinctly-coloured stones, no text.
 ### Next Steps
 Handing to Trin for the *nit's abbreviated check (no Morpheus step -
 this is a nit, not a fix/impl).
+
+## Investigated, not fixed: deck/discard "double wide" panels (2026-09-05)
+
+Direct user report: "why do the deck and the discard take up so much
+extra horizontal space? they look double wide."
+
+**Root cause found and confirmed empirically** (bisecting CSS rules
+live in a real browser, not by reading the CSS): `header-actions.pile-
+title`'s own width, with no explicit value, is normally shrink-to-fit
+against its content. `.pile-title .zone-name-text { flex: 1 0 100%; }`
+(a PERCENTAGE `flex-basis` on a flex-GROW child, forcing the title onto
+its own line so buttons wrap below it) breaks that computation:
+resolving `100%` during an already-shrink-to-fit ancestor's own
+auto-sizing pass is circular, and in practice INFLATES the header (and
+therefore the whole panel, since nothing else sets an explicit width)
+well past what the row of buttons alone needs.
+
+Confirmed the mechanism precisely: for RtG's "Alice's Discard"
+(4 header buttons, empty card-row), the panel measured 277px wide,
+while `header-actions { display:none }` alone dropped it to 176px (the
+`.pile-section` min-width floor) - and so did hiding EITHER just the
+title text OR just the button row while keeping the other, which only
+makes sense as this exact circular-sizing artifact, not as either genuinely needing
+that space. Same root cause for the deck panel (245px, 7 header items
+now that D114 added "Restart game").
+
+**The fix (`.pile-title { width: min-content; }`) works in isolation**
+- confirmed both deck and discard drop to a correct 176px, buttons wrap
+cleanly into a compact grid, screenshotted both. But it's a GLOBAL rule
+(every pile's header uses `.pile-title`), and re-running the full
+regression suite surfaced two real regressions I did not have time to
+resolve safely before end of session:
+
+1. `tests/rtgPlaythrough.browser.mjs`'s Decks-zone-sizing test
+   (D115/US-110's own 1400x570 box) now FAILS - needs 678px, has 568px.
+   The box's dimensions were empirically tuned against the OLD
+   (bloated) per-deck-panel widths; shrinking the panels changes how
+   many fit per row and the box needs re-tuning to match.
+2. `npm run lint:design` gained 2 NEW findings not in the standing
+   baseline: forced page scroll on desktop-1280x800 (6px) and
+   laptop-1024x768 (38px), plus "a hand is not fully visible without
+   scrolling" on the latter - something in the seated-player layout
+   apparently relied on a wider header providing room for OTHER content
+   that a narrower one no longer does, on at least one non-RtG preset's
+   hand.
+
+**Reverted rather than ship a regression.** `style.css` is back to its
+prior committed state (confirmed via `git diff` - clean). The
+`min-content` fix is correct AS FAR AS THE HEADER ITSELF goes; what's
+still unresolved is reconciling it with (a) D115's Decks-zone
+dimensions (re-tune the box once panels are properly sized - should
+actually get SMALLER, not larger, once this is done right) and (b)
+whatever the seated-hand layout was implicitly depending on the old
+width for, which needs its own investigation before this can ship
+safely.
+
+### Next Steps
+Whoever picks this up: apply `.pile-title { width: min-content; }`
+again, then (1) re-measure the Decks zone's real content height at the
+new (correct) panel widths and update `presets.js`'s RtG layout to
+match (should shrink, not grow), and (2) find what regressed on
+desktop-1280x800/laptop-1024x768 (`bobp make lint-design` will
+reproduce) - likely a seated hand or seat-card layout that was
+accidentally relying on an oversized pile header for spacing.
