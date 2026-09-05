@@ -36,6 +36,36 @@ export class Pileable {
    */
   static sortActions = [];
 
+  /**
+   * The pile kind this thing BELONGS in, if it has one (*nit: "drops in
+   * chipstacks should add the chips to the existing piles").
+   *
+   * `undefined` for a card, which belongs anywhere - dropping one on a
+   * zone's empty space to start a new pile is a real, wanted gesture.
+   * `ChipPileable` names `'chip'`, so a chip dropped on empty space
+   * joins the tray that is already there instead of spawning yet another
+   * pile beside it, which is what was actually happening on every
+   * near-miss around a tray.
+   *
+   * A property of the THING rather than a check at the drop site: the
+   * drop code asks what this pileable wants, and never learns what a
+   * chip is.
+   */
+  static homePileKind = undefined;
+
+  /**
+   * Whether this thing survives a round `RESET` (*fix, direct user
+   * report: "reshuffle and redeal... all the chips disappear").
+   *
+   * `false` for a card: a reset gathers every card back into a rebuilt,
+   * reshuffled deck, which is the whole point of the action. `true` for
+   * a chip or a token, because they are not part of the deck - a new
+   * round does not confiscate anyone's money.
+   *
+   * A property of the THING, so `RESET` never asks what a chip is.
+   */
+  static survivesReset = false;
+
   constructor(record = {}) {
     Object.assign(this, record);
   }

@@ -124,6 +124,16 @@ export const ACTION_SPECS = {
   // (target: null) already works above.
   sortRank: { label: 'Sort by rank', destructive: false, hint: 'Sort your hand by rank.', icon: '#' },
   sortSuit: { label: 'Sort by suit', destructive: false, hint: 'Sort your hand by suit.', icon: '♠' },
+  // *fix (chips): a chip pile's own sort. Offered by the CONTENTS
+  // (`ChipPileable.sortActions`), the same way rank/suit are - not by
+  // the pile being a chip tray.
+  sortDenom: { label: 'Sort by value', destructive: false, hint: 'Stack this tray by chip value, highest first.', icon: '¤' },
+  // *fix (direct user request): "actions for braking large denom to
+  // smaller denom". Pile-level and in place, like `shuffle` - it acts on
+  // the tray's biggest breakable chip, not on a hovered card. Not
+  // destructive: value is conserved exactly, so there is nothing to
+  // confirm and nothing to regret.
+  break: { label: 'Make change', destructive: false, hint: 'Break the largest chip into smaller ones of the same value.', icon: '⑂' },
   // Phase 56 (Sprint 12, T56.1): shuffle/split move onto the deck's own
   // pile anchor alongside deal/reshuffleDeal/draw, joining a table they
   // were never part of before (US-35/36 shipped as a standalone button
@@ -136,8 +146,17 @@ export const ACTION_SPECS = {
   // action (`ADJUST_PILE_SPREAD`, a signed delta), the same split D103
   // used for reveal/conceal: the direction belongs in the label, not in
   // a second code path.
-  tighten: { label: 'Tighten', destructive: false, hint: 'Overlap this pile\'s cards more tightly.', icon: '⇥' },
-  loosen: { label: 'Loosen', destructive: false, hint: 'Spread this pile\'s cards further apart.', icon: '⇤' },
+  // *nit (direct user request, restated unambiguously): "if i press a
+  // button that looks like this '<-' it should tighten and '->' should
+  // loosen". So the mapping is by DIRECTION, not by which glyph sits
+  // where: an arrow pointing left pulls the pile together, one pointing
+  // right pushes it apart.
+  //
+  // Plain arrows rather than the previous ⇤/⇥ (arrow-to-BAR): those read
+  // as tab stops as much as directions, which is most of why this took
+  // three passes to get right. There is nothing to misread about ← and →.
+  tighten: { label: 'Tighten', destructive: false, hint: 'Overlap this pile\'s cards more tightly.', icon: '←' },
+  loosen: { label: 'Loosen', destructive: false, hint: 'Spread this pile\'s cards further apart.', icon: '→' },
   // D91/D92 (direct user request: "we're missing... split pile", then
   // "split should always fan the pile to allow the guided picker" -
   // deck included, no exceptions): the old `'split'` (roughly-in-half,
@@ -372,8 +391,14 @@ export function pileLevelActions(kind, context = {}) {
  * @param {number} count
  * @returns {string[]} action ids currently disabled
  */
-export function disabledPileActionsFor(kind, count, { spread } = {}) {
-  return pileForKind(kind)?.disabledActions(count, { spread }) ?? [];
+export function disabledPileActionsFor(kind, count, { spread, cards } = {}) {
+  // `cards` matters as much as `count`: `pileForKind` builds a BARE
+  // instance of the kind, so anything reading `this.cards` sees an empty
+  // pile. `ChipPile`'s break-is-disabled rule did exactly that and
+  // disabled the button on every tray, however many breakable chips it
+  // held - found by clicking it in a real browser, where the control
+  // simply wasn't there.
+  return pileForKind(kind)?.disabledActions(count, { spread, cards }) ?? [];
 }
 
 /**

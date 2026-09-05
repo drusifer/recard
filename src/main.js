@@ -1,6 +1,8 @@
 import { Session } from './session.js';
-import { createInitialState, reduce, viewFor, DECK_PILE_ID } from './state.js';
+import { createInitialState, reduce, viewFor, reseatOwner, DECK_PILE_ID } from './state.js';
 import { SPREAD_STEP } from './piles/Pile.js';
+import { breakInto } from './pileables/ChipPileable.js';
+import { homePileKindFor } from './pileables/pileableTypes.js';
 import { makeStateMessage, makeMotionMessage, createMotionThrottler, cardDragPayload } from './protocol.js';
 import { renderShareCode, wireCopyCode } from './qrcode.js';
 import {
@@ -38,6 +40,7 @@ import './components/ZonePanel.js';
 import './components/PilePanel.js';
 import './components/FanPile.js';
 import './components/DeckStack.js';
+import './components/ChipTray.js';
 import './components/HeaderActions.js';
 
 const MOTION_FLUSH_MS = 50;
@@ -591,14 +594,32 @@ async function resumeHostedTable() {
   //
   // The previous host entry is dropped and re-seated under the current
   // id, because the host's id is a peer id rather than a playerKey.
-  const savedPlayers = (restored.state.players ?? []).filter((p) => p.id !== restored.code);
+  // *fix (direct user report): "chip tray dups again when resuming an
+  // existing game". This used to DROP the saved host entry and JOIN
+  // under the new peer id, which made JOIN treat the host as a new
+  // player and build their declared `perPlayer` piles all over again -
+  // a second chip tray, with the host's actual chips stranded in the
+  // first one. `reseatOwner` MOVES them instead: the player, their
+  // piles and contents, their zones and their score all follow the new
+  // id, so JOIN recognises them and creates nothing.
+  //
+  // Pre-existing for every `perPlayer` declaration (Spit's stock, RtG's
+  // battlefield/discard/exile); a stocked chip tray is just impossible
+  // to miss.
+  const reseated = reseatOwner(restored.state, restored.code, myId);
   gameState = reduce(
     {
-      ...restored.state,
-      players: savedPlayers.map((p) => ({ ...p, connection: 'disconnected' })),
+      ...reseated,
+      players: reseated.players.map((p) => (p.id === myId ? p : { ...p, connection: 'disconnected' })),
     },
     { type: 'JOIN', playerId: myId, name: myName },
   );
+  // *fix (direct user report): a resumed table never shows the share
+  // screen, which is the only place `lastDealCount` was seeded from a
+  // preset - so Reshuffle & deal used the FIRST preset's hand size
+  // (War's 26: the whole deck between two players). The restored table
+  // knows its own, so take it from there.
+  lastDealCount = gameState.gameConfig?.cardsPerPlayer ?? lastDealCount;
   awaitedReturners = expectedReturners(restored.state, restored.code);
 
   document.querySelector('#host-form').hidden = true;
@@ -678,6 +699,10 @@ document.querySelector('#create-table').addEventListener('click', async () => {
     tableZone: selectedPreset.tableZone ?? true,
     piles: selectedPreset.piles ?? [],
     zones: selectedPreset.zones ?? [],
+    // Carried in the TABLE's config, not just this browser's
+    // `lastDealCount` - see `createInitialState`. A restored table has
+    // no share screen to re-seed that local value from.
+    cardsPerPlayer: selectedPreset.cardsPerPlayer,
   };
 
   session = Session.host({ name: myName });
@@ -1162,6 +1187,8 @@ function handlePileAction(pileId, actionId, value) {
   // it belongs in the argument, not in a second code path (D75/D103).
   if (actionId === 'tighten') return performAdjustSpread(pileId, SPREAD_STEP);
   if (actionId === 'loosen') return performAdjustSpread(pileId, -SPREAD_STEP);
+  if (actionId === 'break') return performBreakChip(pileId);
+  if (actionId === 'sortDenom') return performSortPile(pileId, 'denom');
   if (actionId === 'sortRank') return performSortPile(pileId, 'rank');
   if (actionId === 'sortSuit') return performSortPile(pileId, 'suit');
   // D92 (direct user request: "split should always fan the pile to
@@ -1382,6 +1409,23 @@ function dropCardOnPile(pileableId, targetPileId, placement = {}) {
 // request, "THERE SHOULD BE NO CANONICAL PILES"): `pileId` is the real
 // target now - no host/guest branch needed, `shuffle` is host-only at
 // the offer layer (`DeckPile.pileActions`) already.
+/**
+ * *fix (direct user request): "actions for braking large denom to
+ * smaller denom". A pile-level button, so it picks its own target - the
+ * LARGEST breakable chip in the tray, which is what a player reaching
+ * for change actually wants and saves them hunting for one to click.
+ */
+function performBreakChip(pileId) {
+  if (isSessionEnded) return;
+  const pile = currentView()?.piles.find((p) => p.id === pileId);
+  const biggest = (pile?.cards ?? [])
+    .filter((chip) => chip.pileableType === 'chip' && breakInto(chip.denom) !== undefined)
+    .toSorted((a, b) => b.denom - a.denom)[0];
+  if (!biggest) return;
+  if (role === 'host') dispatch({ type: 'BREAK_CHIP', playerId: myId, pileId, pileableId: biggest.id });
+  else session.send({ type: 'action', action: { type: 'BREAK_CHIP', pileId, pileableId: biggest.id } });
+}
+
 function performAdjustSpread(pileId, delta) {
   if (isSessionEnded) return;
   if (role === 'host') dispatch({ type: 'ADJUST_PILE_SPREAD', playerId: myId, pileId, delta });
@@ -1544,6 +1588,27 @@ function performCreatePileWithCard(pileableId, zoneId) {
   // plain "which pile holds this card" lookup already covers both.
   const fromPileId = view.piles.find((p) => p.cards.some((c) => c.id === pileableId))?.id;
   if (!fromPileId) return;
+
+  // *nit (direct user request): "drops in chipstacks should add the
+  // chips to the existing piles". A pileable that names a home pile kind
+  // (`homePileKindFor` - only chips do) joins the one already in this
+  // zone instead of starting another beside it. Dropping on a zone's
+  // empty space to CREATE a pile stays the behaviour for everything
+  // else, because for cards that gesture is the point.
+  //
+  // This is also what "chip piles keep duplicating" was: every near-miss
+  // around a tray landed on the zone's drop gutter and made a new pile.
+  const home = homePileKindFor(view.piles.flatMap((p) => p.cards).find((c) => c.id === pileableId));
+  // Deliberately NOT excluding `fromPileId`: the tray a chip came from is
+  // usually the very tray it should return to, and excluding it was why
+  // the first version still spawned a pile on every gutter drop. A chip
+  // dropped on empty space goes back to its tray and re-sorts, which is
+  // the "snapped to position" behaviour asked for.
+  const existing = home && view.piles.find((p) => p.kind === home && p.zoneId === zoneId);
+  if (existing) {
+    moveCard(pileableId, existing.id);
+    return;
+  }
   if (role === 'host') {
     try { dispatch({ type: 'CREATE_PILE', playerId: myId, zoneId, fromPileId, pileableId }); }
     catch (error) { globalThis.alert(error.message); }
@@ -1822,7 +1887,15 @@ function relayMotion(fromPeerId, message) {
 }
 
 setInterval(() => {
-  if (!session || isSessionEnded) return;
+  // *fix (direct user report): `gameState` too, not just `session`.
+  // `relayMotion` reads `gameState.players`, and the two are set at
+  // different moments - so any pointer movement before a table exists
+  // (or after a JOIN that threw, which is how this surfaced) crashed
+  // here every flush, filling the console with "Cannot read properties
+  // of null (reading 'players')". The precondition was incomplete, not
+  // `relayMotion`; guarding it there instead would leave the same hole
+  // for every future reader of `gameState` in this loop.
+  if (!session || !gameState || isSessionEnded) return;
   for (const { key, data } of motionThrottler.drain()) {
     const message = makeMotionMessage(key, data);
     applyIncomingMotion(myId, message);

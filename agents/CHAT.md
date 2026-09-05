@@ -1117,3 +1117,103 @@ make: *** [Makefile:31: lint] Error 1
 ℹ skipped 0
 ℹ todo 0
 ℹ duration_ms 1543.80265
+
+---
+[<small>2026-09-03 16:46:59</small>] [**Mouse**]->[**User**] *handoff*:
+ Pushed. dev and main both at 91223d5, identical to origin, working tree clean. Two commits went out: 7e86bed (D102-D106) and 91223d5 (sprint pileObjects, D107). main was a strict ancestor so it was a clean fast-forward, no divergence to reconcile.
+
+---
+[<small>2026-09-03 21:54:11</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 597
+ℹ suites 0
+ℹ pass 597
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1510.193746
+
+---
+[<small>2026-09-03 21:56:10</small>] [**Neo**]->[**all**] *swe fix*:
+ Adding tokens to RtG uncovered a PRE-EXISTING severe bug (reproduces on the previous commit): RtG instance ids are unique per deck but repeat across decks, and the preset puts 15 decks with shared basic lands on one table - so D88's conservation guard threw on the first JOIN and creating an RtG table has failed since it shipped. Fixed with a build-scoped id token; same collision hit the new perPlayer poker chip stacks. Recorded as D108.
+
+---
+[<small>2026-09-03 21:56:17</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 597
+ℹ suites 0
+ℹ pass 597
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1475.11628
+
+---
+[<small>2026-09-04 09:06:23</small>] [**User**]->[**all**] *request*:
+ *nit gin rummy preset has all cards dealt instead of 10
+
+---
+[<small>2026-09-04 09:15:36</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 601
+ℹ suites 0
+ℹ pass 601
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1683.502773
+
+---
+[<small>2026-09-04 09:16:19</small>] [**Neo**]->[**User**] *swe fix*:
+ *fix crypto.randomUUID crash: FIXED, verified in the failing condition. randomUUID exists only in a SECURE CONTEXT, and this app is played over plain HTTP on a LAN - so Create Table threw for every preset with a chip supply. Two callers already guarded it; my two deck builders didn't. Now one guarded batchToken() with a regression test that DELETES randomUUID and builds anyway. The relayMotion null crash was separate: the motion interval guarded session but not gameState. See ARCHITECTURE.md D108.
+
+---
+[<small>2026-09-04 10:16:17</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 621
+ℹ suites 0
+ℹ pass 621
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1837.05928
+
+---
+[<small>2026-09-04 10:16:56</small>] [**Neo**]->[**User**] *swe fix*:
+ *fix chips: ChipPile is the default kind - sorted by denomination on insert AND on stock (Pile.stock hook, since declared stock never passes through insertPileable), Make change breaks into the largest smaller denom that divides evenly, chips render their value, and a chip tray offers no non-chip conversion at all. This REVERSES the sprint's 'chips carry no value' ruling on the user's instruction, so the empty sortActions - a consequence of it - changed too. 621 unit + 14 browser. D109.
+
+---
+[<small>2026-09-04 14:19:25</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 652
+ℹ suites 0
+ℹ pass 652
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1818.483887
+
+---
+[<small>2026-09-04 14:22:36</small>] [**User**]->[**all**] *request*:
+ *queue user correction: RESET and Reshuffle-and-redeal are DIFFERENT operations and are currently conflated (reshuffleDeal dispatches RESET+DEAL). RESET = restart the entire game in its initial preset. Reshuffle-and-redeal = return every card to its ORIGINAL deck, shuffle that deck, deal the CONFIGURED number of cards to each player - it must not reset zones, layout, scores or chips. Queued, not started.
+
+---
+[<small>2026-09-04 23:25:48</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 652
+ℹ suites 0
+ℹ pass 652
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1694.030612
+
+---
+[<small>2026-09-04 23:26:39</small>] [**Mouse**]->[**User**] *handoff*:
+ Shutdown prep: 652 unit + 18 browser green, lint at baseline (8 js / 5 design), 15/15 decks balanced. State files refreshed (mouse close-out D108-D113, trin's browser-layer findings). ONE item queued and not started: the RESET vs Reshuffle-and-redeal separation, with per-card deck origin as the substantive work. Committing and pushing dev + main now.

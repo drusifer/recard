@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { buildDeck } from '../src/deck.js';
 import { DECK_TYPES } from '../src/decks/deckTypes.js';
+import { deckLists } from '../src/decks/rtgDeck.js';
 import { DECKS } from '../src/decks/rtg/catalog.js';
 
 test('DECK_TYPES: rtg is registered alongside standard and pinochle', () => {
@@ -24,9 +25,9 @@ test('buildDeck: every physical card gets a unique id', () => {
 
 test('buildDeck: each card keeps its printed id for art and catalog lookup', () => {
   const deck = buildDeck({ type: 'rtg', deckList: 'rtg-mono-white' });
-  const recruit = deck.find((card) => card.pileableId === 'rtg-w-001');
+  const recruit = deck.find((card) => card.printedId === 'rtg-w-001');
   assert.ok(recruit, 'printed id preserved separately from the instance id');
-  assert.notEqual(recruit.id, recruit.pileableId, 'instance id is distinct');
+  assert.notEqual(recruit.id, recruit.printedId, 'instance id is distinct');
   assert.equal(recruit.name, 'Dawnbreak Recruit');
 });
 
@@ -69,4 +70,39 @@ test('buildDeck: standard decks are completely unaffected', () => {
   // perturb any existing deck type.
   assert.equal(buildDeck().length, 52);
   assert.equal(buildDeck({ type: 'standard', jokers: 2 }).length, 54);
+});
+
+
+// PRE-EXISTING BUG, found 2026-09-03 while adding a token supply to this
+// preset - not introduced by that work; it reproduces on the previous
+// commit. D80 says "each physical card gets a unique instance id", and
+// they are unique WITHIN one deck (`rtg-land-plains#0..7`) but repeat in
+// every deck that contains the same printed card. The RtG preset puts 15
+// decks on one table, and basic lands appear in most of them, so the
+// table starts with ~90 duplicate ids.
+//
+// That is not cosmetic: `assertCardsConserved` (D88) treats the set of
+// ids in play as a closed system and throws on the FIRST action, which
+// is JOIN - so creating a Recard the Gathering table threw immediately.
+// The preset has been unusable since it shipped, and no test covered it
+// because every test built ONE deck.
+test('two rtg decks sharing a printed card produce no duplicate instance ids', () => {
+  const first = buildDeck({ type: 'rtg', deckList: 'rtg-mono-white' }).map((card) => card.id);
+  const second = new Set(buildDeck({ type: 'rtg', deckList: 'rtg-mono-blue' }).map((card) => card.id));
+  const overlap = first.filter((id) => second.has(id));
+  assert.deepEqual(overlap, [], `ids must be unique ACROSS decks, shared: ${overlap.slice(0, 5)}`);
+});
+
+test('every deck on the RtG table together forms one closed set of unique ids', () => {
+  const all = deckLists().flatMap((list) => buildDeck({ type: 'rtg', deckList: list.id }).map((card) => card.id));
+  assert.equal(new Set(all).size, all.length, 'no id appears twice across the whole table');
+});
+
+// The printed id is what art and catalog joins key off, and it MUST
+// still repeat - four copies of one card share one picture.
+test('the printed id still repeats across copies and decks - that is what art keys off', () => {
+  const deck = buildDeck({ type: 'rtg', deckList: 'rtg-mono-white' });
+  const copies = deck.filter((card) => card.printedId === deck[0].printedId);
+  assert.ok(copies.length > 1, 'copies of one printed card share a printedId');
+  assert.equal(new Set(copies.map((card) => card.id)).size, copies.length, 'but each has its own instance id');
 });

@@ -1207,3 +1207,27 @@ to rotate -> 2 fails. Restored 7/7.
 `pileActions.test.js`; reducer behavior -> `state.test.js`. Letting it
 drift into re-testing those is how it becomes the slow redundant e2e
 suite D60 deleted.
+
+---
+## 2026-09-04 — what the browser layer actually caught
+
+The layer added in D104 earned itself repeatedly this session. Every one
+of these passed the unit suite and would have passed review:
+
+- `Make change` absent on every tray: `disabledActions` was handed a
+  BARE pile instance, never the pile's cards.
+- Chip stacks fanning sideways: the CSS class was present and LOSING on
+  specificity. A class that loses looks identical to one that works.
+- A 6px discontinuity between the deck's top card and the layer under
+  it: `position: absolute` with no `left` sits at its STATIC position,
+  which padding moves, while explicit `left` ignores padding-left.
+- A chip dropped on a zone gutter spawning a pile: only reachable with
+  synthetic HTML5 drag events, which Playwright cannot generate itself.
+- `crypto.randomUUID` missing outside a secure context: localhost IS
+  secure, so a browser test on localhost passes while the real
+  deployment (LAN over plain HTTP) is broken. The regression test
+  DELETES `randomUUID` before loading the app.
+
+**Standing rule this produces:** assert GEOMETRY and BEHAVIOUR, never
+the presence of a class or a call. And when a bug depends on the
+environment, the test has to simulate the environment, not the code.

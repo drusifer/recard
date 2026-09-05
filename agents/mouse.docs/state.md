@@ -538,3 +538,95 @@ surfaced inside that diff.
 - Oracle: e2e.smoke.mjs still referenced by 2+ memory files (stale).
 
 **Uncommitted** at close: the full sprint diff.
+
+---
+## QUEUED, not started — RESET vs Reshuffle & re-deal (2026-09-04)
+
+Direct user correction, mid-session. The two are currently CONFLATED:
+`dealFromDeck`'s `reshuffleDeal` branch dispatches `RESET` and then
+`DEAL`, so "reshuffle and re-deal" performs a whole-game reset.
+
+**The intended semantics, in the user's own words:**
+- **RESET** — "restarting the entire game in its initial preset."
+- **Reshuffle & re-deal** — "putting all cards back in their original
+  deck, shuffle that deck, deal the configured number of cards to each
+  player."
+
+**What that implies, to be confirmed when the work starts:**
+1. Reshuffle & re-deal needs its OWN reducer action; it must not touch
+   zones, layout, scores, chips or the table's structure.
+2. "their original deck" is per-CARD, not one global deck: the RtG
+   preset puts fifteen decks on the table, so a card has to return to
+   the deck it came from. Nothing currently records that origin — this
+   is the substantive part of the work, not the plumbing.
+3. "the configured number" is `gameConfig.cardsPerPlayer` (added this
+   session, D111), NOT `main.js`'s local `lastDealCount`.
+4. This REVISITS D111's chip handling. That fix made chips survive
+   `RESET`, because a reshuffle was taking everyone's money. Under the
+   corrected definitions a reshuffle should never have touched chips in
+   the first place, and RESET-as-full-restart arguably SHOULD restore
+   the preset's opening stacks rather than preserve them. Re-derive
+   both from the definitions above rather than assuming D111 still
+   applies as written.
+
+---
+## Session close-out — 2026-09-04 (post-pileObjects fixes, D108-D113)
+
+Everything below landed AFTER commit `91223d5` (sprint pileObjects) and
+is committed in the same batch as this note.
+
+**652 unit + 18 browser tests. Lint at its standing baseline: 8 js
+(pre-existing cognitive-complexity + one naming), 5 design (pre-existing
+Table-Zone/seat overlaps), stylelint clean, 15/15 decks balanced.**
+
+### What shipped
+- **D108** — a physical card's id must be unique per BUILD. RtG's 15
+  decks share basic lands, so instance ids collided and D88's
+  conservation guard threw on the first JOIN: **creating an RtG table
+  had failed since the preset shipped.** Also renamed RtG's printed-id
+  field to `printedId` (the pileObjects sweep had made it `pileableId`,
+  colliding with the payload field of that name).
+- **D109** — chips have denominations, a `ChipPile` kind, and Make
+  change. REVERSES the sprint's "chips carry no value" ruling on the
+  user's instruction, so `sortActions` changed with it.
+- **D110** — `<chip-tray>`: one stack per denomination; per-type
+  `maxSpread`; `homePileKind` so a chip dropped on empty space joins its
+  tray instead of spawning one; `reseatOwner` so resuming stops
+  duplicating per-player piles.
+- **D111** — `RESET` no longer confiscates chips (`survivesReset` on the
+  pileable); `gameConfig.cardsPerPlayer` so a RESUMED table reshuffles
+  with its own hand size instead of War's 26 (the whole deck).
+- **D112** — a hand can be merged and reparented; the emptied hand
+  STAYS (`keepWhenEmptied`), per direct user correction.
+- **D113** — the deck renders with depth again (reverses D66/D67 on
+  appearance only: the layers are inert, one real draggable card).
+  Shared `--stack-step`/`--stack-step-x` give deck and chips one slight
+  lower-left-to-upper-right angle.
+- Plus: chips in both poker presets, tokens in RtG, a guarded
+  `batchToken()` (bare `crypto.randomUUID` broke Create Table over plain
+  HTTP — it needs a secure context), and `.pile-section { min-height:
+  max-content }` so a SAVED layout can never squeeze a panel below its
+  contents.
+
+### QUEUED, not started
+**RESET vs Reshuffle & re-deal** — see the entry above this one for the
+full brief. The two are conflated today (`reshuffleDeal` dispatches
+`RESET` + `DEAL`). Per-card deck ORIGIN is the substantive work; nothing
+records it yet. Re-derive D111's chip handling from the corrected
+definitions rather than assuming it still applies.
+
+### Standing backlog (unchanged)
+Cognitive-complexity pass (7 findings), builder screen (blocked on
+product input), 2 pre-existing visual overlaps, RtG's Gate-1 C3 table
+crowding (now visible since RtG actually builds), stale `e2e.smoke.mjs`
+references in memory files.
+
+### The lesson this session kept teaching
+Nearly every defect was invisible to unit tests and to review, and was
+found by DRIVING THE APP and MEASURING: geometry assertions caught a
+stack fanning sideways and a 6px discontinuity; synthetic HTML5 drag
+events caught the gutter drop; deleting `crypto.randomUUID` caught the
+secure-context crash. Three separate fixes also had to be REVERSED after
+a user correction (chip layout honouring drops, the deck's single card,
+tighten/loosen ordering) - each was right for the design that existed at
+the time, so the reasoning is recorded, not just the outcome.

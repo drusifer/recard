@@ -25,9 +25,9 @@ import { SetPile } from '../src/piles/SetPile.js';
 // rather than relaxed to a subset check: knowing precisely which kinds
 // ship is the guard's whole value, so a new kind should have to be
 // added here on purpose.
-test('the registry exposes exactly the twelve pile kinds', () => {
+test('the registry exposes exactly the thirteen pile kinds', () => {
   assert.deepEqual(Object.keys(PILE_TYPES).toSorted(),
-    ['battlefield', 'cascade', 'deck', 'discard', 'exile', 'foundation', 'hand', 'plain', 'rankAdjacent', 'run', 'set', 'stack']);
+    ['battlefield', 'cascade', 'chip', 'deck', 'discard', 'exile', 'foundation', 'hand', 'plain', 'rankAdjacent', 'run', 'set', 'stack']);
   assert.equal(PILE_TYPES.deck, DeckPile);
   assert.equal(PILE_TYPES.hand, OpponentHandPile);
   assert.equal(PILE_TYPES.plain, Pile);
@@ -109,9 +109,12 @@ test('component: deck/hand pick their own dedicated element, everything else fal
 });
 
 
-test('reparentable: hand opts out (D55/US-63/D64), everything else - including deck now - stays eligible', () => {
+// UPDATED: hand's exclusion was lifted by direct user request ("remove
+// block on moving hand piles"), the same way D64 lifted the deck's. Only
+// the Meld family opts out now.
+test('reparentable: only the Meld family opts out now - hand and deck were both freed by direct request', () => {
   assert.equal(DeckPile.reparentable, true, 'D64: reversed Sprint 23\'s deck exclusion, direct user request');
-  assert.equal(HandPile.reparentable, false);
+  assert.equal(HandPile.reparentable, true, '*fix: "remove block on moving hand piles"');
   assert.equal(Pile.reparentable, true);
   assert.equal(DiscardPile.reparentable, true, 'inherited, not overridden');
 });

@@ -35,10 +35,10 @@ const PIP_CLASS = {
  * the card pool at all.
  */
 function artUrl(card) {
-  // `pileableId` is the PRINTED id; `id` is this physical copy's instance id
+  // `printedId` is the PRINTED id; `id` is this physical copy's instance id
   // (D80 - four copies of one card need four distinct ids). Art is per
-  // printed card, so it must key off `pileableId` or all four copies 404.
-  return `assets/cards/rtg/${card.pileableId ?? card.id}.webp`;
+  // printed card, so it must key off `printedId` or all four copies 404.
+  return `assets/cards/rtg/${card.printedId ?? card.id}.webp`;
 }
 
 /** Colour classes for a card with no art yet, so the fallback panel

@@ -23,6 +23,29 @@
      so it gets a token and a colour with actual contrast against
      `--card-bg`, not a hairline that only works over felt. */
   --card-border: #6f6c60;
+  /* *nit (direct user request): "make the stacking angles consistent wrt
+     cards and chips (same perspective)", then "tighten the stacking
+     angle... and give a slight diagonal from lower left to upper right".
+     ONE step for every stacked thing - the deck's depth layers and a
+     chip stack's offset - so a table never shows two viewpoints at once.
+
+     `--stack-step` is the vertical rise per item, `--stack-step-x` the
+     sideways drift. Deeper items sit DOWN and LEFT of the one above, so
+     a stack climbs toward the upper right.
+
+     The drift is deliberately much smaller than the rise - "slight" was
+     the word, and a first pass at 2px read as a real lean rather than a
+     hint of one. Both stacks share these two numbers, so the angle is
+     changed here and nowhere else. */
+  --stack-step: 2.5px;
+  --stack-step-x: 1px;
+  /* The deepest a stack ever draws (`deckDepth`'s cap, ui.js). Used to
+     RESERVE room so a deck panel is sized for a full deck at all times
+     - direct user request, "give the deck panel more room for when the
+     deck gets big". Reserving the maximum rather than the current depth
+     also stops the panel resizing on every single draw, which made the
+     whole row twitch as cards came off. */
+  --stack-max-depth: 5;
   /* Card geometry lives here so the stack/overlap offsets, the deck
      stack and the card itself can't drift apart. `--card-w` is a
      *minimum*: a card grows past it if the browser enlarges its text
@@ -455,6 +478,60 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    shows a narrow strip of its left edge, and the widest LINE in that
    strip is what has to fit". A token is the same problem, and gets the
    same answer rather than a new one. */
+/* A chip tray (direct user correction: "stacked chips should be in
+   separate piles by denomination. currently you are drawing them in an
+   overlapping row which doesn't make sense with chips").
+
+   One COLUMN per denomination, laid out left to right; within a column
+   the chips stack UPWARD the way a real stack of chips does. The
+   columns are the pile's structure, so they get the gap; the stacking
+   inside one is what `--pile-spread` (Tighten/Loosen) controls. */
+.chip-tray {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+/* `column-reverse` so the FIRST chip in the group sits at the bottom of
+   the stack and later ones pile on top, matching both the DOM order and
+   how a physical stack grows. */
+.chip-stack {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  min-height: 0;
+}
+
+/* The diagonal (direct user request: "a slight diagonal from lower left
+   to upper right"). A flex margin cannot express this - margins do not
+   accumulate down a column, so every chip after the first would shift by
+   the SAME amount instead of progressively. `--stack-index` is each
+   chip's position in its own stack, set by `<chip-tray>`, and the
+   transform turns it into a per-chip drift using the same token the
+   deck's layers use. */
+.card-row.chip-stack .middle-card {
+  transform: translateX(calc(var(--stack-index, 0) * var(--stack-step-x)));
+}
+
+/* A chip's value, CENTRED (direct user request). It was top-left while
+   chips rendered as a row, so covered chips still showed a number; in a
+   real stack only the top chip is readable, so the centre is right. */
+.chip-denom {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: -0.02em;
+  color: #f6f6f3;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.card-chip.chip-white .chip-denom { color: #1b1f24; text-shadow: none; }
+
 .token-label {
   position: absolute;
   top: 0.25rem;
@@ -574,6 +651,22 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    that were never given one, never an override of a real placement. */
 .card-row .middle-card + .middle-card:not([data-layout]) {
   margin-left: calc(-1 * (var(--card-w) + var(--card-gap)) * var(--pile-spread, 0));
+}
+
+/* The chip stacking itself, deliberately placed AFTER the generic
+   horizontal overlap rule above and matched with equal specificity
+   (`.card-row.chip-stack`) so it actually wins. It did not, the first
+   time: the generic rule carries a `:not(...)` that outranked a bare
+   `.chip-stack` selector, so every stack still fanned sideways - caught
+   by asserting the chips' real x coordinates rather than trusting the
+   class to have had an effect.
+
+   A tray stacks vertically, so the horizontal margin goes back to zero
+   and `--pile-spread` drives the VERTICAL overlap instead - which keeps
+   Tighten/Loosen working on the axis that matters here. */
+.card-row.chip-stack .middle-card + .middle-card {
+  margin-left: 0;
+  margin-bottom: calc(-1 * (var(--card-h) + var(--card-gap)) * var(--pile-spread, 0.963));
 }
 
 /* D91: the Split picker (`renderSplitPicker`, ui.js) - a `fan-row` used
@@ -822,6 +915,29 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    action). Targets `.card`, same selector shape `.middle-card` uses
    above - `.deck-stack` itself is no longer draggable, only its one
    card child is. */
+/* *nit: the deck's own depth. Inert layers stacked under the one real
+   card - `pointer-events: none` so they can never be grabbed, which is
+   what the D66/D67 correction ("I should only see 1 card") was actually
+   protecting: one DRAGGABLE card, not one visible edge.
+
+   *nit (direct user request): the same angle a chip stack uses, so the
+   whole table reads as one viewpoint - down and to the LEFT as the stack
+   goes deeper, which is the same as saying it climbs to the upper right.
+   `--stack-step`/`--stack-step-x` are shared by both, which is what
+   keeps them honest: change the angle in one place and both follow. */
+.deck-stack-layer {
+  position: absolute;
+  top: calc(var(--layer) * var(--stack-step));
+  left: calc(var(--deck-drift, 0px) - var(--layer) * var(--stack-step-x));
+  width: var(--card-w);
+  height: var(--card-h);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  background: #16341f;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
 .deck-stack-card[draggable='true'] {
   cursor: grab;
 }
@@ -1359,7 +1475,33 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    matching the real card art is what was missing. */
 .deck-stack {
   position: relative;
-  height: var(--card-h);
+  /* *nit (direct user request): "a full deck needs a little more room
+     then an empty one". The depth layers are absolutely positioned, so
+     they contribute nothing to height and a full deck's lowest layers
+     were clipped by the panel. `--deck-depth` is set per-render from the
+     actual layer count (`renderDeckStack`), so the box grows with the
+     deck and shrinks back as it empties. */
+  /* Always sized for the DEEPEST stack this can draw, not the current
+     one (direct user request: "a 42 card deck overlaps both the buttons
+     and the bottom of the panel"). Using the live depth let a big deck
+     grow into the action buttons above and past the panel below; a
+     constant box cannot, and it also stops the row twitching as cards
+     come off. */
+  height: calc(var(--card-h) + var(--stack-max-depth) * var(--stack-step));
+  min-height: calc(var(--card-h) + var(--stack-max-depth) * var(--stack-step));
+  min-width: calc(var(--card-w) + var(--stack-max-depth) * var(--stack-step-x));
+  /* Clearance from the action header above, so the top card never sits
+     against the buttons however deep the stack draws. */
+  margin-top: 0.35rem;
+  /* Room for the leftward drift is made by OFFSETTING every layer right
+     by the full drift (below), not by padding this box.
+     `.deck-stack-card` is `position: absolute` with no `left`, so it
+     sits at its STATIC position - after any padding - while the layers
+     use an explicit `left`, which is measured from the padding box and
+     ignores padding-left entirely. Padding therefore moved the real card
+     6px away from the layer directly beneath it and broke the stack at
+     exactly the point a player looks: "the top few deck cards are off".
+     One coordinate system for both, and the deepest layer lands at 0. */
   /* *nit fix, found live while widening `.pile-anchor-count`: the badge
      is `position: relative; left: 2.9rem` (a corner-badge stamped on
      the card, not a normal-flow sibling) - since the card itself is
@@ -1372,8 +1514,14 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   min-width: 5.2rem;
 }
 
+/* Explicitly placed, not left to its static position - see
+   `.deck-stack`'s note. The top card is the shallowest thing in the
+   stack, so it sits at the full drift, one `--stack-step-x` right of
+   layer 1, exactly like every other pair. */
 .deck-stack-card {
   position: absolute;
+  top: 0;
+  left: var(--deck-drift, 0);
   width: var(--card-w);
   height: var(--card-h);
 }
@@ -1696,7 +1844,15 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    (`wirePanelLayout`'s corner handle, wired once per Zone box, never
    per Pile). `min-width` stays - a readability floor, not a growth
    allowance. */
-.zone-body > .pile-section {
+.zone-body > /* *nit (direct user request): "a 42 card deck overlaps both the buttons
+   and the bottom of the panel". A panel's width/height come from this
+   browser's SAVED layout (`panelLayout.js`), which a preset change can
+   never revisit - so an arranged table kept a box sized before the deck
+   had any depth, and the stack spilled out of it. `min-height` beats an
+   inline `height`, so this makes any panel refuse to be squeezed below
+   what it actually contains, whatever the saved layout says. */
+.pile-section {
+  min-height: max-content;
   flex: 0 1 auto;
   min-width: 11rem;
 }

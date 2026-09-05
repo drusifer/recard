@@ -5,7 +5,7 @@
 D21-D23) is historical - decisions are numbered continuously now and
 the highest number is always the current binding state, not a
 particular sprint's scope.
-**Last updated:** 2026-09-03 (D92-D107)
+**Last updated:** 2026-09-04 (D92-D113)
 
 ## Core invariant (direct user request, stated repeatedly - binding on every Pile type, present and future)
 
@@ -34,6 +34,329 @@ still: card identity REDACTION (D7) is gone too - a viewer sees every
 card's real identity, always, not just whether it can be moved. As of
 D85, the same removal reaches the three BULK/pile-level actions that
 still had their own separate authorization gate.
+
+### D113. The deck looks like a deck again — inert depth, one real card
+Direct user *nit: "show the stacking for the deck of cards. right now it
+looks like there's only 1 card there."
+
+**This reverses D66/D67**, which removed the deck's decorative backs on
+an equally direct correction ("I should only see 1 card"). Both are kept
+on record, because the reason differs and only one of them was about
+appearance: that removal was about there being three DRAGGABLE cards
+where one card should be. The layers added here are inert
+(`pointer-events: none`, `aria-hidden`), and exactly one real, draggable
+card still sits on top — the part the earlier correction was protecting,
+now asserted by test rather than left to convention.
+
+Depth scales with the count (one layer per ~8 cards, capped at 5), so a
+full deck looks thick and a nearly-empty one visibly thins. The badge
+gives the number; the stack gives the glance. The box grows with the
+depth (`--deck-depth`/`--deck-drift`, set per render from the real layer
+count), because "a full deck needs a little more room then an empty one"
+— absolutely positioned layers contribute no height of their own, so
+the lowest ones were clipped.
+
+**One angle for every stack.** `--stack-step` (vertical rise) and
+`--stack-step-x` (sideways drift) are shared by the deck's depth layers
+and a chip stack, so a table never shows two viewpoints at once; deeper
+items sit down and LEFT, meaning a stack climbs toward the upper right.
+The drift is deliberately a fraction of the rise — a first pass at
+parity read as a real lean rather than the "slight" one asked for, and
+was halved. `ChipPile.defaultSpread` is calibrated so a chip's step
+equals `--stack-step` rather than merely resembling it, and a browser
+test asserts the two stacks actually agree: a shared token proves
+nothing if one of them stops reading it.
+
+Worth noting for later: making this diagonal deliberate required
+loosening an earlier assertion of my own ("chips must not fan
+sideways", exact x equality). It was kept rather than deleted, with a
+tolerance — what it was written to catch was a stack fanning by a whole
+CARD WIDTH, which is still caught.
+
+**The room-making broke the stack, and the fix is a general lesson.**
+Reserving space for the leftward drift with `padding-left` on
+`.deck-stack` put a SIX-pixel jump between the real card and the layer
+directly beneath it, on a stack whose every other step is one pixel —
+"the top few deck cards are off". `.deck-stack-card` is
+`position: absolute` with no `left`, so it sits at its STATIC position,
+which padding moves; the layers use an explicit `left`, which is
+measured from the padding box and ignores `padding-left` entirely. Two
+coordinate systems in one box.
+
+Room is made by OFFSETTING every layer right by the full drift instead,
+so the deepest lands at 0 and nothing is measured differently from
+anything else. The regression guard asserts EVENNESS — every gap across
+the stack identical — rather than any particular pixel value, so it
+survives future changes to the angle while still catching a
+discontinuity.
+
+### D111. A reset redeals cards; it does not confiscate chips
+Direct user *fix: "reshuffle and redeal is still busted - deals whole
+deck and all the chips disappear." Two unrelated causes behind one
+gesture.
+
+**The chips.** `RESET` emptied every surviving pile outright
+(`withCards(p, [])`), which is exactly right for cards — a reset gathers
+them into a rebuilt, reshuffled deck — and took every player's chips
+with them. `assertCardsConserved` skips `RESET`, so nothing caught it.
+
+Fixed as `static survivesReset` on the PILEABLE: `false` for a card,
+`true` for a chip or token, so `RESET` never asks what a chip is. A hand
+is still dropped outright, UNLESS its owner was holding something a
+reset does not destroy — the alternative is silently destroying chips
+someone picked up.
+
+**The whole deck.** `lastDealCount` (main.js) is seeded from the preset
+on the SHARE SCREEN, which a resumed table never shows — so a restored
+game kept the module-load default: the first preset's hand size, War's
+26, which between two players is the entire deck. `gameConfig` had no
+record of the preset's hand size to restore it from.
+
+`gameConfig.cardsPerPlayer` now carries it, and resume reads it back. It
+stays `undefined` when a preset does not set one, rather than defaulting
+to a hand size nobody chose.
+
+Both bugs only appear on a RESUMED table or a table with chips, which is
+why "still busted" was right — earlier passes fixed neither.
+
+### D112. A hand is a pile you can move and merge like any other
+Direct user *fix: "Dropping a hand pile move all the cards to the target
+but does not remove the empty HandPile - remove block on moving hand
+piles."
+
+`MERGE_PILE` threw for a `hand` source, so the pile-level merge never
+ran. `HandPile.reparentable` was `false`, blocking `MOVE_PILE` too. Both
+lifted: a hand's seat placement is a layout preference rather than a
+game rule, and the Core invariant points this way. `deck` stays blocked
+for merge, because merging the deck away leaves nothing to draw from;
+that is a different question and was not asked.
+
+**The emptied hand STAYS — user correction after a first wrong reading.**
+I first read "does not remove the empty HandPile" as the defect and made
+the merge delete it; the user's correction was "I said DONT delete the
+hand pile when dropped we need to keep it around for the next draw."
+They were describing the behaviour they wanted, not the bug.
+
+`static keepWhenEmptied` on the pile class: `false` by default, because
+an ordinary pile exists BECAUSE it holds something and merging it away
+should remove it; `true` on `HandPile`, because a hand is the player's
+permanent seat fixture. `ensureHandPile` would rebuild one eventually,
+but only on an action that needs it — the seat would visibly vanish in
+between, which is exactly what the user was describing.
+
+**`MERGE_PILE` also had to learn the hand rules D102 established.** It
+concatenates raw cards rather than going through `transferCard`, so
+merged cards arrived on the table still owned and face-down — every card
+moved correctly and it still looked broken. Cards leaving a hand are now
+made public and face-up, and cards arriving in one are restamped, the
+same as every single-card transfer.
+
+### D110. A chip tray is stacks, not a row — and a chip knows where it belongs
+Four *nits in a row on the same feature, each correcting the one before,
+so the reasoning is recorded together.
+
+**"stacked chips should be in separate piles by denomination... an
+overlapping row doesn't make sense with chips."** `ChipPile` first
+reused `<pile-panel>`, which lays every pileable out in ONE overlapping
+row. Right for cards, where the row IS the pile; wrong for chips, where
+a mixed row reads as a smear and the sorting `ChipPile` maintains buys
+nothing visible. `<chip-tray>` renders one COLUMN per denomination, each
+column via the same `renderPileCards` every other kind uses — so every
+chip keeps its drag, menu and targeting wiring, and only the layout
+differs. That is the same split `<fan-pile>` and `<deck-stack>` make.
+
+**"actually stacked like a deck one on top of the other."** A card fan
+stops at `MAX_SPREAD` so every covered card keeps a readable corner
+index. A chip stack has no index to preserve — you read the top chip,
+exactly like a deck — so the ceiling became `static maxSpread` per pile
+TYPE (0.85 for cards, 0.97 for chips) rather than one global number.
+The reason for the limit differs by kind, so the limit should too.
+
+**"if i press a button that looks like '<-' it should tighten and '->'
+should loosen."** Took three passes. The glyphs were `⇤`/`⇥` — arrows to
+a BAR, which read as tab stops as much as directions — and my first fix
+changed their ORDER rather than the mapping, on an earlier and
+differently-worded version of the request. Now plain `←`/`→` mapped by
+direction, which has nothing left to misread. Worth remembering: when a
+user restates a UI request, the restatement supersedes; do not try to
+satisfy both.
+
+**"drops in chipstacks should add the chips to the existing piles."**
+Dropping a pileable on a zone's EMPTY space creates a new pile — right
+for cards, where that gesture is the point, and the cause of "chip piles
+keep duplicating": every near-miss around a tray landed on the zone's
+drop gutter and left another chip pile behind.
+
+Expressed as `static homePileKind` on the PILEABLE ("where do I
+belong?"), `'chip'` for chips and `undefined` for everything else, so
+the drop site asks the pileable and never learns what a chip is. The
+source pile is deliberately NOT excluded from that lookup — the tray a
+chip came from is usually the tray it should return to, and excluding it
+was why the first attempt still spawned a pile on every gutter drop.
+
+**Also fixed here: resuming a table duplicated every per-player pile.**
+A host's id is a peer id, not a `playerKey`, so it changes each session
+and `resumeHostedTable` re-seats them — by DROPPING the saved host entry
+and JOINing under the new id. JOIN then saw an unknown player and built
+their declared `perPlayer` piles again, leaving the originals orphaned
+under a dead id: two chip trays, with the host's actual chips in the
+wrong one. `reseatOwner` MOVES the player, their piles and contents,
+their zones and their score onto the new id instead, so JOIN recognises
+them and creates nothing. Pre-existing for every `perPlayer` declaration
+(Spit's stock, RtG's battlefield/discard/exile) — a stocked chip tray
+merely made it impossible to miss.
+
+**Two later *nits on the same tray.** The corner badge stamps a chip
+tray's total VALUE rather than its chip count — "17 chips" is not what a
+player is tracking, "$271" is — via `static badge(pile)` on the pile
+type, so what a badge says is the kind's own business (a deck's explicit
+`count` still wins for a deck). Denominations render `$`-prefixed and
+CENTRED: they sat top-left while chips were a flat row, so a covered
+chip still showed its number, but in a real stack only the top chip is
+readable anyway.
+
+**And one reversal worth naming.** `ChipPile.insertPileable` was fixed
+earlier to HONOUR a drop's `layout` (US-32/33 stack-vs-overlap), because
+back then a tray was one flat row and stacking could only come from the
+drop. It now STRIPS it: `<chip-tray>` stacks natively, so a per-card
+layout only contributed its own margins — a dropped chip sat out of line
+with the stack it joined, and shifted the whole column sideways when it
+landed first in one. A tray's arrangement belongs to the kind, by
+denomination; the drop point has no say. Both directions were right for
+the design that existed at the time, which is why the reasoning is
+recorded rather than just the outcome.
+
+**Every one of these was found by driving the real app**, and three of
+them (the sideways-fanning stack, the gutter drop, the misaligned
+dropped chip) only by asserting GEOMETRY and simulating HTML5 drag
+events, which Playwright cannot synthesise on its own. The stack rule also had to be moved AFTER the
+generic overlap rule to win on specificity — a class that is present but
+loses is indistinguishable from one that works, unless something
+measures the result.
+
+### D109. Chips have denominations, their own pile kind, and make change
+Direct user *fix: "we need a good default piletype for chips they should
+be stacked by denom and have actions for braking large denom to smaller
+denom - dont show non-chip piletypes in the menu and as always no back
+compat just fix."
+
+**This reverses the pileObjects sprint's own scope ruling**, on the
+user's instruction. That sprint asked directly whether chips carry
+value, was told they do not, and recorded "chips carry no value" as the
+reason `ChipPileable.sortActions` was empty and denominations were out
+of scope. Breaking a denomination is meaningless without one, so the
+ruling changed and everything derived from it changed with it — the
+empty sort list was a CONSEQUENCE of that ruling, not an independent
+decision, and leaving it would have been the inconsistency.
+
+**Decided:**
+
+- `CHIP_VALUES` maps colour to denomination (white 1, red 5, blue 10,
+  green 25, black 100). One table; `COLOUR_FOR_VALUE` is derived from it
+  rather than kept as a second table that could drift.
+- `ChipPile`, a registered pile kind and the default for every chip
+  supply. `insertPileable` places a chip in its own denomination group,
+  highest first, so a tray is sorted by construction and never needs
+  tidying. `canAccept` is inherited UNCHANGED — the Core invariant
+  ("fully permissive drag and drop... no matter what") outranks
+  tidiness, and a pile that rejected things for presentation reasons
+  would be the first in this codebase.
+- `BREAK_CHIP` replaces one chip with the largest smaller denomination
+  that divides it evenly: a 25 becomes five 5s, a 100 four 25s, a 1
+  cannot be broken. Value is conserved; object COUNT is not, and that is
+  the point.
+- `static stock()` on `Pile` — how a kind arranges a batch it is stocked
+  with. Identity by default (a deck's stocking order IS its shuffle);
+  `ChipPile` sorts. Added because "stacked by denom" has to be true of
+  the tray a player is FIRST shown, and declared stock never passes
+  through `insertPileable`.
+- A kind OPTS IN to a conversion restriction via `static
+  convertibleKinds`; only `ChipPile` does, returning `['chip']`. Its
+  absence means every kind, which keeps D87 true for cards. Opting in is
+  also what keeps `Pile.js` out of a circular import, since enumerating
+  the registry needs `pileTypes.js`, which imports `Pile.js`.
+  `changePileType` is then ABSENT rather than disabled when there is
+  nowhere to convert to — a menu whose one entry is the status quo is a
+  dead control.
+
+**`assertCardsConserved` now states what each action may do**, rather
+than being switched off for either exception: `JOIN` may only ADD (a
+player brings a chip stack; nothing should vanish because someone sat
+down), `BREAK_CHIP` may add AND consume. Duplication remains an error
+for both, because it is never legitimate for either.
+
+**Three gaps in the first cut, all found by driving a real browser and
+none visible to a unit test** — the same pattern as D104 and D108:
+`disabledActions` was never given the pile's cards, so it inspected a
+BARE instance and disabled Make change on every tray however many
+breakable chips it held; `ChipPile.defaultSpread` sat at `MAX_SPREAD`,
+leaving Tighten permanently disabled and reading as broken; and a
+stocked tray arrived in shuffled order. A chip also now RENDERS its
+denomination — a tray sorted by value that doesn't show the values is
+unreadable, and "make change" is unverifiable without them.
+
+### D108. A physical card's id must be unique per BUILD, not per deck
+Found 2026-09-03 while adding a token supply to the Recard the Gathering
+preset (direct user request, "chips in the poker and tokens in rtg").
+Not caused by that work — it reproduces on the previous commit.
+
+**The bug.** D80 says "each physical card gets a unique instance id",
+and `${printedId}#${copy}` is unique WITHIN one deck. It repeats in
+every deck containing the same printed card, and the RtG preset puts
+FIFTEEN decks on one table where basic lands appear in most of them. So
+that table started with roughly ninety duplicate ids.
+
+That is not cosmetic. `assertCardsConserved` (D88) treats the ids in
+play as a closed set, and `reduce` runs it on every action except
+`RESET` — so the first action, which is always `JOIN`, threw. **Creating
+a Recard the Gathering table failed outright, and had done since the
+preset shipped.** No test caught it because every deck test built ONE
+deck, and the preset tests built state without joining a player.
+
+**Decided:** a build-scoped random token in the instance id
+(`${printedId}#${batch}-${copy}`). `printedId` still repeats across
+copies and decks, deliberately — four copies of a card share one
+picture, and art keys off it. The same fix applies to the `chips` deck
+type, where a `perPlayer` poker stack builds the same list once per
+player and hit the identical collision the moment a second player
+joined.
+
+**Two lessons worth more than the fix.** A guard is only as good as the
+scenario that reaches it: D88 was correct and had been reporting nothing
+because nothing exercised a multi-deck table through a real `JOIN`. And
+"unique" in a comment is a claim about a SCOPE — D80's was true per deck
+and false per table, which is exactly the kind of thing a test that
+builds two of something catches and a test that builds one never will.
+
+**Related, same sweep:** the RtG card field holding a printed id was
+called `cardId`, and the pileObjects rename turned it into
+`pileableId` — colliding in meaning with the reducer payload field of
+that name, which identifies WHICH pileable rather than what is printed
+on it. It is `printedId` now.
+
+**Follow-up fix (user-reported, same day): the token generator must GUARD
+`crypto.randomUUID`.** Both deck builders called it bare, and it exists
+only in a SECURE CONTEXT — so over plain HTTP on a LAN address, which is
+exactly how this app is played (one machine hosts, the others join by
+IP), it is undefined and Create Table threw
+`crypto.randomUUID is not a function` for every preset with a chip
+supply. Two callers already guarded it (`state.js`'s `randomPileId`,
+`identity.js`'s `newPlayerKey`); these did not. Now one shared
+`batchToken()` (`src/decks/batchToken.js`), guarded, with a regression
+test that deletes `randomUUID` and builds a deck anyway.
+
+The lesson is about the deployment model, not the API: localhost is a
+secure context and a browser test on localhost passes happily, so this
+class of bug is invisible unless the test simulates the context the app
+actually runs in. The regression test does.
+
+A second crash came with it, and was a genuinely separate incomplete
+precondition: the motion-flush interval guarded on `session` but not
+`gameState`, and `relayMotion` reads `gameState.players`. Any pointer
+movement before a table exists — or after a JOIN that threw, which is how
+it surfaced — crashed every flush. Guarded at the interval rather than
+inside `relayMotion`, so the same hole isn't left for the next reader of
+`gameState` in that loop.
 
 ### D107. `Pileable` — the type of a thing in a pile (sprint pileObjects)
 Sprint pileObjects, US-101..105. The user confirmed Chips and Tokens

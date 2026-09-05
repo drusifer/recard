@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PILEABLE_TYPES, pileableFor, sortActionsFor } from '../src/pileables/pileableTypes.js';
+import { PILEABLE_TYPES, pileableFor, sortActionsFor, homePileKindFor } from '../src/pileables/pileableTypes.js';
 import { Pileable } from '../src/pileables/Pileable.js';
 import { CardPileable } from '../src/pileables/CardPileable.js';
 import { ChipPileable } from '../src/pileables/ChipPileable.js';
@@ -126,17 +126,24 @@ test('a chip with no colour still renders - it degrades, it does not throw or bl
 // Smith Gate 1 condition B, at the type level: nothing to order by, so
 // nothing is offered. An action that rearranges a pile unpredictably is
 // worse than no action.
-test('chips and tokens offer NO sort actions; cards offer rank and suit', () => {
-  assert.deepEqual(ChipPileable.sortActions, []);
+// UPDATED by the chip-denomination *fix: chips carry a value now, so
+// they have a real ordering and offer a sort. Tokens still do not - a
+// label is not a rank, which is what the original reasoning said and
+// remains true for them.
+test('chips sort by denomination, tokens offer no sort, cards offer rank and suit', () => {
+  assert.deepEqual(ChipPileable.sortActions, ['sortDenom']);
   assert.deepEqual(TokenPileable.sortActions, []);
   assert.deepEqual(CardPileable.sortActions, ['sortRank', 'sortSuit']);
 });
 
-// The distinguisher is presentational ONLY (the user's "no new
-// behaviour" ruling). If a colour ever became orderable, this test is
-// what should fail first.
-test('colour is presentational - it gives a chip no ordering, so no sort appears', () => {
-  assert.deepEqual(ChipPileable.sortActions, [], 'even though chips carry a colour');
+// This test used to assert the opposite - that a chip's colour was
+// presentational and gave it no ordering. The user later ruled that
+// chips carry denominations and can be broken down, so colour now MAPS
+// to a value. Rewritten rather than deleted: what it guards is that the
+// mapping is real and total, since `BREAK_CHIP` depends on it.
+test('a chip\'s colour maps to a denomination, for every colour a supply builds', () => {
+  const chips = buildDeck({ type: 'chips', deckList: 'standard-chips' });
+  assert.ok(chips.every((chip) => typeof chip.denom === 'number'), 'no chip is left without a value');
 });
 
 // A token carries a label as well as a colour. Asserted as a FIELD
@@ -160,4 +167,26 @@ test('sortActionsFor: the intersection is order-independent', () => {
   const chipFirst = sortActionsFor([{ pileableType: 'chip' }, { pileableType: 'card' }]);
   assert.deepEqual(cardFirst, chipFirst);
   assert.deepEqual(cardFirst, []);
+});
+
+
+// *nit (direct user request): "drops in chipstacks should add the chips
+// to the existing piles". Dropping a pileable on a zone's EMPTY space
+// creates a new pile - right for cards, where making a new pile is the
+// point, and wrong for chips: every near-miss around the tray spawned
+// another chip pile, which is also what "chip piles keep duplicating"
+// turned out to be.
+//
+// Expressed as a property of the PILEABLE ("where do I belong?"), not a
+// `kind === 'chip'` branch at the drop site.
+test('a chip declares the pile kind it belongs in; a card declares none', () => {
+  assert.equal(homePileKindFor({ pileableType: 'chip' }), 'chip');
+  assert.equal(homePileKindFor({ pileableType: 'card' }), undefined);
+  assert.equal(homePileKindFor({}), undefined, 'an unmarked record is a card, which has no home');
+});
+
+// A token is NOT a chip: it has no dedicated pile kind, so it keeps the
+// ordinary "drop on empty space makes a new pile" behaviour.
+test('a token has no home pile kind - only chips claim one', () => {
+  assert.equal(homePileKindFor({ pileableType: 'token' }), undefined);
 });

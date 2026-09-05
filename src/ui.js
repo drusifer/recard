@@ -7,7 +7,7 @@ import { seatPosition } from './seating.js';
 import { PILE_TYPES } from './piles/pileTypes.js';
 import { ZONE_TYPES } from './zones/zoneTypes.js';
 import { pileableFor } from './pileables/pileableTypes.js';
-import { CHANGE_PILE_TYPE_KINDS, pileKindLabel, pileInstanceFor } from './piles/pileTypes.js';
+import { convertibleKindsFor, pileKindLabel, pileInstanceFor } from './piles/pileTypes.js';
 
 /**
  * The card SHELL, shared by every card face (D76). The `<button>`, its
@@ -1173,7 +1173,9 @@ export function renderPileShell(container, pile, allPiles, options, buildRow) {
   // `count` explicitly; every other kind's is just its real array).
   const countBadge = document.createElement('span');
   countBadge.className = 'pile-count-badge';
-  countBadge.textContent = pile.count ?? pile.cards.length;
+  // *nit: what the badge SAYS is the pile kind's own business now - a
+  // chip tray stamps its total value, everything else its count.
+  countBadge.textContent = (PILE_TYPES[pile.kind] ?? PILE_TYPES.plain).badge(pile);
   container.append(countBadge);
 
   // UX follow-up (direct user request): "like zones, Piles are
@@ -1240,7 +1242,7 @@ export function renderPileShell(container, pile, allPiles, options, buildRow) {
       // resolved here because only this layer knows whether this pile
       // has ever been adjusted; the class only knows its type's default.
       disabled: disabledPileActionsFor(pile.kind, pile.count ?? pile.cards.length,
-        { spread: effectiveSpread(pile) }),
+        { spread: effectiveSpread(pile), cards: pile.cards }),
       // US-61 (Sprint 23), Smith's ruling (Phase 70): `take` confirms
       // unconditionally EXCEPT a 1-card pile, where it's identical in
       // effect to that card's own un-confirmed single-card `pickup`.
@@ -1261,7 +1263,10 @@ export function renderPileShell(container, pile, allPiles, options, buildRow) {
       enumOptions: {
         changePileType: {
           value: pile.kind,
-          choices: CHANGE_PILE_TYPE_KINDS.map((kind) => ({ value: kind, label: pileKindLabel(kind) })),
+          // *fix (direct user request): "dont show non-chip piletypes in
+          // the menu" - the choices are the PILE'S own, not every kind
+          // that exists (`convertibleKindsFor`, D87 unchanged for cards).
+          choices: convertibleKindsFor(pile.kind).map((kind) => ({ value: kind, label: pileKindLabel(kind) })),
         },
       },
       // *nit (2026-08-26): rename affordance, any player.
@@ -1881,6 +1886,16 @@ function attachPanelResize(panelElement, id, onResize) {
  * set) and directly by the pre-game preview screen (`#host-deck-area`,
  * no opts - no host controls exist on that screen at all).
  */
+/**
+ * How many decorative layers sit under the deck's top card - purely a
+ * visual sense of thickness, capped so a 52-card deck doesn't render 51
+ * elements nobody can see. One layer per ~8 cards reads as "thick",
+ * "half", "nearly gone" without anyone counting them.
+ */
+function deckDepth(count) {
+  return Math.min(5, Math.floor((count - 1) / 8));
+}
+
 export function renderDeckStack(container, count, options = {}) {
   container.replaceChildren();
   // `classList.add`, not `className =` - `#host-deck-area` (the pre-game
@@ -1906,6 +1921,33 @@ export function renderDeckStack(container, count, options = {}) {
     // absent on the pre-game preview screen (`#host-deck-area`, no
     // game running yet), which stays a plain inert visual exactly as
     // before.
+    // *nit (direct user request): "show the stacking for the deck of
+    // cards. right now it looks like there's only 1 card there."
+    //
+    // This REVERSES D66/D67, which removed decorative backs on an
+    // earlier direct correction ("I should only see 1 card"). Both are
+    // recorded because the reason differs: that removal was about there
+    // being three DRAGGABLE cards where one card should be; these layers
+    // are inert (`pointer-events: none`, `aria-hidden`) and exist only
+    // to give the deck depth. Exactly one real, draggable card still
+    // sits on top, which is the part that correction was protecting.
+    //
+    // Depth scales with the deck so a thick one looks thick and the last
+    // few cards visibly thin out - the count badge says the number, this
+    // says "a lot" or "nearly gone" at a glance.
+    // *nit: the box has to grow with the stack, or a full deck's lowest
+    // layers are clipped ("a full deck needs a little more room then an
+    // empty one"). Set from the real layer count so it shrinks back too.
+    const depth = deckDepth(count);
+    stack.style.setProperty('--deck-depth', `calc(${depth} * var(--stack-step))`);
+    stack.style.setProperty('--deck-drift', `calc(${depth} * var(--stack-step-x))`);
+    for (let layer = depth; layer > 0; layer--) {
+      const shim = document.createElement('div');
+      shim.className = 'deck-stack-layer';
+      shim.style.setProperty('--layer', String(layer));
+      shim.setAttribute('aria-hidden', 'true');
+      stack.append(shim);
+    }
     const back = cardBackElement(options.topCard);
     back.classList.add('deck-stack-card');
     stack.append(back);

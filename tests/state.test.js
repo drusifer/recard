@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createInitialState, reduce, viewFor, deckOf, handOf, handsOf, pilesOf, pileVisibility, assertCardsConserved } from '../src/state.js';
+import { createInitialState, reduce, viewFor, deckOf, handOf, handsOf, pilesOf, pileVisibility, assertCardsConserved, reseatOwner } from '../src/state.js';
 import { PILE_TYPES } from '../src/piles/pileTypes.js';
 import { SPREAD_STEP, MIN_SPREAD, MAX_SPREAD } from '../src/piles/Pile.js';
 
@@ -52,12 +52,14 @@ test('createInitialState: empty roster, full shuffled deck, one empty default zo
 
 test('createInitialState: gameConfig.allowsPlayerZones defaults true - matches every prior sprint\'s behavior exactly', () => {
   const state = createInitialState({}, () => 0.5);
-  assert.deepEqual(state.gameConfig, { allowsPlayerZones: true, tableZone: true, piles: [], zones: [] });
+  // `cardsPerPlayer` joined the shape when a restored table needed to
+  // recover its own deal size; `undefined` when no preset set one.
+  assert.deepEqual(state.gameConfig, { allowsPlayerZones: true, tableZone: true, piles: [], zones: [], cardsPerPlayer: undefined });
 });
 
 test('createInitialState: allowsPlayerZones can be set false via the third param', () => {
   const state = createInitialState({}, () => 0.5, { allowsPlayerZones: false });
-  assert.deepEqual(state.gameConfig, { allowsPlayerZones: false, tableZone: true, piles: [], zones: [] });
+  assert.deepEqual(state.gameConfig, { allowsPlayerZones: false, tableZone: true, piles: [], zones: [], cardsPerPlayer: undefined });
 });
 
 test('CREATE_ZONE: rejected when the game disallows player zones', () => {
@@ -1752,11 +1754,10 @@ test('MOVE_PILE: the deck can now be reparented into a different Zone', () => {
   assert.equal(deckOf(state).length, 52);
 });
 
-test('MOVE_PILE: rejects hand/foundation/cascade/rankAdjacent - only zone/discard/deck piles are eligible', () => {
-  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
-  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 1 });
-  assert.throws(() => reduce(state, { type: 'MOVE_PILE', pileId: 'hand:p1', targetZoneId: 'table-zone' }), /Cannot move/);
-
+// UPDATED: `hand` was removed from this list by direct user request
+// ("remove block on moving hand piles"); it is covered by its own test
+// above, which asserts a hand DOES move now.
+test('MOVE_PILE: rejects foundation/cascade/rankAdjacent - the Meld family is what stays fixed', () => {
   // *nit fix (Trin, 2026-08-26): the test name promised
   // foundation/cascade/rankAdjacent coverage but never actually
   // exercised any of the three through a real reducer call - caught
@@ -1847,7 +1848,9 @@ test('MERGE_PILE: appends the source\'s cards after the target\'s own, in their 
   assert.equal(merged.kind, 'plain', 'target keeps its own kind, not the source\'s');
 });
 
-test('MERGE_PILE: rejects merging a pile into itself, an unknown target, a deck/hand source, or the default Table pile', () => {
+// UPDATED: a `hand` source is allowed now (direct user request) - see
+// the hand-merge tests above. A `deck` source still is not.
+test('MERGE_PILE: rejects merging a pile into itself, an unknown target, a deck source, or the default Table pile', () => {
   let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
   state = reduce(state, { type: 'CREATE_ZONE', name: 'Solo', kind: 'plain' });
   const solo = pilesOf(state).find((z) => z.name === 'Solo');
@@ -1867,9 +1870,11 @@ test('MERGE_PILE: rejects merging a pile into itself, an unknown target, a deck/
     () => reduce(state, { type: 'MERGE_PILE', playerId: 'p1', pileId: 'deck', targetPileId: solo.id }),
     /Cannot merge/,
   );
-  assert.throws(
+  // A hand USED to be rejected here and is allowed now (direct user
+  // request) - asserted positively rather than deleted, so the change is
+  // visible at the place that used to forbid it.
+  assert.doesNotThrow(
     () => reduce(state, { type: 'MERGE_PILE', playerId: 'p1', pileId: 'hand:p1', targetPileId: solo.id }),
-    /Cannot merge/,
   );
   assert.throws(
     () => reduce(state, { type: 'MERGE_PILE', playerId: 'p1', pileId: 'table', targetPileId: solo.id }),
@@ -3036,4 +3041,212 @@ test('an unadjusted pile carries spread: undefined in its view, so the type defa
   let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
   state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
   assert.equal(viewFor(state, 'p1').piles.find((p) => p.id === 'hand:p1').spread, undefined);
+});
+
+// D88's conservation guard, narrowed rather than switched off for JOIN
+// (sprint pileObjects follow-up). A player joining a poker table brings
+// their own chip stack, so ids legitimately APPEAR at JOIN - the same
+// way a deck appears at RESET. The two failure modes that actually
+// matter, losing a card and duplicating one, still throw.
+test('conservation: JOIN may introduce a declared per-player stock - ids appearing is legal there', () => {
+  let state = createInitialState({}, () => 0.5, {
+    piles: [{ kind: 'plain', ownerId: 'perPlayer', count: 1, deckType: 'chips', deckList: 'poker-stack' }],
+  });
+  assert.doesNotThrow(() => reduce(state, { type: 'JOIN', playerId: 'p1', name: 'Alice' }));
+});
+
+test('conservation: JOIN still catches a LOST card, which is never legitimate', () => {
+  const before = createInitialState({}, () => 0.5);
+  const after = { ...before, piles: before.piles.map((p) => (p.kind === 'deck' ? { ...p, cards: p.cards.slice(1) } : p)) };
+  assert.throws(() => assertCardsConserved(before, after, 'JOIN'), /missing/);
+});
+
+test('conservation: JOIN still catches a DUPLICATED card', () => {
+  const before = createInitialState({}, () => 0.5);
+  const deck = before.piles.find((p) => p.kind === 'deck');
+  const after = { ...before, piles: before.piles.map((p) => (p.kind === 'deck' ? { ...p, cards: [...p.cards, deck.cards[0]] } : p)) };
+  assert.throws(() => assertCardsConserved(before, after, 'JOIN'), /duplicated/);
+});
+
+
+// --- Resuming a table must not duplicate per-player piles ------------
+//
+// *fix (direct user report): "chip tray dups again when resuming an
+// existing game". A host's id is a PEER id, not a playerKey, so it is
+// different every session - `resumeHostedTable` re-seats them under the
+// new one. JOIN then sees an unknown player and builds their declared
+// `perPlayer` piles again, while the saved originals stay behind under
+// the dead id. The visible symptom is two chip trays; the worse one is
+// that the host's own chips are in the orphaned tray.
+//
+// Pre-existing for every perPlayer declaration (Spit's stock, RtG's
+// battlefield/discard/exile) - chips only made it obvious, because a
+// stocked tray is impossible to miss.
+
+test('reseatOwner: moves a player, their piles, their zones and their score to a new id', () => {
+  let state = createInitialState({}, () => 0.5, {
+    piles: [{ kind: 'chip', ownerId: 'perPlayer', count: 1, deckType: 'chips', deckList: 'poker-stack' }],
+  });
+  state = reduce(state, { type: 'JOIN', playerId: 'old-host', name: 'Alice' });
+  const before = pilesOf(state).filter((p) => p.ownerId === 'old-host');
+  assert.equal(before.length, 1);
+
+  const moved = reseatOwner(state, 'old-host', 'new-host');
+  assert.equal(moved.players.filter((p) => p.id === 'new-host').length, 1);
+  assert.equal(moved.players.some((p) => p.id === 'old-host'), false, 'the old id is gone entirely');
+
+  const after = pilesOf(moved).filter((p) => p.ownerId === 'new-host');
+  assert.equal(after.length, 1, 'their pile came with them');
+  assert.equal(after[0].cards.length, before[0].cards.length, 'and kept its chips');
+  assert.ok(!after[0].id.includes('old-host'), `a derived id must not keep the dead one: ${after[0].id}`);
+  assert.ok(moved.zones.every((z) => !z.id.includes('old-host')), 'zones move too');
+});
+
+test('reseatOwner: a table with no such player is returned untouched', () => {
+  const state = createInitialState({}, () => 0.5);
+  assert.deepEqual(reseatOwner(state, 'nobody', 'someone'), state);
+});
+
+// The regression itself, end to end: resume re-seats, then JOINs.
+test('resuming a table re-seats the host WITHOUT duplicating their per-player piles', () => {
+  let saved = createInitialState({}, () => 0.5, {
+    piles: [{ kind: 'chip', ownerId: 'perPlayer', count: 1, deckType: 'chips', deckList: 'poker-stack' }],
+  });
+  saved = reduce(saved, { type: 'JOIN', playerId: 'peer-1', name: 'Alice' });
+  const chipsBefore = pilesOf(saved).find((p) => p.kind === 'chip').cards.length;
+
+  // Exactly what `resumeHostedTable` does: re-seat the old host id onto
+  // this session's new peer id, then JOIN as that id.
+  const reseated = reseatOwner(saved, 'peer-1', 'peer-2');
+  const resumed = reduce(reseated, { type: 'JOIN', playerId: 'peer-2', name: 'Alice' });
+
+  const trays = pilesOf(resumed).filter((p) => p.kind === 'chip');
+  assert.equal(trays.length, 1, `one tray, not ${trays.length}`);
+  assert.equal(trays[0].ownerId, 'peer-2', 'and it belongs to the resumed host');
+  assert.equal(trays[0].cards.length, chipsBefore, 'with their chips still in it');
+});
+
+test('resuming twice still leaves exactly one tray', () => {
+  let state = createInitialState({}, () => 0.5, {
+    piles: [{ kind: 'chip', ownerId: 'perPlayer', count: 1, deckType: 'chips', deckList: 'poker-stack' }],
+  });
+  state = reduce(state, { type: 'JOIN', playerId: 'peer-1', name: 'Alice' });
+  for (const [from, to] of [['peer-1', 'peer-2'], ['peer-2', 'peer-3']]) {
+    state = reduce(reseatOwner(state, from, to), { type: 'JOIN', playerId: to, name: 'Alice' });
+  }
+  assert.equal(pilesOf(state).filter((p) => p.kind === 'chip').length, 1);
+});
+
+
+// *fix (direct user report): "reshuffle and redeal is still busted -
+// deals whole deck". `lastDealCount` (main.js) is seeded from the
+// preset on the share screen - which a RESUMED table never shows, so it
+// kept its module-load default: the FIRST preset's hand size, War's 26.
+// Two players x 26 is the entire deck. `gameConfig` had no record of the
+// preset's hand size at all, so resume had nothing to restore it from.
+test('gameConfig carries cardsPerPlayer, so a restored table can recover its deal size', () => {
+  const state = createInitialState({}, () => 0.5, { cardsPerPlayer: 7 });
+  assert.equal(state.gameConfig.cardsPerPlayer, 7);
+});
+
+test('gameConfig.cardsPerPlayer is undefined when a preset does not set one - no invented default', () => {
+  assert.equal(createInitialState({}, () => 0.5).gameConfig.cardsPerPlayer, undefined);
+});
+
+// It has to SURVIVE a reset, or the same bug returns the moment someone
+// reshuffles on a restored table.
+test('gameConfig.cardsPerPlayer survives a RESET', () => {
+  let state = createInitialState({}, () => 0.5, { cardsPerPlayer: 7 });
+  state = reduce(state, { type: 'JOIN', playerId: 'p1', name: 'Alice' });
+  assert.equal(reduce(state, { type: 'RESET' }).gameConfig.cardsPerPlayer, 7);
+});
+
+
+// --- Dropping a hand pile onto another pile --------------------------
+//
+// *fix (direct user report): "Dropping a hand pile move all the cards to
+// the target but does not remove the empty HandPile - remove block on
+// moving hand piles". `MERGE_PILE` threw for a `hand` source, so the
+// pile-level merge (which is what removes the emptied source) never ran.
+
+// CORRECTED by the user after the first attempt removed it: "I said
+// DONT delete the hand pile when dropped we need to keep it around for
+// the next draw." A hand is the player's permanent seat fixture, not a
+// transient pile that exists only while it holds something - dropping
+// your hand onto the table empties it, it does not remove your seat.
+test('MERGE_PILE: a hand merges its cards away but the hand itself STAYS, empty, for the next draw', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
+  const before = tableOf(state).cards.length;
+
+  state = reduce(state, { type: 'MERGE_PILE', playerId: 'p1', pileId: 'hand:p1', targetPileId: 'table' });
+
+  assert.equal(tableOf(state).cards.length, before + 3, 'every card moved');
+  const hand = state.piles.find((p) => p.id === 'hand:p1');
+  assert.ok(hand, 'the hand pile is still there');
+  assert.deepEqual(hand.cards, [], 'and it is empty');
+});
+
+test('MERGE_PILE: the kept hand really is usable for the next draw', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
+  state = reduce(state, { type: 'MERGE_PILE', playerId: 'p1', pileId: 'hand:p1', targetPileId: 'table' });
+
+  state = reduce(state, { type: 'DRAW', playerId: 'p1', pileId: 'deck' });
+  assert.equal(handOf(state, 'p1').length, 1, 'drawing lands in the hand that was kept');
+  assert.equal(state.piles.filter((p) => p.id === 'hand:p1').length, 1, 'and no second hand was created');
+});
+
+// Every other kind is still removed once merged away - an ordinary pile
+// exists because it has cards in it.
+test('MERGE_PILE: an ordinary pile IS removed once merged away', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Spare' });
+  const spare = pilesOf(state).find((z) => z.name === 'Spare');
+  state = reduce(state, { type: 'MERGE_PILE', playerId: 'p1', pileId: spare.id, targetPileId: 'table' });
+  assert.equal(state.piles.some((p) => p.id === spare.id), false);
+});
+
+// D102's rule, which `MERGE_PILE` bypassed because it concatenates raw
+// cards instead of going through `transferCard`: a card leaving a hand
+// for the table is public and face-up. Without this the merged cards
+// arrived owned and face-down, looking like a bug.
+test('MERGE_PILE: cards leaving a hand land public and face-up, same as any other way out', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 2 });
+  state = reduce(state, { type: 'MERGE_PILE', playerId: 'p1', pileId: 'hand:p1', targetPileId: 'table' });
+
+  for (const card of tableOf(state).cards) {
+    assert.equal(card.owner, null, 'not still owned by the hand it left');
+    assert.equal(card.faceUp, true, 'and not still face-down');
+  }
+});
+
+test('MERGE_PILE: merging INTO a hand keeps the cards as hand cards', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 1 });
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Spare' });
+  const spare = pilesOf(state).find((z) => z.name === 'Spare');
+  const cardId = handOf(state, 'p1')[0].id;
+  state = reduce(state, { type: 'MOVE', playerId: 'p1', pileableId: cardId, toPileId: spare.id });
+
+  state = reduce(state, { type: 'MERGE_PILE', playerId: 'p1', pileId: spare.id, targetPileId: 'hand:p1' });
+  const card = handOf(state, 'p1').find((c) => c.id === cardId);
+  assert.equal(card.owner, 'p1', 'restamped for the hand it landed in');
+  assert.equal(card.faceUp, false);
+});
+
+test('MERGE_PILE: a deck still cannot be merged - only the hand block was lifted', () => {
+  const state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  assert.throws(() => reduce(state, { type: 'MERGE_PILE', playerId: 'p1', pileId: 'deck', targetPileId: 'table' }),
+    /deck/);
+});
+
+// "remove block on moving hand piles": a hand may be reparented into a
+// different Zone like any other pile.
+test('MOVE_PILE: a hand pile can be moved between zones now', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 2 });
+  state = reduce(state, { type: 'MOVE_PILE', pileId: 'hand:p1', targetZoneId: 'table-zone' });
+  assert.equal(pilesOf(state).find((p) => p.id === 'hand:p1').zoneId, 'table-zone');
 });

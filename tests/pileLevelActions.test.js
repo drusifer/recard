@@ -237,8 +237,10 @@ test('sortActionsFor: a pile of cards offers rank and suit', () => {
     ['sortRank', 'sortSuit']);
 });
 
-test('sortActionsFor: a pile of chips or tokens offers nothing to sort by', () => {
-  assert.deepEqual(sortActionsFor([{ pileableType: 'chip' }, { pileableType: 'chip' }]), []);
+// UPDATED by the chip-denomination *fix: a chip has a value to order by
+// now. A token still does not - a label is not a rank.
+test('sortActionsFor: chips sort by denomination; tokens offer nothing', () => {
+  assert.deepEqual(sortActionsFor([{ pileableType: 'chip' }, { pileableType: 'chip' }]), ['sortDenom']);
   assert.deepEqual(sortActionsFor([{ pileableType: 'token' }]), []);
 });
 

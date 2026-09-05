@@ -14,12 +14,25 @@
  * than wrong, and NOT special-casing it is the point - a chip goes
  * through every path a card does.
  */
+import { batchToken } from './batchToken.js';
+import { CHIP_VALUES } from '../pileables/ChipPileable.js';
 
 /** A palette, not a value scale (Smith Gate 1 condition A). Nothing
  * sums or orders these - `ChipPileable.sortActions` is empty, which is
  * what enforces it. They exist so a player can tell one chip from
  * another at rest. */
 const CHIP_SETS = {
+  /** One player's starting stack (direct user request: "chips in the
+   * poker"). Deliberately small - a poker preset declares this
+   * `perPlayer`, so the count here is multiplied by everyone at the
+   * table, and 40 chips each would bury the table the way the first
+   * Chips & Tokens preset did before Smith's `*user test` caught it. */
+  'poker-stack': [
+    { colour: 'white', count: 6 },
+    { colour: 'red', count: 5 },
+    { colour: 'blue', count: 4 },
+    { colour: 'black', count: 2 },
+  ],
   'standard-chips': [
     { colour: 'white', count: 10 },
     { colour: 'red', count: 10 },
@@ -54,12 +67,31 @@ export function build({ deckList } = {}) {
   if (!set) throw new Error(`Unknown chip/token list: "${deckList}"`);
 
   const pileableType = isTokens ? 'token' : 'chip';
+  // Every BUILD gets its own id namespace. Chips are physically
+  // interchangeable, but their ids are not: `assertCardsConserved` (D88)
+  // treats the set of ids in play as a closed system, so two builds of
+  // the same list - which is exactly what a `perPlayer` poker stack does,
+  // once per player - would hand two players the same `chip-white-0` and
+  // read as a duplication bug. It read as one, immediately: the guard
+  // caught it the moment a second player joined.
+  //
+  // `batchToken` guards `crypto.randomUUID`, which exists only in a
+  // secure context - calling it bare here broke Create Table over plain
+  // HTTP, which is how this app is actually played (host on a LAN, peers
+  // join by IP). The host builds and broadcasts, so nothing depends on
+  // the token being reproducible across clients.
+  const batch = batchToken();
   return set.flatMap(({ colour, label, count }) => {
     const marked = label ? `${label}-` : '';
     return Array.from({ length: count }, (_, index) => ({
-      id: `${pileableType}-${colour}-${marked}${index}`,
+      id: `${pileableType}-${batch}-${colour}-${marked}${index}`,
       pileableType,
       colour,
+      // A chip's denomination comes from its colour, one table
+      // (`CHIP_VALUES`) rather than repeated per set - a green chip is
+      // 25 wherever it was built. Tokens have no denomination: they are
+      // marks, and `TokenPileable.sortActions` stays empty because of it.
+      ...(pileableType === 'chip' && { denom: CHIP_VALUES[colour] }),
       ...(label && { label }),
     }));
   });

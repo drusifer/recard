@@ -24,6 +24,7 @@ import { RankAdjacentPile } from './RankAdjacentPile.js';
 import { BattlefieldPile } from './BattlefieldPile.js';
 import { ExilePile } from './ExilePile.js';
 import { StackPile } from './StackPile.js';
+import { ChipPile } from './ChipPile.js';
 
 export const PILE_TYPES = {
   plain: Pile,
@@ -38,6 +39,9 @@ export const PILE_TYPES = {
   battlefield: BattlefieldPile,
   exile: ExilePile,
   stack: StackPile,
+  // *fix (direct user request): chips get their own default pile kind -
+  // stacked, sorted by denomination, able to break a big chip down.
+  chip: ChipPile,
 };
 
 /**
@@ -62,6 +66,20 @@ export const PILE_TYPES = {
  * drawing/dealing again would have produced two piles sharing one id.
  */
 export const CHANGE_PILE_TYPE_KINDS = Object.keys(PILE_TYPES);
+
+/**
+ * Which kinds THIS pile kind may be converted into (*fix: "dont show
+ * non-chip piletypes in the menu").
+ *
+ * A kind opts in to a restriction by defining `static convertibleKinds`
+ * (only `ChipPile` does); its absence means every registered kind, which
+ * is D87's standing rule. Resolved here rather than on `Pile` because
+ * enumerating the registry from inside `Pile.js` would be a circular
+ * import back into this module.
+ */
+export function convertibleKindsFor(kind) {
+  return PILE_TYPES[kind]?.convertibleKinds?.() ?? CHANGE_PILE_TYPE_KINDS;
+}
 
 /**
  * *nit (direct user request): a change-type MENU needs a human label per

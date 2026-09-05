@@ -34,6 +34,23 @@ export function pileableFor(record) {
 }
 
 /**
+ * Which of these pileables survive a round `RESET` - everything that is
+ * not a card (*fix: "reshuffle and redeal... all the chips disappear").
+ */
+export function survivorsOfReset(cards = []) {
+  return cards.filter((card) => (PILEABLE_TYPES[card?.pileableType] ?? PILEABLE_TYPES.card).survivesReset);
+}
+
+/**
+ * The pile kind this pileable belongs in, or `undefined` if it belongs
+ * anywhere (*nit: "drops in chipstacks should add the chips to the
+ * existing piles"). See `Pileable.homePileKind`.
+ */
+export function homePileKindFor(record) {
+  return (PILEABLE_TYPES[record?.pileableType] ?? PILEABLE_TYPES.card).homePileKind;
+}
+
+/**
  * The sort actions a pile offers for the things it holds (US-104).
  * The INTERSECTION across a mixed pile: an action offered there must be
  * meaningful for everything in it, or it would reorder something by an

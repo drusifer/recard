@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildDeck } from '../src/deck.js';
-import { createInitialState, pilesOf } from '../src/state.js';
+import { createInitialState, pilesOf, reduce } from '../src/state.js';
 import { PRESETS } from '../src/presets.js';
+import { ChipPile } from '../src/piles/ChipPile.js';
 
 /**
  * Sprint pileObjects, Phase 102 (US-105). A chip supply is a DECK_TYPE,
@@ -23,6 +24,16 @@ test('buildDeck: the chips deck type builds chips, not cards', () => {
 // Smith Gate 1 condition A, at the supply level: a supply of identical
 // discs is the failure this condition exists to prevent, so the built
 // supply must actually span colours.
+// The bug the conservation guard caught the moment a second player
+// joined a poker table: two builds of the same list handed both players
+// the same `chip-white-0`.
+test('buildDeck: two builds of the same chip list share no ids', () => {
+  const first = buildDeck({ type: 'chips', deckList: 'poker-stack' }).map((chip) => chip.id);
+  const second = buildDeck({ type: 'chips', deckList: 'poker-stack' }).map((chip) => chip.id);
+  assert.equal(new Set([...first, ...second]).size, first.length + second.length,
+    'every id across both builds is distinct');
+});
+
 test('buildDeck: a chip supply spans more than one colour', () => {
   const colours = new Set(buildDeck({ type: 'chips', deckList: 'standard-chips' }).map((chip) => chip.colour));
   assert.ok(colours.size > 1, `a supply of one colour is the thing Gate 1 rejected: ${[...colours]}`);
@@ -40,8 +51,11 @@ test('buildDeck: rejects an unknown chip list by name, rather than building an e
 
 // The demonstration: the sprint's ONLY user-visible output.
 test('the chips preset puts a real, stocked chip pile on the table with no manual setup', () => {
-  const preset = Object.values(PRESETS).find((p) => p.piles?.some((pile) => pile.deckType === 'chips'));
-  assert.ok(preset, 'a preset declares a chip supply');
+  // Named, not "the first preset with chips": poker declares chips too
+  // now, and its stacks are `perPlayer`, so they only exist once someone
+  // has joined. This test is about the shared demo supply specifically.
+  const preset = PRESETS.find((p) => p.name === 'Chips & Tokens');
+  assert.ok(preset, 'the demo preset declares a chip supply');
 
   // `piles` is read from the THIRD argument (gameConfig), the same way
   // `main.js` assembles it from the chosen preset - not from the deck
@@ -66,11 +80,18 @@ test('every other preset is untouched - none of them gains a chip', () => {
 
 // BUG 2: both supply piles fell back to the default name "Pile", so
 // nothing on screen said which held chips and which held tokens.
-test('the chip and token supplies are NAMED, not both left as the default "Pile"', () => {
-  const preset = PRESETS.find((p) => p.piles?.some((pile) => pile.deckType === 'chips'));
-  const names = preset.piles.filter((pile) => pile.deckType === 'chips').map((pile) => pile.name);
-  assert.ok(names.every(Boolean), `every supply declares a name, got ${JSON.stringify(names)}`);
-  assert.equal(new Set(names).size, names.length, 'and they differ from each other');
+// Widened from the demo preset to EVERY preset that declares a supply,
+// once poker and RtG got one: this used to find "the first preset with
+// chips", which quietly became poker and stopped testing what its name
+// says. An invariant is the honest form of it anyway.
+test('every chip or token supply, in every preset, is NAMED rather than left as the default "Pile"', () => {
+  for (const preset of PRESETS) {
+    const supplies = preset.piles?.filter((pile) => pile.deckType === 'chips') ?? [];
+    if (supplies.length === 0) continue;
+    const names = supplies.map((pile) => pile.name);
+    assert.ok(names.every(Boolean), `${preset.name}: every supply declares a name, got ${JSON.stringify(names)}`);
+    assert.equal(new Set(names).size, names.length, `${preset.name}: supply names differ from each other`);
+  }
 });
 
 // BUG 1: 40 chips rendered flat across three wrapped rows. A declared
@@ -90,10 +111,134 @@ test('a declared pile with no spread is untouched - undefined, so its type defau
   assert.equal(pilesOf(state).find((pile) => pile.id === 'plain-one').spread, undefined);
 });
 
-test('the chip supplies declare a spread, so they stack instead of spanning the table', () => {
-  const preset = PRESETS.find((p) => p.piles?.some((pile) => pile.deckType === 'chips'));
-  const supplies = preset.piles.filter((p) => p.deckType === 'chips');
-  for (const pile of supplies) {
-    assert.ok(pile.spread > 0.5, `${pile.name} should stack, got spread ${pile.spread}`);
+// UPDATED by the chip-pile *fix: a chip supply no longer declares its
+// own spread, because `ChipPile.defaultSpread` stacks it - stacking is a
+// property of the KIND now, not something each preset repeats. A TOKEN
+// supply still declares one, since it sits in a plain pile.
+test('every supply stacks - chips by their pile kind, tokens by declaration', () => {
+  for (const preset of PRESETS) {
+    const supplies = preset.piles?.filter((pile) => pile.deckType === 'chips') ?? [];
+    for (const pile of supplies) {
+      const spread = pile.kind === 'chip' ? ChipPile.defaultSpread : pile.spread;
+      assert.ok(spread > 0.5, `${preset.name}/${pile.name} should stack (kind ${pile.kind}, spread ${spread})`);
+    }
   }
+});
+
+
+// --- Chips in poker, tokens in RtG (direct user request) -------------
+//
+// "chips in the poker and tokens in rtg". The supplies stop being a demo
+// and reach the presets that actually want them: poker is played with
+// chips, and MTG's whole token/counter vocabulary is what `standard-tokens`
+// was modelled on.
+
+const presetNamed = (name) => PRESETS.find((preset) => preset.name === name);
+
+test('both poker presets give every player their OWN chip stack', () => {
+  for (const name of ['Poker — 5 Card Draw', "Texas Hold'em"]) {
+    const preset = presetNamed(name);
+    assert.ok(preset, `${name} exists`);
+    const chips = preset.piles?.filter((pile) => pile.deckType === 'chips') ?? [];
+    assert.equal(chips.length, 1, `${name} declares one chip supply`);
+    // Per player, not one shared bank: in real poker every player has
+    // their own stack, and a single shared pile would make "whose chips
+    // are these" unanswerable the moment two people take from it.
+    assert.equal(chips[0].ownerId, 'perPlayer', `${name} chips are per-player`);
+    assert.ok(chips[0].name, 'and the pile is named');
+  }
+});
+
+test('a poker chip stack is a playable size, not the full 40-chip supply', () => {
+  const stack = presetNamed("Texas Hold'em").piles.find((pile) => pile.deckType === 'chips');
+  const built = buildDeck({ type: 'chips', deckList: stack.deckList });
+  assert.ok(built.length > 0 && built.length <= 20,
+    `a per-player stack should be modest, got ${built.length} chips each`);
+  assert.ok(new Set(built.map((chip) => chip.colour)).size > 1, 'and still span colours');
+});
+
+test('Recard the Gathering gets a shared token supply', () => {
+  const preset = presetNamed('Recard the Gathering');
+  const tokens = preset.piles.filter((pile) => pile.deckType === 'chips' && pile.deckList.includes('token'));
+  assert.equal(tokens.length, 1);
+  // Shared, unlike poker's chips: an MTG token is created onto the
+  // battlefield by whoever needs one, not owned in advance.
+  assert.equal(tokens[0].ownerId, null);
+  assert.ok(tokens[0].name);
+});
+
+// Smith's Gate-1 condition C3 on the RtG sprint: that table is already
+// the most crowded one this app builds. A new panel there must be
+// placed, not left to land wherever.
+test('the RtG token supply has an explicit layout entry, on the most crowded table we build', () => {
+  const preset = presetNamed('Recard the Gathering');
+  const tokens = preset.piles.find((pile) => pile.deckList?.includes('token'));
+  const id = tokens.id ?? tokens.name;
+  assert.ok(preset.layout[id] ?? preset.layout[tokens.id],
+    `token supply needs a layout entry, layout has ${Object.keys(preset.layout)}`);
+});
+
+test('presets that use neither still declare no chips at all', () => {
+  for (const name of ['War', 'Hearts', 'Gin Rummy', 'Pinochle', 'Solitaire', 'Spit']) {
+    const preset = presetNamed(name);
+    assert.ok(!preset.piles?.some((pile) => pile.deckType === 'chips'), `${name} gains nothing`);
+  }
+});
+
+
+// --- perPlayer declarations were never stocked (found live) ----------
+//
+// D81 gave a DECLARED pile the ability to start pre-stocked, but only on
+// the shared path (`buildPiles`). The `perPlayer` path runs at JOIN,
+// where a declaration was destructured down to `{kind, count}` - so
+// `deckList`, `name` and `spread` were silently dropped. Nothing noticed
+// until poker asked for a per-player chip stack and got empty piles
+// called "Alice's Pile". Found by driving the real app, not by a test.
+
+function joinAll(state, names) {
+  let next = state;
+  for (const [index, name] of names.entries()) {
+    next = reduce(next, { type: 'JOIN', playerId: `p${index}`, name, rng: () => 0.5 });
+  }
+  return next;
+}
+
+test('a perPlayer declaration is pre-stocked, exactly like a shared one', () => {
+  let state = createInitialState({}, () => 0.5, {
+    piles: [{ kind: 'plain', ownerId: 'perPlayer', count: 1, name: 'Chips', deckType: 'chips', deckList: 'poker-stack' }],
+  });
+  state = joinAll(state, ['Alice', 'Bob']);
+
+  const stacks = pilesOf(state).filter((pile) => pile.cards.some((item) => item.pileableType === 'chip'));
+  assert.equal(stacks.length, 2, 'one stocked stack per player');
+  assert.ok(stacks.every((pile) => pile.cards.length > 1));
+  assert.notEqual(stacks[0].ownerId, stacks[1].ownerId, 'and they belong to different players');
+});
+
+test('a perPlayer declaration\'s name reaches the pile, inside the possessive', () => {
+  let state = createInitialState({}, () => 0.5, {
+    piles: [{ kind: 'plain', ownerId: 'perPlayer', count: 1, name: 'Chips', deckType: 'chips', deckList: 'poker-stack' }],
+  });
+  state = joinAll(state, ['Alice']);
+  const pile = pilesOf(state).find((p) => p.cards.some((item) => item.pileableType === 'chip'));
+  assert.equal(pile.name, "Alice's Chips", `got "${pile.name}"`);
+});
+
+test('a perPlayer declaration\'s spread reaches the pile too', () => {
+  let state = createInitialState({}, () => 0.5, {
+    piles: [{ kind: 'plain', ownerId: 'perPlayer', count: 1, spread: 0.82 }],
+  });
+  state = joinAll(state, ['Alice']);
+  assert.equal(pilesOf(state).find((p) => p.ownerId === 'p0' && p.kind === 'plain').spread, 0.82);
+});
+
+test('a perPlayer declaration with none of those is unchanged - Spit\'s stock still starts empty and unnamed by declaration', () => {
+  let state = createInitialState({}, () => 0.5, {
+    piles: [{ kind: 'cascade', ownerId: 'perPlayer', count: 1 }],
+  });
+  state = joinAll(state, ['Alice']);
+  const pile = pilesOf(state).find((p) => p.kind === 'cascade');
+  assert.equal(pile.cards.length, 0);
+  assert.equal(pile.spread, undefined);
+  assert.match(pile.name, /Alice's/);
 });

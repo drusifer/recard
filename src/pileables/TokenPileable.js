@@ -15,6 +15,11 @@ import { Pileable } from './Pileable.js';
 export class TokenPileable extends Pileable {
   static sortActions = [];
 
+  /**
+   * A reset redeals the cards; a token is not one of them.
+   */
+  static survivesReset = true;
+
   className() {
     return this.colour ? `card-token token-${this.colour}` : 'card-token';
   }

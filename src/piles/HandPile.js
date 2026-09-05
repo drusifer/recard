@@ -39,7 +39,19 @@ export class HandPile extends Pile {
   // separate rule, `pileActions.js`'s `targetsForAction` explicitly
   // excludes `kind === 'hand'` regardless of this flag.
   static tableSide = true;
-  static reparentable = false;
+  // *fix (direct user report): "remove block on moving hand piles". A
+  // hand may be reparented into another Zone like any other pile now.
+  // The flag existed because a hand's seat placement was assumed fixed;
+  // that is a layout preference, not a game rule, and the Core invariant
+  // ("fully permissive... no matter what") points the other way.
+  static reparentable = true;
+
+  /** A hand is a permanent seat fixture: merging its cards away empties
+   * it rather than removing it, so the next draw has somewhere to land
+   * (direct user correction). `ensureHandPile` would rebuild one, but
+   * only on an action that needs it - the seat would visibly vanish in
+   * between, which is what the user was describing. */
+  static keepWhenEmptied = true;
   /** A hand FANS. This replaces the 0.65 that used to be hardcoded in
    * `style.css` - 0.7, not 0.65, because the CSS formula changed with
    * it: the old rule subtracted the row gap separately

@@ -357,8 +357,14 @@ test('the Chips & Tokens preset puts real chips and tokens on the table, rendere
     const actions = await chipPile.locator('.pile-action-btn, button').evaluateAll(
       (buttons) => buttons.map((button) => button.title),
     );
-    assert.ok(actions.every((title) => !/sort/i.test(title ?? '')),
-      `a chip pile must offer no sort, got ${JSON.stringify(actions)}`);
+    // REVERSED by the chip-denomination *fix: chips carry a value now,
+    // so a tray sorts by it. The original assertion ("no sort at all")
+    // was a consequence of chips having nothing to order by, not an
+    // independent rule, so it changes with the premise.
+    assert.ok(actions.some((title) => /sort by value/i.test(title ?? '')),
+      `a chip tray sorts by value, got ${JSON.stringify(actions)}`);
+    assert.ok(actions.every((title) => !/sort by (rank|suit)/i.test(title ?? '')),
+      `and never by rank or suit, got ${JSON.stringify(actions)}`);
 
     // US-102 AC2, the story's real claim: a chip does everything a card
     // does, THROUGH THE SAME PATH. Asserted by driving a chip's own
@@ -374,6 +380,267 @@ test('the Chips & Tokens preset puts real chips and tokens on the table, rendere
     assert.ok(chipActions.includes('move'), `a chip must be movable like any card, got ${JSON.stringify(chipActions)}`);
     assert.ok(chipActions.length > 1, 'and offers a real menu, not one lonely entry');
     await page.keyboard.press('Escape');
+  } finally {
+    await page.close();
+  }
+});
+
+// --- Chip trays (*fix: default pile type, denominations, make change) -
+//
+// This layer found all three gaps in the first cut of that fix, none of
+// which a unit test could see: Make change was absent because
+// `disabledActions` never received the pile's cards, Tighten was absent
+// because the kind's default spread sat at the ceiling, and the tray
+// arrived unsorted because stock bypassed `insertPileable`.
+test('a poker chip tray is stacked by denomination, highest first, with values showing', async () => {
+  const page = await (await fixture.browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+  try {
+    await page.goto(BASE);
+    await page.click('#show-host');
+    await page.fill('#host-name', 'Alice');
+    await page.selectOption('#host-preset', { label: "Texas Hold'em" });
+    await page.click('#create-table');
+    await page.waitForSelector('#host-share:not([hidden])', { timeout: 20_000 });
+    await page.click('#deal-btn');
+    await page.waitForFunction(() => document.querySelectorAll('.card-chip').length > 0, undefined, { timeout: 15_000 });
+
+    // *nit: values are `$`-prefixed and centred on the chip now.
+    const labels = await page.locator('.card-chip .chip-denom').allTextContents();
+    assert.ok(labels.every((label) => label.startsWith('$')), `every chip shows a $ value, got ${labels}`);
+    const values = labels.map((label) => Number(label.slice(1)));
+    assert.ok(values.length > 1, 'a tray of chips');
+    assert.ok(values.every((value) => value > 0), `every chip shows its value, got ${values}`);
+    assert.deepEqual(values, values.toSorted((a, b) => b - a), `tray must be sorted highest first, got ${values}`);
+
+    // *nit: "stacked chips should be in separate piles by denomination"
+    // and "actually stacked like a deck one on top of the other". One
+    // column per value, highest first, and within a column the chips
+    // overlap almost entirely - asserted as GEOMETRY, since a class name
+    // proves nothing about what a player sees.
+    const denoms = await page.locator('.chip-stack').evaluateAll((stacks) => stacks.map((s) => Number(s.dataset.denom)));
+    assert.ok(denoms.length > 1, `one stack per denomination, got ${denoms}`);
+    assert.deepEqual(denoms, denoms.toSorted((a, b) => b - a), 'stacks run highest value first');
+    assert.equal(new Set(denoms).size, denoms.length, 'and no value is split across two stacks');
+
+    const biggest = page.locator('.chip-stack').filter({ has: page.locator('.card-chip') }).last();
+    const chipBoxes = await biggest.locator('.middle-card').evaluateAll(
+      (chips) => chips.map((chip) => chip.getBoundingClientRect()).map((r) => ({ x: r.x, y: r.y, h: r.height })),
+    );
+    if (chipBoxes.length > 1) {
+      // A slight sideways drift is intentional (the "diagonal" *nit);
+      // fanning by a whole card width is the bug this catches.
+      const xs = chipBoxes.map((box) => box.x);
+      const spread = Math.max(...xs) - Math.min(...xs);
+      assert.ok(spread < chipBoxes[0].h / 3,
+        `a stack must stay a column, not fan sideways: spread ${spread}`);
+      const step = Math.abs(chipBoxes[1].y - chipBoxes[0].y);
+      assert.ok(step < chipBoxes[0].h / 2,
+        `chips must sit ON each other like a deck, not spread: step ${step} of height ${chipBoxes[0].h}`);
+    }
+
+    // Make change: value conserved, count increased.
+    const tray = page.locator('.pile-section').filter({ has: page.locator('.card-chip') }).first();
+    const before = values.reduce((sum, value) => sum + value, 0);
+    await tray.locator('button[title="Make change"]').click();
+    await page.waitForFunction(
+      (count) => document.querySelectorAll('.card-chip').length > count,
+      values.length, { timeout: 5000 },
+    );
+    const after = (await page.locator('.card-chip .chip-denom').allTextContents()).map((label) => Number(label.slice(1)));
+    assert.equal(after.reduce((sum, value) => sum + value, 0), before, 'making change conserves value exactly');
+    assert.ok(after.length > values.length, 'and produces more, smaller chips');
+    assert.deepEqual(after, after.toSorted((a, b) => b - a), 'and the tray is still sorted');
+
+    // *nit ("dropped chips are not aligned on the piles?"): a dropped
+    // chip must sit in line with the stack it joined - asserted as real
+    // x coordinates, since the misalignment came from a per-card margin
+    // that no class name would have revealed.
+    // This asserted EXACT x equality until the "slight diagonal" *nit
+    // introduced a deliberate 1px-per-chip drift. The original intent is
+    // kept, with a tolerance the intentional drift fits inside: what it
+    // was written to catch was a stack fanning by a whole CARD WIDTH
+    // (a CSS specificity bug that made every column spread sideways),
+    // not a few pixels of perspective.
+    const columns = await page.locator('.chip-stack').evaluateAll(
+      (stacks) => stacks.map((stack) => [...stack.querySelectorAll('.middle-card')]
+        .map((chip) => chip.getBoundingClientRect().x)),
+    );
+    const cardWidth = (await page.locator('.card-chip').first().boundingBox()).width;
+    for (const [index, xs] of columns.entries()) {
+      const spread = Math.max(...xs) - Math.min(...xs);
+      assert.ok(spread < cardWidth / 3,
+        `stack ${index} must stay a column, not fan: spread ${spread} of width ${cardWidth}`);
+    }
+    const laidOut = await page.locator('.chip-stack .middle-card[data-layout]').count();
+    assert.equal(laidOut, 0, 'no chip in a tray carries a drop layout - the tray arranges itself');
+
+    // *nit: the badge is the tray's total VALUE, not its chip count.
+    const badge = Number(await tray.locator('.pile-count-badge').textContent());
+    assert.equal(badge, after.reduce((sum, value) => sum + value, 0),
+      'the badge stamps the total value of the tray');
+    assert.notEqual(badge, after.length, 'and is not merely the number of chips');
+
+    // "dont show non-chip piletypes in the menu"
+    assert.equal(await tray.locator('.pile-action-enum').count(), 0,
+      'a chip tray offers no pile-type conversion at all - there is nowhere to convert to');
+  } finally {
+    await page.close();
+  }
+});
+
+// *nit: "drops in chipstacks should add the chips to the existing
+// piles" - and the duplication behind it. A chip dropped on the zone's
+// empty space (the drop gutter) used to CREATE a pile, so every
+// near-miss around a tray left another chip pile behind.
+//
+// Driven with synthetic drag events rather than Playwright's own drag:
+// this is an HTML5 drag-and-drop, which Playwright cannot meaningfully
+// synthesise - and that is precisely why nothing caught it before.
+test('a chip dropped on empty zone space joins the existing tray instead of spawning a pile', async () => {
+  const page = await (await fixture.browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+  try {
+    await page.goto(BASE);
+    await page.click('#show-host');
+    await page.fill('#host-name', 'Alice');
+    await page.selectOption('#host-preset', { label: "Texas Hold'em" });
+    await page.click('#create-table');
+    await page.waitForSelector('#host-share:not([hidden])', { timeout: 20_000 });
+    await page.click('#deal-btn');
+    await page.waitForFunction(() => document.querySelectorAll('.card-chip').length > 0, undefined, { timeout: 15_000 });
+
+    const pileCount = () => page.locator('.pile-section[data-pile-id]').count();
+    const before = await pileCount();
+    const chipsBefore = await page.locator('.card-chip').count();
+
+    await page.evaluate(() => {
+      const chip = document.querySelector('.chip-stack .middle-card[data-pileable-id]');
+      const zone = document.querySelector('zone-panel.seat-zone');
+      const gutter = zone.querySelector('.zone-drop-gutter') ?? zone;
+      const box = gutter.getBoundingClientRect();
+      const transfer = new DataTransfer();
+      transfer.setData('text/plain', chip.dataset.pileableId);
+      const at = { bubbles: true, cancelable: true, dataTransfer: transfer, clientX: box.x + 5, clientY: box.y + 5 };
+      gutter.dispatchEvent(new DragEvent('dragover', at));
+      gutter.dispatchEvent(new DragEvent('drop', at));
+    });
+    await page.waitForTimeout(500);
+
+    assert.equal(await pileCount(), before, 'no new pile - the chip joined the tray it belongs in');
+    assert.equal(await page.locator('.card-chip').count(), chipsBefore, 'and no chip was lost or duplicated');
+
+    // And it snapped back into denomination order.
+    const values = (await page.locator('.card-chip .chip-denom').allTextContents()).map((label) => Number(label.slice(1)));
+    assert.deepEqual(values, values.toSorted((a, b) => b - a), `still sorted, got ${values}`);
+  } finally {
+    await page.close();
+  }
+});
+
+// *nit (direct user request): "show the stacking for the deck of cards.
+// right now it looks like there's only 1 card there."
+//
+// The depth layers are inert; exactly ONE real, draggable card sits on
+// top. That last part is what D66/D67's opposite correction ("I should
+// only see 1 card") was protecting, so it is asserted rather than
+// assumed - this *nit reverses the LOOK, not that rule.
+test('the deck renders as a stack with depth, but only one card is draggable', async () => {
+  const deck = fixture.page.locator('.pile-section[data-pile-id="deck"]');
+  assert.ok(await deck.locator('.deck-stack-layer').count() > 0, 'a full deck shows depth');
+  // Scoped to the STACK: the pile's title is draggable too (that is how
+  // a pile is moved), which is not what this asserts.
+  assert.equal(await deck.locator('.deck-stack [draggable="true"]').count(), 1,
+    'exactly one draggable card, however deep the stack looks');
+  assert.equal(await deck.locator('.deck-stack-layer[draggable="true"]').count(), 0,
+    'no decorative layer is ever grabbable');
+
+  // The layers are pointer-transparent, or they would swallow clicks
+  // meant for the card.
+  const inert = await deck.locator('.deck-stack-layer').evaluateAll(
+    (layers) => layers.every((layer) => getComputedStyle(layer).pointerEvents === 'none'),
+  );
+  assert.ok(inert, 'depth layers never intercept a pointer');
+});
+
+test('the deck visibly thins out as it empties, without the panel resizing', async () => {
+  const deck = fixture.page.locator('.pile-section[data-pile-id="deck"]');
+  const before = await deck.locator('.deck-stack-layer').count();
+  const panelBefore = Math.round((await deck.boundingBox()).height);
+
+  // Draw the deck down a long way and watch the stack lose depth.
+  for (let index = 0; index < 25; index++) {
+    await deck.locator('button[title="Draw"]').first().click();
+  }
+  await fixture.page.waitForTimeout(400);
+
+  const after = await deck.locator('.deck-stack-layer').count();
+  assert.ok(after < before, `a thinner deck shows fewer layers: ${before} -> ${after}`);
+
+  // *nit ("give the deck panel more room for when the deck gets big"):
+  // the panel RESERVES room for the deepest stack, so it never crowds a
+  // full deck - and, just as importantly, never resizes as cards come
+  // off. A panel that shrank on every draw made the whole row twitch.
+  assert.equal(Math.round((await deck.boundingBox()).height), panelBefore,
+    'the deck panel keeps its size while the stack inside it thins');
+});
+
+// *nit (direct user request): "make the stacking angles consistent wrt
+// cards and chips (same perspective)", then "tighten the stacking
+// angle... give a slight diagonal from lower left to upper right", then
+// "less of an angle please i said slight".
+//
+// The deck's depth layers and a chip stack share `--stack-step` /
+// `--stack-step-x`, so this asserts they actually AGREE - a shared token
+// proves nothing if one of them stops reading it.
+test('deck and chip stacks climb at the same slight angle, lower-left to upper-right', async () => {
+  const page = await (await fixture.browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+  try {
+    await page.goto(BASE);
+    await page.click('#show-host');
+    await page.fill('#host-name', 'Alice');
+    await page.selectOption('#host-preset', { label: "Texas Hold'em" });
+    await page.click('#create-table');
+    await page.waitForSelector('#host-share:not([hidden])', { timeout: 20_000 });
+    await page.click('#deal-btn');
+    await page.waitForFunction(() => document.querySelectorAll('.card-chip').length > 0, undefined, { timeout: 15_000 });
+
+    const steps = await page.evaluate(() => {
+      const deck = document.querySelector('.pile-section[data-pile-id="deck"] .deck-stack');
+      const layers = [...deck.querySelectorAll('.deck-stack-layer')].map((l) => l.getBoundingClientRect());
+      const columns = [...document.querySelectorAll('.chip-stack')]
+        .map((column) => [...column.querySelectorAll('.middle-card')].map((chip) => chip.getBoundingClientRect()));
+      const tall = columns.find((column) => column.length > 2) ?? [];
+      return {
+        // layers[0] is the DEEPEST; a shallower one sits up and right.
+        deck: layers.length > 1 ? { rise: layers[0].y - layers[1].y, drift: layers[1].x - layers[0].x } : null,
+        // index 0 is the BOTTOM of a chip column.
+        chips: tall.length > 2 ? { rise: tall[0].y - tall[1].y, drift: tall[1].x - tall[0].x } : null,
+      };
+    });
+
+    assert.ok(steps.deck && steps.chips, 'both a deck and a chip stack are on the table');
+
+    // *nit ("the top few deck cards are off"): the REAL card is the
+    // shallowest thing in the deck's stack, so the gap between it and
+    // the layer beneath must match the gap between two layers. It did
+    // not: the card is `position: absolute` with no `left`, so it sat at
+    // its STATIC position - after the box's padding - while the layers
+    // use an explicit `left` measured from the padding box, which
+    // ignores padding-left. Six pixels of jump at exactly the place a
+    // player looks. Asserted as evenness, not as a pixel value.
+    const deckXs = await page.locator('.pile-section[data-pile-id="deck"] .deck-stack > *')
+      .evaluateAll((kids) => kids.map((kid) => kid.getBoundingClientRect().x));
+    const gaps = deckXs.slice(1).map((x, index) => Math.round((x - deckXs[index]) * 10) / 10);
+    assert.ok(gaps.length > 1, 'a full deck has several layers plus its card');
+    assert.equal(new Set(gaps).size, 1, `every step across the deck must be equal, got ${gaps}`);
+    for (const [name, step] of Object.entries(steps)) {
+      assert.ok(step.rise > 0, `${name} must climb upward, rise ${step.rise}`);
+      assert.ok(step.drift > 0, `${name} must drift right as it climbs, drift ${step.drift}`);
+      // "slight": the sideways drift is a fraction of the rise, not a
+      // match for it. At parity the stack reads as a real lean.
+      assert.ok(step.drift < step.rise, `${name} angle must stay slight: drift ${step.drift} vs rise ${step.rise}`);
+    }
+    assert.ok(Math.abs(steps.deck.drift - steps.chips.drift) <= 1,
+      `same perspective: deck drift ${steps.deck.drift} vs chips ${steps.chips.drift}`);
   } finally {
     await page.close();
   }

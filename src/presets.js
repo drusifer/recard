@@ -80,9 +80,37 @@ function row(ids, { x: startX, y, w, h, gap }) {
 // panels every non-Solitaire/Spit preset ever has to place. Centered in
 // the gap a 2-player ring's top/bottom seats leave open (seats measured
 // at roughly y139-279 and y437-580 in the calibration surface above).
+/**
+ * A player's own chip stack (direct user request: "chips in the poker").
+ *
+ * `perPlayer`, not one shared bank: in real poker every player has their
+ * own stack, and a single shared pile makes "whose chips are these"
+ * unanswerable the moment two people take from it. `perPlayer` also
+ * means it lands at each player's own seat through the same placement
+ * every personal pile already gets - no layout entry needed, unlike a
+ * shared pile.
+ *
+ * No declared `spread`: stacking is `ChipPile.defaultSpread` now, a
+ * property of the KIND rather than something every chip preset has to
+ * remember to repeat.
+ *
+ * Shared by both poker presets rather than written twice - they differ
+ * in how many cards are dealt, not in what chips a player sits down
+ * with.
+ */
+const POKER_CHIPS = [
+  { kind: 'chip', ownerId: 'perPlayer', count: 1, name: 'Chips', deckType: 'chips', deckList: 'poker-stack' },
+];
+
 const SIMPLE_LAYOUT = {
-  'table-zone': { x: 110, y: 290, w: 650, h: 160 },
-  score: { x: 780, y: 290, w: 180, h: 160 },
+  // *nit (direct user request): "give the deck panel more room for when
+  // the deck gets big". A full deck's stack draws five depth layers
+  // below its top card, and the Table Zone's own height left the deck
+  // panel only ~12px clear of the bottom - fine at 50 cards, crowded the
+  // moment a preset deals fewer or a deck grows. The extra height is
+  // headroom for the panel, not for more piles.
+  'table-zone': { x: 110, y: 290, w: 650, h: 190 },
+  score: { x: 780, y: 290, w: 180, h: 190 },
 };
 
 
@@ -177,6 +205,7 @@ export const PRESETS = [
     jokers: 0,
     cardsPerPlayer: 5,
     tableZone: true,
+    piles: POKER_CHIPS,
     layout: SIMPLE_LAYOUT,
   },
   {
@@ -185,6 +214,7 @@ export const PRESETS = [
     jokers: 0,
     cardsPerPlayer: 2,
     tableZone: true,
+    piles: POKER_CHIPS,
     layout: SIMPLE_LAYOUT,
   },
   {
@@ -216,7 +246,7 @@ export const PRESETS = [
       // both supplies read as "Pile" with no way to tell them apart;
       // unstacked, 40 chips spanned the table and read as a layout
       // fault rather than a feature.
-      { kind: 'plain', ownerId: null, count: 1, name: 'Chips', spread: 0.82, deckType: 'chips', deckList: 'standard-chips' },
+      { kind: 'chip', ownerId: null, count: 1, name: 'Chips', deckType: 'chips', deckList: 'standard-chips' },
       { kind: 'plain', ownerId: null, count: 1, name: 'Tokens', spread: 0.75, deckType: 'chips', deckList: 'standard-tokens' },
     ],
   },
@@ -302,6 +332,12 @@ export const PRESETS = [
       { kind: 'exile', ownerId: 'perPlayer', count: 1 },
       // One shared stack - spells wait here to resolve, LIFO.
       { kind: 'stack', ownerId: null, count: 1 },
+      // Direct user request: "tokens in rtg". SHARED, unlike poker's
+      // per-player chips - an MTG token isn't owned in advance, it's
+      // created onto the battlefield by whoever needs one, so a common
+      // supply matches how they're actually used. `standard-tokens`
+      // (+1/-1/!) was modelled on this vocabulary in the first place.
+      { kind: 'plain', ownerId: null, count: 1, id: 'rtg-tokens', name: 'Tokens', spread: 0.75, deckType: 'chips', deckList: 'standard-tokens' },
     ],
     // NOTE (flagged, not solved): fifteen deck piles plus two players'
     // zones is a LOT of panels - Smith raised exactly this as Gate-1
@@ -322,6 +358,11 @@ export const PRESETS = [
       score: { x: 590.3828125, y: 230.00390625, w: 250, h: 120 },
       [RTG_DECKS_ZONE_ID]: { x: 30, y: 16, w: 782, h: 376 },
       stack: { x: 850, y: 186, w: 250, h: 130 },
+      // Placed explicitly rather than left to land wherever: Smith's
+      // Gate-1 condition C3 on the RtG sprint was that this is already
+      // the most crowded table the app builds. Sits under the stack,
+      // in the same right-hand column, clear of the Decks zone.
+      'rtg-tokens': { x: 850, y: 330, w: 250, h: 120 },
     },
   },
 ];

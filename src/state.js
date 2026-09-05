@@ -1,6 +1,9 @@
 import { buildDeck, shuffle, RANKS, SUITS } from './deck.js';
 import { PILE_TYPES, revivePile, pileInstanceFor } from './piles/pileTypes.js';
 import { MIN_SPREAD, MAX_SPREAD } from './piles/Pile.js';
+import { survivorsOfReset } from './pileables/pileableTypes.js';
+import { breakInto, COLOUR_FOR_VALUE } from './pileables/ChipPileable.js';
+import { batchToken } from './decks/batchToken.js';
 
 const DEFAULT_PILE_ID = 'table';
 // Exported (only this one, of the three) - `main.js`'s `dealFromDeck`
@@ -240,6 +243,40 @@ function configuredZoneId(kind, index, count, ownerId = null) {
  * here since a 1:1 "this exact pile, alone" relationship needs no
  * separate declaration to be unambiguous.
  */
+/**
+ * The parts of a declared pile that aren't its identity: its starting
+ * contents (D81), and its `spread` (Smith's T102.2 finding - a chip
+ * supply laid flat spans the table, so a declaration may say it stacks,
+ * reusing D106 rather than adding a second layout mechanism).
+ *
+ * Extracted so the SHARED path (`buildPiles`) and the PER-PLAYER path
+ * (`JOIN`) apply the same rules. They didn't: D81's pre-stocking only
+ * ever ran in `buildPiles`, and the JOIN path destructured a declaration
+ * down to `{kind, count}`, silently dropping `deckList`, `name` and
+ * `spread`. A per-player chip stack was therefore always empty and
+ * always called "Alice's Pile" - found by driving the real app, since
+ * every reducer test passed. One helper is what makes "declared piles
+ * behave the same wherever they're built" true rather than intended.
+ *
+ * Both fields stay absent when not declared, so every pile that predates
+ * them is untouched.
+ */
+function applyDeclaration(pile, declaration, rng) {
+  // The KIND arranges its own stock (`Pile.stock`): a deck keeps its
+  // shuffle, a chip tray sorts by denomination. Shuffling first and
+  // letting the kind rearrange keeps one path - the alternative was a
+  // `kind === 'chip'` branch here, which is exactly what the pile
+  // hierarchy exists to avoid.
+  const stocked = declaration.deckList
+    ? {
+      ...pile,
+      cards: (PILE_TYPES[pile.kind] ?? PILE_TYPES.plain)
+        .stock(shuffle(buildDeck({ type: declaration.deckType ?? 'rtg', deckList: declaration.deckList }), rng)),
+    }
+    : pile;
+  return declaration.spread === undefined ? stocked : { ...stocked, spread: declaration.spread };
+}
+
 function buildPiles(pileDeclarations, zoneRegistry, rng = Math.random) {
   const piles = [];
   let zones = zoneRegistry;
@@ -266,16 +303,7 @@ function buildPiles(pileDeclarations, zoneRegistry, rng = Math.random) {
       // decks on the table" - a deck pile with no cards in it is just a
       // label. Additive: a declaration without `deckList` behaves
       // exactly as before.
-      // Smith's `*user test` finding, sprint pileObjects T102.2: a chip
-      // supply rendered as 40 discs flat across three wrapped rows,
-      // spanning the table. Real chips stack. A declaration may now name
-      // a starting `spread`, reusing D106's own primitive rather than
-      // adding a second layout mechanism - and staying `undefined` when
-      // not declared, so every existing preset keeps its type default.
-      const stocked = declaration.deckList
-        ? { ...pile, cards: shuffle(buildDeck({ type: declaration.deckType ?? 'rtg', deckList: declaration.deckList }), rng) }
-        : pile;
-      piles.push(declaration.spread === undefined ? stocked : { ...stocked, spread: declaration.spread });
+      piles.push(applyDeclaration(pile, declaration, rng));
       zones = ensureZoneRecord(zones, zoneId);
     }
   }
@@ -323,7 +351,21 @@ export function createInitialState(deckConfig = {}, rng = Math.random, gameConfi
 
   return {
     deckConfig,
-    gameConfig: { allowsPlayerZones: gameConfig.allowsPlayerZones ?? true, tableZone: hasTableZone, piles: pileDeclarations, zones: zoneDeclarations },
+    gameConfig: {
+      allowsPlayerZones: gameConfig.allowsPlayerZones ?? true,
+      tableZone: hasTableZone,
+      piles: pileDeclarations,
+      zones: zoneDeclarations,
+      // *fix (direct user report, "reshuffle and redeal... deals whole
+      // deck"): the preset's hand size lives in the table's own config
+      // now. It was only ever held in `main.js`'s `lastDealCount`,
+      // seeded on the share screen - which a RESUMED table never shows,
+      // so a restored game reshuffled with the FIRST preset's hand size
+      // (War's 26, i.e. the whole deck between two players). Left
+      // `undefined` when a preset does not set one rather than
+      // defaulting, so nothing invents a hand size that was never chosen.
+      cardsPerPlayer: gameConfig.cardsPerPlayer,
+    },
     zones: built.zones,
     piles: [
       ...(hasTableZone ? [
@@ -708,12 +750,22 @@ const ACTIONS = {
       ? []
       : (state.gameConfig?.piles ?? [])
           .filter((z) => z.ownerId === 'perPlayer')
-          .flatMap(({ kind, count = 1 }) =>
-            Array.from({ length: count }, (_, index) =>
-              makeTableSidePile(
-                kind, `${action.name}'s ${configuredZoneName(kind, index, count)}`, action.playerId,
+          .flatMap((declaration) => {
+            const { kind, count = 1, name: declaredName } = declaration;
+            return Array.from({ length: count }, (_, index) => {
+              // A declared `name` sits INSIDE the possessive - "Alice's
+              // Chips", not "Chips" - so a per-player pile still reads as
+              // that player's, which is the whole reason the possessive
+              // is here. Falling back to the derived name keeps every
+              // existing perPlayer preset (Spit's stock) unchanged.
+              const base = declaredName ?? configuredZoneName(kind, index, count);
+              const pile = makeTableSidePile(
+                kind, `${action.name}'s ${base}`, action.playerId,
                 configuredZoneId(kind, index, count, action.playerId),
-              )));
+              );
+              return applyDeclaration(pile, declaration, action.rng ?? Math.random);
+            });
+          });
     return {
       ...state,
       hostId: state.hostId ?? action.playerId,
@@ -1011,18 +1063,51 @@ const ACTIONS = {
     if (state.piles.every((p) => p.id !== targetPileId)) {
       throw new Error(`Pile ${targetPileId} does not exist`);
     }
-    if (sourcePile.kind === 'deck' || sourcePile.kind === 'hand') {
+    // *fix (direct user report): "remove block on moving hand piles". A
+    // `hand` source used to throw here, so dropping a hand onto another
+    // pile never ran the pile-level merge - which is the step that
+    // removes the emptied source - and left a stranded empty hand behind.
+    // A hand is recreated on demand (`ensureHandPile`) the moment its
+    // owner draws or picks up, so removing it costs nothing.
+    //
+    // `deck` stays blocked: merging the deck away would leave a table
+    // with nothing to draw from, which is a different question and was
+    // not asked.
+    if (sourcePile.kind === 'deck') {
       throw new Error(`Cannot merge a "${sourcePile.kind}" pile into another pile`);
     }
     if (sourcePile.id === DEFAULT_PILE_ID) {
       throw new Error('Cannot merge the default Table pile into another pile');
     }
 
+    // The same hand rules every single-card transfer follows (D102),
+    // applied here because `MERGE_PILE` concatenates raw cards rather
+    // than going through `transferCard`: cards LEAVING a hand become
+    // public and face-up, cards ARRIVING in one are restamped as that
+    // player's. Without this the merged cards landed on the table still
+    // owned and face-down, which reads as a bug even though every card
+    // moved correctly.
+    const targetPile = state.piles.find((p) => p.id === targetPileId);
+    const moved = sourcePile.cards.map((card) => {
+      if (targetPile.kind === 'hand') return toHandCard(card, targetPile.ownerId);
+      if (sourcePile.kind === 'hand') return { ...card, owner: null, faceUp: true };
+      return card;
+    });
+
+    // *nit (direct user correction): a merged-away pile is removed -
+    // it existed because it held something - EXCEPT one that declares
+    // `keepWhenEmptied`. A hand does: it is the player's seat, and the
+    // next draw needs it to still be there.
+    const keepSource = PILE_TYPES[sourcePile.kind]?.keepWhenEmptied ?? false;
     return {
       ...state,
       piles: state.piles
-        .filter((p) => p.id !== pileId)
-        .map((p) => (p.id === targetPileId ? { ...p, cards: [...p.cards, ...sourcePile.cards] } : p)),
+        .filter((p) => p.id !== pileId || keepSource)
+        .map((p) => {
+          if (p.id === targetPileId) return { ...p, cards: [...p.cards, ...moved] };
+          if (p.id === pileId) return withCards(p, []);
+          return p;
+        }),
     };
   },
 
@@ -1209,11 +1294,15 @@ const ACTIONS = {
   ADJUST_PILE_SPREAD(state, action) {
     const pile = state.piles.find((p) => p.id === action.pileId);
     if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
-    const current = pile.spread ?? PILE_TYPES[pile.kind]?.defaultSpread ?? MIN_SPREAD;
+    const kind = PILE_TYPES[pile.kind];
+    const current = pile.spread ?? kind?.defaultSpread ?? MIN_SPREAD;
+    // The ceiling is the pile TYPE's (*nit: chip stacks go tighter than
+    // a card fan may, because a stack reads by its top chip).
+    const ceiling = kind?.maxSpread ?? MAX_SPREAD;
     // Rounded to the step: floating-point addition of 0.1 otherwise
     // drifts (0.65 + 0.1 + 0.1 = 0.8500000000000001), which would never
     // compare equal to MAX_SPREAD and so never disable the button.
-    const next = Math.round(Math.min(MAX_SPREAD, Math.max(MIN_SPREAD, current + action.delta)) * 1000) / 1000;
+    const next = Math.round(Math.min(ceiling, Math.max(MIN_SPREAD, current + action.delta)) * 1000) / 1000;
     return { ...state, piles: state.piles.map((p) => (p.id === action.pileId ? { ...p, spread: next } : p)) };
   },
 
@@ -1353,11 +1442,65 @@ const ACTIONS = {
    * owned, never shared - narrower on purpose to match what's actually
    * offered today, not a general "any pile" feature nothing asked for.
    */
+  /**
+   * *fix (direct user request): "actions for braking large denom to
+   * smaller denom". Replaces one chip with its exact equivalent in the
+   * largest smaller denomination that divides it evenly - a 25 becomes
+   * five 5s, a 100 becomes four 25s, and a 1 cannot be broken at all.
+   *
+   * Value is conserved; COUNT is not, and that is the point. This is the
+   * one action in the reducer that legitimately creates pileables, which
+   * is why `assertCardsConserved` has to know about it (see its own
+   * comment) - chips are fungible, unlike a deck of cards, and "make
+   * change" is meaningless if the object count has to stay fixed.
+   *
+   * The new chips land through the pile's own `insertPileable`, so on a
+   * `ChipPile` they sort themselves into the right part of the tray
+   * rather than being appended - no special case here for where they go.
+   */
+  BREAK_CHIP(state, action) {
+    const pile = state.piles.find((p) => p.id === action.pileId);
+    if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
+    const chip = pile.cards.find((c) => c.id === action.pileableId);
+    if (!chip) throw new Error(`Chip ${action.pileableId} is not in pile ${action.pileId}`);
+    if (chip.pileableType !== 'chip') {
+      throw new Error(`${action.pileableId} is not a chip, so it cannot be broken`);
+    }
+    const into = breakInto(chip.denom);
+    if (into === undefined) {
+      throw new Error(`A ${chip.denom} is the smallest denomination and cannot be broken`);
+    }
+
+    const batch = batchToken();
+    const count = chip.denom / into;
+    const made = Array.from({ length: count }, (_, index) => ({
+      id: `chip-${batch}-${into}-${index}`,
+      pileableType: 'chip',
+      denom: into,
+      colour: COLOUR_FOR_VALUE[into],
+    }));
+
+    return replacePile(state, action.pileId, (p) => {
+      const without = revivePile(p).removePileable(action.pileableId);
+      let result = without;
+      for (const newChip of made) result = revivePile(result).insertPileable(newChip);
+      return result;
+    });
+  },
+
   SORT_PILE(state, action) {
     const pile = state.piles.find((p) => p.id === action.pileId);
     if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
     if (pile.ownerId !== action.playerId) {
       throw new Error(`Player ${action.playerId} is not authorized to sort pile ${action.pileId}`);
+    }
+    // *fix (chips): a denomination is a plain number, not a position in
+    // a named order, so it sorts on its own - highest first, the way a
+    // tray reads. Kept as its own branch rather than forced into the
+    // rank/suit index machinery below, which has nothing to say about it.
+    if (action.by === 'denom') {
+      const byDenom = pile.cards.toSorted((a, b) => (b.denom ?? 0) - (a.denom ?? 0));
+      return replacePile(state, action.pileId, (p) => withCards(p, byDenom));
     }
     const [primaryKey, secondaryKey] = action.by === 'suit' ? ['suit', 'rank'] : ['rank', 'suit'];
     const primaryOrder = primaryKey === 'suit' ? SUITS : RANKS;
@@ -1651,7 +1794,22 @@ const ACTIONS = {
         // cards cleared instead of dropping it outright, silently
         // contradicting the comment (and `handsOf()`'s own contract)
         // right above it.
-        ...pilesOf(state).filter((p) => p.id !== DECK_PILE_ID && p.kind !== 'hand').map((p) => withCards(p, [])),
+        // *fix (direct user report): `withCards(p, [])` used to empty
+        // every surviving pile outright, which is right for CARDS - a
+        // reset rebuilds the deck from them - and took every player's
+        // chips with it. `survivorsOfReset` keeps whatever is not a
+        // card; `assertCardsConserved` skips RESET, so nothing caught
+        // this.
+        ...pilesOf(state)
+          .filter((p) => p.id !== DECK_PILE_ID && p.kind !== 'hand')
+          .map((p) => withCards(p, survivorsOfReset(p.cards))),
+        // A hand is still DROPPED, not emptied (`handsOf()` must be `{}`
+        // again) - unless the player was holding something a reset does
+        // not destroy, in which case the pile stays with just that. The
+        // alternative is silently destroying chips someone picked up.
+        ...pilesOf(state)
+          .filter((p) => p.kind === 'hand' && survivorsOfReset(p.cards).length > 0)
+          .map((p) => withCards(p, survivorsOfReset(p.cards))),
       ],
     };
   },
@@ -1663,6 +1821,55 @@ ACTIONS.DEAL_MORE = ACTIONS.DEAL;
  * needs to detect). */
 function allCardIds(state) {
   return state.piles.flatMap((p) => p.cards.map((c) => c.id));
+}
+
+/**
+ * Move everything belonging to one player id onto another (*fix, direct
+ * user report: "chip tray dups again when resuming an existing game").
+ *
+ * A host's id is a PEER id, not a `playerKey`, so it is different every
+ * session and `resumeHostedTable` has to re-seat them. Before this, that
+ * re-seating dropped the old host entry and JOINed under the new id -
+ * so JOIN saw an unknown player and built their declared `perPlayer`
+ * piles a SECOND time, while the saved originals stayed behind owned by
+ * a dead id. Two chip trays, and the host's actual chips in the wrong
+ * one.
+ *
+ * Moving the player rather than re-creating them is what makes resume
+ * mean "carry on" instead of "start again with the same table": the
+ * pile, its contents, its zone and the score all follow the person.
+ *
+ * Ids DERIVED from the owner (`configuredZoneId` builds `chip-<owner>`)
+ * are rewritten too, or the pile would keep a name pointing at a player
+ * who no longer exists - cosmetic today, but it is exactly the kind of
+ * stale reference that makes the next bug hard to read.
+ *
+ * @param {object} state
+ * @param {string} fromId
+ * @param {string} toId
+ */
+export function reseatOwner(state, fromId, toId) {
+  if (!fromId || !toId || fromId === toId) return state;
+  const isKnown = state.players.some((p) => p.id === fromId) || state.piles.some((p) => p.ownerId === fromId);
+  if (!isKnown) return state;
+
+  // `split`/`join` rather than `replaceAll`: a replacement built from a
+  // peer id is not a literal, and `$&`-style sequences in it would be
+  // interpreted as backreferences by `replaceAll`.
+  const rekey = (id) => (typeof id === 'string' ? id.split(fromId).join(toId) : id);
+  const { [fromId]: movedScore, ...otherScores } = state.scores ?? {};
+
+  return {
+    ...state,
+    players: state.players.map((p) => (p.id === fromId ? { ...p, id: toId } : p)),
+    piles: state.piles.map((pile) => (pile.ownerId === fromId
+      ? { ...pile, ownerId: toId, id: rekey(pile.id), zoneId: rekey(pile.zoneId) }
+      : { ...pile, zoneId: rekey(pile.zoneId) })),
+    zones: (state.zones ?? []).map((zone) => (zone.ownerId === fromId
+      ? { ...zone, ownerId: toId, id: rekey(zone.id) }
+      : { ...zone, id: rekey(zone.id) })),
+    scores: movedScore === undefined ? state.scores : { ...otherScores, [toId]: movedScore },
+  };
 }
 
 /**
@@ -1690,6 +1897,26 @@ function allCardIds(state) {
  * that caused it.
  */
 export function assertCardsConserved(before, after, actionType) {
+  // Sprint pileObjects: a player joining a poker table brings their own
+  // chip stack (a `perPlayer` declaration with declared stock), so ids
+  // legitimately APPEAR at JOIN - the same way a whole deck appears at
+  // RESET. Narrowed rather than exempting JOIN outright: the two failure
+  // modes this guard exists for, losing a card and duplicating one, are
+  // never legitimate at JOIN either and still throw. A blanket exemption
+  // would have hidden both.
+  // Two actions legitimately change the SET of ids, in different ways,
+  // and the guard says which rather than being switched off for either.
+  //
+  // JOIN may only ADD: a player brings their own chip stack, and nothing
+  // should ever vanish because someone sat down.
+  //
+  // BREAK_CHIP both consumes and creates - a 25 becomes five 5s - so it
+  // may do both. Value is conserved even though the object COUNT is not;
+  // chips are fungible, unlike the deck of cards this guard was written
+  // for. Duplication stays an error for both, because it is never
+  // legitimate for either.
+  const canIntroduce = actionType === 'JOIN' || actionType === 'BREAK_CHIP';
+  const canConsume = actionType === 'BREAK_CHIP';
   const beforeIds = allCardIds(before);
   const afterIds = allCardIds(after);
 
@@ -1704,11 +1931,13 @@ export function assertCardsConserved(before, after, actionType) {
   const missing = beforeIds.filter((id) => !afterSeen.has(id));
   const appeared = afterIds.filter((id) => !beforeSet.has(id));
 
-  if (duplicated.size > 0 || missing.length > 0 || appeared.length > 0) {
+  const unexplained = canIntroduce ? [] : appeared;
+  const lost = canConsume ? [] : missing;
+  if (duplicated.size > 0 || lost.length > 0 || unexplained.length > 0) {
     const parts = [];
-    if (missing.length > 0) parts.push(`missing: ${missing.join(', ')}`);
+    if (lost.length > 0) parts.push(`missing: ${lost.join(', ')}`);
     if (duplicated.size > 0) parts.push(`duplicated: ${[...duplicated].join(', ')}`);
-    if (appeared.length > 0) parts.push(`appeared from nowhere: ${appeared.join(', ')}`);
+    if (unexplained.length > 0) parts.push(`appeared from nowhere: ${unexplained.join(', ')}`);
     throw new Error(`Card conservation violated by "${actionType}" (${parts.join('; ')})`);
   }
 }

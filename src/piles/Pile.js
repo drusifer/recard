@@ -103,6 +103,41 @@ export class Pile {
    * (`HandPile` overrides it `false`). */
   static tableSide = true;
 
+  /**
+   * How this kind of pile arranges a batch of pileables it is STOCKED
+   * with (a preset's declared starting contents, D81). Identity by
+   * default, because a deck's stocking order is its shuffle and must
+   * survive untouched.
+   *
+   * `ChipPile` sorts, because "a tray is stacked by denomination" has to
+   * be true of the tray a player is first shown - not only of chips
+   * added later through `insertPileable`. Found by looking at a real
+   * stocked tray, which arrived in shuffled deck order.
+   *
+   * @param {object[]} pileables
+   * @returns {object[]}
+   */
+  static stock(pileables) {
+    return pileables;
+  }
+
+  /**
+   * Which pile kinds this one may be converted INTO (*fix, direct user
+   * request: "dont show non-chip piletypes in the menu").
+   *
+   * The base class deliberately does NOT define this: a kind OPTS IN to
+   * a restriction, and its absence means "every registered kind", which
+   * is D87's standing rule ("all pile types must be convertible to any
+   * other") and stays true for cards. `ChipPile` defines it, because
+   * offering to turn a chip tray into a Foundation offers a meaningless
+   * operation.
+   *
+   * Opting in rather than defaulting to the full list is also what
+   * keeps this file out of a circular import: enumerating every kind
+   * needs `PILE_TYPES`, and `pileTypes.js` imports THIS file.
+   * `convertibleKindsFor` (there) resolves the absent case.
+   */
+
   /** How far this KIND of pile overlaps its cards by default, as a
    * fraction of a card's width (MIN_SPREAD/MAX_SPREAD above).
    * A static fact about the type, same shape as `visibility`/
@@ -112,6 +147,43 @@ export class Pile {
    * existed, so an unadjusted pile is unchanged. `HandPile` overrides
    * it with the fan's own 0.65. */
   static defaultSpread = 0;
+
+  /**
+   * What this kind of pile stamps in its corner badge (D95). The number
+   * of things in it, by default - and a deck's view carries an explicit
+   * `count` (its cards may be redacted), which still wins.
+   *
+   * `ChipPile` overrides it with the total VALUE (*nit: "on chip piles
+   * show the Sum of the denominations not the count of chips") - "17
+   * chips" tells a player nothing they need; "155" is the thing they
+   * are actually tracking.
+   *
+   * @param {{cards: object[], count?: number}} pile
+   */
+  static badge(pile) {
+    return pile.count ?? pile.cards.length;
+  }
+
+  /** How far this KIND may be tightened. `MAX_SPREAD` (0.85) for cards,
+   * where the limit exists so every covered card keeps a readable corner
+   * index. `ChipPile` raises it: a chip stack has no index to preserve -
+   * you read the TOP chip, the way you read a deck - so "one on top of
+   * the other" is the correct look rather than a degenerate one. A
+   * ceiling per TYPE, not one global number, because the reason for the
+   * limit is different for each. */
+  static maxSpread = MAX_SPREAD;
+
+  /**
+   * Whether this pile survives being emptied by a merge (*nit, direct
+   * user correction: "I said DONT delete the hand pile when dropped we
+   * need to keep it around for the next draw").
+   *
+   * `false` by default: an ordinary pile exists BECAUSE it holds
+   * something, so merging it away removes it. `HandPile` overrides it -
+   * a hand is a player's permanent seat fixture, and dropping your hand
+   * onto the table should empty it, not remove your seat.
+   */
+  static keepWhenEmptied = false;
 
   /** Which Web Component renders this pile's row - a component renders
    * a render SHAPE, not a 1:1 class mapping, so several classes may
@@ -279,7 +351,12 @@ export class Pile {
     // melds, runs, sets, foundations, discards, plain piles. `DeckPile`
     // fully overrides this method and so is excluded by construction,
     // correctly: a deck is a STACK, there is no overlap to adjust.
-    return ['take', 'split', 'changePileType', 'remove', 'tighten', 'loosen', ...orientationActions(cards)];
+    // `changePileType` only when there is somewhere to convert TO
+    // (*fix, chip piles): a menu whose one entry is the kind you already
+    // are is a dead control, same rule as `disabledActions` elsewhere.
+    const restriction = this.constructor.convertibleKinds?.();
+    const convertible = restriction === undefined || restriction.length > 1 ? ['changePileType'] : [];
+    return ['take', 'split', ...convertible, 'remove', 'tighten', 'loosen', ...orientationActions(cards)];
   }
 
   /**
@@ -302,7 +379,7 @@ export class Pile {
     // effective value, resolved by the caller (`disabledPileActionsFor`)
     // since only it knows whether the pile has been adjusted yet.
     if (spread !== undefined) {
-      if (spread >= MAX_SPREAD) disabled.push('tighten');
+      if (spread >= this.constructor.maxSpread) disabled.push('tighten');
       if (spread <= MIN_SPREAD) disabled.push('loosen');
     }
     return disabled;
