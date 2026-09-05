@@ -136,6 +136,31 @@ test('chips sort by denomination, tokens offer no sort, cards offer rank and sui
   assert.deepEqual(CardPileable.sortActions, ['sortRank', 'sortSuit']);
 });
 
+// US-113 (direct user request: "rtg hand sorting should be by color and
+// card type not suite and rank") - an INSTANCE-level override:
+// `CardPileable` serves both standard and RtG cards, distinguished only
+// at the record level by `face`, so the static default above still
+// describes a standard card correctly; only a live instance knows which
+// one it's looking at.
+test('an RtG-faced card offers color/type sort instead of rank/suit; a standard card is unaffected', () => {
+  const rtgCard = new CardPileable({ id: 'x', face: 'rtg', colors: ['U'], type: 'Instant' });
+  assert.deepEqual(rtgCard.sortActions, ['sortColor', 'sortCardType']);
+
+  const standardCard = new CardPileable({ id: 'y', rank: 'K', suit: 'spades' });
+  assert.deepEqual(standardCard.sortActions, ['sortRank', 'sortSuit']);
+});
+
+test('sortActionsFor reads the real instance override, not just the static default', () => {
+  const rtgHand = [
+    { pileableType: 'card', face: 'rtg', colors: ['U'], type: 'Instant' },
+    { pileableType: 'card', face: 'rtg', colors: ['B'], type: 'Creature' },
+  ];
+  assert.deepEqual(sortActionsFor(rtgHand), ['sortColor', 'sortCardType']);
+
+  const standardHand = [{ pileableType: 'card', rank: 'K', suit: 'spades' }];
+  assert.deepEqual(sortActionsFor(standardHand), ['sortRank', 'sortSuit']);
+});
+
 // This test used to assert the opposite - that a chip's colour was
 // presentational and gave it no ordering. The user later ruled that
 // chips carry denominations and can be broken down, so colour now MAPS

@@ -3016,6 +3016,34 @@ test('SORT_PILE: only the owner may sort their own hand', () => {
   );
 });
 
+// US-113 (direct user request: "rtg hand sorting should be by color and
+// card type not suite and rank") - RtG cards have no rank/suit at all,
+// so those two sorts did nothing for them. `colors` is an array (a card
+// can be multicolour or, for a land, colourless), so the sort key is
+// the FIRST colour in WUBRG order, colourless last.
+test('SORT_PILE by color: WUBRG order, card type breaks a tie', () => {
+  const state = handStateWith([
+    { id: 'a', colors: ['R'], type: 'Creature' },
+    { id: 'b', colors: ['W'], type: 'Instant' },
+    { id: 'c', colors: ['W'], type: 'Creature' },
+    { id: 'd', colors: [] }, // a land - colourless, sorts last
+  ]);
+  const after = reduce(state, { type: 'SORT_PILE', pileId: 'hand:p1', playerId: 'p1', by: 'color' });
+  assert.deepEqual(handOf(after, 'p1').map((c) => c.id), ['c', 'b', 'a', 'd'],
+    'white before red; Creature before Instant breaks the white/white tie; colourless last');
+});
+
+test('SORT_PILE by cardType: Creature/Instant/Sorcery/Enchantment/Land order, color breaks a tie', () => {
+  const state = handStateWith([
+    { id: 'a', colors: ['R'], type: 'Land' },
+    { id: 'b', colors: ['R'], type: 'Creature' },
+    { id: 'c', colors: ['G'], type: 'Creature' },
+  ]);
+  const after = reduce(state, { type: 'SORT_PILE', pileId: 'hand:p1', playerId: 'p1', by: 'cardType' });
+  assert.deepEqual(handOf(after, 'p1').map((c) => c.id), ['b', 'c', 'a'],
+    'Creature before Land; red before green breaks the Creature/Creature tie');
+});
+
 
 // --- Pile spread: Tighten / Loosen (*nit) ---------------------------
 //

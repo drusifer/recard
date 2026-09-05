@@ -138,6 +138,13 @@ export const ACTION_SPECS = {
   // (target: null) already works above.
   sortRank: { label: 'Sort by rank', destructive: false, hint: 'Sort your hand by rank.', icon: '#' },
   sortSuit: { label: 'Sort by suit', destructive: false, hint: 'Sort your hand by suit.', icon: '♠' },
+  // US-113 (direct user request: "rtg hand sorting should be by color
+  // and card type not suite and rank") - offered by the CONTENTS, same
+  // as rank/suit above (`CardPileable`'s own instance-level override
+  // for an RtG-faced card, `pileableTypes.js`'s `sortActionsFor`), not
+  // by the pile being a hand.
+  sortColor: { label: 'Sort by color', destructive: false, hint: 'Sort your hand by color (WUBRG order).', icon: '◆' },
+  sortCardType: { label: 'Sort by type', destructive: false, hint: 'Sort your hand by card type.', icon: '▤' },
   // *fix (chips): a chip pile's own sort. Offered by the CONTENTS
   // (`ChipPileable.sortActions`), the same way rank/suit are - not by
   // the pile being a chip tray.

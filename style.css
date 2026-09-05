@@ -2557,10 +2557,15 @@ body.panel-resize-active {
   object-fit: cover;
 }
 
+/* *nit (direct user request: "put cost upper left so I can see it in
+   the fan") - a fanned hand only shows the LEFT edge of each covered
+   card (later cards overlap from the right), the same reasoning
+   `.card-corner`'s own placement already documents elsewhere. Cost
+   pips sat top-RIGHT, which a fan hides on every card but the last. */
 .rtg-top {
   position: relative;
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   padding: 0.12rem 0.15rem;
 }
 

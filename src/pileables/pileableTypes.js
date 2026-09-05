@@ -55,9 +55,23 @@ export function homePileKindFor(record) {
  * The INTERSECTION across a mixed pile: an action offered there must be
  * meaningful for everything in it, or it would reorder something by an
  * attribute it hasn't got. An empty pile offers none.
+ *
+ * Reads `sortActions` off a real INSTANCE (`pileableFor`), not the
+ * class's static field directly - US-113 gave `CardPileable` an
+ * instance-level override (an RtG-faced card sorts by colour/type, a
+ * standard one by rank/suit), and only an instance can tell those two
+ * apart. `ChipPileable`/`TokenPileable` have no such variance, so
+ * `instance.sortActions` for them is simply the static default
+ * (`static sortActions` lives on the CLASS, unreachable via an instance
+ * unless something defines an instance-level property - `pileableFor`'s
+ * constructed instance never does for those two, so this would read
+ * `undefined` without the fallback below).
  */
 export function sortActionsFor(records = []) {
   if (records.length === 0) return [];
-  const lists = records.map((record) => (PILEABLE_TYPES[record?.pileableType] ?? PILEABLE_TYPES.card).sortActions);
+  const lists = records.map((record) => {
+    const PileableClass = PILEABLE_TYPES[record?.pileableType] ?? PILEABLE_TYPES.card;
+    return pileableFor(record).sortActions ?? PileableClass.sortActions;
+  });
   return lists[0].filter((action) => lists.every((list) => list.includes(action)));
 }

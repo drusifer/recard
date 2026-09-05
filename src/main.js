@@ -1316,6 +1316,14 @@ document.querySelector('#save-layout-btn').addEventListener('click', performSave
 document.querySelector('#save-layout-as-btn').addEventListener('click', performSaveLayoutAs);
 document.querySelector('#reset-layout-btn').addEventListener('click', performResetLayout);
 
+/** Every `sort*` action id's own `SORT_PILE.by` value (US-113 added
+ * `sortColor`/`sortCardType` alongside the original `sortRank`/
+ * `sortSuit`/`sortDenom`) - a lookup table `handlePileAction` reads
+ * once, rather than one `if` per id. */
+const SORT_BY_FOR_ACTION = {
+  sortDenom: 'denom', sortRank: 'rank', sortSuit: 'suit', sortColor: 'color', sortCardType: 'cardType',
+};
+
 /**
  * Every pile-level action button dispatches through here (`renderPile`,
  * ui.js, one callback regardless of which pile kind offered the
@@ -1348,9 +1356,11 @@ function handlePileAction(pileId, actionId, value) {
   if (actionId === 'tighten') return performAdjustSpread(pileId, SPREAD_STEP);
   if (actionId === 'loosen') return performAdjustSpread(pileId, -SPREAD_STEP);
   if (actionId === 'break') return performBreakChip(pileId);
-  if (actionId === 'sortDenom') return performSortPile(pileId, 'denom');
-  if (actionId === 'sortRank') return performSortPile(pileId, 'rank');
-  if (actionId === 'sortSuit') return performSortPile(pileId, 'suit');
+  // One small table, not five `if`s - every `sort*` action id differs
+  // ONLY in which `SORT_PILE.by` value it forwards (US-113 added two
+  // more, which is what pushed the old if-chain over the cognitive-
+  // complexity threshold; a lookup doesn't grow that way).
+  if (Object.hasOwn(SORT_BY_FOR_ACTION, actionId)) return performSortPile(pileId, SORT_BY_FOR_ACTION[actionId]);
   // D92 (direct user request: "split should always fan the pile to
   // allow the guided picker" - deck included, no kind branch here at
   // all any more).

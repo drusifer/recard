@@ -5,6 +5,15 @@ import { survivorsOfReset } from './pileables/pileableTypes.js';
 import { breakInto, COLOUR_FOR_VALUE } from './pileables/ChipPileable.js';
 import { batchToken } from './decks/batchToken.js';
 
+// US-113 (direct user request: "rtg hand sorting should be by color and
+// card type not suite and rank") - SORT_PILE's two RtG-specific keys.
+// WUBRG is Magic's own canonical colour order; the type order puts
+// Creatures first (the biggest category, and what a player scans for
+// first) and Land last (never something you're choosing BETWEEN, just
+// the thing at the end of the hand).
+const RTG_COLOR_ORDER = ['W', 'U', 'B', 'R', 'G'];
+const RTG_TYPE_ORDER = ['Creature', 'Instant', 'Sorcery', 'Enchantment', 'Land'];
+
 const DEFAULT_PILE_ID = 'table';
 // Exported (only this one, of the three) - `RESET`'s own contract:
 // whenever a preset has a table zone at all, `RESET` always rebuilds
@@ -1592,6 +1601,29 @@ const ACTIONS = {
     if (action.by === 'denom') {
       const byDenom = pile.cards.toSorted((a, b) => (b.denom ?? 0) - (a.denom ?? 0));
       return replacePile(state, action.pileId, (p) => withCards(p, byDenom));
+    }
+    // US-113 (direct user request: "rtg hand sorting should be by color
+    // and card type not suite and rank") - RtG cards carry neither
+    // `rank` nor `suit`, so those two sorts did nothing for them
+    // (`indexOf` on an absent field is -1 either side, a no-op tie).
+    // `colors` is an ARRAY (a card can be multicolour, or colourless for
+    // a land), so the sort key is the FIRST colour, WUBRG order.
+    // "Not found" (colourless, or an unrecognised type) sorts LAST here,
+    // deliberately different from rank/suit's "-1 sorts first" fallback
+    // below - a land belongs at the end of a colour-sorted hand, not the
+    // start, matching how a player actually organises one.
+    if (action.by === 'color' || action.by === 'cardType') {
+      const colorIndex = (card) => {
+        const index = RTG_COLOR_ORDER.indexOf(card.colors?.[0]);
+        return index === -1 ? RTG_COLOR_ORDER.length : index;
+      };
+      const typeIndex = (card) => {
+        const index = RTG_TYPE_ORDER.indexOf(card.type);
+        return index === -1 ? RTG_TYPE_ORDER.length : index;
+      };
+      const [primary, secondary] = action.by === 'color' ? [colorIndex, typeIndex] : [typeIndex, colorIndex];
+      const sorted = pile.cards.toSorted((a, b) => (primary(a) - primary(b)) || (secondary(a) - secondary(b)));
+      return replacePile(state, action.pileId, (p) => withCards(p, sorted));
     }
     const [primaryKey, secondaryKey] = action.by === 'suit' ? ['suit', 'rank'] : ['rank', 'suit'];
     const primaryOrder = primaryKey === 'suit' ? SUITS : RANKS;

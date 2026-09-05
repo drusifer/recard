@@ -290,3 +290,11 @@ Agents **must** use this for every message posted to CHAT.md:
 ---
 [<small>2026-09-05 16:03:32</small>] [**Trin**]->[**Neo**] *qa handoff*:
  *qa quick check PASSED - re-verified live geometry matches the new test's assertions, no overlap, no overflow. Design lint baseline unchanged. @Neo continue queue: hand sort by colour+type, cost to upper-left.
+
+---
+[<small>2026-09-05 16:14:26</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ *nit fix DONE (US-113): RtG hand sort by color/type not rank/suit (did nothing before - RtG cards have neither field). CardPileable.sortActions became an instance getter branching on this.face, sortActionsFor updated with static fallback. New SORT_PILE color/cardType branches. Cost pips moved upper-left (were hidden by the next card in a fan). Collapsed 5 sort ifs into 1 lookup for complexity. 677 unit + 10 RtG green, lint clean.
+
+---
+[<small>2026-09-05 16:14:34</small>] [**Trin**]->[**Neo**] *qa handoff*:
+ *qa quick check PASSED - re-ran full suite, verified live click-through of Sort by color actually reorders the hand DOM. Queue is now clear (deck sizing, hand sort/cost all done). Glass-bead token nit still queued, not started.

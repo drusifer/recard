@@ -180,6 +180,27 @@ test('game 1: draw an opening hand from a real deck pile', async () => {
   assert.equal(await deckCount(page, DECK_ID), before - 3, 'the deck badge reflects exactly 3 fewer cards');
 });
 
+// US-113 (direct user request: "rtg hand sorting should be by color
+// and card type not suite and rank and put cost upper left so I can
+// see it in the fan"). Two checks: the hand offers the RtG-specific
+// sort actions (not rank/suit, which do nothing for a card with
+// neither field), and the mana cost sits at the card's LEFT edge -
+// the one part of a fanned, overlapping card every sibling but the
+// last doesn't cover.
+test('the hand offers RtG-specific sort actions, and cost sits at the card\'s left edge (visible in a fan)', async () => {
+  const page = fixture.page;
+  const sortButtons = await page.locator('[data-kind="hand"] header-actions button').evaluateAll(
+    (buttons) => buttons.map((b) => b.getAttribute('aria-label')).filter(Boolean),
+  );
+  assert.ok(sortButtons.includes('Sort by color'), `expected a color sort button, got ${sortButtons}`);
+  assert.ok(sortButtons.includes('Sort by type'), `expected a type sort button, got ${sortButtons}`);
+  assert.ok(sortButtons.every((label) => !/rank|suit/i.test(label)), 'rank/suit sort makes no sense for RtG cards');
+
+  const cardBox = await page.locator('[data-kind="hand"] .card-rtg').first().boundingBox();
+  const costBox = await page.locator('[data-kind="hand"] .rtg-top').first().boundingBox();
+  assert.ok(Math.abs(costBox.x - cardBox.x) < 5, `cost should sit at the card's left edge, offset was ${costBox.x - cardBox.x}px`);
+});
+
 test('game 1: cast a creature to the battlefield and tap it', async () => {
   const page = fixture.page;
   const card = page.locator('[data-kind="hand"] .middle-card').first();

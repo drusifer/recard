@@ -122,4 +122,8 @@ sequenceDiagram
     Note right of Neo: "*nit fix DONE: RtG Decks<br/>zone was too small for<br/>its own content -<br/>measured live<br/>(scrollHeight 1055 vs<br/>box 376), SCORES'<br/>captured position s…"
     Trin->>Neo: "qa handoff"
     Note right of Trin: "*qa quick check PASSED -<br/>re-verified live<br/>geometry matches the new<br/>test's assertions, no<br/>overlap, no overflow.<br/>Design lint baseline<br/>unchang…"
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "*nit fix DONE (US-113):<br/>RtG hand sort by<br/>color/type not rank/suit<br/>(did nothing before -<br/>RtG cards have neither<br/>field).<br/>CardPileable.sortAct…"
+    Trin->>Neo: "qa handoff"
+    Note right of Trin: "*qa quick check PASSED -<br/>re-ran full suite,<br/>verified live click-<br/>through of Sort by color<br/>actually reorders the<br/>hand DOM. Queue is now<br/>clear…"
 ```
