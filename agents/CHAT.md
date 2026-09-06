@@ -330,3 +330,150 @@ Agents **must** use this for every message posted to CHAT.md:
 ---
 [<small>2026-09-05 17:06:23</small>] [**Neo**]->[**User**] *swe finding*:
  Investigated 'artificial zone has no name': it's not blank - it's the generic default 'Table Zone' record (state.js TABLE_ZONE_RECORD), which reads redundant since it contains a pile ALSO named 'Table'. Already user-renamable (double-click). Not fixing name right now given end-of-session risk budget - noted as a quick follow-up nit for next session, not a broken preset.
+
+---
+[<small>2026-09-05 17:08:28</small>] [**User**]->[**all**] *request*:
+ *sprint: New Game button - host selects a different game/preset without creating a new table code
+
+---
+[<small>2026-09-05 17:46:58</small>] [**Cypher**]->[**Smith**] *pm handoff*:
+ *pm plan sprint: US-116 New Game - host picks a different preset mid-table, same code, no re-host. Full story+AC in agents/cypher.docs/US-116-new-game.md. Key ACs: host-only control on live screen, reuses preset picker, rebuilds gameConfig/deckConfig fresh for new preset, roster/connections preserved, scores/chips RESET (unlike Restart Game), guests auto-transition, confirm-step required. @Smith *user review US-116
+
+---
+[<small>2026-09-05 17:47:14</small>] [**Smith**]->[**Morpheus**] *user approve*:
+ *user approve US-116, 2 amendments (full text: agents/cypher.docs/US-116-new-game.md, appending now). (1) Placement: host-only chrome (near Scores/roster), NOT the deck panel - would read as a flavor of the existing 'Restart game' deck action and invite a wrong click on a more destructive op. (2) Guests need a visible notice naming the new game on transition, not a silent wipe of their hand. @Morpheus *lead arch sprint
+
+---
+[<small>2026-09-05 17:48:13</small>] [**Morpheus**]->[**Smith**] *lead handoff*:
+ *lead arch sprint D116 (US-116 New Game): new NEW_GAME(state,{deckConfig,gameConfig,rng}) reducer - rebuilds via createInitialState then re-JOINs every existing player (preserving connection+hostId), exempted from assertCardsConserved like RESET (new deck epoch, same reasoning). gameConfig gains presetName, exposed via viewFor so guests can detect the change. Full design in agents/morpheus.docs/D116-new-game.md. @Smith *user feedback D116
+
+---
+[<small>2026-09-05 17:48:30</small>] [**Smith**]->[**Mouse**] *user approve*:
+ *user approve D116. Design matches Gate 1 amendments: distinct placement from Restart game, guest banner reuses existing mechanism, no naming clash. One nit for Mouse's phase plan: verify the picker markup is genuinely REUSED (not copy-pasted) so it doesn't drift from the host-create form over time. @Mouse *sm plan sprint
+
+---
+[<small>2026-09-05 17:48:39</small>] [**Mouse**]->[**Morpheus**] *sm handoff*:
+ *sm plan sprint US-116, 3 phases. P1 (Neo): state.js - NEW_GAME reducer, gameConfig.presetName (set at CREATE too), assertCardsConserved exemption, viewFor exposure; unit tests first (TDD). P2 (Neo): host UI - New Game button near Scores/roster, preset-picker reused from host-create markup, Start/Cancel dispatches NEW_GAME. P3 (Neo): guest banner on presetName change + confirm-step polish; regression pass. @Morpheus *lead review sprint plan
+
+---
+[<small>2026-09-05 17:48:43</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ *lead review sprint plan: approved, phases match D116 architecture and stay small. @Neo *swe impl phase-1
+
+---
+[<small>2026-09-05 17:52:08</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-js | /home/drusifer/Projects/recard/build/build.out
+=== make lint-js @ 2026-09-05 17:51:50 ===
+npm run lint:js
+
+> lint:js
+> eslint 'src/**/*.js' 'tools/**/*.mjs' 'tests/**/*.js' 'tests/**/*.mjs'
+
+
+---
+[<small>2026-09-05 17:52:20</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ *swe handoff Phase 1 (US-116) done: NEW_GAME reducer + gameConfig.presetName + conservation exemption in state.js. 6 new TDD tests. 683 unit green, lint-js clean. Pre-existing design-lint overlap failure confirmed on baseline dev too, unrelated. @Trin *qa uat phase-1
+
+---
+[<small>2026-09-05 17:52:43</small>] [**Trin**]->[**Neo**] *qa handoff*:
+ *qa quick check PASSED (phase 1) - mutation check: reverted the conservation exemption, 2 NEW_GAME tests correctly failed with exact card lists (deck + chip piles), reverted, 252 green again. Reducer logic sound. @Neo *swe impl phase-2 (host UI)
+
+---
+[<small>2026-09-05 17:52:52</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ *lead review phase-1: approved - mutation-checked, matches D116. @Neo continue phase-2.
+
+---
+[<small>2026-09-05 18:02:53</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-ui | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12414.722947
+
+---
+[<small>2026-09-05 18:03:20</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ *swe handoff Phase 2+3 (US-116) done - full details agents/neo.docs/US-116-phase-2-3.md. Highlights: New Game button reuses host-form picker verbatim, confirm-gated NEW_GAME dispatch, guest banner on presetName change. Found+fixed a real pre-existing bug live (#screen-game[hidden] CSS specificity). 5 new Playwright tests, 683 unit + 4 browser suites green, lint clean. One known gap: no 2-peer harness to test the guest banner automatically (project backlog item). @Trin *qa uat phase-2-3
+
+---
+[<small>2026-09-05 18:04:08</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa quick check PASSED (phase 2-3) - mutation check: bypassed the confirm-gate, the 'asks for confirmation' test correctly failed, reverted, 5/5 green again. Independently re-ran all 4 browser suites + 683 unit - no regressions. @Morpheus *lead review phase-2-3
+
+---
+[<small>2026-09-05 18:04:25</small>] [**Morpheus**]->[**Oracle**] *lead handoff*:
+ *lead review phase-2-3: approved. Clean extraction (configsForPreset shared, no drift risk), UI reuse genuine (same DOM), found bug is a real fix not scope creep. No further changes needed. @Oracle *ora groom
+
+---
+[<small>2026-09-05 18:05:43</small>] [**Oracle**]->[**Smith**] *ora handoff*:
+ *ora groom: D116 recorded in docs/ARCHITECTURE.md (full writeup - reducer, presetName, UI reuse, the #screen-game[hidden] bug found+fixed, known 2-peer test gap). mouse.docs/state.md sprint log updated. @Smith *user test US-116
+
+---
+[<small>2026-09-05 18:09:50</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-style | /home/drusifer/Projects/recard/build/build.out
+=== make lint-style @ 2026-09-05 18:09:49 ===
+npm run lint:style
+
+> lint:style
+> stylelint style.css
+
+
+---
+[<small>2026-09-05 18:10:04</small>] [**Smith**]->[**all**] *user approve*:
+ *user test US-116 PASSED - drove it live in a real browser (create table, deal, New Game to RtG, confirm dialog, banner, Cancel-is-noop, scores reset). Found+fixed 1 HCI nit: the guest/host notice banner reused the red danger styling every other banner caller wants, reading as an alarm for a neutral notice - added an opt-in .banner-info tone, verified blue in a live screenshot. All ACs met. @all *sprint retro
+
+---
+[<small>2026-09-05 18:10:17</small>] [**Neo**]->[**Cypher**] *retro*:
+ Neo retro: clean phase split (reducer/tests, then UI) kept each phase independently verifiable. configsForPreset() extraction paid off immediately - New Game and Create Table share it with zero drift risk. Biggest value wasn't the feature logic, it was actually DRIVING the browser: found a real pre-existing CSS specificity bug (#screen-game[hidden]) no unit test could ever catch.
+
+---
+[<small>2026-09-05 18:10:24</small>] [**Trin**]->[**Cypher**] *retro*:
+ Trin retro: test coverage solid for the host side (5 new Playwright tests + 6 unit tests), both destructive gates mutation-checked (conservation exemption, confirm dialog). Gap flagged, not silently accepted: no 2-peer harness means the guest banner is code-reviewed, not test-proven - same standing gap as reconnect-after-refresh, now 2 features deep.
+
+---
+[<small>2026-09-05 18:10:25</small>] [**Morpheus**]->[**Cypher**] *retro*:
+ Morpheus retro: NEW_GAME-via-JOIN-replay held up cleanly - reusing an existing mechanism (host-restore's roster rebuild) instead of inventing a new one meant zero new edge cases in perPlayer pile handling. D116 is now the architecture reference for any future 'wholesale reconfigure, same identity' feature.
+
+---
+[<small>2026-09-05 18:10:33</small>] [**Oracle**]->[**Cypher**] *retro*:
+ Oracle retro: D116 fully recorded in ARCHITECTURE.md including both live findings (the CSS specificity bug and the banner-tone HCI fix) - the pattern of documenting bugs found DURING a sprint, not just the planned feature, keeps working. Backlog item added: 2-peer browser harness, now blocking test coverage for 2 separate features.
+
+---
+[<small>2026-09-05 18:10:35</small>] [**Mouse**]->[**Cypher**] *retro*:
+ Mouse retro: 3-phase estimate held (folded P3 into P2 since both were small - correctly sized, not scope creep). Velocity good: plan-to-launch in one session, no rework loop needed.
+
+---
+[<small>2026-09-05 18:10:43</small>] [**Cypher**]->[**Cypher**] *retro*:
+ Cypher retro: story/AC quality held up through all 3 phases with no rework - the scores/chips-reset call and the Restart-game-distinction requirement (Smith Gate 1) were the right calls up front. Smith retro: HCI gate caught 2 real issues before/after code (placement+guest-notice at planning, banner tone at close) - the two-gate pattern is earning its keep.
+
+---
+[<small>2026-09-05 18:10:50</small>] [**Cypher**]->[**all**] *pm launch*:
+ *pm launch US-116 New Game: host can now swap to a different preset mid-table via a new host-only button, same table code, no re-host. Scores/chips reset (different game); roster/connections carried over. Backlog: 2-peer browser harness (blocks guest-side auto-test, 2 features deep now). Sprint complete.
+
+---
+[<small>2026-09-06 17:13:46</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-newgame | /home/drusifer/Projects/recard/build/build.out
+✔ Start New Game resets scores to 0 (1638.756747ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8815.832401
+
+---
+[<small>2026-09-06 17:14:00</small>] [**Neo**]->[**Neo**] *queue*:
+ *queue nit: add a drop zone on the lower half of a card that snaps it into vertical alignment with the card above/below, so lands (or anything) can be organized into color columns. Queued, not started.
+
+---
+[<small>2026-09-06 17:21:30</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-style | /home/drusifer/Projects/recard/build/build.out
+=== make lint-style @ 2026-09-06 17:21:29 ===
+npm run lint:style
+
+> lint:style
+> stylelint style.css
+

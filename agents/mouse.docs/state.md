@@ -643,3 +643,26 @@ standing reserved bug-fix slot (108).
 
 ### Next Steps
 Handed to Morpheus for plan review. On approval, Neo starts phase 103.
+
+## Sprint: New Game (2026-09-05), D116 — 3 phases, no rework
+
+US-116 (host picks a different preset mid-table, same code) -> Smith
+Gate 1 (2 amendments: placement away from Restart game, guest notice) ->
+Morpheus D116 (NEW_GAME reducer via createInitialState+JOIN replay,
+gameConfig.presetName) -> Smith Gate 2 approve -> 3-phase plan: P1
+reducer+tests, P2 host UI, P3 guest banner (folded into P2's pass since
+both were small). Neo found and fixed a real pre-existing bug live
+(`#screen-game[hidden]` CSS specificity, same class as an already-fixed
+`.btn-row`/`.deck-choices` gotcha) while testing the picker in a real
+browser - never would have surfaced from unit tests alone. Trin
+mutation-checked both the conservation-guard exemption and the
+confirm-dialog gate. 5 new Playwright tests (`test:newgame`), 683 unit +
+all 4 browser suites green.
+
+### Backlog added this sprint
+- Guest-side New Game banner has no automated 2-peer test - still
+  blocked on the same missing 2-peer browser harness the reconnect-
+  after-refresh item has needed for 6+ sprints running.
+
+### Next Steps
+Handed to Oracle for groom, then Smith for end-to-end user test.
