@@ -61,6 +61,20 @@
   /* UX follow-up (direct user request): -25% off the D51 desktop size
      (3.6rem/4.9rem -> 2.7rem/3.675rem). Rounded to 2 decimal places so
      the exact -25% ratio survives, not eyeballed. */
+  /* *fix (direct user report): "rtg deck pile's cards too small and
+     don't match the top card" - `--card-w`/`--card-h` are no longer a
+     fixed constant. Direct user correction: don't give RtG (or any
+     other deck) its own separate sizing tokens/CSS - every card
+     measurement in this file (`.card`, `.deck-stack`,
+     `.deck-stack-layer`, `.deck-stack-card`, hand fan spread, ...)
+     already reads THESE two tokens, so a preset that needs bigger cards
+     (`presets.js`'s `cardSize`) reconfigures them for the whole table
+     instead (`ui.js`'s `applyCardSize`) - every rule below picks that
+     up automatically, with no per-face override anywhere. These are
+     therefore the values below only until a game with its own
+     `cardSize` is running; JS sets an inline override on `:root`
+     (`document.documentElement.style`) at that point, which always
+     outranks this stylesheet rule for the same property. */
   --card-w: 2.7rem;
   --table-min-h: 30rem;
   --card-h: 3.68rem;
@@ -105,6 +119,15 @@ body {
   flex-direction: column;
   gap: 0.5rem;
 }
+
+/* US-116 (New Game) bug, found live: the id selector's own `display:
+   flex` above outranks the UA stylesheet's `[hidden] { display: none }`
+   (same specificity gotcha already fixed for `.btn-row[hidden]`/
+   `.deck-choices[hidden]`) - harmless while `#screen-game` only ever
+   went from hidden to shown ONCE per table, but New Game navigates back
+   to `#screen-host` mid-game, and without this the live table stayed
+   visible (forced `display: flex`) underneath the host form. */
+#screen-game[hidden] { display: none; }
 
 /* `gap` above is now what spaces the game screen's direct children -
    their own `margin-bottom` (`.panel`'s 1.25rem, `.game-code-bar`'s
@@ -386,6 +409,14 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   text-align: center;
   padding: 0.75rem;
   font-weight: 600;
+}
+
+/* Smith HCI finding (live, US-116): a neutral status notice (New Game
+   started) styled identically to the "lost the host"/"session ended"
+   banners above reads as an alarm for something that isn't a problem. */
+.banner.banner-info {
+  background: var(--accent);
+  color: var(--accent-text);
 }
 
 .share-code {
@@ -1498,7 +1529,17 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .deck-area-row {
   display: flex;
   align-items: center;
-  height: 3.7rem;
+  /* *fix (direct user report): "rtg deck pile's cards too small and
+     don't match the top card" - was a flat `3.7rem`, tuned for the
+     standard `--card-h` (3.68rem) alone. `.deck-stack` (its child) is
+     genuinely taller than that while an RtG game reconfigures
+     `--card-h` for the whole table (`applyCardSize`) - with a fixed
+     height here, `align-items: center` centered the now-taller stack
+     around this row's own too-short box, overflowing it (and the
+     action header above) equally on both sides. Reading the same token
+     keeps this row exactly as tall as the stack it holds, whatever size
+     that currently is. */
+  height: var(--card-h);
 }
 
 /* UX follow-up (real bug, found live): `.deck-stack-card`'s `position:
@@ -1646,19 +1687,34 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .deck-config { color: var(--muted); font-size: 0.9rem; }
 .error-text { color: var(--danger); font-size: 0.9rem; margin-top: 0.5rem; }
 
-/* US-110: one checkbox per RtG catalog deck - a plain wrapping row, not
-   a scrollable list, since fifteen short labels fit a normal form width
-   without one. Border/padding match `.panel`'s own vocabulary rather
-   than inventing a second "grouped content" look. */
+/* US-110: one checkbox per RtG catalog deck. *nit (direct user
+   request): "use a grid so they line up nicely" - a GRID, not a
+   wrapping flex row, so every column's checkbox/art/name lines up
+   across rows instead of each label just claiming its own content
+   width. Border/padding match `.panel`'s own vocabulary rather than
+   inventing a second "grouped content" look. */
 .deck-choices {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.5rem 1rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 0.75rem 1rem;
   margin: 0.5rem 0;
 }
+/* *nit (direct user request): "group decks by color" - a heading
+   spans every column so a group reads as its own row, not a stray grid
+   cell fighting the deck labels around it for a column. */
+.deck-choice-group-heading {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 0.4rem;
+}
+.deck-choice-group-heading:first-child { margin-top: 0; }
 /* Same fix as `.btn-row[hidden]` above, same reason: a class selector's
    `display: flex` outranks the UA stylesheet's `[hidden] { display:
    none }`, so a hidden `.deck-choices` (every preset but RtG) would
@@ -1673,7 +1729,12 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    property and the checkbox/art/name stacked vertically instead of
    forming one row. Caught live, not by the unit tests (which never
    touch layout). */
-.deck-choice { display: flex; flex-direction: row; align-items: center; gap: 0.4rem; font-size: 0.9rem; white-space: nowrap; }
+/* `align-items: start` (not `center`, US-110's original) - a grid
+   column is narrower than the old flex row's content-hugging width, so
+   a longer deck name now wraps to 2 lines instead of overflowing
+   (`white-space: nowrap` dropped for the same reason). */
+.deck-choice { display: flex; flex-direction: row; align-items: start; gap: 0.4rem; font-size: 0.9rem; }
+.deck-choice-name { flex: 1 1 auto; min-width: 0; }
 
 /* Direct follow-up request: "use an image from one of the powerful
    cards in each deck and show the deck colors" - the thumbnail's own
@@ -1690,7 +1751,6 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   background: linear-gradient(160deg, var(--rtg-fallback-a, #4a4a4a), var(--rtg-fallback-b, #1d1d1d));
 }
 .deck-choice-art img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.deck-choice-name { flex: none; }
 .deck-choice-colors { flex: none; }
 
 .rules-toggle {
@@ -2600,7 +2660,18 @@ body.panel-resize-active {
   gap: 0.08rem;
 }
 
+/* *nit (direct user request): "show the mana requirements as glyphs
+   not {u} etc" - a pip now also appears inline inside running prose
+   (`.rtg-inspect-rules`, via `renderRulesText`), not just inside
+   `.rtg-cost`'s own flex row. `display`/`vertical-align` move here
+   (were implicit, relying on `.rtg-cost`'s flex context to give a bare
+   `<span>` a box at all) so a pip is a self-contained glyph wherever
+   it's placed. */
 .rtg-pip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: -0.1em;
   width: 0.72rem;
   height: 0.72rem;
   border-radius: 50%;
@@ -2618,6 +2689,12 @@ body.panel-resize-active {
 .pip-b { background: #a6a29c; }
 .pip-r { background: #f0a081; }
 .pip-g { background: #a7d7a9; }
+/* *nit (direct user request): "replace {T} with a bent arrow tap
+   symbol" - tap isn't one of the five colours, so it gets its own
+   neutral (not colour-coded) pip rather than borrowing `pip-generic`,
+   which already means "colourless/generic mana" (a real, different
+   concept - a {1} in a cost is not the same symbol as a tap). */
+.pip-tap { background: #d8d2c4; font-size: 0.55rem; }
 
 /* Name strip sits at the bottom over the art, where it stays legible
    against the ridge silhouettes (which are always the darkest band of

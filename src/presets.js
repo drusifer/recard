@@ -351,6 +351,20 @@ export const PRESETS = [
     jokers: 0,
     cardsPerPlayer: 0,
     tableZone: false,
+    // *fix (direct user report): "rtg deck pile's cards too small and
+    // don't match the top card" - an MTG card needs more room than a
+    // pip card, but a fixed `.card-rtg`-only override left every OTHER
+    // card-sized element (the deck stack's depth layers, its outer box)
+    // still reading the standard `--card-w`/`--card-h`, so they drifted
+    // out of sync with the real card. Direct user correction: don't
+    // special-case RtG - this is a GAME parameter (every card at THIS
+    // table is the same size) that reconfigures the shared `--card-w`/
+    // `--card-h` tokens themselves (`ui.js`'s `applyCardSize`, wired
+    // through `gameConfig.cardSize` in `main.js`), so every existing
+    // `--card-w`/`--card-h`-based rule picks it up automatically. A
+    // preset that omits `cardSize` (every one but this) leaves the
+    // stylesheet's own default in place.
+    cardSize: { w: '4.4rem', h: '6.1rem' },
     zones: [{ id: RTG_DECKS_ZONE_ID, name: 'Decks' }],
     // US-110 (direct user request): "we don't need all the decks in
     // every game" - the host form offers a checkbox per catalog deck

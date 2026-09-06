@@ -84,7 +84,7 @@ test('a preset with no deckChoices (every game but RtG) never shows the picker',
   }
 });
 
-test('RtG shows one checked checkbox per catalog deck', async () => {
+test('RtG shows one checkbox per catalog deck, grouped by colour and sorted by name, only the first checked', async () => {
   const context = await fixture.browser.newContext();
   try {
     const page = await freshHostScreen(context);
@@ -92,8 +92,36 @@ test('RtG shows one checked checkbox per catalog deck', async () => {
     const checkboxes = page.locator('#host-deck-choices input[type=checkbox]');
     assert.ok(await checkboxes.count() > 1, 'RtG has more than one deck to choose from');
     assert.ok(await page.locator('#host-deck-choices').isVisible());
-    assert.deepEqual(await checkboxes.evaluateAll((els) => els.map((element) => element.checked)), await checkboxes.evaluateAll((els) => els.map(() => true)),
-      'every deck is checked by default');
+    // *nit (direct user request): "only select the first by default" -
+    // reversed from US-110's original "every deck checked".
+    const checkedStates = await checkboxes.evaluateAll((els) => els.map((element) => element.checked));
+    assert.deepEqual(checkedStates, [true, ...checkedStates.slice(1).map(() => false)], 'only the first deck is checked by default');
+
+    // *nit (direct user request): "group decks by color" - more than
+    // one heading means the grouping actually rendered, not one flat list.
+    assert.ok(await page.locator('.deck-choice-group-heading').count() > 1, 'decks are grouped under more than one colour heading');
+  } finally {
+    await context.close();
+  }
+});
+
+test('deck choices within each colour group are sorted alphabetically by name', async () => {
+  const context = await fixture.browser.newContext();
+  try {
+    const page = await freshHostScreen(context);
+    await page.selectOption('#host-preset', { label: 'Recard the Gathering' });
+    const rows = await page.locator('.deck-choice-group-heading, .deck-choice-name').evaluateAll(
+      (els) => els.map((element) => ({ isHeading: element.classList.contains('deck-choice-group-heading'), text: element.textContent })));
+
+    const groups = [];
+    for (const row of rows) {
+      if (row.isHeading) groups.push([]);
+      else groups.at(-1).push(row.text);
+    }
+    assert.ok(groups.length > 1, 'RtG decks span more than one colour group');
+    for (const names of groups) {
+      assert.deepEqual(names, names.toSorted((a, b) => a.localeCompare(b)), `group [${names}] is sorted by name`);
+    }
   } finally {
     await context.close();
   }

@@ -69,17 +69,60 @@ function colorClasses(card) {
   return rtgColorClasses(colors);
 }
 
+// *nit (direct user request): "replace {T} with a bent arrow tap
+// symbol" - a real Magic card never prints the letter T for tap, it
+// prints this glyph. `manaSymbolElement`'s only reader of `symbol ===
+// 'T'` lives here, one place, so the cost line and rules-text glyphs
+// (`renderRulesText`, below) render tap identically.
+const TAP_GLYPH = '↷';
+
+/** One colour-coded circular pip for a single `{X}` mana/tap symbol -
+ * shared by the cost line (`manaPips`) and inline rules-text symbols
+ * (`renderRulesText`), so both read the same glyph vocabulary instead
+ * of each inventing its own. The letter itself stays the visible,
+ * accessible label (colour is decoration, same reasoning `RtgCardFace`
+ * already documents elsewhere) - `{T}` is the one exception, since its
+ * real printed symbol never was a letter to begin with. */
+function manaSymbolElement(symbol) {
+  const pip = document.createElement('span');
+  if (symbol === 'T') {
+    pip.className = 'rtg-pip pip-tap';
+    pip.textContent = TAP_GLYPH;
+    pip.setAttribute('aria-label', 'Tap');
+  } else {
+    pip.className = `rtg-pip ${PIP_CLASS[symbol] ?? 'pip-generic'}`;
+    pip.textContent = symbol;
+  }
+  return pip;
+}
+
 function manaPips(symbols) {
   const wrap = document.createElement('span');
   wrap.className = 'rtg-cost';
   const list = symbols ?? [];
-  for (const symbol of list) {
-    const pip = document.createElement('span');
-    pip.className = `rtg-pip ${PIP_CLASS[symbol] ?? 'pip-generic'}`;
-    pip.textContent = symbol;
-    wrap.append(pip);
-  }
+  for (const symbol of list) wrap.append(manaSymbolElement(symbol));
   return wrap;
+}
+
+// *nit (direct user request): "show the mana requirements as glyphs
+// not {u} etc" - rules text (`card.text`, e.g. "{T}: Add {W} or
+// {U}.") is raw MTG templating shorthand, shown verbatim before this
+// (`rules.textContent = card.text`). Splits out every `{X}` token and
+// replaces it with the same real glyph pip the cost line uses, leaving
+// the surrounding prose as plain text nodes.
+function renderRulesText(container, text) {
+  let cursor = 0;
+  while (cursor < text.length) {
+    const open = text.indexOf('{', cursor);
+    const close = open === -1 ? -1 : text.indexOf('}', open + 1);
+    if (open === -1 || close === -1) {
+      container.append(document.createTextNode(text.slice(cursor)));
+      return;
+    }
+    if (open > cursor) container.append(document.createTextNode(text.slice(cursor, open)));
+    container.append(manaSymbolElement(text.slice(open + 1, close)));
+    cursor = close + 1;
+  }
 }
 
 /** "Creature — Human Soldier". Shared with the overlay and exported via
@@ -126,7 +169,7 @@ function buildOverlay(card) {
   if (card.text) {
     const rules = document.createElement('p');
     rules.className = 'rtg-inspect-rules';
-    rules.textContent = card.text;
+    renderRulesText(rules, card.text);
     body.append(rules);
   }
   if (card.flavor) {
@@ -158,6 +201,16 @@ function closeInspect() {
 }
 
 function openInspect(element, card) {
+  // *fix (real bug, found live): a right-click's own "Move" choice
+  // highlights every valid destination with `.pile-target` (ui.js) -
+  // while that's active, the pointer sitting still over the ORIGINATING
+  // card can still fire a fresh `mouseenter` (the row it's in gets
+  // reflowed/re-created under it), reopening this preview UNDER the
+  // menu and, now that a bigger RtG card anchors it further across the
+  // table, sometimes directly over the very pile-target the click needs
+  // to land on. A card menu open or a move in progress both mean the
+  // pointer's real job right now is picking a destination, not previewing.
+  if (document.querySelector('.card-context-menu, .pile-target')) return;
   closeInspect();
   const overlay = buildOverlay(card);
   document.body.append(overlay);
@@ -222,5 +275,12 @@ export const RtgCardFace = {
     element.addEventListener('blur', closeInspect);
     // A drag must not leave a preview stranded over the table.
     element.addEventListener('dragstart', closeInspect);
+    // *fix (real bug, found live): right-clicking a card for its context
+    // menu doesn't fire `mouseleave` first (the pointer never actually
+    // moves), so the hover preview stayed open UNDERNEATH the menu -
+    // and, now that a bigger RtG card anchors it further across the
+    // table, sometimes directly over the very pile-target the menu's
+    // own "Move" choice needs clicked next, silently eating that click.
+    element.addEventListener('contextmenu', closeInspect);
   },
 };

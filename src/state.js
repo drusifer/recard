@@ -346,7 +346,22 @@ function buildPiles(pileDeclarations, zoneRegistry, rng = Math.random) {
       // label. Additive: a declaration without `deckList` behaves
       // exactly as before.
       piles.push(applyDeclaration(pile, declaration, rng));
-      zones = ensureZoneRecord(zones, zoneId);
+      // *fix (direct user report): "tokenzone has no name" - a declared
+      // pile with no `zoneId` of its own (RtG's `rtg-tokens`, D107) gets
+      // a fresh STANDALONE zone here, equal to its own id - previously
+      // registered with no name at all (`ensureZoneRecord`'s own
+      // `name = null` default), so its zone heading rendered blank
+      // (`renderOneZone` renders every zone's heading unconditionally
+      // now, D62/D-nit "don't hide zone headings ever" - blank text, not
+      // a hidden bar). The pile already HAS a real name (`name`, just
+      // computed above) - reusing it is a real default, not a guess:
+      // for a 1:1 standalone zone, "the zone" and "the pile in it" are
+      // the same named thing. Harmless when `zoneId` names an ALREADY-
+      // registered shared zone instead (RtG's "Decks", declared via
+      // `GameConfig.zones` before this loop runs) - `ensureZoneRecord`
+      // no-ops on an existing id, so that zone's own real name is never
+      // overwritten by whichever pile happens to be declared first.
+      zones = ensureZoneRecord(zones, zoneId, name);
     }
   }
   return { piles, zones };
@@ -407,6 +422,21 @@ export function createInitialState(deckConfig = {}, rng = Math.random, gameConfi
       // `undefined` when a preset does not set one rather than
       // defaulting, so nothing invents a hand size that was never chosen.
       cardsPerPlayer: gameConfig.cardsPerPlayer,
+      // D116 (US-116, New Game): the only way a GUEST can tell which
+      // preset is live, since `deckConfig`/the rest of `gameConfig`
+      // carry no human-readable name. Left `undefined` for a caller
+      // that doesn't set one (every pre-D116 test/call site), same
+      // "additive, no invented default" shape as `cardsPerPlayer` above.
+      presetName: gameConfig.presetName,
+      // *fix (direct user report): "rtg deck pile's cards too small and
+      // don't match the top card" - a GAME parameter (`presets.js`'s
+      // `cardSize`), not a per-card-type CSS special case: every card
+      // at one table is the same size, so this reconfigures the shared
+      // `--card-w`/`--card-h` tokens for the whole table
+      // (`ui.js`'s `applyCardSize`) rather than one face overriding its
+      // own box. `undefined` for every preset that doesn't declare one,
+      // same "additive, no invented default" shape as `presetName`.
+      cardSize: gameConfig.cardSize,
     },
     zones: built.zones,
     piles: [
@@ -1862,13 +1892,25 @@ const ACTIONS = {
     if (!Object.hasOwn(PILE_TYPES, action.kind)) {
       throw new Error(`Cannot change a "${pile.kind}" pile to kind "${action.kind}"`);
     }
-    if (action.kind === 'hand' && !pile.ownerId) {
+    // *fix (direct user report): "hand got no owner error when
+    // switching pile type to hand. It should adopt the owner of the
+    // zone that it's in" - an unowned pile sitting inside a player's
+    // OWN zone (e.g. a plain pile the player created in their personal
+    // zone) has a perfectly good owner available, just not stamped on
+    // the pile itself yet; only a pile with no owner AND no owned zone
+    // to inherit from (a genuinely shared/table zone) is still a real
+    // error - a hand with nobody's cards in it makes no sense. Scoped to
+    // the `hand` conversion alone - every OTHER target kind keeps the
+    // pile's existing `ownerId` exactly as before, unowned or not.
+    const inheritedOwnerId = pile.ownerId ?? state.zones.find((z) => z.id === pile.zoneId)?.ownerId ?? null;
+    if (!inheritedOwnerId && action.kind === 'hand') {
       throw new Error(`Cannot change pile ${action.pileId} to kind "hand": it has no owner`);
     }
     const name = isDefaultPileName(pile.name, pile.kind) ? defaultKindName(action.kind) : pile.name;
+    const ownerId = action.kind === 'hand' ? inheritedOwnerId : pile.ownerId;
     return {
       ...state,
-      piles: state.piles.map((p) => (p.id === action.pileId ? { ...p, kind: action.kind, name } : p)),
+      piles: state.piles.map((p) => (p.id === action.pileId ? { ...p, kind: action.kind, name, ownerId } : p)),
     };
   },
 
@@ -1957,6 +1999,40 @@ const ACTIONS = {
           .filter((p) => p.kind === 'hand' && survivorsOfReset(p.cards).length > 0)
           .map((p) => withCards(p, survivorsOfReset(p.cards))),
       ],
+    };
+  },
+
+  /**
+   * D116 (US-116): the host swaps to a DIFFERENT preset without a new
+   * table code. Unlike `RESET` (which rebuilds the CURRENT preset's
+   * shape only), this replaces `deckConfig`/`gameConfig` wholesale -
+   * so it is built by re-running `createInitialState` for the new
+   * preset and then replaying `JOIN` for every existing player, the
+   * same mechanism `main.js` already uses to rebuild a roster on host
+   * restore. That is what builds the new preset's own `perPlayer`
+   * piles (chips/stock/etc.) correctly, rather than carrying over
+   * piles shaped for the OLD preset.
+   *
+   * Scores reset to 0 and chip/token supplies rebuild fresh - both
+   * fall out of `createInitialState`/`JOIN`'s normal behavior with no
+   * special-case code, which is correct here: a different game's old
+   * scores and denominations don't carry meaning forward (contrast
+   * `RESET`, a same-game round restart, which deliberately preserves
+   * both).
+   */
+  NEW_GAME(state, action) {
+    const rng = action.rng ?? Math.random;
+    let next = createInitialState(action.deckConfig, rng, action.gameConfig);
+    for (const player of state.players) {
+      next = reduce(next, { type: 'JOIN', playerId: player.id, name: player.name, rng });
+    }
+    return {
+      ...next,
+      hostId: state.hostId,
+      players: next.players.map((p) => {
+        const prior = state.players.find((sp) => sp.id === p.id);
+        return prior ? { ...p, connection: prior.connection } : p;
+      }),
     };
   },
 };
@@ -2096,10 +2172,11 @@ export function reduce(state, action) {
   const apply = ACTIONS[action.type];
   if (!apply) throw new Error(`Unknown action type: ${action.type}`);
   const next = apply(state, action);
-  // RESET is the one legitimate "new epoch" - it rebuilds the deck with
-  // brand new card ids on purpose (a new round), same reason it's
+  // RESET and NEW_GAME are the legitimate "new epoch" actions - each
+  // rebuilds the deck with brand new card ids on purpose (a new round,
+  // or D116's wholesale preset swap), same reason RESET is already
   // exempt from D24's "exactly one deck pile" invariant elsewhere.
-  if (action.type !== 'RESET') assertCardsConserved(state, next, action.type);
+  if (action.type !== 'RESET' && action.type !== 'NEW_GAME') assertCardsConserved(state, next, action.type);
   return next;
 }
 
@@ -2142,7 +2219,17 @@ export function viewFor(state, playerId) {
     // `?? true` mirrors CREATE_ZONE's own `state.gameConfig?.allowsPlayerZones
     // === false` default (a pre-D46 restored snapshot has no `gameConfig`
     // at all, and must default to "allowed" the same way here as there).
-    gameConfig: { allowsPlayerZones: state.gameConfig?.allowsPlayerZones ?? true },
+    gameConfig: {
+      allowsPlayerZones: state.gameConfig?.allowsPlayerZones ?? true,
+      // D116: lets a guest's client detect a New Game (a changed
+      // `presetName`) and show a notice - see `main.js`'s banner logic.
+      presetName: state.gameConfig?.presetName,
+      // *fix (direct user report): "rtg deck pile's cards too small and
+      // don't match the top card" - a guest applies this the same way
+      // the host does (`renderGameFromView`'s `applyCardSize` call),
+      // since a card's real size is otherwise host-only config.
+      cardSize: state.gameConfig?.cardSize,
+    },
   };
   for (const pile of state.piles) pileInstanceFor(pile, playerId).contributeToView(view, playerId);
   return view;

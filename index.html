@@ -62,16 +62,31 @@
            default, matching every prior sprint's behavior exactly - Add
            Zone was always available before this control existed. -->
       <label><input id="host-allow-player-zones" type="checkbox" checked /> Players can add zones</label>
-      <!-- US-42: OPTIONAL. Empty means no auto-start, i.e. exactly the
-           behaviour before this existed (Smith Gate 1 answer 3). It is a
-           start TRIGGER, not a capacity limit - a 5th player may still
-           join a table expecting 4; the game simply doesn't re-deal. -->
-      <label>Start automatically at
-        <input id="host-expected-players" type="number" min="2" max="8" placeholder="any" />
-        players <small>(optional)</small>
-      </label>
-      <button id="create-table" type="button" class="btn-primary">Create Table</button>
-      <p id="host-create-error" class="error-text" hidden></p>
+      <!-- US-116 (New Game): this whole picker (preset/deck-choices/
+           layout/allow-zones above) is genuinely REUSED, not copied, for
+           picking a DIFFERENT game on an already-running table - see
+           `startNewGameFlow` in main.js. These two field groups only
+           make sense at ONE of the two times, so each is hidden during
+           the other rather than shown-but-inert (Smith Gate 1 nit). -->
+      <div id="host-create-only-fields">
+        <!-- US-42: OPTIONAL. Empty means no auto-start, i.e. exactly the
+             behaviour before this existed (Smith Gate 1 answer 3). It is a
+             start TRIGGER, not a capacity limit - a 5th player may still
+             join a table expecting 4; the game simply doesn't re-deal. -->
+        <label>Start automatically at
+          <input id="host-expected-players" type="number" min="2" max="8" placeholder="any" />
+          players <small>(optional)</small>
+        </label>
+        <button id="create-table" type="button" class="btn-primary">Create Table</button>
+        <p id="host-create-error" class="error-text" hidden></p>
+      </div>
+      <div id="host-newgame-only-fields" hidden>
+        <div class="btn-row">
+          <button id="start-new-game-btn" type="button" class="btn-primary">Start New Game</button>
+          <button id="cancel-new-game-btn" type="button">Cancel</button>
+        </div>
+        <p id="new-game-error" class="error-text" hidden></p>
+      </div>
     </div>
     <div id="host-share" class="panel panel-felt" hidden>
       <p>Share this code or link with the room:</p>
@@ -143,6 +158,10 @@
         Saves positions of built-in panels only — custom zones aren't included.
         Applies to new games with this preset, not this table.
       </p>
+      <!-- US-116: deliberately away from the deck panel's "Restart game"
+           action (Smith Gate 1) - that's a same-game round restart, this
+           discards the whole table for a DIFFERENT preset. -->
+      <button id="new-game-btn" type="button">New Game…</button>
     </div>
     <section class="panel panel-felt table-section">
       <h2 class="sr-only">Table</h2>

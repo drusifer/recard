@@ -5,7 +5,7 @@
 D21-D23) is historical - decisions are numbered continuously now and
 the highest number is always the current binding state, not a
 particular sprint's scope.
-**Last updated:** 2026-09-04 (D92-D113)
+**Last updated:** 2026-09-05 (D92-D116)
 
 ## Core invariant (direct user request, stated repeatedly - binding on every Pile type, present and future)
 
@@ -95,6 +95,73 @@ built speculatively.
 
 @Smith *user test — no new UX surface (a bug fix + an internal
 refactor), flagging for awareness rather than a gate.
+
+### D116. New Game — the host swaps to a different preset, same table code
+
+Direct user request: a "New Game" button that lets the host pick a
+different game without making a new table code. Distinct from `RESET`
+("restart THIS game's current round") - `RESET` rebuilds the CURRENT
+preset's shape only and deliberately preserves scores/chips (D111);
+New Game replaces `deckConfig`/`gameConfig` wholesale for a genuinely
+different preset, so old scores/chip denominations don't carry meaning
+forward and are dropped.
+
+**Reducer.** New `NEW_GAME` action, built by re-running
+`createInitialState` for the new preset and then replaying `JOIN` for
+every existing player - the same roster-rebuild mechanism `main.js`
+already uses on host restore (`reseatOwner` + a `JOIN` loop). Replaying
+`JOIN` is what builds the NEW preset's own `perPlayer` piles (chips/
+stock/etc.) correctly, rather than carrying over piles shaped for the
+old one. `hostId` and each player's `connection` state are carried over
+explicitly afterward - `createInitialState`/`JOIN` know nothing about
+either. Exempted from `assertCardsConserved` alongside `RESET`: a
+wholesale preset swap is a new card-id epoch by definition, the exact
+reasoning already recorded for RESET.
+
+**`gameConfig.presetName`.** New field, set at table creation and by
+`NEW_GAME`, exposed through `viewFor` next to the existing
+`allowsPlayerZones`. The only way a GUEST client can tell which preset
+is live without a second, one-off network message - `main.js` diffs it
+on every render (`noticeNewGameIfPresetChanged`) to show a "Host
+started a new game" banner (Smith Gate 1 amendment: a guest's hand
+disappearing with no explanation reads as a bug).
+
+**Host UI reuses the Create Table picker verbatim** - the same
+`#host-preset`/`#host-deck-choices`/`#host-layout` DOM (Smith Gate 1
+nit: reuse, not a second copy that can drift). `configsForPreset()`
+(`main.js`) is the shared `deckConfig`/`gameConfig`-building logic both
+Create Table and New Game call. The "New Game…" button itself sits in
+the host-only `#layout-controls` chrome, deliberately away from the
+deck panel's "Restart game" action (same gate: a round restart and a
+whole-table discard reading as the same button invites the wrong
+click). A `globalThis.confirm` gate (same pattern `performResetLayout`
+already uses) sits between picking a preset and actually dispatching -
+mutation-tested (`tests/newGame.browser.mjs`): bypassing it made the
+test suite fail as expected.
+
+**Bug found and fixed along the way:** `#screen-game { display: flex }`
+(an id selector, `style.css`) outranked the UA stylesheet's `[hidden] {
+display: none }` - the exact same specificity gotcha already fixed for
+`.btn-row[hidden]`/`.deck-choices[hidden]` elsewhere in this file, just
+never triggered for `#screen-game` before because it only ever went
+hidden -> shown ONCE per table. New Game is the first flow to navigate
+BACK to `#screen-host` mid-game, and without `#screen-game[hidden] {
+display: none }` the live table stayed visible underneath the picker.
+
+**Second finding, live user-testing pass (Smith):** the banner reused
+`.banner`'s existing red `--danger` styling, which every prior caller
+(lost host, session ended) legitimately wants but reads as an alarm for
+this genuinely neutral notice. Fixed with an opt-in `.banner-info`
+modifier (`renderBanner(container, message, { tone: 'info' })`) rather
+than changing the shared default - existing callers are unaffected.
+
+**Known test gap:** the guest-side banner has no automated 2-peer
+(host+guest) browser test - this project has no 2-peer browser harness
+yet (standing backlog item). Verified by code review: the banner logic
+runs inside `renderGameFromView`, the single render funnel both host
+and guest go through.
+
+@Smith *user test D116.
 
 ### D115. RESET rebuilds every declared card deck, not just the canonical one
 
@@ -4360,7 +4427,11 @@ wiring through the right-click context menu; `npm run test:rtg`
 RtG game end to end (draw, cast, tap, the shared token supply, exile/
 discard, the stack, life total, a reshuffle, and a full Restart) - the
 bug-hunt pattern that found D115. Both are `bobp make test-ui`/
-`test-rtg`.
+`test-rtg`. `npm run test:hostsetup` (`tests/hostSetup.browser.mjs`)
+covers the pre-game deck-choice/sticky-settings picker, and `npm run
+test:newgame` (`tests/newGame.browser.mjs`, D116) covers New Game -
+same single-client convention, same reason: no 2-peer harness exists
+yet for anything that needs a real guest.
 
 ## UI Conventions
 - **Interactive elements are ≥44×44px** (iOS HIG / Material minimum),

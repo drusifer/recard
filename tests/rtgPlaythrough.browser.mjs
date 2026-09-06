@@ -131,6 +131,12 @@ before(async () => {
   await page.click('#show-host');
   await page.fill('#host-name', 'Alice');
   await page.selectOption('#host-preset', { label: 'Recard the Gathering' });
+  // *nit (direct user request, "only select the first by default"):
+  // deck choices no longer default to all-checked, so this playthrough
+  // (which needs BOTH `DECK_ID` and `OTHER_DECK_ID` on the table) has to
+  // check them explicitly rather than relying on the old default.
+  await page.locator(`#host-deck-choices input[value="${DECK_ID}"]`).check();
+  await page.locator(`#host-deck-choices input[value="${OTHER_DECK_ID}"]`).check();
   await page.click('#create-table');
   await page.waitForSelector('#host-share:not([hidden])', { timeout: 20_000 });
   await page.click('#deal-btn'); // RtG's own DEAL is a documented no-op (cardsPerPlayer: 0) - this just starts the game
@@ -203,7 +209,17 @@ test('the hand offers RtG-specific sort actions, and cost sits at the card\'s le
 
 test('game 1: cast a creature to the battlefield and tap it', async () => {
   const page = fixture.page;
-  const card = page.locator('[data-kind="hand"] .middle-card').first();
+  // `.last()`, not `.first()`: same reasoning as `uiActions.browser.mjs`'s
+  // own `handCard()` - a fanned, overlapping hand only leaves its LAST
+  // DOM sibling actually unobstructed to click. `.first()` happened to
+  // still land on real pixels at the OLD, RtG-cards-too-small fan
+  // spacing (the very bug US-116's card-size fix corrects) - once the
+  // fan spread the correct amount for RtG's real card size, `.first()`
+  // was genuinely covered and a `force: true` right-click on it landed
+  // on whichever card actually sits on top instead (caught live: the
+  // WRONG card moved to the battlefield, not a timeout with nothing
+  // happening at all).
+  const card = page.locator('[data-kind="hand"] .middle-card').last();
   const cardId = await card.getAttribute('data-pileable-id');
   await moveTo(page, card, '[data-kind="battlefield"]');
   await page.waitForSelector(`[data-kind="battlefield"] .middle-card[data-pileable-id="${cardId}"]`, { timeout: 5000 });
@@ -322,14 +338,18 @@ test('game 1: exile, discard, the shared stack, and life total all work', async 
   for (let index = 0; index < 3; index++) await pileAction(page, DECK_ID, 'Draw').click();
   await page.waitForFunction(() => document.querySelectorAll('[data-kind="hand"] .middle-card').length >= 3, undefined, { timeout: 10_000 });
 
+  // `.last()`, not `.first()`: same reasoning as `uiActions.browser.mjs`'s
+  // own `handCard()` and this file's own "cast a creature" test - a
+  // fanned, overlapping hand only leaves its LAST DOM sibling actually
+  // unobstructed to click.
   const hand = () => page.locator('[data-kind="hand"] .middle-card');
-  await moveTo(page, hand().first(), '[data-kind="exile"]');
+  await moveTo(page, hand().last(), '[data-kind="exile"]');
   await page.waitForFunction(() => document.querySelectorAll('[data-kind="exile"] .middle-card').length === 1, undefined, { timeout: 5000 });
 
-  await moveTo(page, hand().first(), '[data-kind="discard"]');
+  await moveTo(page, hand().last(), '[data-kind="discard"]');
   await page.waitForFunction(() => document.querySelectorAll('[data-kind="discard"] .middle-card').length === 1, undefined, { timeout: 5000 });
 
-  const stackCard = hand().first();
+  const stackCard = hand().last();
   const stackCardId = await stackCard.getAttribute('data-pileable-id');
   await moveTo(page, stackCard, '[data-kind="stack"]');
   await page.waitForSelector(`[data-kind="stack"] .middle-card[data-pileable-id="${stackCardId}"]`, { timeout: 5000 });

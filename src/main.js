@@ -10,6 +10,7 @@ import {
   renderRoster,
   renderRulesPanel,
   renderBanner,
+  applyCardSize,
   renderDeckStack,
   wirePanelLayout,
   showScreen,
@@ -220,13 +221,45 @@ function deckColorDots(colors) {
   return wrap;
 }
 
+// *nit (direct user request): "group decks by color and sort by name...
+// only select the first by default" - `colors[0]` (WUBRG order, then a
+// trailing colourless bucket) is the grouping key rather than the full
+// `colors` set, since a guild deck's two-colour set would otherwise put
+// it in its own group of one - grouping by first colour instead clusters
+// every White deck (mono AND every White guild pairing) together, same
+// "which colour does this deck read as" heuristic MTG's own guild wheel
+// uses. Sorted by NAME within a group, not declaration order, so the
+// grid reads as an actual alphabetical picker rather than "whatever
+// order presets.js happened to list them in".
+const WUBRG_ORDER = ['W', 'U', 'B', 'R', 'G'];
+
+/** @param {{colors?: string[]}[]} deckChoices
+ * @returns {{color: string|null, decks: object[]}[]} */
+function groupDeckChoicesByColor(deckChoices) {
+  const byColor = new Map();
+  for (const deck of deckChoices) {
+    const key = deck.colors?.[0] ?? null;
+    if (!byColor.has(key)) byColor.set(key, []);
+    byColor.get(key).push(deck);
+  }
+  const orderedKeys = [...WUBRG_ORDER.filter((color) => byColor.has(color)), ...(byColor.has(null) ? [null] : [])];
+  return orderedKeys.map((color) => ({
+    color,
+    decks: byColor.get(color).toSorted((a, b) => a.name.localeCompare(b.name)),
+  }));
+}
+
 // US-110: one checkbox per preset-declared `deckChoices` entry (RtG
 // today - "we don't need all the decks in every game"). A preset with
 // no `deckChoices` hides the fieldset entirely, exactly the pre-US-110
-// look for every other game. All checked by default; a REMEMBERED
-// selection (US-111) only applies when it was saved against THIS same
-// preset - switching presets mid-session and back doesn't try to carry
-// a choice list that might not even apply to the new preset's decks.
+// look for every other game. Only the FIRST deck (post group/sort) is
+// checked by default now - direct user request, reversing US-110's
+// original "every deck checked" default now that there's a real
+// alphabetical order to have a "first" at all. A REMEMBERED selection
+// (US-111) still wins over that default when it was saved against THIS
+// same preset - switching presets mid-session and back doesn't try to
+// carry a choice list that might not even apply to the new preset's
+// decks.
 //
 // Direct follow-up request: "use an image from one of the powerful
 // cards in each deck and show the deck colors" - each choice shows its
@@ -235,6 +268,38 @@ function deckColorDots(colors) {
 // exact `artUrl`/fallback-class machinery rather than inventing a
 // second art-resolution path - a missing image degrades to the same
 // colour-keyed gradient a dealt card with no art falls back to.
+/** One `<label>` grid cell for a single deck choice - extracted out of
+ * `renderDeckChoices`'s loop purely to stay under the lint's cognitive-
+ * complexity ceiling once grouping/heading logic joined it. */
+function renderDeckChoiceLabel(deck, isChecked) {
+  const label = document.createElement('label');
+  label.className = 'deck-choice';
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.value = deck.id;
+  checkbox.checked = isChecked;
+
+  const thumb = document.createElement('span');
+  thumb.className = `deck-choice-art ${rtgColorClasses(deck.colors).join(' ')}`;
+  if (deck.signatureCard) {
+    const art = document.createElement('img');
+    art.src = artUrl(deck.signatureCard);
+    art.alt = '';
+    // Same "degrade to a colour panel, never a broken-image icon" rule
+    // `RtgCardFace.js`'s own resting face already follows - art
+    // generation is quota-limited and may legitimately be missing.
+    art.addEventListener('error', () => art.remove());
+    thumb.append(art);
+  }
+
+  const name = document.createElement('span');
+  name.className = 'deck-choice-name';
+  name.textContent = deck.name;
+
+  label.append(checkbox, thumb, name, deckColorDots(deck.colors));
+  return label;
+}
+
 function renderDeckChoices(preset) {
   deckChoicesElement.replaceChildren(deckChoicesElement.querySelector('legend'));
   if (!preset.deckChoices?.length) {
@@ -243,33 +308,24 @@ function renderDeckChoices(preset) {
   }
   deckChoicesElement.hidden = false;
   const remembered = rememberedHostSettings?.presetName === preset.name ? rememberedHostSettings.deckChoiceIds : null;
-  for (const deck of preset.deckChoices) {
-    const label = document.createElement('label');
-    label.className = 'deck-choice';
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.value = deck.id;
-    checkbox.checked = remembered ? remembered.includes(deck.id) : true;
-
-    const thumb = document.createElement('span');
-    thumb.className = `deck-choice-art ${rtgColorClasses(deck.colors).join(' ')}`;
-    if (deck.signatureCard) {
-      const art = document.createElement('img');
-      art.src = artUrl(deck.signatureCard);
-      art.alt = '';
-      // Same "degrade to a colour panel, never a broken-image icon"
-      // rule `RtgCardFace.js`'s own resting face already follows - art
-      // generation is quota-limited and may legitimately be missing.
-      art.addEventListener('error', () => art.remove());
-      thumb.append(art);
+  const groups = groupDeckChoicesByColor(preset.deckChoices);
+  let isFirstDeck = true;
+  for (const group of groups) {
+    // A heading per colour only earns its place once there's more than
+    // one group to tell apart - a preset whose decks carry no `colors`
+    // at all (every non-RtG multi-deck game, today none) renders one
+    // plain grid, exactly the pre-grouping look.
+    if (groups.length > 1) {
+      const heading = document.createElement('div');
+      heading.className = 'deck-choice-group-heading';
+      heading.textContent = group.color ? COLOR_NAME[group.color] : 'Colorless';
+      deckChoicesElement.append(heading);
     }
-
-    const name = document.createElement('span');
-    name.className = 'deck-choice-name';
-    name.textContent = deck.name;
-
-    label.append(checkbox, thumb, name, deckColorDots(deck.colors));
-    deckChoicesElement.append(label);
+    for (const deck of group.decks) {
+      const isChecked = remembered ? remembered.includes(deck.id) : isFirstDeck;
+      isFirstDeck = false;
+      deckChoicesElement.append(renderDeckChoiceLabel(deck, isChecked));
+    }
   }
 }
 
@@ -309,6 +365,16 @@ function onPresetSelected() {
   selectedPreset = preset;
   refreshLayoutOptions(preset.name);
   renderDeckChoices(preset);
+  // *fix (direct user report): "rtg deck pile's cards too small and
+  // don't match the top card" - previews the SAME card size the real
+  // table will use (`configsForPreset` carries `preset.cardSize`
+  // through to `gameConfig`) on `#host-deck-area`'s pre-game deck
+  // preview, not just after Create Table. Also fires while picking a
+  // preset for New Game (same dropdown) - harmless, since the live
+  // game screen sits hidden behind that picker either way
+  // (`cancelNewGameFlow` restores the actual running game's own size
+  // if Cancel is clicked after changing this selection).
+  applyCardSize(preset.cardSize);
   const previewElement = document.querySelector('#host-preset-preview');
   const cardsWord = preset.cardsPerPlayer === 1 ? 'card' : 'cards';
   // D53 (Smith Gate 2): a preset that declares a starting table layout
@@ -796,6 +862,52 @@ async function resumeHostedTable() {
   }
 }
 
+/**
+ * Direct user request: "every game should ONLY be based on preset" -
+ * `deckConfig`/`gameConfig` are read entirely off the selected preset
+ * (never a manual host control). Extracted (US-116) so New Game can
+ * build the exact same shapes for a DIFFERENT preset without a second,
+ * drifting copy of this logic - Create Table and New Game differ only
+ * in what they do with the result.
+ */
+function configsForPreset(preset, deckIds, allowsPlayerZones) {
+  const deckConfig = {
+    type: preset.type ?? 'standard',
+    numDecks: preset.numDecks,
+    jokers: preset.jokers,
+    ...(preset.deckList && { deckList: preset.deckList }),
+  };
+  // D46: GameConfig's first real field. D53: `piles` (renamed from
+  // `zones` - D55, that name now belongs to the real Zone-entity list)
+  // comes from the selected preset - US-110: filtered down to only the
+  // chosen deck choices (`deckIds`), if the preset offers any at all;
+  // every other pile passes through unchanged (`filterDeckChoicePiles`'s
+  // own contract). `zones` carries any Zone entities the preset itself
+  // declares (e.g. none today reach beyond the always-present Table
+  // Zone - Gin Rummy's discard only ever references it, never declares
+  // a new one).
+  const gameConfig = {
+    allowsPlayerZones,
+    tableZone: preset.tableZone ?? true,
+    piles: filterDeckChoicePiles(preset, deckIds),
+    zones: preset.zones ?? [],
+    // Carried in the TABLE's config, not just this browser's
+    // `lastDealCount` - see `createInitialState`. A restored table has
+    // no share screen to re-seed that local value from.
+    cardsPerPlayer: preset.cardsPerPlayer,
+    // D116: the only way a GUEST can tell which game is live (New Game
+    // notice, `noticeNewGameIfPresetChanged`).
+    presetName: preset.name,
+    // *fix (direct user report): "rtg deck pile's cards too small and
+    // don't match the top card" - carried into the real table's
+    // `gameConfig` so a GUEST's own render (`applyCardSize`,
+    // `renderGameFromView`) sizes cards the same way the host's
+    // pre-game preview already does (`onPresetSelected`, below).
+    cardSize: preset.cardSize,
+  };
+  return { deckConfig, gameConfig };
+}
+
 document.querySelector('#create-table').addEventListener('click', async () => {
   const createErrorElement = document.querySelector('#host-create-error');
   // US-110: a preset that offers deck choices must have at least one
@@ -817,40 +929,7 @@ document.querySelector('#create-table').addEventListener('click', async () => {
   myName = document.querySelector('#host-name').value.trim() || 'Host';
   expectedPlayers = Number(document.querySelector('#host-expected-players').value) || 0;
   const allowsPlayerZones = document.querySelector('#host-allow-player-zones').checked;
-  // Direct user request: "every game should ONLY be based on preset" -
-  // `deckConfig` is read entirely off the selected preset now (the
-  // module-level `selectedPreset`, kept in sync by `onPresetSelected`),
-  // never from a manual host control. This is also the fix for a real
-  // bug that hiding-the-numDecks-control only papered over: `gameConfig`
-  // below never actually forwarded a preset's own `tableZone` at all -
-  // RTG's `tableZone: false` (state.js) was silently ignored at table
-  // creation, so a real RTG table still got the default Deck/Table Zone
-  // panels this whole thread exists to remove.
-  const deckConfig = {
-    type: selectedPreset.type ?? 'standard',
-    numDecks: selectedPreset.numDecks,
-    jokers: selectedPreset.jokers,
-    ...(selectedPreset.deckList && { deckList: selectedPreset.deckList }),
-  };
-  // D46: GameConfig's first real field. D53: `piles` (renamed from
-  // `zones` - D55, that name now belongs to the real Zone-entity list)
-  // comes from the selected preset - US-110: filtered down to only the
-  // chosen deck choices (`deckIds`), if the preset offers any at all;
-  // every other pile passes through unchanged (`filterDeckChoicePiles`'s
-  // own contract). `zones` carries any Zone entities the preset itself
-  // declares (e.g. none today reach beyond the always-present Table
-  // Zone - Gin Rummy's discard only ever references it, never declares
-  // a new one).
-  const gameConfig = {
-    allowsPlayerZones,
-    tableZone: selectedPreset.tableZone ?? true,
-    piles: filterDeckChoicePiles(selectedPreset, deckIds),
-    zones: selectedPreset.zones ?? [],
-    // Carried in the TABLE's config, not just this browser's
-    // `lastDealCount` - see `createInitialState`. A restored table has
-    // no share screen to re-seed that local value from.
-    cardsPerPlayer: selectedPreset.cardsPerPlayer,
-  };
+  const { deckConfig, gameConfig } = configsForPreset(selectedPreset, deckIds, allowsPlayerZones);
   // US-111 (direct user request: "make the game params sticky"):
   // written on every successful table creation, overwriting whatever
   // the last session left - see `hostSettings.js`'s own "last one wins"
@@ -919,6 +998,72 @@ document.querySelector('#create-table').addEventListener('click', async () => {
   renderRosterOnly();
 
   wireHostSession();
+});
+
+// --- New Game (US-116): host swaps to a different preset, same table,
+// same code - no new session/`Session.host` call, unlike Create Table
+// just above. Reuses the exact same preset/deck-choice/layout DOM
+// (`#host-preset` etc.) rather than a second copy (Smith Gate 1 nit) -
+// only which field group is visible, and what the submit button does,
+// differs between the two flows. ---
+function startNewGameFlow() {
+  if (role !== 'host' || !gameState) return;
+  document.querySelector('#host-create-only-fields').hidden = true;
+  document.querySelector('#host-newgame-only-fields').hidden = false;
+  document.querySelector('#new-game-error').hidden = true;
+  document.querySelector('#host-share').hidden = true;
+  document.querySelector('#host-form').hidden = false;
+  showScreen(screens, 'host');
+}
+
+function cancelNewGameFlow() {
+  document.querySelector('#host-create-only-fields').hidden = false;
+  document.querySelector('#host-newgame-only-fields').hidden = true;
+  document.querySelector('#host-form').hidden = true;
+  document.querySelector('#host-share').hidden = false;
+  showScreen(screens, 'game');
+  // Undoes any preview drift from changing the preset dropdown while
+  // this picker was open (`onPresetSelected` applies a card size live,
+  // for the picker's OWN preview) - Cancel means the table underneath
+  // never actually changed, so its real size must still win.
+  applyCardSize(gameState.gameConfig?.cardSize);
+}
+
+document.querySelector('#new-game-btn').addEventListener('click', startNewGameFlow);
+document.querySelector('#cancel-new-game-btn').addEventListener('click', cancelNewGameFlow);
+
+document.querySelector('#start-new-game-btn').addEventListener('click', () => {
+  const errorElement = document.querySelector('#new-game-error');
+  const deckIds = chosenDeckIds(selectedPreset);
+  if (deckIds && deckIds.length === 0) {
+    errorElement.textContent = 'Choose at least one deck.';
+    errorElement.hidden = false;
+    return;
+  }
+  errorElement.hidden = true;
+  // Smith Gate 1 AC7: a confirm step, same `globalThis.confirm` pattern
+  // `performResetLayout` already uses for its own destructive action -
+  // this one is strictly more destructive (the whole table, not just a
+  // saved layout), so it says exactly what's discarded.
+  const proceed = globalThis.confirm(
+    `Discard the current game and start "${selectedPreset.name}" instead? Scores and chips will reset.`);
+  if (!proceed) return;
+
+  const allowsPlayerZones = document.querySelector('#host-allow-player-zones').checked;
+  const { deckConfig, gameConfig } = configsForPreset(selectedPreset, deckIds, allowsPlayerZones);
+  rememberHostSettings(localStorage, {
+    name: myName, presetName: selectedPreset.name, allowsPlayerZones, expectedPlayers, deckChoiceIds: deckIds,
+  });
+  dispatch({ type: 'NEW_GAME', deckConfig, gameConfig });
+  lastDealCount = selectedPreset.cardsPerPlayer;
+  // Same "Layout picker overrides the preset's own built-in layout"
+  // choice Create Table's handler makes, above.
+  const chosenOverrideName = layoutSelect.value;
+  const chosenOverride = chosenOverrideName
+    ? overridesForPreset(localStorage, selectedPreset.name).find((o) => o.name === chosenOverrideName)
+    : null;
+  applyPresetLayout(localStorage, chosenOverride?.layout ?? selectedPreset.layout);
+  cancelNewGameFlow();
 });
 
 // UX follow-up (direct user request): Reset/Reset Scores/Add Zone
@@ -1475,6 +1620,12 @@ function buildZoneOptions(nameById) {
 }
 
 function renderGameFromView(view) {
+  noticeNewGameIfPresetChanged(view);
+  // *fix (direct user report): "rtg deck pile's cards too small and
+  // don't match the top card" - the single render funnel both host and
+  // guest go through, so this is what keeps a GUEST's own cards sized
+  // correctly too, not just the host's local preview.
+  applyCardSize(view.gameConfig?.cardSize);
   updateLayoutControlsVisibility();
   const nameById = new Map(view.players.map((p) => [p.id, p.id === myId ? 'You' : p.name]));
   const zoneOptions = buildZoneOptions(nameById);
@@ -1829,6 +1980,32 @@ function performCreatePileWithCard(pileableId, zoneId) {
  *  just whichever preset the dropdown starts on, same source of truth
  *  `Create Table`'s own re-sync (below) already uses. */
 let lastDealCount = selectedPreset.cardsPerPlayer;
+
+// --- New Game (US-116): host swaps to a different preset, same table ---
+
+/** Sentinel distinct from any real `presetName` (including `undefined`,
+ * which a pre-D116/no-name preset legitimately has) - marks "no render
+ * has happened yet for this table", so the very first render never
+ * reads as a preset CHANGE and pops the notice below. */
+const NO_RENDER_YET = Symbol('no-render-yet');
+let lastSeenPresetName = NO_RENDER_YET;
+let newGameNoticeTimer = null;
+
+/** Smith Gate 1 amendment 2: a guest's screen changes out from under
+ * them the moment the host confirms New Game (NEW_GAME wipes their hand
+ * same as any other pile) - a silent wipe reads as a bug, so this names
+ * what happened. Detected off the replicated `gameConfig.presetName`
+ * (D116) rather than a one-off network message, since every render
+ * already carries the current view. */
+function noticeNewGameIfPresetChanged(view) {
+  const presetName = view.gameConfig?.presetName;
+  const isRealChange = lastSeenPresetName !== NO_RENDER_YET && presetName !== lastSeenPresetName;
+  lastSeenPresetName = presetName;
+  if (!isRealChange) return;
+  clearTimeout(newGameNoticeTimer);
+  renderBanner(bannerElement, presetName ? `Host started a new game: ${presetName}` : 'Host started a new game.', { tone: 'info' });
+  newGameNoticeTimer = setTimeout(() => renderBanner(bannerElement, ''), 5000);
+}
 
 // D91/D92 (direct user request, "we're missing... split pile" / "split
 // should always fan the pile"): which pile (if any) is currently

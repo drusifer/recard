@@ -54,12 +54,14 @@ test('createInitialState: gameConfig.allowsPlayerZones defaults true - matches e
   const state = createInitialState({}, () => 0.5);
   // `cardsPerPlayer` joined the shape when a restored table needed to
   // recover its own deal size; `undefined` when no preset set one.
-  assert.deepEqual(state.gameConfig, { allowsPlayerZones: true, tableZone: true, piles: [], zones: [], cardsPerPlayer: undefined });
+  assert.deepEqual(state.gameConfig,
+    { allowsPlayerZones: true, tableZone: true, piles: [], zones: [], cardsPerPlayer: undefined, presetName: undefined, cardSize: undefined });
 });
 
 test('createInitialState: allowsPlayerZones can be set false via the third param', () => {
   const state = createInitialState({}, () => 0.5, { allowsPlayerZones: false });
-  assert.deepEqual(state.gameConfig, { allowsPlayerZones: false, tableZone: true, piles: [], zones: [], cardsPerPlayer: undefined });
+  assert.deepEqual(state.gameConfig,
+    { allowsPlayerZones: false, tableZone: true, piles: [], zones: [], cardsPerPlayer: undefined, presetName: undefined, cardSize: undefined });
 });
 
 test('CREATE_ZONE: rejected when the game disallows player zones', () => {
@@ -263,6 +265,72 @@ test('RESET: a declared chip/token supply keeps its EXISTING pieces (D111), not 
 
   assert.deepEqual(next.piles.find((p) => p.id === 'tokens').cards.map((c) => c.id).toSorted(), before,
     'the exact same tokens, not a second freshly-built set');
+});
+
+// --- D116 (US-116): New Game - swap to a different preset, same table ---
+
+test('NEW_GAME: replaces deckConfig/gameConfig with the new preset\'s shape', () => {
+  let state = createInitialState({ numDecks: 1, jokers: 0 }, () => 0.5, { presetName: 'War' });
+  state = withPlayers(state, ['p1', 'p2']);
+
+  const next = reduce(state, {
+    type: 'NEW_GAME',
+    deckConfig: { numDecks: 2, jokers: 2 },
+    gameConfig: { presetName: 'Euchre', cardsPerPlayer: 5 },
+  });
+
+  assert.equal(next.deckConfig.numDecks, 2);
+  assert.equal(next.gameConfig.presetName, 'Euchre');
+  assert.equal(next.gameConfig.cardsPerPlayer, 5);
+  assert.equal(deckOf(next).length, 2 * (52 + 2), 'a fresh deck built for the NEW preset\'s config (2 decks, 2 jokers each)');
+});
+
+test('NEW_GAME: keeps the existing roster and each player\'s connection state, no rejoin required', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = withPlayers(state, ['p1', 'p2']);
+  state = reduce(state, { type: 'SET_CONNECTION', playerId: 'p2', connection: 'disconnected' });
+
+  const next = reduce(state, { type: 'NEW_GAME', deckConfig: {}, gameConfig: {} });
+
+  assert.deepEqual(next.players.map((p) => p.id).toSorted(), ['p1', 'p2']);
+  assert.equal(next.players.find((p) => p.id === 'p1').connection, 'connected');
+  assert.equal(next.players.find((p) => p.id === 'p2').connection, 'disconnected');
+});
+
+test('NEW_GAME: resets every player\'s score to 0 - a different game\'s old scores don\'t carry over', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = withPlayers(state, ['p1', 'p2']);
+  state = reduce(state, { type: 'SET_SCORE', targetPlayerId: 'p1', value: 42 });
+
+  const next = reduce(state, { type: 'NEW_GAME', deckConfig: {}, gameConfig: {} });
+
+  assert.deepEqual(next.scores, { p1: 0, p2: 0 });
+});
+
+test('NEW_GAME: rebuilds a NEW preset\'s perPlayer piles for every existing player (e.g. poker chips)', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = withPlayers(state, ['p1', 'p2']);
+
+  const next = reduce(state, {
+    type: 'NEW_GAME',
+    deckConfig: {},
+    gameConfig: { piles: [{ kind: 'chip', ownerId: 'perPlayer', count: 1, name: 'Chips', deckType: 'chips', deckList: 'poker-stack' }] },
+  });
+
+  for (const id of ['p1', 'p2']) {
+    assert.equal(next.piles.filter((p) => p.kind === 'chip' && p.ownerId === id).length, 1, `${id} got a fresh chip stack in the new preset`);
+  }
+});
+
+test('NEW_GAME: does not trip the card-conservation guard - a preset swap is a new deck epoch, like RESET', () => {
+  let state = createInitialState({ numDecks: 1, jokers: 0 }, () => 0.5);
+  state = withPlayers(state, ['p1']);
+  assert.doesNotThrow(() => reduce(state, { type: 'NEW_GAME', deckConfig: { numDecks: 1, jokers: 0 }, gameConfig: {} }));
+});
+
+test('viewFor: carries gameConfig.presetName through, so a guest can detect a New Game', () => {
+  const state = createInitialState({}, () => 0.5, { presetName: 'War' });
+  assert.equal(viewFor(state, 'anyone').gameConfig.presetName, 'War');
 });
 
 // *nit (direct user request, D84: "remove card redaction entirely...
@@ -941,6 +1009,28 @@ test('createInitialState: a configured zone is capitalized and only numbered whe
 test('createInitialState: a configured zone\'s id is deterministic (kind alone when there\'s only one), not a random UUID', () => {
   const state = createInitialState({}, () => 0.5, { piles: [{ kind: 'discard', ownerId: null, count: 1 }] });
   assert.equal(pilesOf(state).find((z) => z.kind === 'discard').id, 'discard');
+});
+
+// *fix (direct user report): "tokenzone has no name" - a declared pile
+// with no `zoneId` of its own gets a fresh STANDALONE zone equal to its
+// own id (RtG's `rtg-tokens`, D107 is the real-world case), which used
+// to register with no name at all - a real, blank zone heading, not a
+// hidden one (`renderOneZone` always renders a zone's heading now).
+test('createInitialState: a declared pile\'s own standalone zone takes the PILE\'s name, not a blank one', () => {
+  const state = createInitialState({}, () => 0.5, {
+    piles: [{ kind: 'plain', id: 'rtg-tokens', name: 'Tokens', deckType: 'chips', deckList: 'standard-tokens' }],
+  });
+  const zone = state.zones.find((z) => z.id === 'rtg-tokens');
+  assert.equal(zone.name, 'Tokens');
+});
+
+test('createInitialState: a pile declared into an ALREADY-registered shared zone does not overwrite that zone\'s own name', () => {
+  const state = createInitialState({}, () => 0.5, {
+    zones: [{ id: 'rtg-decks', name: 'Decks' }],
+    piles: [{ kind: 'deck', id: 'some-deck', name: 'Some Deck', zoneId: 'rtg-decks', deckList: 'poker-stack', deckType: 'chips' }],
+  });
+  const zone = state.zones.find((z) => z.id === 'rtg-decks');
+  assert.equal(zone.name, 'Decks', 'the shared zone keeps its OWN declared name, not the first pile\'s');
 });
 
 test('createInitialState: a configured zone\'s id is deterministic AND stable across separate calls with the same preset', () => {
@@ -2709,6 +2799,24 @@ test('CHANGE_PILE_TYPE: a personal (owned) pile can become a real hand', () => {
   const pile = pilesOf(state).find((z) => z.kind === 'plain' && z.ownerId === 'p1');
   state = reduce(state, { type: 'CHANGE_PILE_TYPE', pileId: pile.id, kind: 'hand', playerId: 'p1' });
   assert.equal(state.piles.find((p) => p.id === pile.id).kind, 'hand');
+});
+
+// *fix (direct user report): "hand got no owner error when switching
+// pile type to hand. It should adopt the owner of the zone that it's
+// in" - `CREATE_PILE` always builds a new pile UNOWNED (`ownerId:
+// null`), even when placed in a player's OWN zone (`player-<id>`, D55),
+// so this used to be the exact case that hit the "no owner" throw even
+// though a real owner was one lookup away.
+test('CHANGE_PILE_TYPE: an unowned pile in a player\'s OWN zone adopts that zone\'s owner, no error', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'CREATE_PILE', zoneId: 'player-p1', kind: 'plain', name: 'Loose Pile' });
+  const pile = state.piles.find((p) => p.name === 'Loose Pile');
+  assert.equal(pile.ownerId, null, 'CREATE_PILE never stamps an owner on its own');
+
+  state = reduce(state, { type: 'CHANGE_PILE_TYPE', pileId: pile.id, kind: 'hand', playerId: 'p1' });
+  const converted = state.piles.find((p) => p.id === pile.id);
+  assert.equal(converted.kind, 'hand');
+  assert.equal(converted.ownerId, 'p1', 'inherited the owning zone\'s player, not left null');
 });
 
 // D89 (direct user request: "no need to support orphaned piles since

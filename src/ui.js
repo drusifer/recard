@@ -2285,13 +2285,52 @@ export function removeDragGhost(container, playerId) {
   container.querySelector(`[data-card-drag-id="${CSS.escape(playerId)}"]`)?.remove();
 }
 
-export function renderBanner(container, message) {
+/**
+ * @param {{tone?: 'danger'|'info'}} [options] Smith HCI finding (live,
+ * US-116): every prior caller is a real problem (lost host, session
+ * ended) - the shared `.banner` styling (red, `--danger`) fits those.
+ * The New Game notice is neutral status, not a problem, so it opts into
+ * `.banner-info` instead of inheriting the alarming default - existing
+ * callers are unaffected (`tone` defaults to the original look).
+ */
+export function renderBanner(container, message, { tone = 'danger' } = {}) {
   container.textContent = message ?? '';
   container.hidden = !message;
+  container.classList.toggle('banner-info', tone === 'info');
 }
 
 export function showScreen(screens, name) {
   for (const [key, element] of Object.entries(screens)) {
     element.hidden = key !== name;
+  }
+}
+
+/**
+ * *fix (direct user report): "rtg deck pile's cards too small and don't
+ * match the top card" - the root cause was RtG cards being sized
+ * through their OWN separate `.card-rtg`-scoped constants while the
+ * deck stack's decorative depth layers (and its outer box) stayed sized
+ * from the global `--card-w`/`--card-h`, so the two drifted apart.
+ * Direct user correction: don't special-case RtG - every card
+ * measurement (`.card`, `.deck-stack`, `.deck-stack-layer`,
+ * `.deck-stack-card`, hand fan spread, ...) already reads `--card-w`/
+ * `--card-h` from `style.css`'s `:root`; this just makes those two
+ * tokens CONFIGURABLE per running game instead of fixed, since every
+ * card in one game is the same size (`preset.cardSize` in
+ * `presets.js`, threaded through `gameConfig.cardSize` - see
+ * `configsForPreset`/`renderGameFromView` in `main.js`). A preset that
+ * doesn't declare one (every preset but RtG) leaves the stylesheet's
+ * own default in place - `size` absent clears any previous override
+ * rather than leaving a stale one from whatever game ran before it.
+ * @param {{w: string, h: string}|null|undefined} size
+ */
+export function applyCardSize(size) {
+  const root = document.documentElement.style;
+  if (size) {
+    root.setProperty('--card-w', size.w);
+    root.setProperty('--card-h', size.h);
+  } else {
+    root.removeProperty('--card-w');
+    root.removeProperty('--card-h');
   }
 }

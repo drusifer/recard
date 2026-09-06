@@ -7,6 +7,7 @@
     "test:ui": "node --test tests/uiActions.browser.mjs",
     "test:rtg": "node --test tests/rtgPlaythrough.browser.mjs",
     "test:hostsetup": "node --test tests/hostSetup.browser.mjs",
+    "test:newgame": "node --test tests/newGame.browser.mjs",
     "dev": "node tools/devserver.mjs",
     "cards:build": "node tools/rtg/compile.mjs",
     "cards:jobs": "node tools/rtg/genArtJobs.mjs",
