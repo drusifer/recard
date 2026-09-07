@@ -240,4 +240,10 @@ sequenceDiagram
     Note right of Trin: "qa uat PASSED: re-<br/>verified all 4 zones<br/>live (own screenshots,<br/>same as Neo's). Full<br/>suite green, lint at<br/>baseline, no unit test<br/>changes need…"
     Morpheus->>Neo: "lead review"
     Note right of Morpheus: "lead review: approved.<br/>Reusing a single ghost<br/>element inserted as a<br/>real DOM sibling,<br/>rendered through the<br/>SAME data-layout CSS<br/>rules real…"
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "swe fix (why no side by<br/>side in battlefield?):<br/>the 14px overlap zone<br/>never actually tested<br/>two cards at their REAL<br/>~8px resting gap -<br/>whole…"
+    Trin->>Morpheus: "qa handoff"
+    Note right of Trin: "qa uat PASSED: re-ran<br/>both mutation checks<br/>independently<br/>(SANDWICHED zone<br/>widened, isSandwiched<br/>stubbed false) - both<br/>failed the right test…"
+    Morpheus->>Neo: "lead review"
+    Note right of Morpheus: "lead review: approved.<br/>isSandwiched is a small,<br/>well-scoped addition to<br/>the pure geometry<br/>module, doesn't touch<br/>state/reducer, and the<br/>3px…"
 ```

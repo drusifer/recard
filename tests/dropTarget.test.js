@@ -38,36 +38,46 @@ test('a drop in the halo RIGHT of a card overlaps after it', () => {
   });
 });
 
-test('past the last card, still within the NEAR half of the halo, overlaps after it', () => {
-  // C's halo runs 140-180 (one card-width, 40px); its near half is
-  // 140-160. x=155 is 15px past C's right edge - inside that near half.
-  assert.deepEqual(resolveDropTarget(ROW, { x: 155, y: 30 }), {
+test('past the last card, still within the fixed overlap edge zone, overlaps after it', () => {
+  // C's halo runs 140-180 (one card-width, 40px); OVERLAP_EDGE_ZONE is
+  // a fixed 14px, not a fraction of it. x=150 is 10px past C's right
+  // edge - inside that fixed zone regardless of card width.
+  assert.deepEqual(resolveDropTarget(ROW, { x: 150, y: 30 }), {
     targetCardId: 'C',
     side: 'after',
     layout: 'overlap',
   });
 });
 
-// D-nit (direct user request): "clear drop targets that work
-// consistently... next to the target card with a little space in
-// between" - the FAR half of the halo (still a real, specific target -
-// this card, this side - just not close enough to overlap) is a
-// distinct 4th outcome from stack/column/overlap.
-test('the FAR half of the halo, past a card, is adjacent - a real target with no overlap', () => {
-  // C's halo runs 140-180; its far half is 160-180. x=170 is 30px past
-  // C's right edge, past the near/far midpoint at 20px.
+// *fix (direct user report): "why no side by side in the battlefield
+// pile?" - splitting the halo at its own MIDPOINT (half the card's
+// width) meant two cards at their normal small resting gap had NO
+// room for this zone at all (the whole gap was always within the
+// near-half of whichever card was closer). A small FIXED edge zone
+// (this ROW's 40px-wide cards would have had a 20px midpoint before;
+// OVERLAP_EDGE_ZONE is 14px regardless of card width) leaves the rest
+// of the halo - including an ordinary inter-card gap - genuinely
+// reachable as a distinct 4th outcome from stack/column/overlap.
+test('past the fixed overlap edge zone, still in the halo, is adjacent - a real target with no overlap', () => {
+  // 30px past C's right edge - well past the 14px edge zone, still
+  // within the one-card-width (40px) halo.
   assert.deepEqual(resolveDropTarget(ROW, { x: 170, y: 30 }), {
     targetCardId: 'C',
     side: 'after',
   }, 'no layout key at all - present as a target, not as an overlap');
 });
 
-test('the halo\'s near/far midpoint itself still overlaps (boundary belongs to the closer behavior)', () => {
-  // Exactly 20px past C's right edge - box.width/2.
-  assert.deepEqual(resolveDropTarget(ROW, { x: 160, y: 30 }), {
+test('the overlap edge zone\'s own boundary belongs to overlap, not adjacent', () => {
+  // Exactly 14px past C's right edge - OVERLAP_EDGE_ZONE itself.
+  assert.deepEqual(resolveDropTarget(ROW, { x: 154, y: 30 }), {
     targetCardId: 'C',
     side: 'after',
     layout: 'overlap',
+  });
+  // One pixel further - already adjacent.
+  assert.deepEqual(resolveDropTarget(ROW, { x: 155, y: 30 }), {
+    targetCardId: 'C',
+    side: 'after',
   });
 });
 
@@ -94,8 +104,9 @@ test('the nearer card wins when two are in range (no ambiguous double-claim)', (
 });
 
 test('side is decided by which edge the point is past, not by card index', () => {
-  // Left of the very first card -> before A, not "after" anything.
-  assert.deepEqual(resolveDropTarget(ROW, { x: -15, y: 30 }), {
+  // Left of the very first card, within the overlap edge zone -> before
+  // A, not "after" anything.
+  assert.deepEqual(resolveDropTarget(ROW, { x: -10, y: 30 }), {
     targetCardId: 'A',
     side: 'before',
     layout: 'overlap',
@@ -130,4 +141,47 @@ test('the upper half (including exactly the midline) still stacks, not columns',
   // so a future off-by-one in `isLowerHalf`'s `>` vs `>=` fails loudly
   // here instead of silently flipping that other test's meaning.
   assert.deepEqual(resolveDropTarget(ROW, { x: 20, y: 30 }).layout, 'stack');
+});
+
+// *fix (direct user report): "why no side by side in the battlefield
+// pile?" - two cards at their NORMAL resting gap (`--card-gap`, ~8px
+// in the real app - far smaller than this ROW fixture's own 10px gap,
+// on purpose, to match the actual reported scenario) left NO room for
+// adjacent at all: the whole gap sat inside the near-half of whichever
+// card was closer. A tight (sandwiched) gap now gets its own much
+// smaller overlap zone, so most of even an 8px gap is reachable as
+// adjacent - only genuinely hovering right at one specific edge still
+// overlaps it.
+const TIGHT = [box('X', 0), box('Y', 52)]; // 40-wide cards, 12px gap (52 - 40)
+test('a real battlefield-style TIGHT gap: the middle is adjacent, not overlap', () => {
+  // Gap runs 40-52 (12px); its midpoint is 46, 6px from either edge -
+  // clear of SANDWICHED_OVERLAP_EDGE_ZONE (4px) on both sides.
+  assert.deepEqual(resolveDropTarget(TIGHT, { x: 46, y: 30 }), {
+    targetCardId: 'X',
+    side: 'after',
+  }, 'no layout key - genuinely adjacent, not forced into overlapping X or Y');
+});
+
+test('a real battlefield-style TIGHT gap: right at either edge still overlaps', () => {
+  assert.deepEqual(resolveDropTarget(TIGHT, { x: 42, y: 30 }), {
+    targetCardId: 'X',
+    side: 'after',
+    layout: 'overlap',
+  }, '2px past X - clearly touching X on purpose');
+  assert.deepEqual(resolveDropTarget(TIGHT, { x: 50, y: 30 }), {
+    targetCardId: 'Y',
+    side: 'before',
+    layout: 'overlap',
+  }, '2px before Y - clearly touching Y on purpose');
+});
+
+test('an OPEN end (only one neighbour, not sandwiched) still gets the wider overlap zone', () => {
+  // Past the LAST card (Y ends at 92) - open space, no flanking
+  // neighbour on the far side - so the ordinary (wider)
+  // OVERLAP_EDGE_ZONE applies, same as the non-sandwiched tests above.
+  assert.deepEqual(resolveDropTarget(TIGHT, { x: 102, y: 30 }), {
+    targetCardId: 'Y',
+    side: 'after',
+    layout: 'overlap',
+  }, '10px past Y with nothing beyond it - well within the open-end zone');
 });
