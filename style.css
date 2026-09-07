@@ -78,6 +78,15 @@
   --card-w: 2.7rem;
   --table-min-h: 30rem;
   --card-h: 3.68rem;
+  /* Unitless width/height ratio, kept in step with the two tokens above
+     (`ui.js`'s `applyCardSize` sets all three together for a preset
+     with its own `cardSize`) - `aspect-ratio` needs a plain number pair,
+     not lengths, so this exists alongside `--card-w`/`--card-h` rather
+     than being computed from them in CSS (dividing two lengths isn't
+     something `calc()` can do). Used by `.rtg-inspect-art` so the
+     inspect overlay crops the same card art at the same ratio the
+     resting face already does, instead of an unrelated fixed box. */
+  --card-aspect: 2.7 / 3.68;
   --card-gap: 0.5rem;
   --card-peek: 0.85rem;
   --radius-sm: 0.45rem;
@@ -2827,10 +2836,21 @@ body.panel-resize-active {
   line-height: 0.85rem;
 }
 
+/* *nit (direct user report): "the card expand/hover is not the same
+   ratio as the card so it looks funny and the top of the card image is
+   cut off" - a fixed `height: 7rem` against a `width: 100%` (15rem,
+   this overlay's own width) forced every card's portrait art (~0.7:1,
+   `--card-aspect`) into a ~2.1:1 landscape crop, showing only a thin
+   centre band of the illustration - EVERYTHING above and below that
+   band is lost, not just "the top" specifically, but that's the part a
+   viewer notices first since it's usually where the subject's head is.
+   `aspect-ratio: var(--card-aspect)` makes this box the same shape as
+   the resting card's own art, so `object-fit: cover` crops it the same
+   way the player already sees at rest, just bigger. */
 .rtg-inspect-art {
   display: block;
   width: 100%;
-  height: 7rem;
+  aspect-ratio: var(--card-aspect);
   object-fit: cover;
   border-radius: 0.25rem;
   margin: 0.35rem 0;

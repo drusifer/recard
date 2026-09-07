@@ -2329,8 +2329,14 @@ export function applyCardSize(size) {
   if (size) {
     root.setProperty('--card-w', size.w);
     root.setProperty('--card-h', size.h);
+    // `--card-aspect` (style.css's `.rtg-inspect-art`) needs a plain
+    // number ratio, not lengths - `aspect-ratio` can't consume
+    // `--card-w`/`--card-h` directly, so this derives the same ratio
+    // numerically alongside them rather than leaving it to drift.
+    root.setProperty('--card-aspect', `${Number.parseFloat(size.w)} / ${Number.parseFloat(size.h)}`);
   } else {
     root.removeProperty('--card-w');
     root.removeProperty('--card-h');
+    root.removeProperty('--card-aspect');
   }
 }
