@@ -521,3 +521,18 @@ npm run lint:style
 ---
 [<small>2026-09-07 13:33:47</small>] [**Trin**]->[**Neo**] *qa check*:
  qa check PASSED: confirmed via same-card before/after screenshot (mocked old CSS with !important on the live DOM, no re-deal needed) - Sunsteel Duelist went from a headless sword-flash sliver to the full figure. All 5 suites + lint (baseline unchanged) green. No Morpheus step - nit.
+
+---
+[<small>2026-09-07 13:45:57</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make lint | /home/drusifer/Projects/recard/build/build.out
+> node tests/designLint.check.mjs
+make: *** [Makefile:47: lint] Error 1
+
+
+---
+[<small>2026-09-07 13:46:03</small>] [**Neo**]->[**Trin**] *swe fix*:
+ nit fix: RtG card's native title tooltip (redundant with .rtg-inspect-name) removed - it could render on top of the inspect overlay it duplicated. aria-label kept for a11y. All suites+lint green (baseline unchanged).
+
+---
+[<small>2026-09-07 13:46:12</small>] [**Trin**]->[**Neo**] *qa check*:
+ qa check PASSED: 1-line removal, no title attr consumers in tests, all 5 suites+lint green at baseline. No Morpheus step - nit.

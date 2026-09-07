@@ -253,7 +253,14 @@ export const RtgCardFace = {
     });
     // Art is decorative here; the accessible name is the card's own.
     element.setAttribute('aria-label', card.name ?? card.id);
-    element.title = card.name ?? card.id;
+    // *nit (direct user report): "the tooltip with the name of the card
+    // blocks part of the card-hover inspect thing" - a native `title`
+    // tooltip and the inspect overlay below both open on the same
+    // `mouseenter`/hover, and the browser's own tooltip can render
+    // anywhere near the cursor, including on top of the overlay it's
+    // redundant with (`.rtg-inspect-name` already shows this same
+    // name). No `title` here at all; `aria-label` alone still gives
+    // the card its accessible name.
 
     const top = document.createElement('span');
     top.className = 'rtg-top';
