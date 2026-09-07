@@ -233,6 +233,68 @@ test('game 1: cast a creature to the battlefield and tap it', async () => {
   );
 });
 
+// D-nit (direct user request): "vertical drop targets... like how
+// lands are normally arranged in a game of mtg", then a real bug found
+// live and fixed the same session: "adding additional cards to the
+// vertical layout blocks the second one instead of offsetting from the
+// previous card" - a THIRD card dropped onto the second's lower half
+// landed at the same height as the second (cross-axis flex margins
+// don't chain the way `margin-left`'s negative pull does), not one
+// step further down. `--column-depth` (ui.js) fixed it; this pins the
+// fix down as a real regression test, not just the manual screenshot
+// verification that originally caught it.
+test('game 1: a column of 3+ cards offsets each one further down, not on top of the last', async () => {
+  const page = fixture.page;
+
+  // Direct synthetic drag straight from hand to a specific point on the
+  // battlefield, same mechanism the token test below already uses -
+  // avoids `moveTo`'s menu-driven "drop into open space" path (no
+  // specific target point) and any earlier test's own leftover
+  // battlefield cards (this only ever touches the 3 ids drawn here).
+  async function dropAt(cardId, x, y) {
+    await page.evaluate(({ id, px, py }) => {
+      const bf = document.querySelector('[data-kind="battlefield"]');
+      const transfer = new DataTransfer();
+      transfer.setData('text/plain', id);
+      const at = { bubbles: true, cancelable: true, dataTransfer: transfer, clientX: px, clientY: py };
+      bf.dispatchEvent(new DragEvent('dragover', at));
+      bf.dispatchEvent(new DragEvent('drop', at));
+    }, { id: cardId, px: x, py: y });
+    await page.waitForSelector(`[data-kind="battlefield"] .middle-card[data-pileable-id="${cardId}"]`, { timeout: 5000 });
+  }
+
+  const handCountBefore = await page.locator('[data-kind="hand"] .middle-card').count();
+  for (let i = 0; i < 3; i++) await pileAction(page, DECK_ID, 'Draw').click();
+  await page.waitForFunction(
+    (n) => document.querySelectorAll('[data-kind="hand"] .middle-card').length >= n,
+    handCountBefore + 3, { timeout: 10_000 },
+  );
+  const [idA, idB, idC] = await page.locator('[data-kind="hand"] .middle-card[data-pileable-id]').evaluateAll(
+    (elements) => elements.slice(-3).map((element) => element.dataset.pileableId),
+  );
+
+  const bfBox = await page.locator('[data-kind="battlefield"]').boundingBox();
+  await dropAt(idA, bfBox.x + 50, bfBox.y + 50);
+  await page.waitForTimeout(150);
+
+  async function boxOf(id) {
+    return page.locator(`[data-kind="battlefield"] .middle-card[data-pileable-id="${id}"] .card`).boundingBox();
+  }
+  let box = await boxOf(idA);
+  await dropAt(idB, box.x + box.width / 2, box.y + box.height * 0.85);
+  await page.waitForTimeout(150);
+
+  box = await boxOf(idB);
+  await dropAt(idC, box.x + box.width / 2, box.y + box.height * 0.85);
+  await page.waitForTimeout(150);
+
+  const [yA, yB, yC] = [await boxOf(idA), await boxOf(idB), await boxOf(idC)].map((b) => b.y);
+  const [deltaAB, deltaBC] = [yB - yA, yC - yB];
+  assert.ok(deltaAB > 5, `card B must sit below card A, got delta ${deltaAB}`);
+  assert.ok(deltaBC > 5, `card C must sit below card B, got delta ${deltaBC} - a delta near 0 means it landed on top of B instead of offsetting further`);
+  assert.ok(Math.abs(deltaAB - deltaBC) < 2, `each column step should be the same size, got ${deltaAB} then ${deltaBC}`);
+});
+
 // US-112 (direct user request, found by driving the real app): a token
 // dropped on empty space WITHIN THE SUPPLY'S OWN ZONE used to spawn a
 // brand-new pile beside the real one - the exact chip-duplication bug

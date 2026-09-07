@@ -20,15 +20,25 @@ export class BattlefieldPile extends Pile {
   /** Permanents spread rather than stack, so a drop lands beside its
    * neighbours (base `Pile` halo behaviour) - inherited deliberately. */
 
+  /** *nit (direct user request): "add tighter/looser actions to the
+   * battlefield pile" - offered by the base class already (D21/US-32),
+   * this override just wasn't including them. `split`/`take` stay
+   * excluded (this class's own doc comment above explains why - a
+   * battlefield isn't a stack of interchangeable cards); tighten/loosen
+   * has nothing to do with that, it adjusts overlap density, which a
+   * battlefield's cards have exactly as much as any other pile's. */
   pileActions({ isOwner, isShared } = {}) {
     if (!isOwner && !isShared) return [];
-    return ['untapAll', 'changePileType', 'remove'];
+    return ['untapAll', 'changePileType', 'remove', 'tighten', 'loosen'];
   }
 
-  /** `remove`/`changePileType` stay empty-only (inherited); `untapAll`
-   * is never disabled - untapping an empty board is a harmless no-op,
-   * and greying it out mid-game would just read as broken. */
-  disabledActions(count) {
-    return count > 0 ? ['remove'] : [];
-  }
+  /** `remove`/`changePileType` stay empty-only, `untapAll` is never
+   * disabled (untapping an empty board is a harmless no-op, and
+   * greying it out mid-game would just read as broken), and
+   * tighten/loosen disable at the spread ceiling/floor exactly like
+   * every other pile - all of which is just the base class's own
+   * `disabledActions`, unchanged. The override that used to live here
+   * predated tighten/loosen and only ever duplicated the `remove` half
+   * of it under a narrower signature (no `spread`) - deleted rather
+   * than kept in sync by hand. */
 }

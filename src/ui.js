@@ -695,7 +695,26 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
   // The fan math (rotate + arc, pivoting from the bottom like cards
   // actually held in a hand) is exactly `renderHand`'s old formula,
   // just applied generically by index instead of being hand-specific.
+  // *fix (real bug, direct user report): "adding additional cards to
+  // the vertical layout blocks the second one instead of offsetting
+  // from the previous card". `margin-top` (style.css's own `[data-
+  // layout='column']` rule) is a CROSS-axis margin in this row - unlike
+  // `margin-left`'s negative pull (which shrinks the main-axis space
+  // every LATER sibling's own position is computed from, so horizontal
+  // overlap chains for free), each flex item's own cross-axis margin
+  // offsets it from the LINE's shared top independently of its
+  // siblings' margins. A third column card landed at exactly the same
+  // depth as the second, not one step further down, because both
+  // margins were being measured from the same shared reference point,
+  // never from each other. `--column-depth` makes the chain explicit
+  // instead of assuming flex will do it: how many CONSECUTIVE cards
+  // (this one included) have carried `layout: 'column'` back to the
+  // nearest card that doesn't - style.css multiplies its one per-step
+  // offset by this count, so depth 2 lands exactly one more step below
+  // depth 1, same step size, chained by arithmetic instead of by flow.
+  let columnDepth = 0;
   for (const [index, card] of pileView.cards.entries()) {
+    columnDepth = card.layout === 'column' ? columnDepth + 1 : 0;
     const wrapper = document.createElement('div');
     // *nit (2026-08-26): `pile-hover-host` used to arrive via the now-
     // deleted `attachActionRow` (the popup mechanism) as a side effect
@@ -733,6 +752,7 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
     // could drift out of sync with it.
     wrapper.dataset.pileableId = card.id;
     if (card.layout) wrapper.dataset.layout = card.layout;
+    if (card.layout === 'column') wrapper.style.setProperty('--column-depth', String(columnDepth));
     // D48/D40: same "state drives the visual" reasoning as `layout` -
     // style.css rotates the card face when this is 'landscape'.
     if (card.orientation) wrapper.dataset.orientation = card.orientation;

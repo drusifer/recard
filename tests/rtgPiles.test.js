@@ -49,6 +49,17 @@ test('BattlefieldPile: a non-owner of a personal battlefield gets nothing', () =
   assert.deepEqual(new BattlefieldPile({}).pileActions(stranger), []);
 });
 
+// *nit (direct user request): "add tighter/looser actions to the
+// battlefield pile" - offered by the base class for every ROW-laid-out
+// pile kind; this pile just wasn't including them in its own override.
+test('BattlefieldPile: offers tighten and loosen, disabled at the spread ceiling/floor', () => {
+  const pile = new BattlefieldPile({});
+  assert.ok(pile.pileActions(shared).includes('tighten'));
+  assert.ok(pile.pileActions(shared).includes('loosen'));
+  assert.deepEqual(pile.disabledActions(2, { spread: pile.constructor.maxSpread }).includes('tighten'), true);
+  assert.deepEqual(pile.disabledActions(2, { spread: 0 }).includes('loosen'), true);
+});
+
 // --- ExilePile ---------------------------------------------------------
 
 // *nit (direct user request, reversed): "exile is one-way" used to mean

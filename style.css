@@ -1074,20 +1074,47 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    (full horizontal pull-back, like `stack` but with no peek left over -
    the offset here is entirely vertical, not sideways) and slides DOWN
    from it instead of sideways, so a whole column still reads as roughly
-   one card wide in the row's own flow, not one card per member. The
-   downward push (not a pull, unlike the two horizontal rules above -
-   there's no gap to swallow vertically the way there is horizontally)
-   is a fraction of the card's own height rather than a fixed length,
-   so it scales with `--card-h` the same way every other card
-   measurement in this file already does (RtG's own larger cards
-   included) - tuned to leave roughly a land's mana-cost-and-name strip
-   showing above each covered card (the same "cost lives upper-left"
-   placement `.rtg-top` already exists for, so a card buried in a
-   column is still identifiable at a glance, same AC as the horizontal
-   `stack` rule above). */
+   one card wide in the row's own flow, not one card per member.
+
+   *nit (direct user request, follow-up): "add tighter/looser actions to
+   the battlefield pile and tighter/looser also effects the column
+   layout" - the downward push used to be a fixed fraction of the
+   card's own height; it's `--pile-spread`-driven now, the same
+   variable Tighten/Loosen already writes for every OTHER pile's
+   default row spacing (`renderPileCards`/`effectiveSpread`, ui.js) -
+   one shared control for "how much overlap", not a second slider that
+   only happens to look similar. Shaped the opposite way from the
+   horizontal default-row rule below (`1 -` instead of a bare
+   multiply): that rule PULLS a card left as spread rises from 0 (no
+   overlap); this one's unadjusted state (spread 0, same "never
+   touched" default every pile starts at) should read as no overlap
+   EITHER - the two full card-heights (this card's own plus the gap)
+   showing in full - and Tighten (rising spread) should uncover LESS,
+   not more, the same direction chip-stack's own vertical formula
+   already established. Un-tightened, this looks like a plain vertical
+   list, not "lands" - hit Tighten (now offered, see BattlefieldPile.js)
+   a few times for the classic overlapping look; `MAX_SPREAD` (0.85)
+   still leaves the covered card's own cost/name strip visible, same
+   AC as the horizontal `stack` rule below.
+
+   *fix (real bug, direct user report): "adding additional cards to the
+   vertical layout blocks the second one instead of offsetting from
+   the previous card" - `margin-top` is a CROSS-axis margin here, and
+   flex measures every item's cross-axis position from the shared LINE
+   top independently, not from the previous sibling's own (already
+   offset) position the way a negative `margin-left` compounds along
+   the main axis. A third column card landed at the SAME depth as the
+   second instead of one step further, because both were being measured
+   from that same shared reference point rather than from each other.
+   `--column-depth` (ui.js, counted per card: how many consecutive
+   `layout: 'column'` cards back to the nearest non-column one,
+   inclusive) makes the chain explicit instead of relying on flex to
+   produce it: multiplying the one-step offset by depth puts the Nth
+   column card N steps below the anchor, which IS "one step further
+   than the (N-1)th" when every step is the same size. */
 .middle-card[data-layout='column'] {
   margin-left: calc(-1 * (var(--card-w) + var(--card-gap)));
-  margin-top: calc(var(--card-h) * 0.4);
+  margin-top: calc(var(--column-depth, 1) * (var(--card-h) + var(--card-gap)) * (1 - var(--pile-spread, 0)));
 }
 
 /* Overlapping necessarily covers the buried cards' own Pick up / Move

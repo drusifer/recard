@@ -555,3 +555,22 @@ make: *** [Makefile:47: lint] Error 1
 ---
 [<small>2026-09-07 14:06:17</small>] [**Morpheus**]->[**Neo**] *lead review*:
  lead review: approved. Clean reuse of D21's generic layout mechanism (no new state/reducer plumbing), fits BattlefieldPile's existing base-class inheritance with zero pile-specific code, drop-hint vocabulary matches existing stack/before/after pattern. No architecture concerns. Ready to commit.
+
+---
+[<small>2026-09-07 15:59:44</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make lint | /home/drusifer/Projects/recard/build/build.out
+
+See ARCHITECTURE.md UI Conventions (44px floor) and D24 (zone overlap) for the invariants being checked.
+make: *** [Makefile:47: lint] Error 1
+
+---
+[<small>2026-09-07 16:00:30</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ swe fix: battlefield tighten/loosen added + column layout now spread-driven, plus a real chaining bug found immediately (3rd column card landed on the 2nd instead of below it - cross-axis flex margins don't chain like horizontal ones). Fixed with --column-depth. Details: agents/neo.docs/battlefield-tighten-loosen.md. New unit+browser tests, both mutation-checked. All suites+lint green. @Trin qa uat
+
+---
+[<small>2026-09-07 16:00:37</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ qa uat PASSED: independently re-ran mutation checks on both new tests (removed tighten/loosen from pileActions, reverted --column-depth's multiply) - both failed correctly, both reverted clean. Re-ran full suite (689/12/18) + lint - all green, design baseline unchanged. No further changes needed.
+
+---
+[<small>2026-09-07 16:00:44</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ lead review: approved. Deleting the stale disabledActions override (rather than hand-syncing its signature) is the right call - inheritance now actually matches the doc comment's own claim. --column-depth is a clean, minimal fix for a real flex cross-axis gotcha, no architecture concerns. Ready to commit.

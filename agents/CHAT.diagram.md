@@ -208,4 +208,10 @@ sequenceDiagram
     Note right of Trin: "qa uat PASSED: all 8<br/>pre-existing dropTarget<br/>tests unchanged/green (s<br/>tack/overlap/halo/append<br/>regression-free), 2 new<br/>column tests mutation…"
     Morpheus->>Neo: "lead review"
     Note right of Morpheus: "lead review: approved.<br/>Clean reuse of D21's<br/>generic layout mechanism<br/>(no new state/reducer<br/>plumbing), fits<br/>BattlefieldPile's<br/>existing base-…"
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "swe fix: battlefield<br/>tighten/loosen added +<br/>column layout now<br/>spread-driven, plus a<br/>real chaining bug found<br/>immediately (3rd column<br/>card la…"
+    Trin->>Morpheus: "qa handoff"
+    Note right of Trin: "qa uat PASSED:<br/>independently re-ran<br/>mutation checks on both<br/>new tests (removed<br/>tighten/loosen from<br/>pileActions, reverted<br/>--column-depth's m…"
+    Morpheus->>Neo: "lead review"
+    Note right of Morpheus: "lead review: approved.<br/>Deleting the stale<br/>disabledActions override<br/>(rather than hand-<br/>syncing its signature)<br/>is the right call -<br/>inheritance…"
 ```
