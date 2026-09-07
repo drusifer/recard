@@ -1030,7 +1030,7 @@ function cardBoxesIn(rowElement) {
   });
 }
 
-const DROP_HINTS = ['drop-onto', 'drop-before', 'drop-after'];
+const DROP_HINTS = ['drop-onto', 'drop-below', 'drop-before', 'drop-after'];
 
 function clearDropHints(rowElement) {
   for (const element of rowElement.querySelectorAll('.middle-card')) element.classList.remove(...DROP_HINTS);
@@ -1049,6 +1049,7 @@ function showDropHint(rowElement, placement) {
   const target = rowElement.querySelector(`.middle-card[data-pileable-id="${CSS.escape(placement.targetCardId)}"]`);
   if (!target) return;
   if (placement.layout === 'stack') target.classList.add('drop-onto');
+  else if (placement.layout === 'column') target.classList.add('drop-below');
   else target.classList.add(placement.side === 'before' ? 'drop-before' : 'drop-after');
 }
 

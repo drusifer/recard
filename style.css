@@ -1068,6 +1068,28 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    from the corner index, so a sequence stays legible end to end. */
 .middle-card[data-layout='overlap'] { margin-left: calc(-1 * (var(--card-w) - 1.7rem) - var(--card-gap)); }
 
+/* *nit (direct user request): "vertical drop targets for making piles
+   that stack vertically like how lands are normally arranged in a game
+   of mtg" - a column: the dropped card sits at the SAME x as its target
+   (full horizontal pull-back, like `stack` but with no peek left over -
+   the offset here is entirely vertical, not sideways) and slides DOWN
+   from it instead of sideways, so a whole column still reads as roughly
+   one card wide in the row's own flow, not one card per member. The
+   downward push (not a pull, unlike the two horizontal rules above -
+   there's no gap to swallow vertically the way there is horizontally)
+   is a fraction of the card's own height rather than a fixed length,
+   so it scales with `--card-h` the same way every other card
+   measurement in this file already does (RtG's own larger cards
+   included) - tuned to leave roughly a land's mana-cost-and-name strip
+   showing above each covered card (the same "cost lives upper-left"
+   placement `.rtg-top` already exists for, so a card buried in a
+   column is still identifiable at a glance, same AC as the horizontal
+   `stack` rule above). */
+.middle-card[data-layout='column'] {
+  margin-left: calc(-1 * (var(--card-w) + var(--card-gap)));
+  margin-top: calc(var(--card-h) * 0.4);
+}
+
 /* Overlapping necessarily covers the buried cards' own Pick up / Move
    to… controls. Raising the hovered/focused card (and its controls)
    above its neighbours keeps every card individually operable, so the
@@ -1131,6 +1153,25 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .middle-card.drop-before::before { left: -0.35rem; }
 .middle-card.drop-after::after { right: -0.35rem; }
+
+/* Column's own hint (D-nit, lower-half drop target): a bar under the
+   card's bottom edge, the same "glow reads onto, a line reads
+   before/after" vocabulary as the other two hints above - this one
+   reads "will slot below". */
+.middle-card.drop-below {
+  position: relative;
+}
+
+.middle-card.drop-below::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -0.35rem;
+  width: var(--card-w);
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
 
 /* A named zone (US-19) - its own bordered sub-panel so it reads as a
    distinct area on the table, not just a blob of cards (Smith Gate 1:

@@ -76,3 +76,33 @@ test('side is decided by which edge the point is past, not by card index', () =>
     layout: 'overlap',
   });
 });
+
+// D-nit: "vertical drop targets... like how lands are normally arranged
+// in a game of mtg" - the lower half of a card's own box is a THIRD
+// on-card outcome (column), not just stack/overlap. Same ROW fixture -
+// each box spans y 0..60, so its midline is y=30.
+test('a drop on the LOWER half of a card body columns below it', () => {
+  assert.deepEqual(resolveDropTarget(ROW, { x: 20, y: 45 }), {
+    targetCardId: 'A',
+    side: 'after',
+    layout: 'column',
+  });
+  assert.deepEqual(resolveDropTarget(ROW, { x: 120, y: 59 }), {
+    targetCardId: 'C',
+    side: 'after',
+    layout: 'column',
+  });
+});
+
+test('the upper half (including exactly the midline) still stacks, not columns', () => {
+  assert.deepEqual(resolveDropTarget(ROW, { x: 20, y: 0 }), {
+    targetCardId: 'A',
+    side: 'after',
+    layout: 'stack',
+  });
+  // Exactly on the midline: an existing test above already asserts
+  // this point (x:20, y:30) resolves to 'stack' - this just names WHY,
+  // so a future off-by-one in `isLowerHalf`'s `>` vs `>=` fails loudly
+  // here instead of silently flipping that other test's meaning.
+  assert.deepEqual(resolveDropTarget(ROW, { x: 20, y: 30 }).layout, 'stack');
+});
