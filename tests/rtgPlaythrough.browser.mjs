@@ -89,11 +89,24 @@ async function openMenu(page, locator) {
  * `[data-pile-id="rtg-tokens"]` for a fixed shared pile, or
  * `[data-kind="battlefield"]` for a per-player pile whose real id
  * isn't known ahead of time - `battlefield-<playerId>`, D55).
+ *
+ * Clicks the pile's own TITLE bar (`.pile-title`), not the panel as a
+ * whole - direct user request ("use the Move card action to reveal the
+ * ACTUAL targets within the piles") made a click on the pile's BODY
+ * resolve to a real per-card placement (onto/below/beside/adjacent a
+ * specific card) instead of always blindly appending. This helper's own
+ * job is "just get it into this pile, position doesn't matter for what
+ * the test is checking" - the title bar is never part of the card row,
+ * so it's guaranteed empty space regardless of how crowded the pile is,
+ * the same "just append" outcome this helper always meant. A test that
+ * wants a SPECIFIC per-card target should compute its own point and
+ * dispatch the click there directly, the way the column/adjacent tests
+ * elsewhere in this file already do.
  */
 async function moveTo(page, cardLocator, destination) {
   await openMenu(page, cardLocator);
   await page.locator('.card-context-menu [data-action="move"]').click();
-  await page.locator(`.pile-section.pile-target${destination}`).click();
+  await page.locator(`.pile-section.pile-target${destination} .pile-title`).click();
 }
 
 async function rotate(page, cardLocator) {

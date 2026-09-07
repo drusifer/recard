@@ -617,3 +617,23 @@ make: *** [Makefile:47: lint] Error 1
 ---
 [<small>2026-09-07 17:47:42</small>] [**Morpheus**]->[**Neo**] *lead review*:
  lead review: approved. Reusing the SAME near/far halving idea already established for stack/column, rather than inventing a new fraction, keeps the four zones conceptually consistent. No new state/reducer plumbing needed since undefined layout already meant no-overlap everywhere. No architecture concerns.
+
+---
+[<small>2026-09-07 18:23:29</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make lint | /home/drusifer/Projects/recard/build/build.out
+> lint:design
+make: *** [Makefile:47: lint] Error 1
+> node tests/designLint.check.mjs
+
+
+---
+[<small>2026-09-07 18:24:00</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ swe fix (direct user correction, K.I.S.S.): Move-click flow now reveals real per-card drop targets (reuses existing resolveDropTargetFor/showDropHint, no new layouts). Found+fixed a real test-helper bug this exposed: moveTo() clicked panel center which used to always append blind, now can land on a card - fixed by clicking the pile's title bar instead. Details: agents/neo.docs/move-reveals-targets.md. test-rtg run 3x clean. All suites+lint green.
+
+---
+[<small>2026-09-07 18:24:07</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ qa uat PASSED: re-ran test-rtg 3x independently (deterministic, no flake). Verified fix is minimal - no new state/layout plumbing, reuses existing drag-drop machinery verbatim. moveTo() fix is scoped to the test helper only, doesn't weaken any assertion. All suites+lint green.
+
+---
+[<small>2026-09-07 18:24:14</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ lead review: approved. Correctly identified that the mis-click was a test-harness assumption invalidated by the feature, not a feature bug - fixed at the right layer (test helper), not by weakening the new behavior. Reusing resolveDropTargetFor/showDropHint verbatim for the click flow is exactly the 'one target vocabulary, not two' the user asked for. No architecture concerns.

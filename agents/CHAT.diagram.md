@@ -228,4 +228,10 @@ sequenceDiagram
     Note right of Trin: "qa uat PASSED:<br/>independently re-ran the<br/>mutation check (forced<br/>always-overlap, watched<br/>the boundary test fail),<br/>re-ran full suite<br/>(693/12/1…"
     Morpheus->>Neo: "lead review"
     Note right of Morpheus: "lead review: approved.<br/>Reusing the SAME<br/>near/far halving idea<br/>already established for<br/>stack/column, rather<br/>than inventing a new<br/>fraction, k…"
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "swe fix (direct user<br/>correction, K.I.S.S.):<br/>Move-click flow now<br/>reveals real per-card<br/>drop targets (reuses<br/>existing<br/>resolveDropTargetFor/sh…"
+    Trin->>Morpheus: "qa handoff"
+    Note right of Trin: "qa uat PASSED: re-ran<br/>test-rtg 3x<br/>independently<br/>(deterministic, no<br/>flake). Verified fix is<br/>minimal - no new<br/>state/layout plumbing,<br/>reuses e…"
+    Morpheus->>Neo: "lead review"
+    Note right of Morpheus: "lead review: approved.<br/>Correctly identified<br/>that the mis-click was a<br/>test-harness assumption<br/>invalidated by the<br/>feature, not a feature<br/>bug…"
 ```

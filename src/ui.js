@@ -987,9 +987,10 @@ function onContextMenuKeydown(event) {
  * and cards only ever had native drag). Reuses the SAME
  * `highlightDragTargets` a native drag already calls on `dragstart` -
  * one lit-pile vocabulary for "where can this go", not a second one for
- * clicks - and completes through `options.onMoveCard(pileableId, pileId)`,
- * the exact callback `dragstart`'s own presence-check already gates on.
- * No new reducer/commit path.
+ * clicks - and completes through `options.onMoveCard(pileableId, pileId,
+ * placement)`, the exact callback `dragstart`'s own presence-check
+ * already gates on (`placement` added below - see the fix note further
+ * down). No new reducer/commit path.
  *
  * The commit listener runs in the CAPTURE phase and calls
  * `stopPropagation` when the click lands on a lit pile - otherwise a
@@ -997,24 +998,54 @@ function onContextMenuKeydown(event) {
  * cards would also fire that other card's own tap gesture (reveal/
  * rotate) in the same click. A click that misses every lit pile just
  * cancels silently, same as dismissing the menu by clicking outside it.
+ *
+ * *fix (direct user request): "use the Move card action to reveal the
+ * ACTUAL targets within the piles" - lighting up a whole pile told you
+ * WHERE you could go, but not what would actually happen once you got
+ * there (onto/below/beside/adjacent a specific card - the same real
+ * geometry a native drag already resolves via `resolveDropTargetFor`/
+ * `showDropHint`). A non-empty lit pile now shows that same per-card
+ * hint live as the mouse moves over it, and commits with the SAME
+ * placement a drop there would have produced - one real target
+ * vocabulary for both gestures, not a second, cruder one for clicks.
  */
 function beginCardTargetPick(actionId, card, piles, fromPileId, options) {
   highlightDragTargets([actionId], piles, { viewerId: options.viewerId, fromPileId });
 
+  function rowUnder(event) {
+    const target = event.target.closest?.('.pile-section.pile-target[data-pile-id]');
+    return target ? { pileElement: target, row: target.querySelector('.card-row') } : {};
+  }
+  function placementAt(pileElement, row, event) {
+    if (!row) return {};
+    return resolveDropTargetFor(pileElement.dataset.kind, cardBoxesIn(row), { x: event.clientX, y: event.clientY });
+  }
+
+  const onMouseMove = (event) => {
+    const { pileElement, row } = rowUnder(event);
+    for (const otherRow of document.querySelectorAll('.pile-target .card-row')) {
+      if (otherRow !== row) clearDropHints(otherRow);
+    }
+    if (row) showDropHint(row, placementAt(pileElement, row, event));
+  };
+
   const cancelOnEscape = (event) => {
     if (event.key !== 'Escape') return;
     document.removeEventListener('click', commit, true);
+    document.removeEventListener('mousemove', onMouseMove);
     clearPileTargets();
   };
   const commit = (event) => {
     document.removeEventListener('keydown', cancelOnEscape);
-    const pileElement = event.target.closest?.('.pile-section.pile-target[data-pile-id]');
+    document.removeEventListener('mousemove', onMouseMove);
+    const { pileElement, row } = rowUnder(event);
     if (pileElement) {
       event.stopPropagation();
       event.preventDefault();
     }
+    const placement = pileElement ? placementAt(pileElement, row, event) : {};
     clearPileTargets();
-    if (pileElement) options.onMoveCard?.(card.id, pileElement.dataset.pileId);
+    if (pileElement) options.onMoveCard?.(card.id, pileElement.dataset.pileId, placement);
   };
   // Same next-tick deferral as the menu's own dismiss listener - the
   // click that closed the menu (or the escape-hatch from a `contextmenu`
@@ -1022,6 +1053,7 @@ function beginCardTargetPick(actionId, card, piles, fromPileId, options) {
   setTimeout(() => {
     document.addEventListener('click', commit, { once: true, capture: true });
     document.addEventListener('keydown', cancelOnEscape, { once: true });
+    document.addEventListener('mousemove', onMouseMove);
   }, 0);
 }
 

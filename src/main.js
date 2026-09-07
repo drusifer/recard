@@ -1560,7 +1560,7 @@ function buildZoneOptions(nameById) {
     onReveal: (pileableId) => revealCard(pileableId),
     onRotate: (pileableId) => rotateCard(pileableId),
     onPickup: (pileableId) => pickupCard(pileableId),
-    onMoveCard: (pileableId, toPileId) => moveCard(pileableId, toPileId),
+    onMoveCard: (pileableId, toPileId, placement) => moveCard(pileableId, toPileId, placement),
     onCardLift: (pileableId, active) => motionThrottler.schedule('card-lift', { pileableId, active }),
     onDropCard: (pileableId, toPileId, placement) => dropCardOnPile(pileableId, toPileId, placement),
     // D91: `renderPile` (ui.js) checks `splitPicker?.pileId === pile.id`
