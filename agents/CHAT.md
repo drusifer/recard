@@ -637,3 +637,23 @@ make: *** [Makefile:47: lint] Error 1
 ---
 [<small>2026-09-07 18:24:14</small>] [**Morpheus**]->[**Neo**] *lead review*:
  lead review: approved. Correctly identified that the mis-click was a test-harness assumption invalidated by the feature, not a feature bug - fixed at the right layer (test helper), not by weakening the new behavior. Reusing resolveDropTargetFor/showDropHint verbatim for the click flow is exactly the 'one target vocabulary, not two' the user asked for. No architecture concerns.
+
+---
+[<small>2026-09-07 18:59:08</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make lint | /home/drusifer/Projects/recard/build/build.out
+make: *** [Makefile:47: lint] Error 1
+> lint:design
+> node tests/designLint.check.mjs
+
+
+---
+[<small>2026-09-07 18:59:32</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ swe fix (direct user report): replaced 4 separate hint decorations (glow/bar/2 lines) with ONE ghost-card preview, inserted as a real sibling with the actual data-layout a drop would set - so it renders via the SAME CSS margin rules, showing the real overlap/gap/position live instead of an abstract marker. Details: agents/neo.docs/ghost-drop-preview.md. Screenshot-verified all 4 zones visually distinct. All suites+lint green.
+
+---
+[<small>2026-09-07 18:59:39</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ qa uat PASSED: re-verified all 4 zones live (own screenshots, same as Neo's). Full suite green, lint at baseline, no unit test changes needed since resolveDropTarget's geometry is untouched - only visualization changed. No further changes needed.
+
+---
+[<small>2026-09-07 18:59:47</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ lead review: approved. Reusing a single ghost element inserted as a real DOM sibling, rendered through the SAME data-layout CSS rules real cards use, is the right call - WYSIWYG by construction, not a second approximation of the real layout math. The before-side target-toggle is a disclosed, reasonable tradeoff. No architecture concerns.

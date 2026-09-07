@@ -234,4 +234,10 @@ sequenceDiagram
     Note right of Trin: "qa uat PASSED: re-ran<br/>test-rtg 3x<br/>independently<br/>(deterministic, no<br/>flake). Verified fix is<br/>minimal - no new<br/>state/layout plumbing,<br/>reuses e…"
     Morpheus->>Neo: "lead review"
     Note right of Morpheus: "lead review: approved.<br/>Correctly identified<br/>that the mis-click was a<br/>test-harness assumption<br/>invalidated by the<br/>feature, not a feature<br/>bug…"
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "swe fix (direct user<br/>report): replaced 4<br/>separate hint<br/>decorations (glow/bar/2<br/>lines) with ONE ghost-<br/>card preview, inserted<br/>as a real sibli…"
+    Trin->>Morpheus: "qa handoff"
+    Note right of Trin: "qa uat PASSED: re-<br/>verified all 4 zones<br/>live (own screenshots,<br/>same as Neo's). Full<br/>suite green, lint at<br/>baseline, no unit test<br/>changes need…"
+    Morpheus->>Neo: "lead review"
+    Note right of Morpheus: "lead review: approved.<br/>Reusing a single ghost<br/>element inserted as a<br/>real DOM sibling,<br/>rendered through the<br/>SAME data-layout CSS<br/>rules real…"
 ```

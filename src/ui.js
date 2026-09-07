@@ -1004,8 +1004,8 @@ function onContextMenuKeydown(event) {
  * WHERE you could go, but not what would actually happen once you got
  * there (onto/below/beside/adjacent a specific card - the same real
  * geometry a native drag already resolves via `resolveDropTargetFor`/
- * `showDropHint`). A non-empty lit pile now shows that same per-card
- * hint live as the mouse moves over it, and commits with the SAME
+ * `showDropPreview`). A non-empty lit pile now shows that same live
+ * preview as the mouse moves over it, and commits with the SAME
  * placement a drop there would have produced - one real target
  * vocabulary for both gestures, not a second, cruder one for clicks.
  */
@@ -1023,16 +1023,15 @@ function beginCardTargetPick(actionId, card, piles, fromPileId, options) {
 
   const onMouseMove = (event) => {
     const { pileElement, row } = rowUnder(event);
-    for (const otherRow of document.querySelectorAll('.pile-target .card-row')) {
-      if (otherRow !== row) clearDropHints(otherRow);
-    }
-    if (row) showDropHint(row, placementAt(pileElement, row, event));
+    if (row) showDropPreview(row, placementAt(pileElement, row, event));
+    else clearDropPreview();
   };
 
   const cancelOnEscape = (event) => {
     if (event.key !== 'Escape') return;
     document.removeEventListener('click', commit, true);
     document.removeEventListener('mousemove', onMouseMove);
+    clearDropPreview();
     clearPileTargets();
   };
   const commit = (event) => {
@@ -1044,6 +1043,7 @@ function beginCardTargetPick(actionId, card, piles, fromPileId, options) {
       event.preventDefault();
     }
     const placement = pileElement ? placementAt(pileElement, row, event) : {};
+    clearDropPreview();
     clearPileTargets();
     if (pileElement) options.onMoveCard?.(card.id, pileElement.dataset.pileId, placement);
   };
@@ -1082,34 +1082,73 @@ function cardBoxesIn(rowElement) {
   });
 }
 
-const DROP_HINTS = ['drop-onto', 'drop-below', 'drop-before', 'drop-after', 'drop-adjacent-before', 'drop-adjacent-after'];
-
-function clearDropHints(rowElement) {
-  for (const element of rowElement.querySelectorAll('.middle-card')) element.classList.remove(...DROP_HINTS);
-}
-
 /**
  * Smith Gate 1 (Nielsen #1/#6): native drag-and-drop gives no feedback
  * until release, so the *mode* a drop is about to use has to be visible
- * during the drag or it isn't discoverable at all. A glow on the card
- * body reads "will stack here"; an insertion line beside it reads "will
- * slot in here".
+ * during the drag or it isn't discoverable at all.
+ *
+ * *fix (direct user report): "I expect to see the overlap targets
+ * ACTUALLY overlap the card so one can SEE where the card will go
+ * before they select that target" - four separate decorations (a glow,
+ * a bar, two kinds of line) told you WHICH zone you were in, but never
+ * showed the actual outcome, so telling them apart under a moving
+ * cursor was still guesswork ("it almost always overlaps" - direct
+ * quote). One reusable ghost card, inserted as a REAL sibling with the
+ * SAME `data-layout` a real drop would set, replaces all four: it
+ * renders through the exact CSS rules (`.middle-card[data-layout=...]`)
+ * an actual card would, so "will this overlap or sit beside it" is
+ * answered by literally seeing a card-shaped outline do exactly that,
+ * not by recognizing which decoration means which.
+ *
+ * A `side: 'before'` placement is the one case the ghost can't show by
+ * insertion alone: D21 puts `layout` on whichever card ends up SECOND,
+ * which for `before` is the EXISTING target, not the (first-now)
+ * dropped card - so the target's own `data-layout` is toggled to match
+ * for the duration of the preview (restored in `clearDropPreview`),
+ * the same shift it would actually make once the drop lands there.
  */
-function showDropHint(rowElement, placement) {
-  clearDropHints(rowElement);
-  if (!placement.targetCardId) return;
+let dropGhost = null;
+let previewedTarget = null;
+
+function ghostElement() {
+  if (dropGhost) return dropGhost;
+  dropGhost = document.createElement('div');
+  dropGhost.className = 'middle-card drop-ghost';
+  const face = document.createElement('div');
+  face.className = 'card card-ghost';
+  dropGhost.append(face);
+  return dropGhost;
+}
+
+function clearDropPreview() {
+  dropGhost?.remove();
+  if (previewedTarget) {
+    const { element, originalLayout } = previewedTarget;
+    if (originalLayout === undefined) delete element.dataset.layout;
+    else element.dataset.layout = originalLayout;
+    previewedTarget = null;
+  }
+}
+
+function showDropPreview(rowElement, placement) {
+  clearDropPreview();
+  const ghost = ghostElement();
+  delete ghost.dataset.layout;
+  if (!placement.targetCardId) {
+    rowElement.append(ghost);
+    return;
+  }
   const target = rowElement.querySelector(`.middle-card[data-pileable-id="${CSS.escape(placement.targetCardId)}"]`);
   if (!target) return;
-  if (placement.layout === 'stack') target.classList.add('drop-onto');
-  else if (placement.layout === 'column') target.classList.add('drop-below');
-  else if (placement.layout === 'overlap') target.classList.add(placement.side === 'before' ? 'drop-before' : 'drop-after');
-  // D-nit (direct user request): "clear drop targets... next to the
-  // target card with a little space in between" - a target with no
-  // `layout` at all is the new adjacent zone (real target, no overlap),
-  // and needs its OWN hint distinct from the overlap line above, or the
-  // two zones would look identical during drag despite doing different
-  // things on drop.
-  else target.classList.add(placement.side === 'before' ? 'drop-adjacent-before' : 'drop-adjacent-after');
+  if (placement.side === 'before') {
+    previewedTarget = { element: target, originalLayout: target.dataset.layout };
+    if (placement.layout) target.dataset.layout = placement.layout;
+    else delete target.dataset.layout;
+    target.before(ghost);
+  } else {
+    if (placement.layout) ghost.dataset.layout = placement.layout;
+    target.after(ghost);
+  }
 }
 
 /**
@@ -1130,12 +1169,12 @@ function showDropHint(rowElement, placement) {
  */
 function showPileDragOver(pileElement, row, point, kind) {
   pileElement.classList.add('drag-over');
-  showDropHint(row, resolveDropTargetFor(kind, cardBoxesIn(row), point));
+  showDropPreview(row, resolveDropTargetFor(kind, cardBoxesIn(row), point));
 }
 
 function clearPileDragOver(pileElement, row) {
   pileElement.classList.remove('drag-over');
-  clearDropHints(row);
+  clearDropPreview();
 }
 
 function performPileDrop(pileElement, row, pileId, pileableId, point, onDropCard, kind) {

@@ -1155,77 +1155,26 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* Live drop-mode affordance (Smith Gate 1, Nielsen #1/#6): native
    drag-and-drop shows nothing until release, so which mode a drop is
-   about to use has to be visible mid-drag or it can't be discovered. */
-.middle-card.drop-onto .card {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 4px rgba(79, 157, 255, 0.25);
+   about to use has to be visible mid-drag or it can't be discovered.
+   *fix (direct user report): "I expect to see the overlap targets
+   ACTUALLY overlap the card so one can SEE where the card will go
+   before they select that target" - four separate decorations (a
+   glow, a bar, two kinds of line) named which zone you were in but
+   never showed the actual outcome, so telling "will overlap" from
+   "will sit beside" apart under a moving cursor was still guesswork.
+   One reusable ghost card (ui.js's `showDropPreview`) replaces all
+   four: inserted as a REAL sibling with the SAME `data-layout` a real
+   drop would set, it renders through the exact same CSS rules a real
+   card would - "will this overlap or sit beside it" is answered by
+   literally seeing a card-shaped outline do exactly that. */
+.middle-card.drop-ghost {
+  pointer-events: none;
 }
 
-.middle-card.drop-before,
-.middle-card.drop-after {
-  position: relative;
-}
-
-.middle-card.drop-before::before,
-.middle-card.drop-after::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  height: var(--card-h); /* the card face, not the controls below it */
-  width: 3px;
-  border-radius: 2px;
-  background: var(--accent);
-}
-
-.middle-card.drop-before::before { left: -0.35rem; }
-.middle-card.drop-after::after { right: -0.35rem; }
-
-/* Adjacent's own hint (D-nit, direct user request: "next to the target
-   card with a little space in between" - the far half of the halo, a
-   real target distinct from the overlap line above it). Same solid-
-   line vocabulary, but HOLLOW (a ring, not a filled bar) and sitting
-   further out from the card's edge than the overlap line - reads as
-   "something will land near here, with room between", the visual
-   opposite of overlap's line sitting flush against the edge it will
-   actually touch. */
-.middle-card.drop-adjacent-before,
-.middle-card.drop-adjacent-after {
-  position: relative;
-}
-
-.middle-card.drop-adjacent-before::before,
-.middle-card.drop-adjacent-after::after {
-  content: '';
-  position: absolute;
-  top: 0.15rem;
-  height: calc(var(--card-h) - 0.3rem);
-  width: 3px;
-  border-radius: 2px;
-  border: 1px solid var(--accent);
-  background: transparent;
-}
-
-.middle-card.drop-adjacent-before::before { left: -0.7rem; }
-.middle-card.drop-adjacent-after::after { right: -0.7rem; }
-
-/* Column's own hint (D-nit, lower-half drop target): a bar under the
-   card's bottom edge, the same "glow reads onto, a line reads
-   before/after" vocabulary as the other two hints above - this one
-   reads "will slot below". */
-.middle-card.drop-below {
-  position: relative;
-}
-
-.middle-card.drop-below::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  bottom: -0.35rem;
-  width: var(--card-w);
-  height: 3px;
-  border-radius: 2px;
-  background: var(--accent);
+.card.card-ghost {
+  background: rgba(79, 157, 255, 0.22);
+  border: 2px dashed var(--accent);
+  box-shadow: none;
 }
 
 /* A named zone (US-19) - its own bordered sub-panel so it reads as a
