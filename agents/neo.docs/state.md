@@ -898,3 +898,19 @@ match (should shrink, not grow), and (2) find what regressed on
 desktop-1280x800/laptop-1024x768 (`bobp make lint-design` will
 reproduce) - likely a seated hand or seat-card layout that was
 accidentally relying on an oversized pile header for spacing.
+
+## Nit: deck/discard "double wide" panels — closed (2026-09-07)
+
+Resumed the item above. `min-content` (the plan left here) turned out to
+be the wrong fix — full writeup, including why two different attempts
+each looked right on one header and wrong on another, in
+`neo.docs/pile-title-nit.md`. Real fix: `.pile-title` switched from flex
++ percentage-basis line-break to plain block layout, which has no
+circular-sizing edge case at all. RtG Discard panel 277px -> 176px,
+`lint:design` at exact pre-existing baseline (confirmed by measuring the
+unfixed baseline directly, not from memory - the two viewport
+regressions this note worried about are pre-existing, unrelated to
+pile-title), Decks-zone box needed no re-tuning, all 5 suites + full
+lint green. Trin mutation-checked (a second header config, not just the
+one that happened to measure right first) and closed - no Morpheus
+step, this is a nit.

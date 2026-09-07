@@ -2241,7 +2241,64 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    plain text, no actions, and every player's own +/-1/+/-10 controls
    live in that player's row instead (`.score-adjust-btn`, below). */
 .pile-title .zone-name-text {
-  flex: 1 0 100%;
+  /* Superseded by the block-layout fix below (`.pile-title { display:
+     block }`) - a block-level child always starts its own line with no
+     percentage math needed, so `flex: 1 0 100%` no longer does
+     anything here, but the rule stays merged into the one below rather
+     than left as a second, now-inert declaration for the same
+     selector (stylelint's `no-duplicate-selectors`). */
+  display: block;
+}
+
+/* nit fix, resumed 2026-09-07 (was reverted 2026-09-04, then re-
+   attempted twice more before landing here - see the two failed
+   attempts below, kept for the next person who's tempted to retry
+   them): `.pile-title` itself had no explicit width, so it sized
+   shrink-to-fit against its content by default - but
+   `.zone-name-text`'s percentage `flex-basis` (above) resolves
+   CIRCULARLY against that same shrink-to-fit ancestor (a flex item's
+   percentage basis needs a definite container size to resolve against;
+   a shrink-to-fit container's size is defined IN TERMS OF its items'
+   sizes - the two can't both be resolved first), inflating the header
+   well past what its content needs. Confirmed by measuring an
+   individual title span cloned outside the flex context: its real text
+   width was 106px, but resolved to 259px in place - not a fixed
+   overshoot, so no fudge-factor width would fix every case.
+     - `width: min-content` breaks the circularity but goes too far the
+       other way: min-content for a wrapping flex row is the width of
+       its single widest UNBREAKABLE item (one button, ~44px), so every
+       button wraps onto its own line - taller headers, which is what
+       regressed `lint:design`'s scroll checks when this was tried.
+     - `width: max-content` also breaks the circularity, and looked
+       right on the header tested first (RtG's Decks panel, plain
+       buttons only) - but re-measuring RtG's Discard header (which
+       adds a `.pile-action-enum` `<details>` control to the mix)
+       showed the SAME 259px inflation still happening. `max-content`
+       resolves the container's OWN preferred size correctly, but the
+       percentage basis inside it is still asking "100% of what?" during
+       that same resolution pass - the circularity isn't about which
+       content-sizing keyword the container gets, it's that a
+       PERCENTAGE basis can't participate in that resolution at all.
+   The actual fix: stop using flex + a percentage basis to force the
+   title onto its own line. `.pile-title` is normal block layout instead
+   - a block-level `.zone-name-text` always starts a new line by
+   definition (no percentage math involved), and the buttons after it
+   are ordinary inline-level boxes that wrap like words, so the
+   container's shrink-to-fit width is just "the widest line", computed
+   the same well-defined way a paragraph's shrink-to-fit width is.
+   Confirmed empirically: RtG Discard now measures 176px (matches the
+   "hide either the title or the buttons alone" floor Neo's original
+   investigation established as correct), Deck panel unaffected,
+   `lint:design`'s violation set is still the pre-existing baseline, and
+   RtG's Decks-zone box (`presets.js`, 1400x570) still fits with no
+   re-tuning needed. */
+.pile-title {
+  display: block;
+  width: max-content;
+}
+.pile-title .pile-action-btn,
+.pile-title .pile-action-enum {
+  margin: 0.1rem 0.1rem 0 0;
 }
 
 /* UX follow-up (direct user request): "small square icons ... tool tip

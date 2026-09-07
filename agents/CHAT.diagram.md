@@ -189,4 +189,9 @@ sequenceDiagram
     Note over Oracle,User: 📅 2026-09-06
     Neo->>Neo: "queue"
     Note right of Neo: "*queue nit: add a drop<br/>zone on the lower half<br/>of a card that snaps it<br/>into vertical alignment<br/>with the card<br/>above/below, so lands<br/>(or anyth…"
+    Note over Oracle,User: 📅 2026-09-07
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "swe fix: reapplied<br/>deck/discard double-wide<br/>fix, min-content->max-<br/>content (avoids the<br/>button-per-line trap<br/>min-content caused).<br/>lint:design…"
+    Trin->>Neo: "qa check"
+    Note right of Trin: "qa: mutation-checked<br/>Neo's max-content fix<br/>against RtG Discard<br/>header (has a <details><br/>enum control) - still<br/>277px, same bug<br/>survived. Real…"
 ```

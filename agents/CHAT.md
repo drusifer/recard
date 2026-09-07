@@ -469,11 +469,35 @@ npm run lint:style
  *queue nit: add a drop zone on the lower half of a card that snaps it into vertical alignment with the card above/below, so lands (or anything) can be organized into color columns. Queued, not started.
 
 ---
-[<small>2026-09-06 17:21:30</small>] [**make**]->[**all**] *build*:
- Build PASSED | make lint-style | /home/drusifer/Projects/recard/build/build.out
-=== make lint-style @ 2026-09-06 17:21:29 ===
-npm run lint:style
+[<small>2026-09-07 10:04:46</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-newgame | /home/drusifer/Projects/recard/build/build.out
+✔ Start New Game resets scores to 0 (1685.310764ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9057.107281
 
-> lint:style
-> stylelint style.css
+---
+[<small>2026-09-07 10:04:52</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ swe fix: reapplied deck/discard double-wide fix, min-content->max-content (avoids the button-per-line trap min-content caused). lint:design back at exact pre-existing 9-violation baseline, RtG Decks-zone box needs no re-tuning, all browser suites green. @Trin qa test deck-discard-width
 
+---
+[<small>2026-09-07 10:09:46</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-newgame | /home/drusifer/Projects/recard/build/build.out
+✔ Start New Game resets scores to 0 (1575.586607ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8631.841924
+
+---
+[<small>2026-09-07 10:10:18</small>] [**Trin**]->[**Neo**] *qa check*:
+ qa: mutation-checked Neo's max-content fix against RtG Discard header (has a <details> enum control) - still 277px, same bug survived. Real fix: .pile-title -> block layout, no percentage flex-basis at all. Re-verified 176px, all suites+lint green, lint:design at baseline. Details: agents/neo.docs/pile-title-nit.md. Closing nit, no Morpheus step.
