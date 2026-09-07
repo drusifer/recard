@@ -397,9 +397,25 @@ export class Pile {
   /** Returns a plain NEW pile shape (not `this` mutated, not a new
    * instance) - the reducer stores plain records at rest; this result
    * re-enters `state.piles` exactly the same way a pre-D93 `{...pile,
-   * cards: […]}` spread did. */
+   * cards: […]}` spread did.
+   *
+   * *fix (real bug, direct user report): "cards and tokens get stuck
+   * over the left edge of their panel". `layout` ('stack'/'overlap'/
+   * 'column' - D21/D-nit) means "overlap onto whichever card ends up
+   * immediately before me" - the first card in a pile never has one,
+   * by definition. Removing a card can leave its successor as the new
+   * first card while that successor still carries the `layout` it had
+   * relative to the card that just left - rendered as if still
+   * overlapping a predecessor that no longer exists, which pulls it
+   * left (or, for a `column` card, down) past the panel's own edge
+   * instead of onto a sibling. Stripping it here, at the one place a
+   * pile's first card can change, covers every removal path (pickup,
+   * discard, exile, move away, merge-in) rather than a stale-layout
+   * check bolted onto each one separately. */
   removePileable(pileableId) {
-    return { ...this.toJSON(), cards: this.cards.filter((c) => c.id !== pileableId) };
+    const cards = this.cards.filter((c) => c.id !== pileableId);
+    if (cards.length > 0 && cards[0].layout) cards[0] = withLayout(cards[0], null);
+    return { ...this.toJSON(), cards };
   }
 
   /**

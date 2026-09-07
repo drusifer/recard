@@ -289,6 +289,27 @@ test('plain pile insertPileable: placement before/after a target, layout on the 
   assert.equal(after.cards.find((c) => c.id === 'x').layout, 'stack');
 });
 
+// *fix (real bug, direct user report): "cards and tokens get stuck over
+// the left edge of their panel". `layout` means "overlap onto whichever
+// card ends up immediately before me" - meaningless for whatever is
+// currently first, since it has no predecessor. Removing a card used to
+// leave its successor stranded with a stale `layout` from the neighbour
+// that just left, rendered pulled toward (or past) the panel's own
+// edge instead of onto a sibling that no longer exists.
+test('removePileable strips a stale layout from whatever becomes the new first card', () => {
+  const pile = { id: 'z', kind: 'plain', cards: [{ id: 'a' }, { id: 'b', layout: 'stack' }, { id: 'c', layout: 'overlap' }] };
+  const removed = new Pile(pile).removePileable('a');
+  assert.deepEqual(removed.cards.map((c) => c.id), ['b', 'c']);
+  assert.equal(removed.cards.find((c) => c.id === 'b').layout, undefined, 'b is now first - its old layout (relative to the removed a) must be cleared');
+  assert.equal(removed.cards.find((c) => c.id === 'c').layout, 'overlap', 'c is still second, still relative to b - untouched');
+});
+
+test('removePileable leaves an UNaffected first card alone', () => {
+  const pile = { id: 'z', kind: 'plain', cards: [{ id: 'a' }, { id: 'b', layout: 'stack' }, { id: 'c' }] };
+  const removed = new Pile(pile).removePileable('c');
+  assert.deepEqual(removed.cards, [{ id: 'a' }, { id: 'b', layout: 'stack' }], 'a is still first with no layout to begin with - nothing to strip');
+});
+
 // D102: was "PLAY authorized on PlayerHandPile, never on
 // OpponentHandPile". `'move'` is the verb on both sides now, and
 // OpponentHandPile authorizes it too - a non-owner has been able to

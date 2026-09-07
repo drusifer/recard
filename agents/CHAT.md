@@ -574,3 +574,27 @@ make: *** [Makefile:47: lint] Error 1
 ---
 [<small>2026-09-07 16:00:44</small>] [**Morpheus**]->[**Neo**] *lead review*:
  lead review: approved. Deleting the stale disabledActions override (rather than hand-syncing its signature) is the right call - inheritance now actually matches the doc comment's own claim. --column-depth is a clean, minimal fix for a real flex cross-axis gotcha, no architecture concerns. Ready to commit.
+
+---
+[<small>2026-09-07 16:01:07</small>] [**Neo**]->[**Neo**] *queue*:
+ queue nit (direct user request): tapping a card in the vertical/column layout should tap all the cards beneath it, and same with untap - i.e. rotate propagates down the column, not just the single card clicked. Queued, not started.
+
+---
+[<small>2026-09-07 17:17:19</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make lint | /home/drusifer/Projects/recard/build/build.out
+> lint:design
+make: *** [Makefile:47: lint] Error 1
+> node tests/designLint.check.mjs
+
+
+---
+[<small>2026-09-07 17:17:29</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ swe fix: found root cause of 'cards/tokens stuck over left edge of panel' - removePileable never cleared a stale layout field when its predecessor left, so the new first card kept overlapping/columning onto a sibling that no longer exists (pulled left, or for column cards, down). Fixed at the one shared Pile.removePileable, covers every removal path. 2 new mutation-checked unit tests. All suites+lint green.
+
+---
+[<small>2026-09-07 17:17:35</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ qa uat PASSED: re-ran both mutation checks independently (stripped the fix, watched the right test fail with the exact stale-layout value, reverted). Also live-verified in a real browser (synthetic drag): a column card's layout genuinely goes column->null when its predecessor is picked up. Full suite green, lint at baseline.
+
+---
+[<small>2026-09-07 17:17:49</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ lead review: approved. Single shared fix point (base Pile.removePileable) is exactly right - covers pickup/discard/exile/move/merge uniformly instead of patching each dispatch path. No architecture concerns.

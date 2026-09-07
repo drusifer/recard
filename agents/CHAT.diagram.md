@@ -214,4 +214,12 @@ sequenceDiagram
     Note right of Trin: "qa uat PASSED:<br/>independently re-ran<br/>mutation checks on both<br/>new tests (removed<br/>tighten/loosen from<br/>pileActions, reverted<br/>--column-depth's m…"
     Morpheus->>Neo: "lead review"
     Note right of Morpheus: "lead review: approved.<br/>Deleting the stale<br/>disabledActions override<br/>(rather than hand-<br/>syncing its signature)<br/>is the right call -<br/>inheritance…"
+    Neo->>Neo: "queue"
+    Note right of Neo: "queue nit (direct user<br/>request): tapping a card<br/>in the vertical/column<br/>layout should tap all<br/>the cards beneath it,<br/>and same with untap -<br/>i.…"
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "swe fix: found root<br/>cause of 'cards/tokens<br/>stuck over left edge of<br/>panel' - removePileable<br/>never cleared a stale<br/>layout field when its<br/>pred…"
+    Trin->>Morpheus: "qa handoff"
+    Note right of Trin: "qa uat PASSED: re-ran<br/>both mutation checks<br/>independently (stripped<br/>the fix, watched the<br/>right test fail with the<br/>exact stale-layout<br/>value,…"
+    Morpheus->>Neo: "lead review"
+    Note right of Morpheus: "lead review: approved.<br/>Single shared fix point<br/>(base<br/>Pile.removePileable) is<br/>exactly right - covers p<br/>ickup/discard/exile/move<br/>/merge uniform…"
 ```
