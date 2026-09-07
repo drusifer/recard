@@ -1050,7 +1050,7 @@ function cardBoxesIn(rowElement) {
   });
 }
 
-const DROP_HINTS = ['drop-onto', 'drop-below', 'drop-before', 'drop-after'];
+const DROP_HINTS = ['drop-onto', 'drop-below', 'drop-before', 'drop-after', 'drop-adjacent-before', 'drop-adjacent-after'];
 
 function clearDropHints(rowElement) {
   for (const element of rowElement.querySelectorAll('.middle-card')) element.classList.remove(...DROP_HINTS);
@@ -1070,7 +1070,14 @@ function showDropHint(rowElement, placement) {
   if (!target) return;
   if (placement.layout === 'stack') target.classList.add('drop-onto');
   else if (placement.layout === 'column') target.classList.add('drop-below');
-  else target.classList.add(placement.side === 'before' ? 'drop-before' : 'drop-after');
+  else if (placement.layout === 'overlap') target.classList.add(placement.side === 'before' ? 'drop-before' : 'drop-after');
+  // D-nit (direct user request): "clear drop targets... next to the
+  // target card with a little space in between" - a target with no
+  // `layout` at all is the new adjacent zone (real target, no overlap),
+  // and needs its OWN hint distinct from the overlap line above, or the
+  // two zones would look identical during drag despite doing different
+  // things on drop.
+  else target.classList.add(placement.side === 'before' ? 'drop-adjacent-before' : 'drop-adjacent-after');
 }
 
 /**

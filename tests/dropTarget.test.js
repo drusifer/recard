@@ -38,8 +38,33 @@ test('a drop in the halo RIGHT of a card overlaps after it', () => {
   });
 });
 
-test('past the last card, still within one card-width, overlaps after it', () => {
+test('past the last card, still within the NEAR half of the halo, overlaps after it', () => {
+  // C's halo runs 140-180 (one card-width, 40px); its near half is
+  // 140-160. x=155 is 15px past C's right edge - inside that near half.
+  assert.deepEqual(resolveDropTarget(ROW, { x: 155, y: 30 }), {
+    targetCardId: 'C',
+    side: 'after',
+    layout: 'overlap',
+  });
+});
+
+// D-nit (direct user request): "clear drop targets that work
+// consistently... next to the target card with a little space in
+// between" - the FAR half of the halo (still a real, specific target -
+// this card, this side - just not close enough to overlap) is a
+// distinct 4th outcome from stack/column/overlap.
+test('the FAR half of the halo, past a card, is adjacent - a real target with no overlap', () => {
+  // C's halo runs 140-180; its far half is 160-180. x=170 is 30px past
+  // C's right edge, past the near/far midpoint at 20px.
   assert.deepEqual(resolveDropTarget(ROW, { x: 170, y: 30 }), {
+    targetCardId: 'C',
+    side: 'after',
+  }, 'no layout key at all - present as a target, not as an overlap');
+});
+
+test('the halo\'s near/far midpoint itself still overlaps (boundary belongs to the closer behavior)', () => {
+  // Exactly 20px past C's right edge - box.width/2.
+  assert.deepEqual(resolveDropTarget(ROW, { x: 160, y: 30 }), {
     targetCardId: 'C',
     side: 'after',
     layout: 'overlap',

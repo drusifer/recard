@@ -1181,6 +1181,34 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .middle-card.drop-before::before { left: -0.35rem; }
 .middle-card.drop-after::after { right: -0.35rem; }
 
+/* Adjacent's own hint (D-nit, direct user request: "next to the target
+   card with a little space in between" - the far half of the halo, a
+   real target distinct from the overlap line above it). Same solid-
+   line vocabulary, but HOLLOW (a ring, not a filled bar) and sitting
+   further out from the card's edge than the overlap line - reads as
+   "something will land near here, with room between", the visual
+   opposite of overlap's line sitting flush against the edge it will
+   actually touch. */
+.middle-card.drop-adjacent-before,
+.middle-card.drop-adjacent-after {
+  position: relative;
+}
+
+.middle-card.drop-adjacent-before::before,
+.middle-card.drop-adjacent-after::after {
+  content: '';
+  position: absolute;
+  top: 0.15rem;
+  height: calc(var(--card-h) - 0.3rem);
+  width: 3px;
+  border-radius: 2px;
+  border: 1px solid var(--accent);
+  background: transparent;
+}
+
+.middle-card.drop-adjacent-before::before { left: -0.7rem; }
+.middle-card.drop-adjacent-after::after { right: -0.7rem; }
+
 /* Column's own hint (D-nit, lower-half drop target): a bar under the
    card's bottom edge, the same "glow reads onto, a line reads
    before/after" vocabulary as the other two hints above - this one

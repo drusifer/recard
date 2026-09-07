@@ -222,4 +222,10 @@ sequenceDiagram
     Note right of Trin: "qa uat PASSED: re-ran<br/>both mutation checks<br/>independently (stripped<br/>the fix, watched the<br/>right test fail with the<br/>exact stale-layout<br/>value,…"
     Morpheus->>Neo: "lead review"
     Note right of Morpheus: "lead review: approved.<br/>Single shared fix point<br/>(base<br/>Pile.removePileable) is<br/>exactly right - covers p<br/>ickup/discard/exile/move<br/>/merge uniform…"
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "swe fix: added the<br/>missing 4th drop zone -<br/>'adjacent' (far half of<br/>the halo, real<br/>target+side but no<br/>overlap, plain gap). The<br/>other 3 (stac…"
+    Trin->>Morpheus: "qa handoff"
+    Note right of Trin: "qa uat PASSED:<br/>independently re-ran the<br/>mutation check (forced<br/>always-overlap, watched<br/>the boundary test fail),<br/>re-ran full suite<br/>(693/12/1…"
+    Morpheus->>Neo: "lead review"
+    Note right of Morpheus: "lead review: approved.<br/>Reusing the SAME<br/>near/far halving idea<br/>already established for<br/>stack/column, rather<br/>than inventing a new<br/>fraction, k…"
 ```

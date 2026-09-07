@@ -598,3 +598,22 @@ make: *** [Makefile:47: lint] Error 1
 ---
 [<small>2026-09-07 17:17:49</small>] [**Morpheus**]->[**Neo**] *lead review*:
  lead review: approved. Single shared fix point (base Pile.removePileable) is exactly right - covers pickup/discard/exile/move/merge uniformly instead of patching each dispatch path. No architecture concerns.
+
+---
+[<small>2026-09-07 17:47:04</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make lint | /home/drusifer/Projects/recard/build/build.out
+See ARCHITECTURE.md UI Conventions (44px floor) and D24 (zone overlap) for the invariants being checked.
+
+make: *** [Makefile:47: lint] Error 1
+
+---
+[<small>2026-09-07 17:47:28</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ swe fix: added the missing 4th drop zone - 'adjacent' (far half of the halo, real target+side but no overlap, plain gap). The other 3 (stack/column/overlap) already existed. New drop-adjacent-before/-after hint (hollow bar vs overlap's solid line) so all 4 zones look distinct mid-drag. Details: agents/neo.docs/adjacent-drop-zone.md. 2 new mutation-checked tests, live-verified. All suites+lint green.
+
+---
+[<small>2026-09-07 17:47:35</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ qa uat PASSED: independently re-ran the mutation check (forced always-overlap, watched the boundary test fail), re-ran full suite (693/12/18/7/5) + lint at baseline. Screenshot confirms the hollow adjacent hint is visually distinct from the solid overlap line. No further changes needed.
+
+---
+[<small>2026-09-07 17:47:42</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ lead review: approved. Reusing the SAME near/far halving idea already established for stack/column, rather than inventing a new fraction, keeps the four zones conceptually consistent. No new state/reducer plumbing needed since undefined layout already meant no-overlap everywhere. No architecture concerns.

@@ -7,23 +7,27 @@
  * element lookups. (Sprint 4 retro item 13: give new pure logic its own
  * home *before* writing it, not after someone asks.)
  *
- * Smith's Gate 1 mechanism, expressed as geometry:
- * - upper half of a card's own box     -> stack onto that card
- * - lower half of a card's own box     -> column below it (D-nit,
- *   "vertical drop targets... like how lands are normally arranged in
- *   a game of mtg")
- * - in the halo beside a card          -> overlap, before or after it
- * - anywhere else                      -> plain append, no layout
+ * Smith's Gate 1 mechanism, expressed as geometry - four distinct
+ * targets per card (direct user request: "clear drop targets that work
+ * consistently... overlap on the side, overlap from below, exactly on
+ * top, or next to the target card with a little space in between"):
+ * - upper half of a card's own box       -> stack ONTO it (exactly on
+ *   top - Smith's original "on top" region, unchanged)
+ * - lower half of a card's own box       -> column BELOW it (D-nit,
+ *   "like how lands are normally arranged in a game of mtg")
+ * - near half of the halo beside a card  -> overlap ON that side
+ * - far half of the halo beside a card   -> ADJACENT to that side (a
+ *   plain, un-overlapped placement, but still targeted at a specific
+ *   card+side rather than only reachable by missing every other zone)
+ * - anywhere else                        -> plain append, no target
  *
- * The halo is one card-width, so the reachable area for "overlap" is as
- * generous as the card itself rather than a cramped sub-strip — Smith
- * chose the on-card/beside-card split over bisecting each card for THAT
- * choice specifically to keep both targets comfortably large. The
- * upper/lower split within the card's own box is a second, narrower
- * bisection layered on top of that first choice, not a replacement of
- * it - onto-card is still one whole target, just now two different
- * outcomes depending on which half, the same way "beside" was already
- * two outcomes (before/after) depending on which side.
+ * The halo is one card-width (as generous as the card itself, not a
+ * cramped sub-strip - Smith's original reasoning for the on-card/
+ * beside-card split, still true of the halo as a whole). Adjacent's
+ * own split is the SAME halving idea `isLowerHalf` already uses for
+ * stack/column, applied to the halo instead of the card: near half
+ * overlaps, far half doesn't - one consistent rule (bisect the
+ * reachable region) instead of a different fraction for every zone.
  */
 
 /**
@@ -91,8 +95,16 @@ function evaluateBox(box, point, nearest) {
   const distance = isBefore ? box.left - point.x : point.x - box.right;
   if (distance > box.width) return { nearest };
 
+  // Near half of the halo overlaps; the far half is ADJACENT instead -
+  // a real, deliberately-targeted placement (still this card, still
+  // this side) that just doesn't overlap. Ties keep the SAME distance-
+  // then-id comparison `isBetterMatch` already uses regardless of
+  // which half either candidate falls in - "closest card wins" doesn't
+  // change just because one candidate would overlap and another
+  // wouldn't.
+  const layout = distance <= box.width / 2 ? 'overlap' : undefined;
   return isBetterMatch(distance, box.pileableId, nearest)
-    ? { nearest: { distance, targetCardId: box.pileableId, side: isBefore ? 'before' : 'after' } }
+    ? { nearest: { distance, targetCardId: box.pileableId, side: isBefore ? 'before' : 'after', layout } }
     : { nearest };
 }
 
@@ -102,9 +114,11 @@ function evaluateBox(box, point, nearest) {
  *   cards currently rendered in the zone, in any order.
  * @param {{x: number, y: number}} point the drop/dragover point.
  * @returns {{targetCardId?: string, side?: 'before'|'after',
- *            layout?: 'stack'|'overlap'|'column'}} empty when the point
- *   is open space — which the reducer reads as "append, and clear any
- *   layout".
+ *            layout?: 'stack'|'overlap'|'column'}} `layout` is absent
+ *   for the adjacent case (a real target, just no overlap) and the
+ *   whole result is empty when the point is open space with no nearby
+ *   card at all - which the reducer reads as "append, and clear any
+ *   layout" either way.
  */
 export function resolveDropTarget(cardBoxes, point) {
   let nearest = null;
@@ -116,5 +130,6 @@ export function resolveDropTarget(cardBoxes, point) {
   }
 
   if (!nearest) return {};
-  return { targetCardId: nearest.targetCardId, side: nearest.side, layout: 'overlap' };
+  const { targetCardId, side, layout } = nearest;
+  return layout ? { targetCardId, side, layout } : { targetCardId, side };
 }
