@@ -676,3 +676,33 @@ make: *** [Makefile:47: lint] Error 1
 ---
 [<small>2026-09-07 19:11:44</small>] [**Morpheus**]->[**Neo**] *lead review*:
  lead review: approved. isSandwiched is a small, well-scoped addition to the pure geometry module, doesn't touch state/reducer, and the 3px vs 14px asymmetry is well-justified (deliberate override vs default reachable target). Test fixture uses a deliberately non-boundary gap size, good call avoiding a fragile exact-midpoint assertion. No architecture concerns.
+
+---
+[<small>2026-09-07 20:41:06</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1701.490196
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-09-07 20:41:42</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ swe impl: new LandsPile (extends GroupedPile, not CascadePile - that was Solitaire-specific and would've needed everything overridden). Groups by derived colour, multiple columns side by side reusing chip-tray, + a live per-column mana-count badge that updates on tap. Details: agents/neo.docs/lands-pile.md. 6 new mutation-checked tests, live-verified (badge 6->5 on real tap). All suites+lint green.
+
+---
+[<small>2026-09-07 20:41:51</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ qa uat PASSED: mutation-checked colour derivation independently (forced sortValue to ignore derivedColors, badge-colour test failed correctly). Re-ran full suite (702/12/18/7/5) + check (15 decks balanced) + lint at baseline. Live-verified badge decrements on real tap. No further changes needed.
+
+---
+[<small>2026-09-07 20:42:01</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ lead review: approved. Correctly reused GroupedPile's existing multi-column shape instead of stretching CascadePile - that class's Solitaire-specific overrides (rank/suit sequence, no reparenting, horizontal-only) would have needed replacing wholesale, so reuse would have been nominal only. groupBadge as an opt-in static hook on the pile class, called generically by ChipTray, keeps chips/tokens untouched. No architecture concerns.
+
+---
+[<small>2026-09-07 20:42:11</small>] [**Neo**]->[**Neo**] *queue*:
+ queue nit (direct user request): see if there are any other pile types we can merge or get rid of - a registry audit (currently 15 kinds: plain/deck/hand/discard/foundation/run/set/cascade/rankAdjacent/battlefield/exile/stack/chip/token/lands). Queued, not started.

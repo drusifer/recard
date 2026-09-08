@@ -246,4 +246,12 @@ sequenceDiagram
     Note right of Trin: "qa uat PASSED: re-ran<br/>both mutation checks<br/>independently<br/>(SANDWICHED zone<br/>widened, isSandwiched<br/>stubbed false) - both<br/>failed the right test…"
     Morpheus->>Neo: "lead review"
     Note right of Morpheus: "lead review: approved.<br/>isSandwiched is a small,<br/>well-scoped addition to<br/>the pure geometry<br/>module, doesn't touch<br/>state/reducer, and the<br/>3px…"
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "swe impl: new LandsPile<br/>(extends GroupedPile,<br/>not CascadePile - that<br/>was Solitaire-specific<br/>and would've needed<br/>everything overridden).<br/>Gro…"
+    Trin->>Morpheus: "qa handoff"
+    Note right of Trin: "qa uat PASSED: mutation-<br/>checked colour<br/>derivation independently<br/>(forced sortValue to<br/>ignore derivedColors,<br/>badge-colour test failed<br/>correct…"
+    Morpheus->>Neo: "lead review"
+    Note right of Morpheus: "lead review: approved.<br/>Correctly reused<br/>GroupedPile's existing<br/>multi-column shape<br/>instead of stretching<br/>CascadePile - that<br/>class's Solitair…"
+    Neo->>Neo: "queue"
+    Note right of Neo: "queue nit (direct user<br/>request): see if there<br/>are any other pile types<br/>we can merge or get rid<br/>of - a registry audit<br/>(currently 15 kinds: p…"
 ```

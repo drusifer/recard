@@ -5,6 +5,7 @@ import { PILE_TYPES, CHANGE_PILE_TYPE_KINDS } from '../src/piles/pileTypes.js';
 import { BattlefieldPile } from '../src/piles/BattlefieldPile.js';
 import { ExilePile } from '../src/piles/ExilePile.js';
 import { StackPile } from '../src/piles/StackPile.js';
+import { LandsPile } from '../src/piles/LandsPile.js';
 import { reduce } from '../src/state.js';
 
 const shared = { isOwner: false, isShared: true, cards: [] };
@@ -137,4 +138,54 @@ test('UNTAP_ALL: a non-owner cannot untap someone else\'s battlefield', () => {
     () => reduce(state, { type: 'UNTAP_ALL', pileId: 'bf-p1', playerId: 'p2' }),
     /authoriz/i,
   );
+});
+
+// --- LandsPile -----------------------------------------------------------
+
+// Direct user request: "I want to organize my lands by color, each
+// color stacked vertically, overlapped so it's easy to count/tap/untap"
+// - reuses GroupedPile (the same shape chips/tokens already use, "one
+// stack per group value, side by side"), grouped by colour.
+
+test('LandsPile: groups by colour, deriving it from mana text for a colourless-field basic land', () => {
+  const plains = { id: 'p', colors: [], text: '{T}: Add {W}.' };
+  const island = { id: 'i', colors: [], text: '{T}: Add {U}.' };
+  const dual = { id: 'd', colors: ['B', 'R'], text: '' };
+  assert.equal(LandsPile.sortValue(plains), 'W');
+  assert.equal(LandsPile.sortValue(island), 'U');
+  assert.equal(LandsPile.sortValue(dual), 'B', 'multicolour groups under its FIRST colour');
+});
+
+test('LandsPile: a land with no derivable colour at all still gets a real (colourless) bucket, not undefined', () => {
+  assert.equal(LandsPile.sortValue({ id: 'x', colors: [], text: 'Sacrifice: draw a card.' }), 'C');
+});
+
+test('LandsPile: offers untapAll and NOT take/split (a set of distinct permanents, not a stack to scoop)', () => {
+  const actions = new LandsPile({}).pileActions(shared);
+  assert.ok(actions.includes('untapAll'));
+  assert.ok(actions.includes('tighten'));
+  assert.ok(actions.includes('loosen'));
+  assert.ok(!actions.includes('take'));
+  assert.ok(!actions.includes('split'));
+});
+
+test('LandsPile: a non-owner of a personal lands pile gets nothing', () => {
+  assert.deepEqual(new LandsPile({}).pileActions(stranger), []);
+});
+
+test('LandsPile.groupBadge: counts untapped lands in the group, out of the total', () => {
+  const cards = [
+    { id: 'a', colors: [], text: '{T}: Add {W}.' },
+    { id: 'b', colors: [], text: '{T}: Add {W}.', orientation: 'landscape' },
+    { id: 'c', colors: [], text: '{T}: Add {W}.' },
+  ];
+  const badge = LandsPile.groupBadge(cards);
+  assert.equal(badge.text, '2', '2 of 3 are still portrait (untapped)');
+  assert.equal(badge.className, 'pip-w');
+  assert.match(badge.title, /2 of 3/);
+});
+
+test('LandsPile: PILE_TYPES registers it, and it is eligible for changePileType', () => {
+  assert.equal(PILE_TYPES.lands, LandsPile);
+  assert.ok(CHANGE_PILE_TYPE_KINDS.includes('lands'));
 });

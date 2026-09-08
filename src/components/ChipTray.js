@@ -47,6 +47,22 @@ export class ChipTrayElement extends HTMLElement {
         if (groupValue !== undefined) column.dataset.denom = String(groupValue);
         tray.append(column);
         renderPileCards(column, { ...pile, cards: group }, allPiles, options);
+        // *nit (direct user request): "display the total manacount in a
+        // cool way, when tapping" - `groupBadge` is opt-in (`LandsPile`
+        // only; the `GroupedPile` default is absent, so chips/tokens are
+        // unaffected). Derived fresh from this column's own cards every
+        // render, so it always reflects the real tapped/untapped state,
+        // never a separately-tracked count that could drift from it.
+        // Appended AFTER `renderPileCards`, which `replaceChildren()`s
+        // this same column - added any earlier would just get wiped.
+        const badge = PILE_TYPES[pile.kind]?.groupBadge?.(group);
+        if (badge) {
+          const badgeEl = document.createElement('span');
+          badgeEl.className = `chip-stack-badge ${badge.className}`;
+          badgeEl.textContent = badge.text;
+          badgeEl.title = badge.title;
+          column.append(badgeEl);
+        }
         // *nit ("a slight diagonal from lower left to upper right"):
         // each chip's position in its own stack, so CSS can drift it
         // sideways progressively. A margin cannot do this - margins do

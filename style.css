@@ -592,10 +592,40 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    the stack and later ones pile on top, matching both the DOM order and
    how a physical stack grows. */
 .chip-stack {
+  position: relative; /* anchors an opt-in `.chip-stack-badge` (LandsPile) */
   display: flex;
   flex-direction: column-reverse;
   align-items: center;
   min-height: 0;
+}
+
+/* *nit (direct user request): "display the total manacount in a cool
+   way, when tapping" - one per colour column (`LandsPile.groupBadge`,
+   `<chip-tray>`), pinned above the stack it describes. Reuses the SAME
+   mana-pip colour classes (`.pip-w` etc, RtgCardFace.js's `PIP_CLASS`)
+   the cost line and cast picker already use, so a column's own colour
+   identity reads the same way everywhere in the app, not a second
+   palette invented just for this badge. Absent for chips/tokens
+   (`GroupedPile`'s default `groupBadge` is undefined) - opt-in, not a
+   new universal decoration. */
+.chip-stack-badge {
+  position: absolute;
+  top: -0.6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 50%;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #1a1a1a;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
 /* The diagonal (direct user request: "a slight diagonal from lower left

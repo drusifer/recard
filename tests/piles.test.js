@@ -21,13 +21,14 @@ import { SetPile } from '../src/piles/SetPile.js';
 // methods, matching how `state.js`/`pileActions.js`/`ui.js` actually
 // call them now (`revivePile(pile).method(...)`).
 
-// D79 (US-82) added battlefield/exile/stack. Kept as an EXACT list
-// rather than relaxed to a subset check: knowing precisely which kinds
-// ship is the guard's whole value, so a new kind should have to be
-// added here on purpose.
-test('the registry exposes exactly the fourteen pile kinds', () => {
+// D79 (US-82) added battlefield/exile/stack; `lands` (direct user
+// request, "organize my lands by color... stacked vertically") is the
+// most recent addition. Kept as an EXACT list rather than relaxed to a
+// subset check: knowing precisely which kinds ship is the guard's
+// whole value, so a new kind should have to be added here on purpose.
+test('the registry exposes exactly the fifteen pile kinds', () => {
   assert.deepEqual(Object.keys(PILE_TYPES).toSorted(),
-    ['battlefield', 'cascade', 'chip', 'deck', 'discard', 'exile', 'foundation', 'hand', 'plain', 'rankAdjacent', 'run', 'set', 'stack', 'token']);
+    ['battlefield', 'cascade', 'chip', 'deck', 'discard', 'exile', 'foundation', 'hand', 'lands', 'plain', 'rankAdjacent', 'run', 'set', 'stack', 'token']);
   assert.equal(PILE_TYPES.deck, DeckPile);
   assert.equal(PILE_TYPES.hand, OpponentHandPile);
   assert.equal(PILE_TYPES.plain, Pile);

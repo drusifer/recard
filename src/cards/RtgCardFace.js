@@ -59,14 +59,25 @@ export function rtgColorClasses(colors) {
   return colors?.length > 0 ? colors.map((c) => `rtg-c-${c.toLowerCase()}`) : ['rtg-c-c'];
 }
 
+/** A card's real colour identity - `colors` when it has one, otherwise
+ * (a basic land, always `colors: []`) whichever mana symbols its OWN
+ * text produces, so a land groups/colours by what it's actually FOR
+ * rather than by an empty field. Exported so anything that needs a
+ * card's colour for real (not just a CSS class) - `LandsPile`'s own
+ * grouping key - reads the exact same derivation `colorClasses` (the
+ * art-fallback panel) already established, rather than re-deriving it
+ * a second way that could drift out of sync. */
+export function derivedColors(card) {
+  return card.colors?.length > 0
+    ? card.colors
+    : ['W', 'U', 'B', 'R', 'G'].filter((c) => (card.text ?? '').includes(`{${c}}`));
+}
+
 /** Colour classes for a card with no art yet, so the fallback panel
  * still reads as the right colour. A land is keyed off the mana it
  * produces, matching how the rest of the set treats colourless lands. */
 function colorClasses(card) {
-  const colors = card.colors?.length > 0
-    ? card.colors
-    : ['W', 'U', 'B', 'R', 'G'].filter((c) => (card.text ?? '').includes(`{${c}}`));
-  return rtgColorClasses(colors);
+  return rtgColorClasses(derivedColors(card));
 }
 
 // *nit (direct user request): "replace {T} with a bent arrow tap
