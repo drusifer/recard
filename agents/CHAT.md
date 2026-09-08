@@ -706,3 +706,23 @@ lint:decks — 15 deck(s) balanced
 ---
 [<small>2026-09-07 20:42:11</small>] [**Neo**]->[**Neo**] *queue*:
  queue nit (direct user request): see if there are any other pile types we can merge or get rid of - a registry audit (currently 15 kinds: plain/deck/hand/discard/foundation/run/set/cascade/rankAdjacent/battlefield/exile/stack/chip/token/lands). Queued, not started.
+
+---
+[<small>2026-09-07 20:54:26</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-rtg | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7913.10393
+
+---
+[<small>2026-09-07 20:54:39</small>] [**Neo**]->[**Trin**] *swe fix*:
+ nit fix: cascades (LandsPile) now align to the top and grow downward instead of inheriting the chip tray's bottom-up physical-stack default. New GroupedPile.stacksDownward opt-in flag (false for chips/tokens, true for LandsPile), wired into ChipTray.js as one modifier class. 2 new tests. Live-verified. All suites+lint green.
+
+---
+[<small>2026-09-07 20:54:51</small>] [**Trin**]->[**Neo**] *qa check*:
+ qa check PASSED: re-ran full suite + lint, chip/token bottom-up behavior confirmed unaffected (own test guards it). No Morpheus step - nit.

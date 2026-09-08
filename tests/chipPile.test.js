@@ -370,3 +370,10 @@ test('RESET drops an ordinary hand entirely, exactly as before', () => {
   state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
   assert.deepEqual(handsOf(reduce(state, { type: 'RESET' })), {});
 });
+
+// *nit (direct user request, "align cascades to the top"): a physical
+// chip stack still grows UPWARD from the tray's bottom edge - only
+// LandsPile opts into the downward cascade direction.
+test('ChipPile keeps GroupedPile\'s default stacksDownward: false', () => {
+  assert.equal(ChipPile.stacksDownward, false);
+});

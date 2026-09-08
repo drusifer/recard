@@ -189,3 +189,10 @@ test('LandsPile: PILE_TYPES registers it, and it is eligible for changePileType'
   assert.equal(PILE_TYPES.lands, LandsPile);
   assert.ok(CHANGE_PILE_TYPE_KINDS.includes('lands'));
 });
+
+// *nit (direct user request): "align cascades to the top" - a cascade
+// reads top-down (first card at the top), unlike a chip tray's own
+// bottom-up physical-stack default (`GroupedPile.stacksDownward`).
+test('LandsPile: cascades grow downward from the top, unlike a chip tray', () => {
+  assert.equal(LandsPile.stacksDownward, true);
+});

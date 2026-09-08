@@ -36,7 +36,12 @@ export class ChipTrayElement extends HTMLElement {
 
     renderPileShell(this, pile, allPiles, options, (container) => {
       const tray = document.createElement('div');
-      tray.className = 'chip-tray';
+      // *nit (direct user request, "align cascades to the top"):
+      // `stacksDownward` (`GroupedPile`, opt-in - `LandsPile` only) flips
+      // the tray from chips' own bottom-aligned/grows-up default to
+      // top-aligned/grows-down, the same direction a cascade already
+      // reads in. One modifier class, not a second component.
+      tray.className = PILE_TYPES[pile.kind]?.stacksDownward ? 'chip-tray chip-tray-downward' : 'chip-tray';
       container.append(tray);
 
       for (const [groupValue, group] of groupByValue(pile)) {

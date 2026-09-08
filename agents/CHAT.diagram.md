@@ -254,4 +254,8 @@ sequenceDiagram
     Note right of Morpheus: "lead review: approved.<br/>Correctly reused<br/>GroupedPile's existing<br/>multi-column shape<br/>instead of stretching<br/>CascadePile - that<br/>class's Solitair…"
     Neo->>Neo: "queue"
     Note right of Neo: "queue nit (direct user<br/>request): see if there<br/>are any other pile types<br/>we can merge or get rid<br/>of - a registry audit<br/>(currently 15 kinds: p…"
+    Neo->>Trin: "swe fix"
+    Note right of Neo: "nit fix: cascades<br/>(LandsPile) now align to<br/>the top and grow<br/>downward instead of<br/>inheriting the chip<br/>tray's bottom-up<br/>physical-stack default…"
+    Trin->>Neo: "qa check"
+    Note right of Trin: "qa check PASSED: re-ran<br/>full suite + lint,<br/>chip/token bottom-up<br/>behavior confirmed<br/>unaffected (own test<br/>guards it). No Morpheus<br/>step - nit."
 ```

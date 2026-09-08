@@ -599,6 +599,19 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   min-height: 0;
 }
 
+/* *nit (direct user request, "align cascades to the top"): the opt-in
+   flip (`GroupedPile.stacksDownward`, `LandsPile` only) - top-aligned
+   columns that grow DOWNWARD, the way a cascade already reads (first
+   card at the top, later ones cascading below it), instead of chips'
+   own bottom-aligned/grows-up physical-stack metaphor. */
+.chip-tray-downward {
+  align-items: flex-start;
+}
+
+.chip-tray-downward .chip-stack {
+  flex-direction: column;
+}
+
 /* *nit (direct user request): "display the total manacount in a cool
    way, when tapping" - one per colour column (`LandsPile.groupBadge`,
    `<chip-tray>`), pinned above the stack it describes. Reuses the SAME

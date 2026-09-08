@@ -60,6 +60,18 @@ export class GroupedPile extends Pile {
   static defaultSpread = 0.963;
   static maxSpread = 0.97;
 
+  /** Which way a column grows from its own top-aligned/bottom-aligned
+   * tray edge. `false` (the default: chips, tokens) grows UPWARD from
+   * the tray's bottom edge, like a real stack of chips sitting on a
+   * table. *nit (direct user request, "align cascades to the top"):
+   * `LandsPile` overrides this `true` - a cascade of lands reads top-
+   * down (the first card at the top, later ones cascading below it),
+   * matching the SAME downward "column" layout `BattlefieldPile`'s own
+   * drop-target already builds elsewhere, not the chip tray's own
+   * physical-stack metaphor. `<chip-tray>` (ChipTray.js) is the only
+   * reader. */
+  static stacksDownward = false;
+
   /** The value a pileable groups and sorts by. The base class has none
    * of its own - a subclass MUST name one, the same "opts in" shape
    * `convertibleKinds` documents on `Pile` itself. Returning `undefined`

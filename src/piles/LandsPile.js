@@ -29,6 +29,12 @@ import { derivedColors, PIP_CLASS } from '../cards/RtgCardFace.js';
 const COLORLESS = 'C';
 
 export class LandsPile extends GroupedPile {
+  /** *nit (direct user request, "align cascades to the top"): a cascade
+   * of lands reads top-down - the first one played at the top, later
+   * ones cascading below it - not bottom-up like a physical chip stack
+   * (`GroupedPile`'s own default). See that flag's own comment. */
+  static stacksDownward = true;
+
   /** A land's real colour identity (`derivedColors`, RtgCardFace.js) -
    * the FIRST one, same "primary colour" simplification `state.js`'s
    * own SORT_PILE-by-colour already makes for a hand. A genuinely
