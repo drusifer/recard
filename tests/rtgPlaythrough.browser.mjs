@@ -89,11 +89,24 @@ async function openMenu(page, locator) {
  * `[data-pile-id="rtg-tokens"]` for a fixed shared pile, or
  * `[data-kind="battlefield"]` for a per-player pile whose real id
  * isn't known ahead of time - `battlefield-<playerId>`, D55).
+ *
+ * Clicks the pile's own TITLE bar (`.pile-title`), not the panel as a
+ * whole - direct user request ("use the Move card action to reveal the
+ * ACTUAL targets within the piles") made a click on the pile's BODY
+ * resolve to a real per-card placement (onto/below/beside/adjacent a
+ * specific card) instead of always blindly appending. This helper's own
+ * job is "just get it into this pile, position doesn't matter for what
+ * the test is checking" - the title bar is never part of the card row,
+ * so it's guaranteed empty space regardless of how crowded the pile is,
+ * the same "just append" outcome this helper always meant. A test that
+ * wants a SPECIFIC per-card target should compute its own point and
+ * dispatch the click there directly, the way the column/adjacent tests
+ * elsewhere in this file already do.
  */
 async function moveTo(page, cardLocator, destination) {
   await openMenu(page, cardLocator);
   await page.locator('.card-context-menu [data-action="move"]').click();
-  await page.locator(`.pile-section.pile-target${destination}`).click();
+  await page.locator(`.pile-section.pile-target${destination} .pile-title`).click();
 }
 
 async function rotate(page, cardLocator) {
@@ -233,6 +246,113 @@ test('game 1: cast a creature to the battlefield and tap it', async () => {
   );
 });
 
+// D-nit (direct user request): "vertical drop targets... like how
+// lands are normally arranged in a game of mtg", then a real bug found
+// live and fixed the same session: "adding additional cards to the
+// vertical layout blocks the second one instead of offsetting from the
+// previous card" - a THIRD card dropped onto the second's lower half
+// landed at the same height as the second (cross-axis flex margins
+// don't chain the way `margin-left`'s negative pull does), not one
+// step further down. `--column-depth` (ui.js) fixed it; this pins the
+// fix down as a real regression test, not just the manual screenshot
+// verification that originally caught it.
+test('game 1: a column of 3+ cards offsets each one further down, not on top of the last', async () => {
+  const page = fixture.page;
+
+  // Direct synthetic drag straight from hand to a specific point on the
+  // battlefield, same mechanism the token test below already uses -
+  // avoids `moveTo`'s menu-driven "drop into open space" path (no
+  // specific target point) and any earlier test's own leftover
+  // battlefield cards (this only ever touches the 3 ids drawn here).
+  async function dropAt(cardId, x, y) {
+    await page.evaluate(({ id, px, py }) => {
+      const bf = document.querySelector('[data-kind="battlefield"]');
+      const transfer = new DataTransfer();
+      transfer.setData('text/plain', id);
+      const at = { bubbles: true, cancelable: true, dataTransfer: transfer, clientX: px, clientY: py };
+      bf.dispatchEvent(new DragEvent('dragover', at));
+      bf.dispatchEvent(new DragEvent('drop', at));
+    }, { id: cardId, px: x, py: y });
+    await page.waitForSelector(`[data-kind="battlefield"] .middle-card[data-pileable-id="${cardId}"]`, { timeout: 5000 });
+  }
+
+  const handCountBefore = await page.locator('[data-kind="hand"] .middle-card').count();
+  for (let index = 0; index < 3; index++) await pileAction(page, DECK_ID, 'Draw').click();
+  await page.waitForFunction(
+    (n) => document.querySelectorAll('[data-kind="hand"] .middle-card').length >= n,
+    handCountBefore + 3, { timeout: 10_000 },
+  );
+  const [idA, idB, idC] = await page.locator('[data-kind="hand"] .middle-card[data-pileable-id]').evaluateAll(
+    (elements) => elements.slice(-3).map((element) => element.dataset.pileableId),
+  );
+
+  const bfBox = await page.locator('[data-kind="battlefield"]').boundingBox();
+  await dropAt(idA, bfBox.x + 50, bfBox.y + 50);
+  await page.waitForTimeout(150);
+
+  async function boxOf(id) {
+    return page.locator(`[data-kind="battlefield"] .middle-card[data-pileable-id="${id}"] .card`).boundingBox();
+  }
+  let box = await boxOf(idA);
+  await dropAt(idB, box.x + box.width / 2, box.y + box.height * 0.85);
+  await page.waitForTimeout(150);
+
+  box = await boxOf(idB);
+  await dropAt(idC, box.x + box.width / 2, box.y + box.height * 0.85);
+  await page.waitForTimeout(150);
+
+  const [yA, yB, yC] = [await boxOf(idA), await boxOf(idB), await boxOf(idC)].map((b) => b.y);
+  const [deltaAB, deltaBC] = [yB - yA, yC - yB];
+  assert.ok(deltaAB > 5, `card B must sit below card A, got delta ${deltaAB}`);
+  assert.ok(deltaBC > 5, `card C must sit below card B, got delta ${deltaBC} - a delta near 0 means it landed on top of B instead of offsetting further`);
+  assert.ok(Math.abs(deltaAB - deltaBC) < 2, `each column step should be the same size, got ${deltaAB} then ${deltaBC}`);
+});
+
+// D129 (direct user request: "add stackaction for tap/untap, keep
+// pile level for all stacks") - the gear on a real, live BattlefieldPile
+// column: Tap sets every card in THAT stack, Untap reverses it, and a
+// card outside the stack is never touched. Reuses the exact column
+// the test above just built rather than re-creating one.
+test('game 1: a stack gear taps and untaps one battlefield column without touching the rest', async () => {
+  const page = fixture.page;
+  const battlefield = page.locator('[data-kind="battlefield"]');
+  const columns = await battlefield.locator('.card-stack').evaluateAll(
+    (stacks) => stacks.map((element) => element.querySelectorAll(':scope > .middle-card').length),
+  );
+  const deepIndex = columns.findIndex((count) => count >= 2);
+  assert.notEqual(deepIndex, -1, 'need the 3-card column the previous test built');
+  const column = battlefield.locator('.card-stack').nth(deepIndex);
+
+  const gear = column.locator('.stack-gear');
+  assert.equal(await gear.count(), 1, 'a multi-card battlefield column carries a gear');
+  await gear.click();
+  const menu = page.locator('.stack-action-menu');
+  assert.equal(await menu.count(), 1);
+  await menu.locator('[data-action="tapStack"]').click();
+
+  await page.waitForFunction((index) => {
+    const stack = document.querySelectorAll('[data-kind="battlefield"] .card-stack')[index];
+    const cards = [...stack.querySelectorAll(':scope > .middle-card')];
+    return cards.length > 0 && cards.every((card) => card.dataset.orientation === 'landscape');
+  }, deepIndex, { timeout: 5000 });
+
+  // A card OUTSIDE this stack must be untouched by a stack-scoped action.
+  const otherOrientation = await battlefield.locator('.card-stack').evaluateAll((stacks, index) => {
+    const other = stacks.find((element, index_) => index_ !== index && element.querySelector(':scope > .middle-card'));
+    return other?.querySelector(':scope > .middle-card')?.dataset.orientation ?? null;
+  }, deepIndex);
+  assert.notEqual(otherOrientation, 'landscape', 'a card outside the tapped stack must not be tapped too');
+
+  // Untap reverses it - and put the table back the way the next tests expect.
+  await gear.click();
+  await page.locator('.stack-action-menu [data-action="untapStack"]').click();
+  await page.waitForFunction((index) => {
+    const stack = document.querySelectorAll('[data-kind="battlefield"] .card-stack')[index];
+    const cards = [...stack.querySelectorAll(':scope > .middle-card')];
+    return cards.length > 0 && cards.every((card) => card.dataset.orientation !== 'landscape');
+  }, deepIndex, { timeout: 5000 });
+});
+
 // US-112 (direct user request, found by driving the real app): a token
 // dropped on empty space WITHIN THE SUPPLY'S OWN ZONE used to spawn a
 // brand-new pile beside the real one - the exact chip-duplication bug
@@ -269,8 +389,11 @@ test('game 1: a token dropped on empty space in its own zone joins the supply, n
 // colour+shape (the gem *nit) rather than by which column they sit in.
 test('the token supply renders as a plain pile, not grouped colour stacks', async () => {
   const page = fixture.page;
-  const stacks = await page.locator('[data-pile-id="rtg-tokens"] .chip-stack').count();
-  assert.equal(stacks, 0, 'no grouped columns - a plain pile has none');
+  // D129: every pile renders as stacks now, so "not grouped" is no
+  // longer "no stacks at all" - it is exactly ONE. A grouped supply
+  // would show a column per colour.
+  const stacks = await page.locator('[data-pile-id="rtg-tokens"] .card-stack').count();
+  assert.equal(stacks, 1, 'one stack - a plain pile is not split into colour columns');
   const colours = await page.locator('[data-pile-id="rtg-tokens"] .card-token').evaluateAll(
     (tokens) => new Set(tokens.map((t) => t.className)).size,
   );
@@ -409,4 +532,121 @@ test('game 2: Restart game rebuilds every deck, not just the canonical one', asy
   await pileAction(page, DECK_ID, 'Draw').click();
   await page.waitForFunction(() => document.querySelectorAll('[data-kind="hand"] .middle-card').length === 1, undefined, { timeout: 10_000 });
   assert.equal(await page.locator('[data-kind="hand"] .middle-card').count(), 1, 'game 2 is genuinely playable - drawing works after a restart');
+});
+
+// D129: the LANDS tray's own cascade, live.
+//
+// This surface had NO live coverage at all before now, which is how
+// its cascade broke twice without a test noticing - and it is the one
+// the original report was about ("3 cards cascades weird", then "zero
+// overlap, cards FARTHER apart than before the fix"). It is also the
+// only user of the downward (`GroupedPile.stacksDownward`) direction,
+// so the whole `top:`-anchored half of the stacking CSS rests on it.
+test('game 1: a lands column cascades downward with an even, overlapping step', async () => {
+  const page = fixture.page;
+
+  const lands = page.locator('[data-kind="lands"]').first();
+  assert.equal(await lands.count(), 1, 'the RtG preset gives each player a lands pile');
+
+  // Move three cards from hand into the lands pile through the real
+  // menu action, so this exercises the same path a player uses.
+  // Enough draws that SOME colour column is guaranteed 3+ deep: the
+  // tray groups by derived colour, and a 3-card draw can land one in
+  // each of three columns - which is exactly a depth a cascade bug
+  // hides at. Nine from a two-colour guild deck leaves no such out.
+  const DRAWS = 9;
+  const handCountBefore = await page.locator('[data-kind="hand"] .middle-card').count();
+  for (let index = 0; index < DRAWS; index++) await pileAction(page, DECK_ID, 'Draw').click();
+  await page.waitForFunction(
+    (n) => document.querySelectorAll('[data-kind="hand"] .middle-card').length >= n,
+    handCountBefore + DRAWS, { timeout: 10_000 },
+  );
+
+  const ids = await page.locator('[data-kind="hand"] .middle-card[data-pileable-id]').evaluateAll(
+    (elements, n) => elements.slice(-n).map((element) => element.dataset.pileableId),
+    DRAWS,
+  );
+  const landsId = await lands.getAttribute('data-pile-id');
+  for (const id of ids) {
+    await page.evaluate(({ cardId, toPileId }) => {
+      const target = document.querySelector(`[data-pile-id="${CSS.escape(toPileId)}"]`);
+      const transfer = new DataTransfer();
+      transfer.setData('text/plain', cardId);
+      const box = target.getBoundingClientRect();
+      const at = {
+        bubbles: true,
+        cancelable: true,
+        dataTransfer: transfer,
+        clientX: box.x + box.width / 2,
+        clientY: box.y + box.height / 2,
+      };
+      target.dispatchEvent(new DragEvent('dragover', at));
+      target.dispatchEvent(new DragEvent('drop', at));
+    }, { cardId: id, toPileId: landsId });
+    await page.waitForTimeout(150);
+  }
+
+  // Find whichever colour column actually received 3+ cards - the
+  // grouping is by derived colour, so which column that is depends on
+  // what was drawn.
+  // Carry the layout's own inputs beside the measured result so a
+  // failure explains itself instead of sending the next person to
+  // hand-probe computed styles.
+  const columns = await lands.locator('.card-stack').all();
+  let deepest = null;
+  for (const column of columns) {
+    const boxes = await column.evaluate((element) => {
+      // The spread is the layout's other input; a zero step is almost
+      // always a spread of 1, not a broken direction, and reporting it
+      // is the difference between a one-line diagnosis and a hunt.
+      const spread = getComputedStyle(element).getPropertyValue('--pile-spread');
+      return [...element.children]
+        .filter((child) => child.classList.contains('middle-card'))
+        .map((child) => ({
+          spread,
+          y: child.getBoundingClientRect().y,
+          height: child.getBoundingClientRect().height,
+          stackX: child.style.getPropertyValue('--stack-x'),
+          stackY: child.style.getPropertyValue('--stack-y'),
+          top: getComputedStyle(child).top,
+          position: getComputedStyle(child).position,
+        }));
+    });
+    if (!deepest || boxes.length > deepest.length) deepest = boxes;
+  }
+  const why = () => JSON.stringify(deepest);
+
+  assert.ok(deepest && deepest.length >= 3,
+    `need a column of 3+ to see a cascade bug at all, deepest was ${deepest?.length ?? 0}`);
+
+  // Downward: each card sits BELOW the one before it (larger y), the
+  // opposite of a chip stack, and the direction the whole `top:`
+  // -anchored branch of the stacking CSS exists for.
+  const steps = deepest.slice(1).map((box, index) => box.y - deepest[index].y);
+  for (const step of steps) {
+    assert.ok(step > 0, `a cascade must run DOWNWARD, got a step of ${step}px from ${why()}`);
+    assert.ok(step < deepest[0].height,
+      `a cascade must OVERLAP, not separate - got ${step}px between cards ${deepest[0].height}px tall ` +
+      '(the reported bug: cards farther apart than before the "fix")');
+  }
+
+  // Smith's usability defect, as a permanent assertion rather than a
+  // one-off screenshot review: a buried land must still be
+  // IDENTIFIABLE, not just present. At the chip-calibrated spread this
+  // pile used to inherit (0.963) each covered card showed a 2-3px
+  // sliver, so a 7-mana column told a player how many lands they had
+  // but not which. Recognition over recall - the strip carrying a
+  // card's name and cost has to survive.
+  const visibleStrip = steps[0];
+  assert.ok(visibleStrip > deepest[0].height * 0.1,
+    `a buried land must stay identifiable - only ${visibleStrip.toFixed(1)}px of a ` +
+    `${deepest[0].height.toFixed(1)}px card shows, which is a sliver, not a name`);
+
+  // Even steps: the third card must land one step past the second, not
+  // on top of it. This is the assertion the tray never had.
+  const [first] = steps;
+  for (const step of steps) {
+    assert.ok(Math.abs(step - first) < 0.5,
+      `every step of a ${deepest.length}-card cascade must match, got ${steps.join(', ')}`);
+  }
 });

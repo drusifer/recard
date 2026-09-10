@@ -8,9 +8,9 @@
  * compares it or orders it - `sortActions` stays empty, which is what
  * enforces that.
  */
-import { Pileable } from './Pileable.js';
+import { Stackable } from './Stackable.js';
 
-export class TokenPileable extends Pileable {
+export class TokenPileable extends Stackable {
   static sortActions = [];
 
   /**

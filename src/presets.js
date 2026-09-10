@@ -384,6 +384,16 @@ export const PRESETS = [
       // The standard MTG zones each player owns. `hand` already exists
       // for every player; library is the shared deck piles above.
       { kind: 'battlefield', ownerId: 'perPlayer', count: 1 },
+      // Direct user request: "organize my lands by color, each color
+      // stacked vertically, overlapped so it's easy to count/tap/untap"
+      // - a real MTG battlefield has no such split, but this app's own
+      // `battlefield` pile is already just "wherever a player drops
+      // permanents", not a rules-enforced zone, so a second, purely
+      // organizational pile for lands specifically costs nothing rule-
+      // wise. Players move lands here themselves (fully permissive
+      // drag-and-drop, same as everywhere else) - nothing routes a cast
+      // land here automatically.
+      { kind: 'lands', ownerId: 'perPlayer', count: 1 },
       { kind: 'discard', ownerId: 'perPlayer', count: 1 },
       { kind: 'exile', ownerId: 'perPlayer', count: 1 },
       // One shared stack - spells wait here to resolve, LIFO.

@@ -2,525 +2,210 @@
 
 ## Context
 
-Older sprint-by-sprint history (pre-D82) truncated from this file - it
-had grown to 1121 lines of stale per-sprint review logs no longer
-load-bearing. Full reasoning for anything before D82 is in
-`agents/chat_archive/` (`*ora report` archives) and `docs/ARCHITECTURE.md`
-itself, which is the current binding spec through D91. This file now
-tracks only active/recent architectural work.
-
-**Binding architecture**: `docs/ARCHITECTURE.md`'s Core invariant
-(fully permissive drag-and-drop, no redaction) and D82-D91 are current.
-The `Pile` class hierarchy (`src/piles/*.js`, `PILE_TYPES` registry,
-`src/piles/pileTypes.js`) is real and sound - polymorphic dispatch for
-`cardActions`/`pileActions`/`canAccept`/`disabledActions`/`showsFace`
-all genuinely differ per subclass, proven working this session (Neo
-reworked card-back/owner-tag rendering onto this exact mechanism after
-a rejected if/else first pass).
+`*lead review stackable` iteration 1 (D129 domain model). Reviewed the
+code, not the summary. The hierarchy move and the offset formula are
+right and I approve them; two seams the iteration did NOT touch will
+break the wiring if they aren't settled first, and one of them changes
+`offsetIn`'s interface — so this is APPROVED WITH CONDITIONS, and the
+conditions are for iteration 2 before it writes a line of wiring.
 
 ## Current Task
 
-**Status:** User (direct, `*chat @morpheus`) raised a code-quality
-concern: `main.js` has "an enormous kitchen-sink `zoneOptions`" and
-`ui.js`'s `renderZones` path is "the opposite of encapsulation."
-Asked for a refactor PLAN (not implementation) using the existing
-Table->Zone->Pile->Card hierarchy, real WebComponents encapsulating
-behavior, a structural guarantee on universal drag-and-drop, and
-specifically questioned Deck's inclusion in the universal
-`changePileType` set ("WTF Deck?"). Reminded: YAGNI, KISS, DRY.
+**`*lead review stackactions` (iteration 4): APPROVED.**
 
-Investigated directly (file sizes, `zoneOptions`' actual shape, and the
-Deck question) before writing anything - findings below are grounded in
-real numbers, not impression.
+The routing design is right and it is the user's, not mine: pile-level
+Tighten/Loosen became "All" and FANS OUT to each stack rather than
+writing one pile-wide number, so columns adjusted apart keep their
+relative differences. `spread` joining `direction` in the same
+metadata map means no new persistence shape for a genuinely new
+capability.
 
-### Diagnosis (concrete, not vibes)
+**`ADJUST_PILE_SPREAD` taking an optional `stackKey` rather than
+gaining a sibling action** follows D75/D103's "there can be only 1"
+correction, and the `DEFAULT_STACK_KEY` detail is what makes it safe -
+omitting the key can mean ALL precisely because the default stack has
+a real name, so the two readings can never collide.
 
-1. **`main.js` (1790 lines) / `ui.js` (1921 lines)** are the two
-   outliers in the codebase (every other file is under 340 lines,
-   `state.js` at 1722 is the one other large file but it's a single
-   cohesive reducer, not a grab-bag). `zoneOptions` (`main.js`,
-   `renderGameFromView`) is a flat 23-property object - 17 callbacks
-   (`onPlay`/`onReveal`/`onRotate`/`onPickup`/`onMoveCard`/`onCardLift`/
-   `onDropCard`/`onSplitCommit`/`onPileAction`/`onRenamePile`/
-   `onRenameZone`/`onRemoveZone`/`onMovePile`/`onReorderPile`/
-   `onDropCardOnZone`/`onMovePanel`/`onResizePanel`) plus data fields,
-   threaded UNFILTERED through every rendering layer: `renderZones` ->
-   `<zone-panel>` -> `<pile-panel>`/`<fan-pile>`/`<deck-stack>` ->
-   `renderPileShell` -> `renderPileCards` -> each card. A CARD-level
-   renderer receives `onMovePanel`/`onResizePanel` it will never call;
-   a ZONE-level renderer receives `onRotate`/`onSplitCommit` it will
-   never call. Real Interface Segregation Principle violation - not a
-   style complaint, an actual coupling cost (every layer can reach
-   every callback, so nothing stops a future edit from wiring a
-   card-level action straight to a zone-level effect by accident).
+**Two findings worth carrying forward, both about bare instances and
+empty collections:**
+- `pileForKind` builds a BARE instance, so anything `disabledActions`
+  reads off `this` is empty. That comment was already in the file, for
+  `ChipPile`'s break rule, and this work walked straight into it
+  anyway. Context-not-`this` is the rule for that method.
+- `every()` on an empty list is vacuously TRUE, which disabled BOTH
+  spread directions on an empty pile. Empty-collection defaults need
+  stating explicitly, not inheriting from a fold's identity element.
 
-2. **Every "Web Component" in `src/components/*.js` is a thin shell**,
-   not a real encapsulation boundary. Checked all six
-   (`PilePanel`/`FanPile`/`DeckStack`/`ZonePanel`/`HeaderActions`/
-   `ScoreZone`, 24-123 lines each): every one's `.render()` does
-   nothing but forward straight into one of `ui.js`'s giant exported
-   functions (`renderPile`/`renderPileShell`/`renderPileCards`/
-   `renderZonePanel`/`renderActionHeader`/`renderSplitPicker`/
-   `renderDeckStack`). The REAL polymorphic model (`PILE_TYPES`, item
-   above) exists one layer down and is sound - but the rendering layer
-   never asks it anything beyond `componentFor(kind)` (which DOM tag to
-   use). Two real models coexist: a good one (the class hierarchy) and
-   a procedural one (everything in `ui.js`) that doesn't use it. THAT
-   is the "opposite of encapsulation" - not that WebComponents are
-   missing, but that the ones present are hollow.
+**On the gear placement**, which took three attempts: this is the
+clearest case yet for the browser layer existing at all. Nothing below
+it can see that a control covers the thing it controls. Both failing
+placements were reasonable on paper.
 
-3. **The Deck bug ("WTF Deck?"), confirmed real and reachable**:
-   `state.js`'s deck-finding logic (`deckOf`, `DRAW`, `DEAL`,
-   `SHUFFLE_DECK`, `RESET`) is entirely ID-based - `pile.id ===
-   DECK_PILE_ID`, NEVER `pile.kind === 'deck'`. `CHANGE_PILE_TYPE` has
-   NO guard against converting the canonical deck pile's `kind` away
-   (only an unrelated accident blocks `-> 'hand'`: the hand-target
-   ownerId guard, since the deck is ownerless). Convert the deck to
-   `'foundation'`/`'battlefield'`/`'run'`/etc TODAY and it keeps
-   rendering as that new kind while `DRAW`/`DEAL`/`SHUFFLE_DECK` keep
-   silently reading/writing it by id, unaware its `kind` changed. Two
-   different models of "what makes a pile a deck" (id-based reducer,
-   kind-based UI/registry) disagree, and "universal changePileType"
-   was built assuming kind is always the right axis without checking
-   whether an id-based structural role exists underneath. This is a
-   real correctness bug, not a taste question.
-
-### Proposed direction (YAGNI/KISS/DRY - explicitly NOT a rewrite)
-
-The class hierarchy underneath is already good and proven working.
-This is "finish moving the rendering layer onto polymorphism that
-already exists, and narrow the options bag along real interface
-boundaries" - not "throw it out and rebuild."
-
-**A. Fix the Deck bug - CORRECTED per direct user override ("THERE
-SHOULD BE NO CANONICAL PILES", all-caps, unambiguous).** My original
-A.1 (make the deck permanently un-convertible) was REJECTED - it would
-have preserved a canonical-id assumption instead of removing it. The
-actual, bigger bug this surfaced: `DRAW`/`DEAL`/`DEAL_MORE`/
-`SHUFFLE_DECK` are ALL hardcoded to `DECK_PILE_ID` today, not just
-`CHANGE_PILE_TYPE`. Confirmed via RTG specifically: `DeckPile.pileActions`
-offers `draw`/`deal`/`reshuffleDeal`/`shuffle` on EVERY deck-kind pile
-(host-only, unconditional on kind alone) - RTG has 15 simultaneous
-deck-kind piles, none of them `DECK_PILE_ID` (RTG's `tableZone: false`
-means that pile never exists), so those buttons render on every one of
-RTG's 15 decks today and either throw ("Cannot draw: deck is empty")
-or silently no-op - a real, live false-affordance bug, not hypothetical.
-
-**Real fix**: parameterize `DRAW`/`DEAL`/`DEAL_MORE`/`SHUFFLE_DECK` by
-an explicit `pileId`, the same pattern `MOVE_CARD`/`SPLIT_PILE`/every
-other pile-targeted action already uses - no implicit "the" deck
-constant read out of thin air. The UI already knows exactly which pile
-was clicked (`<deck-stack>` always renders from a real `pile.id`) - it
-just isn't forwarding it today (`main.js`'s `dealFromDeck` drops it).
-`resolveHandPileId` (state.js) is the RIGHT existing precedent for this
-- kind+ownership lookup first, a fixed string only ever as a last-resort
-MINT default (hand-only; deck piles are never lazily minted, so deck's
-version doesn't even need that fallback). `RESET`'s own deck-recreation
-(assigning `DECK_PILE_ID` to a freshly built pile from `gameConfig`) is
-NOT the same problem - that's declaring a preset's own starting id, not
-reading a singleton by assumption - leave it alone.
-`CHANGE_PILE_TYPE` then needs NO deck-specific guard at all once reads
-are pileId-scoped - a converted-away former-deck pile simply stops
-being any deck-scoped action's target, exactly as it should, with zero
-special-casing.
-
-**Framing correction, direct user request - this is the model going
-forward, not just for A:** "A deck is just a pile of cards." Cards get
-unique ids ONCE at game init (presets/YAML deck configs, organized by
-DeckType - `deck.js`/`DECK_TYPES`, unchanged, already correct). A
-card's id never changes for its whole life, regardless of which pile
-holds it or what kind that pile is - moving cards and `changePileType`
-already never touch card identity today (verified: `CHANGE_PILE_TYPE`
-only ever writes `{...p, kind, name}`, `MOVE_CARD`/`transferCard` only
-ever relocate/re-stamp `{owner, faceUp}`, no path mutates `id`). This
-app simulates a card TABLE - Zones/Piles exist to organize that table
-on a screen, nothing more; pile-level actions (Draw/Deal/Shuffle/Split/
-Take) are CONVENIENCE SHORTCUTS for common table-organizing moves a
-player could otherwise do by hand, one drag at a time - never
-privileged game mechanics bound to one blessed pile. Litmus test the
-user gave directly: gather every card into one pile, convert it to
-`kind: 'deck'`, and the table is back to its initial state - nothing
-about that sequence should need special-casing anywhere.
-
-**Consequence for A, beyond the pileId plumbing**: `DRAW`/`DEAL`/
-`SHUFFLE_DECK` should not hard-require `pile.kind === 'deck'` at the
-REDUCER either - that would just re-introduce a privileged-pile
-assumption under a kind check instead of an id check. Reducer stays
-fully permissive (Core invariant: works on whatever pile
-`action.pileId` names, no matter its kind) - `DeckPile.pileActions()`
-(and only it, by default) is what decides which kind's HEADER offers
-these buttons, same offer-vs-authorization split (D43) every other
-action in this codebase already respects. A future kind offering Draw/
-Deal too is then a one-line addition to that class's `pileActions()`,
-never a reducer change - this is what "shortcuts to keep the table
-organized" actually buys.
-
-**B. Narrow `zoneOptions` into per-layer interfaces** (mechanical
-regrouping of existing callbacks into 3 plain objects, NOT a new
-DI/options-provider framework - that would itself be a YAGNI
-violation):
-- `tableOptions` - layout persistence, zone create/remove/rename, panel
-  move/resize. Consumed by `<zone-panel>` only.
-- `pileOptions` - pile-level actions, split picker, deal count,
-  drop-on-pile. Consumed by `<pile-panel>`/`<fan-pile>`/`<deck-stack>`.
-- `cardOptions` - play/reveal/rotate/pickup/move/drag. Consumed by the
-  per-card renderer only.
-A component's `.render()` receives ONLY the slice it actually uses.
-
-**C. Migrate remaining `pile.kind === 'deck'` branches in `main.js`/
-`ui.js` onto the `Pile` hierarchy**, opportunistically (not a forced
-sweep) - the same migration this session already did for
-`showsFace`/`pileActions`/`disabledActions`. E.g. `handlePileAction`'s
-deck-instant-split-vs-picker branch belongs on the class, not an
-`if (pile.kind === 'deck')` in main.js.
-
-**D. Universal drag-and-drop as a structural GUARANTEE, not scattered
-convention**: one small test iterating `Object.values(PILE_TYPES)`,
-asserting every concrete subclass's `cardActions` for a visible card
-includes `move` (or hand's `play`) - so a FUTURE pile type that
-accidentally restricts drag-and-drop fails CI immediately. Same
-"executable guarantee, not folklore" instinct already proven by
-`assertCardsConserved`.
-
-**E. Shell components - concrete, immediate action** (user asked
-directly "what are you doing about the shell components" - not
-satisfied by C's "opportunistic" framing alone, correctly). Audited
-every `src/components/*.js` for OTHER callers of the function it
-forwards to, before touching anything:
-- `<pile-panel>`/`renderPile` and `<zone-panel>`/`renderZonePanel` -
-  ZERO other callers each (grepped, confirmed). Pure 1:1 passthrough
-  shells - inline the function body directly into the component's own
-  `.render()` method, delete the standalone export. Real encapsulation:
-  the component owns its rendering, not a name-matched indirection to
-  a same-shaped free function.
-- `<deck-stack>`/`renderDeckStack` - genuinely shared: `main.js`'s
-  pre-game preview screen (`#host-deck-area`) calls it directly too, no
-  component involved there. Stays a standalone exported function -
-  inlining it would just move the duplication problem, not remove it.
-  `<fan-pile>`'s own render function needs the same check before
-  touching it (not yet done).
-- This is the FIRST real step of C too, not separate from it - once a
-  component owns its own render body, a `pile.kind === 'deck'` branch
-  that only matters to `<deck-stack>` naturally has nowhere else to
-  leak into.
-
-### Explicitly NOT recommending (YAGNI)
-- A full `main.js`/`ui.js` rewrite in one pass - too much blast radius
-  for a codebase with no continuous e2e coverage; this session's own
-  history shows small verified steps beat big-bang rewrites here.
-- A dependency-injection/options-provider framework for (B) - three
-  plain objects assembled once in `main.js` is enough.
-- Moving Zone/Table logic into the Pile hierarchy or vice versa - the
-  Zone/Pile separation (D55) stays; this is about interface WIDTH, not
-  merging concerns that are correctly separate today.
-
-### Sequencing (small, independently verifiable, Neo+TDD, Trin gates each)
-1. Deck pileId-parameterization fix (A, corrected) - ships alone.
-2. Shell inlining, pile-panel + zone-panel (E) - ships alone.
-3. Universal-DnD guarantee test (D) - ships alone, zero behavior change.
-4. Options-bag split (B) - one component at a time.
-5. Remaining kind-check migration (C) - folded into work touching those
-   spots as it's encountered, not a dedicated pass.
-
-User has already overridden my original A.1 recommendation and directed
-E concretely.
-
-## Session close-out: what actually shipped vs. this plan (2026-08-31)
-
-**Shipped, committed, pushed (`f9d410b`, both `main`/`dev`), recorded
-as D93/D94 in `docs/ARCHITECTURE.md`:**
-1. Deck pileId-parameterization (A, corrected) - done, then the user
-   pushed FURTHER than this plan anticipated: the entire `Pile`
-   hierarchy is real ES class instances now (constructor, instance
-   methods, `toJSON()`), not plain data through static methods. This
-   plan's own diagnosis (item 2, "hollow shell components... the real
-   polymorphic model exists one layer down") is now moot in its
-   original form - the model isn't one layer down any more, it's the
-   direct call shape (`revivePile(pile).cardActions(...)`) everywhere.
-2. `viewFor`'s own `switch` (flagged in this plan's diagnosis as one of
-   the two concrete monstrosities, alongside `zoneOptions`) - replaced
-   by `Pile.getView()`/`contributeToView()`. Direct user request, not
-   originally item 5 (kind-check migration) but the same category of
-   fix, arrived at directly.
-
-**NOT done - still real, open work, not abandoned:**
-- Shell inlining (E: `<pile-panel>`/`renderPile`,
-  `<zone-panel>`/`renderZonePanel` collapsing into their own
-  `.render()` bodies) - scoped in this plan, never executed. Re-verify
-  the "zero other callers" facts still hold before starting (this
-  session's other changes may have added a caller).
-- Universal-DnD guarantee test (D) - never written. Still a genuinely
-  good, small, isolated addition - `Object.values(PILE_TYPES)` +
-  `.prototype.cardActions` iteration.
-- `zoneOptions` split into 3 layer-scoped objects (B) - the original
-  "kitchen sink" complaint's most direct fix, never started. `main.js`
-  is bigger now (D93's class-conversion touched it), worth re-measuring
-  before assuming the same 3-way split is still the right shape.
-
-**The original complaint's root causes ARE substantially addressed**,
-even though the specific sequencing in this plan wasn't followed
-literally - "hollow shell components over a real model underneath" is
-now "real polymorphic dispatch, directly" (piles are instances, not
-just a class registry nobody calls into). The remaining open items
-(shell inlining, DnD test, options split) are smaller, more mechanical
-follow-ups on a now-solid foundation, not blocked on anything.
-
-## Session update (2026-08-31): item D shipped
-
-`*impl continue morph refactor` resolved to this file's own sequencing
-note (item D, DnD guarantee test - smallest/most isolated). Full
-Neo->Trin->Morpheus gate cleared:
-- Neo: `tests/piles.test.js`, iterates `PILE_TYPES`, asserts
-  `move`/`play` on a visible card for every kind except `DeckPile`
-  (named exception, D34 - deck never renders a per-card hover row).
-- Trin: 512/512 independently re-run, mutation-killed the test itself
-  (temporarily broke `HandPile.cardActions` -> the new test failed by
-  name, not a coincidental other failure), restored byte-identical.
-- Morpheus (me): matches this plan's item D exactly, zero behavior
-  change. Fixed one misleading comment (`"D95 refactor plan item D"`
-  conflated the count-badge decision number with this plan's own A-E
-  lettering) to a plain-language reference instead.
-
-**Real finding, disclosed not silently fixed**: `docs/ARCHITECTURE.md`
-is NOT actually current through D95 as this file (and Neo's) claimed -
-grepped, only D91 exists as a header, file's own "Last updated" stamp
-is 2026-08-29. D92-D95 were broadcast to CHAT.md and summarized in
-state files but never written into ARCHITECTURE.md itself - same drift
-`docs/DECISIONS.md` already has at D20. Posted to CHAT.md, addressed to
-User, asking whether to backfill now or backlog - not fixed unprompted,
-this is a separate, larger job than the DnD test itself and wasn't
-asked for.
-
-Item D committed to git after this state save (see Next Steps).
-
-## Session update (2026-09-01): two direct-correction fixes, unplanned but real
-
-Two user corrections landed outside this plan's own item list, both
-Neo->Trin->Morpheus gate-cleared, PASS, not yet committed:
-
-1. **Deck's D34 `cardActions` exception struck** - "it is absolutely
-   permissable to put cards back on the deck and take cards off." Real
-   architecture fix, not cosmetic: needed a `canRemoveCard` override
-   (`draw` isn't a per-card `cardActions` entry) and a `cardActions`
-   override that's unconditional rather than the base `faceUp === false`
-   rule (a deck card never carries `faceUp` at all).
-2. **HandPile split into `PlayerHandPile`/`OpponentHandPile`** - "I
-   don't like the special ownership property for hand... make PlayerHand
-   and OpponentHand as separate classes." Bigger than it looks: exposed
-   that `state.js` was calling `revivePile` (viewer-agnostic) for 3
-   genuinely viewer-aware checks that used to work only because
-   `HandPile` computed `this.ownerId === viewerId` internally - switched
-   those 3 to `pileInstanceFor(pile, viewerId)`, confirmed load-bearing
-   via mutation test (PLAY breaks immediately without it).
-   `pileActions` correctly stayed shared/ctx-based on `HandPile` itself
-   - it was never the offending pattern (every other kind's
-   `pileActions` already takes `{isOwner}`), and `pileLevelActions`'s
-   one caller with no real pile/viewerId (pre-game deck preview)
-   structurally can't use the class-selection mechanism anyway.
-
-Also scoped (discussion only, not implemented): a YAML-backed pile-
-capabilities table, following `tools/rtg/compile.mjs`'s exact
-authored-YAML -> compiled-committed-ES-module pattern, covering ONLY
-the unconditional per-kind baseline - explicitly NOT the dynamic
-gating logic, to avoid rebuilding the "rules engine" this codebase has
-repeatedly, deliberately rejected. See `neo.docs/state.md` for the
-fuller writeup. Not started.
-
-## Session update (2026-09-01, continued): MERGE_PILE shipped
-
-Direct user request: dropping a pile directly onto another pile merges
-all its cards into the target (target keeps its own kind) and removes
-the emptied source. New `MERGE_PILE` reducer case + real drag-drop
-wiring in `ui.js`/`main.js`. Neo->Trin->Morpheus gate cleared, PASS,
-514/514, mutation-tested. Reuses `REMOVE_PILE`'s own deck/hand/Table
-exemption set rather than inventing new rules.
-
-**One real architectural judgment call, not explicitly specified by the
-user - approved but flagged**: a pile dropped onto another pile in the
-SAME zone still reorders (pre-existing, separately-requested feature,
-left unchanged); only a CROSS-zone pile-on-pile drop now merges,
-replacing what used to bubble up as a reparent-into-that-zone
-(`onMovePile`). Dropping onto a Zone's own empty space is untouched
-(still always a sibling, Smith's Gate 1/D55). If the user actually
-wanted same-zone drops to merge too, that's a one-line UI change
-(`renderPileShell`'s drop handler) - revisit if raised.
-
-**Resolved same session**: user did want it simplified - "remove the
-weird zone distinction, KISS." The flagged judgment call above is gone;
-every pile-on-pile drop merges now, no zone check. Also fixed a real
-bug the flagged review missed: the per-card `transferCard` loop reversed
-merge order into prepend-style targets (deck/discard) - now a plain,
-order-preserving concat. `onReorderPile`/`performReorderPile` correctly
-removed as dead code (their one caller is gone); `REORDER_PILE` the
-reducer stays, untouched, in case a future gesture wants it.
-
-## Session update (2026-09-01, continued): reconnect identity fix (real architectural decision, needs D100)
-
-Escalated from a *nit ("guest's hand shows wrong name") through a real
-*fix, per direct user request when the trade-off surfaced mid-
-investigation. Root cause: `identity.js`'s `resolvePlayer` refused a
-returning `playerKey` whenever WebRTC hadn't yet detected the OLD
-connection as gone - confirmed live this session that detection can
-lag indefinitely (held 25s, never self-corrected), so the guard
-false-positived on ordinary reconnects, silently minting a duplicate
-empty identity instead of resuming the real one.
-
-**Real, disclosed architectural decision**: `resolvePlayer` now trusts
-a returning key UNCONDITIONALLY - no more liveness check at all. This
-REMOVES the original protection against two tabs deliberately sharing
-one identity mid-game (verified live: it now silently evicts the older
-one instead of refusing the newer one). User's own explicit trade-off
-call, asked directly rather than assumed, addressing their own
-resource-leak concern via a new `Session.closePeer(peerId)` method
-that actively tears down the evicted connection.
-
-Not yet backfilled into `docs/ARCHITECTURE.md` as a numbered decision
-(D100) - Oracle wasn't active this session; flagging for the next
-`*ora groom`, same as the D92-D99 backfill gap Oracle already closed
-once this session.
-
-## Next Steps
-
-**Nothing in-flight.** `docs/ARCHITECTURE.md` D92-D100 backfill is
-done (Oracle, same day) - the "waiting on User's call" question below
-is resolved: user wanted it backfilled, it's backfilled. Everything
-committed and pushed to `main`/`dev` (`c791715`).
-
-Two plan items remain, not currently assigned:
-1. Shell inlining (E): `<pile-panel>`/`renderPile`,
-   `<zone-panel>`/`renderZonePanel` collapsing into their own
-   `.render()` bodies - re-verify "zero other callers" still holds
-   first (several sessions of class-conversion work since this was
-   scoped may have added one).
-2. `zoneOptions` split into 3 layer-scoped objects (B) - re-measure
-   `main.js`'s current size/shape before assuming the original
-   3-object design still fits; do this one last per this file's
-   established sequencing.
-
-Post each step's completion as its own decision broadcast, same
-discipline as every fix this session (D92-D100).
+I am NOT treating the source growing here as a regression: +362/-238
+non-comment lines across `src/` + `style.css` for the whole D129 arc,
+which now includes a reducer action, per-stack metadata, a menu and an
+emblem that did not exist before. The four collapsed layout mechanisms
+are still four collapsed into one.
 
 ---
 
-## Session update (2026-09-02): D101 card context menu — arch owned, both phases reviewed, SHIPPED
+**`*lead review stackable` iteration 3 (full unification): APPROVED.**
 
-**Supersedes the "Next Steps" above** on repo state only: HEAD is
-`d8ce5a1` on `dev` (pushed), tests are 517/517. The two unstarted plan
-items (shell inlining E, `zoneOptions` split B) are untouched and still
-open.
+Four layout mechanisms are now one, and the code got SMALLER doing it:
+-24 lines of non-comment source across `src/` + `style.css`, with
+`applyFanOffset`, the `options.fan` flag, `--column-depth`, the
+per-card `layout` field, D21's second-card rule, `removePileable`'s
+stale-layout strip, `withColumnLayout`, `<chip-tray>`'s own grouping
+and positioning, and all four CSS overlap formulas deleted outright.
+No aliases, no forwarders - the standing "no back-compat" rule held.
 
-**D101 (mine, `docs/ARCHITECTURE.md`, inserted at top above D100).**
-Card actions get a right-click context menu; explicitly NOT a
-PileActions-style header bar, which would have reopened the 2026-08-26
-"cards are Movable not Actionable" nit. Design, and why:
-- New plain `ui.js` function, not a Web Component. Per-card interaction
-  wiring follows `renderPileCards`' convention; the Web-Component rule
-  is scoped to pile/zone UI.
-- Reuse `.pile-action-menu`/`-item` for the look — one visual
-  vocabulary for "a button offering action X", never a second one
-  invented for menus.
-- **Targeted actions were the real design question**, and the one I had
-  to check before assuming: there was NO click-based destination picker
-  in the codebase. D52's radial targeting was retired 2026-08-24 for
-  pile/zone actions and never existed for cards, which only ever had
-  native drag. A stale comment on `highlightDragTargets` still refers to
-  a `beginTargeting` function that does not exist — that comment misled
-  me at first; it is a leftover from the radial era. Treat it as
-  historical, not as a pointer to live code.
-- Resolution: reuse `highlightDragTargets` for lighting up targets and
-  the existing `onMoveCard(cardId, pileId)` for the commit, adding only
-  a one-shot click-to-commit step. **Rejected**: reviving a
-  radial/drag-simulation picker — more code for an identical result,
-  and D52's own retirement already settled that static highlighted
-  targets beat a pointer-follow mode here.
+**FAN as the third layout was the right call** and I would not have
+proposed it. A hand's POSITION came from a stack while its ARC came
+from a transform helper, which is the same "two mechanisms describing
+one thing" the whole rewrite exists to remove - it just did not look
+like it because the arc was cosmetic. Making the droop a fraction of a
+stride rather than a fixed `0.08rem` is a real fix riding along: the
+old one silently stopped matching whenever a preset resized the cards.
 
-Both phase reviews passed with no rework. The architecture held
-unchanged across both phases, which is the signal the "reuse existing
-commit paths, add only the missing step" framing was right.
+**Per-stack direction as METADATA is the load-bearing decision.**
+`pile.stacks` carries direction and nothing else, so it cannot
+contradict `cards` about what is in a stack. That is what made mixed
+directions in one pile expressible, and it is why the earlier nested
+`pile.stacks = [[id, id]]` had to be rejected - it would have
+duplicated ordering and needed reconciliation on every mutation.
 
-## Next Steps (current, supersedes every earlier Next Steps in this file)
+**One thing I want on the record as a process finding**, since it has
+now happened twice with identical shape: `Pile.getView()`'s explicit
+field list silently dropped `stacks`, exactly as it once dropped
+`spread` - reducer correct, model tests green, screen wrong. The new
+category-level guard is the right fix. Any future pile-level field
+that the LAYOUT reads must be added there, and the test will say so.
 
-**Nothing in-flight.** D101 shipped (`d8ce5a1`), and at the user's
-request `main` was fast-forwarded to match `dev` at close-out — both
-branches and origin sit at `b7bb098`, no divergence.
+---
 
-Still open, unassigned, unchanged: (1) shell inlining (E), re-verify
-"zero other callers" first; (2) `zoneOptions` 3-way split (B),
-re-measure `main.js` first, do it last.
+**`*lead review stackable` iteration 2 (wiring): APPROVED.**
 
-**Queued sprint, not started** (user asked for shutdown prep before
-Stage 1): `Pileable` interface with Chips/Tokens/Cards extending it, a
-`PileableActions` base extracted from `cardActions`, per-pile-type UX +
-sorting, universal DnD unchanged, **no back-compat**. Arch is entirely
-undesigned — do not assume anything from this note beyond the user's
-words. Two things I'd want checked first when it starts: how much of
-`ACTION_SPECS`/`actionsForCard` is genuinely card-specific vs. already
-generic (D51 merged card and pile specs into one table once already —
-read D51 before splitting anything back apart), and whether the Core
-invariant's "all cards can be moved... no matter what" wording needs to
-become "all Pileables".
+The tray path is genuinely unified now - one formula, in
+`Stackable.offsetIn`, reached through real `Stack` objects, with the
+two bespoke `calc()` shapes deleted rather than corrected. The CSS
+that remains does unit conversion only, which was the whole point of
+Condition 2.
 
-## Sprint: Tech Debt (2026-09-04) — D114 recorded, arch complete for US-106
+Two things I want on the record because they are the reason this
+iteration is trustworthy where the last three attempts were not:
+- The live tests are mutation-proved against BOTH original bugs, and
+  the sign-flip mutation reproduces the user's own description
+  verbatim. A test that can be shown to fail on the real defect is
+  worth more than any amount of review.
+- `LandsPile` had no live coverage at all before this. That, not the
+  formula, is why the cascade broke twice unnoticed. Closing it is
+  the durable part of this work.
 
-**D114** (`docs/ARCHITECTURE.md`, inserted above D113): RESHUFFLE_DEAL
-becomes its own reducer action, decoupled from RESET. Per-card
-`originPileId` stamped at `makeDeckPile`/`applyDeclaration` (where
-`buildDeck`'s output actually attaches to a specific pile - confirmed
-RtG's 15 decks are genuinely 15 separate declared `deck`-kind piles via
-`GameConfig.piles`, not one big deck, by reading `presets.js` directly).
+**Accepting Smith's defect as a real one, and agreeing it is not
+this task's to fix.** `LandsPile` inheriting a chip-calibrated
+`defaultSpread` is a genuine design miss - `GroupedPile` documents
+0.963 in explicitly chip terms and nobody re-derived it when a CARD
+pile was added underneath. But retuning it is a visible behaviour
+change nobody asked for, so it goes to the user, not into this diff.
 
-**Real gap found while designing, not assumed**: grepped every RESET
-dispatch site - there is exactly one, inside `reshuffleDeal`'s branch.
-Decoupling without adding a replacement would delete "restart the game"
-as a reachable feature entirely. Added a `reset` deck action to the
-design (host-only, destructive, same family as draw/deal/shuffle) -
-required by US-106's own AC, flagged to Smith as a new visible control
-needing Gate 2 sign-off.
+**Outstanding architecture question, NOT to be guessed at.** The
+battlefield/plain-row path still uses the old `layout`/margin
+mechanism, so two mechanisms coexist against "rip and replace". Plain
+rows are trivial to convert. The real fork is `layout:
+'stack'`/`'overlap'` (horizontal drop intents) coexisting with
+`'column'` in ONE pile - stacks of different directions, which
+`stacksOf` cannot express since direction comes from the pile. This
+model has now needed four user corrections, every one of them on a
+question of exactly this shape. Ask.
 
-**Deferred, not re-derived**: Smith's Gate 1 condition asked whether
-RESET should now restore opening chip stacks. Decided to leave D111's
-chip-preserving RESET untouched - out of this story's scope, no signal
-either way from the user, flagged as an open product question rather
-than silently deciding either way.
+---
 
-US-107 (lint) and US-108 (stale refs) need no architecture - pure
-mechanical work for Neo, no design decisions to make.
+**`*lead review stackable` iteration 1: APPROVED.** Conditions 1 and 2
+were implemented and re-verified in the same iteration — both cleared,
+so the conditional approval is now a clean one. Re-reviewed the
+resulting shape: `offsetIn` taking no metrics at all is better than
+what I asked for, because it removes the last per-direction arithmetic
+from JS (direction now selects an axis and nothing else), and
+`extent()` deriving from the same `layout()` the rendering uses closes
+the second-path risk I flagged. The `stackId` strip landing in exactly
+two destructures confirms `toHandCard`/`toDeckCard` really are the
+choke points, and the over-stripping guard Trin called out is the
+right test to have — it protects the capability, not just the code.
 
-### Next Steps
-Waiting on Smith's Gate 2 feedback (specifically the new `reset` button
-- name/icon/confirm-text/placement are all still open, deliberately
-left to Smith rather than guessed here). On approval, hand to Mouse for
-phase breakdown.
+Original conditions, kept for the record:
 
-## Sprint: Tech Debt (2026-09-04) — COMPLETE, all phases reviewed
+What's right:
+- `Stackable` between `Pileable` and the concrete types is the correct
+  reading of the user's requirement, and the multiple-inheritance
+  argument against a sibling is sound — there is no mixin anywhere in
+  this codebase to follow, and D116 already set the push-it-up
+  precedent.
+- One absolute-from-origin formula instead of two margin-relative ones
+  is the actual fix. The four competing `calc()`s were never four
+  cases; they were one formula expressed against four accidental
+  baselines. Index-driven offsets make the depth-compounding bug
+  unrepresentable rather than fixed, which is the right kind of fix.
+- Membership as a flat foreign key over a nested `pile.stacks`: agreed,
+  and the "card in `cards` but missing from `stacks`" argument is the
+  decisive one. Plain-records-at-rest (D93/D107) survives intact.
+- `Stack` in `src/piles/` is acceptable — it is a Pile collaborator and
+  the containment ladder puts it there — even though it is not a `Pile`
+  subclass. Not worth a `src/stacks/` directory for one class.
 
-D114 shipped (RESHUFFLE_DEAL decoupled from RESET, per-card originPileId,
-new host-only `reset` action). US-107 (all 8 lint findings, extraction
-pattern throughout) and US-108 (stale e2e.smoke.mjs reference groom)
-both complete. Phase 108's reserved-slot fix (`.deck-stack` dup
-min-width, merged via `max()`) closes it out. 654 unit + 18 browser
-green throughout, `npm run lint` fully clean except the unchanged
-5-item design-lint baseline (pre-existing, out of scope).
+### Condition 1 (BLOCKING, and it would have shipped silently)
+**`stackId` must be stripped everywhere `layout` is stripped.**
+`state.js`'s `toHandCard` (line ~561) and `toDeckCard` (line ~571)
+both strip `layout` because it describes a placement that is
+meaningless in the destination. `stackId` is the same class of stamp
+and Neo's own plan has it SUBSUMING `layout` — so the moment `layout`
+goes away and `stackId` doesn't inherit its strip sites, a card moving
+into a hand or back to the deck carries a stale `stackId` and lands in
+a phantom stack in its next pile. Every entry point named in
+`toHandCard`'s comment (DEAL/DRAW/PICKUP/TAKE_PILE/PICKUP_SPLIT) is
+affected. This needs a test per strip site, not one representative.
 
-### Next Steps
-Handed to Oracle for groom (Stage 3). Nothing architecturally open from
-this sprint. Standing backlog unchanged: reconnect-after-refresh, real
-QR image, 5+-player mobile density, builder screen, browser-automation
-tooling investment, jsdom/e2e harness for ui.js.
+### Condition 2 (BLOCKING, changes `offsetIn`'s interface)
+**`offsetIn` must NOT return px.** It currently takes numeric
+`cardW`/`cardH`/`gap` and returns px offsets. But card metrics in this
+project are rem-based custom properties (`--card-w: 2.7rem`) and are
+REWRITTEN AT RUNTIME per preset (`ui.js:2429` sets `--card-w`
+directly). A px-returning formula forces the wiring to either read
+`getComputedStyle` per card per render — layout thrash, and untestable
+without a browser — or freeze a px value that silently goes stale the
+next time a preset changes the card size. That is a regression against
+the resolution-independence the rem sizing exists to provide.
 
-## Fix: US-110/111/112 (2026-09-05) — D116, reviewed
+**Decision: `offsetIn` returns unitless STRIDE MULTIPLIERS**, and the
+component writes them as `--stack-x`/`--stack-y`. One CSS rule does
+the unit conversion:
+`left: calc(var(--stack-x) * (var(--card-w) + var(--card-gap)))`.
+The FORMULA — the thing that was wrong four times — stays in JS and
+stays unit-tested; CSS keeps only a multiply it cannot get subtly
+wrong, and preset-driven resizing keeps working for free. Rejected
+"read computed styles in JS" (thrash + untestable) and "keep px and
+recompute on resize" (a second invalidation path to forget).
 
-GroupedPile extraction reviewed and approved - real shared parent for
-ChipPile/TokenPile, one extension point (`sortValue`). Verified the
-private-static-method footgun claim independently before trusting it
-(private static methods are not inherited by subclasses in JS - a real,
-easy-to-miss bug the first draft would have shipped). D116 recorded.
+This is not a walk-back of "style.css stops computing anything" — it
+stops computing the LAYOUT. Converting a multiplier to a length is
+unit arithmetic, and CSS is the correct place for it.
 
-Backlog item from this fix, not yet acted on: RtG's "Decks" zone panel
-is a fixed pixel layout sized for 15 decks - doesn't shrink when fewer
-are chosen (US-110's own new picker feature exposed this). Deliberately
-left alone - panels are already user-resizable, and dynamic zone sizing
-by content is a real, separate architecture question.
+### Non-blocking notes
+- `stacksOf` gives every stack in a pile the same `direction` and
+  `spread`. Fine now; if per-stack Tighten (one column, not the whole
+  tray) is ever wanted, `spread` moves onto the persisted stack rather
+  than the pile. Not speculative work today — just don't design it out.
+- `Stack` revives pileables in its constructor while `Pile` also
+  revives. Harmless (a Pileable is a cheap view over its record), but
+  don't let a third reviver appear.
 
-### Next Steps
-Nothing in-flight architecturally. Handed to Oracle for groom.
+## Next Steps
+
+Iteration 2 (Neo) is the WIRING ONLY — Conditions 1 and 2 are done.
+D129 should be written up in `docs/ARCHITECTURE.md` (it is currently
+only in CHAT.md and the state files); note that `docs/DECISIONS.md`
+already stops at D20 while D21-D28 live only in ARCHITECTURE.md, so
+follow ARCHITECTURE.md and do not start a third location. Smith's UX gate is correctly SKIPPED this iteration
+(nothing is wired, so there is no observable surface) and is REQUIRED
+in iteration 2 — overlap is the most directly user-visible thing on
+the table, and `lint-design`'s 9 red violations are user-facing
+layout failures, not lint noise.

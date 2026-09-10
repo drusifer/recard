@@ -16,10 +16,15 @@ import { renderPileShell, renderPileCards } from '../ui.js';
  * nesting inside another.
  *
  * `renderPileShell` (`ui.js`) is what's actually SHARED across all
- * three: the header, the addressability, the drop wiring. This only
- * supplies the one thing unique to a fan - the row's own fanned card
- * layout (`renderPileCards`'s `opts.fan` branch: each card's `--raise-
- * base` rotate/translateY, identical to `renderHand`'s old formula).
+ * three: the header, the addressability, the drop wiring.
+ *
+ * D129: this component supplies NOTHING layout-related any more. A fan
+ * is a stack layout (`Stackable`'s `FAN`, declared by
+ * `HandPile.stackDirection`), so the arc comes out of the same
+ * `renderPileCards` call every other pile makes. The `opts.fan` flag
+ * and `applyFanOffset` that used to live behind it are deleted - a
+ * hand's position and its arc came from two different mechanisms, and
+ * that was the last place two layout mechanisms coexisted.
  */
 export class FanPileElement extends HTMLElement {
   render(pile, allPiles, options) {
@@ -27,7 +32,7 @@ export class FanPileElement extends HTMLElement {
       const row = document.createElement('div');
       row.className = 'card-row fan-row';
       container.append(row);
-      renderPileCards(row, pile, allPiles, { ...options, fan: true });
+      renderPileCards(row, pile, allPiles, options);
       return row;
     });
   }

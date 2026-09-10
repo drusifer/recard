@@ -1498,8 +1498,9 @@ function handlePileAction(pileId, actionId, value) {
   // adjust the overlap." Two ids, ONE dispatch and one reducer action
   // taking a signed delta - the direction is the only difference, and
   // it belongs in the argument, not in a second code path (D75/D103).
-  if (actionId === 'tighten') return performAdjustSpread(pileId, SPREAD_STEP);
-  if (actionId === 'loosen') return performAdjustSpread(pileId, -SPREAD_STEP);
+  // D129: no `stackKey` means every stack - see `ADJUST_PILE_SPREAD`.
+  if (actionId === 'tightenAll') return performAdjustSpread(pileId, SPREAD_STEP);
+  if (actionId === 'loosenAll') return performAdjustSpread(pileId, -SPREAD_STEP);
   if (actionId === 'break') return performBreakChip(pileId);
   // One small table, not five `if`s - every `sort*` action id differs
   // ONLY in which `SORT_PILE.by` value it forwards (US-113 added two
@@ -1560,7 +1561,7 @@ function buildZoneOptions(nameById) {
     onReveal: (pileableId) => revealCard(pileableId),
     onRotate: (pileableId) => rotateCard(pileableId),
     onPickup: (pileableId) => pickupCard(pileableId),
-    onMoveCard: (pileableId, toPileId) => moveCard(pileableId, toPileId),
+    onMoveCard: (pileableId, toPileId, placement) => moveCard(pileableId, toPileId, placement),
     onCardLift: (pileableId, active) => motionThrottler.schedule('card-lift', { pileableId, active }),
     onDropCard: (pileableId, toPileId, placement) => dropCardOnPile(pileableId, toPileId, placement),
     // D91: `renderPile` (ui.js) checks `splitPicker?.pileId === pile.id`
@@ -1576,6 +1577,8 @@ function buildZoneOptions(nameById) {
     // (`renderPile`, `ui.js`). Dispatch table itself is `handlePileAction`
     // above (its own doc comment has the rest).
     onPileAction: whenLive(handlePileAction),
+    // D129: one stack's own actions, from its gear emblem.
+    onStackAction: whenLive(handleStackAction),
     // *nit (2026-08-26): "allow user to rename zones and piles - any
     // user can edit - persisted by host." Same `sessionEnded` gate
     // every other dispatching handler in this object already uses.
@@ -1769,10 +1772,44 @@ function performBreakChip(pileId) {
   else session.send({ type: 'action', action: { type: 'BREAK_CHIP', pileId, pileableId: biggest.id } });
 }
 
-function performAdjustSpread(pileId, delta) {
+function performAdjustSpread(pileId, delta, stackKey) {
   if (isSessionEnded) return;
-  if (role === 'host') dispatch({ type: 'ADJUST_PILE_SPREAD', playerId: myId, pileId, delta });
-  else session.send({ type: 'action', action: { type: 'ADJUST_PILE_SPREAD', pileId, delta } });
+  // D129: `stackKey` omitted means every stack - the pile-level
+  // Tighten All / Loosen All. See `ADJUST_PILE_SPREAD`.
+  const action = { type: 'ADJUST_PILE_SPREAD', pileId, delta, stackKey };
+  if (role === 'host') dispatch({ ...action, playerId: myId });
+  else session.send({ type: 'action', action });
+}
+
+/**
+ * D129 (direct user request): a stack's own gear emblem. Every action
+ * it offers acts on ONE stack, addressed by its key - the same
+ * dispatch shape as the pile-level pair, with the key supplied.
+ */
+function handleStackAction(pileId, stackKey, actionId) {
+  if (actionId === 'tightenStack') { performAdjustSpread(pileId, SPREAD_STEP, stackKey); return; }
+  if (actionId === 'loosenStack') { performAdjustSpread(pileId, -SPREAD_STEP, stackKey); return; }
+  if (actionId === 'flipStack') { performFlipStack(pileId, stackKey); return; }
+  if (actionId === 'tapStack') { performSetStackOrientation(pileId, stackKey, 'landscape'); return; }
+  if (actionId === 'untapStack') performSetStackOrientation(pileId, stackKey, 'portrait');
+}
+
+/** D129 (direct user request): the stack-scoped sibling of `UNTAP_ALL`,
+ * dispatched by a stack's own gear Tap/Untap buttons. Replicated like
+ * every other presentation-adjacent change here - see
+ * `performFlipStack`'s own comment. */
+function performSetStackOrientation(pileId, stackKey, orientation) {
+  if (isSessionEnded) return;
+  const action = { type: 'SET_STACK_ORIENTATION', pileId, stackKey, orientation };
+  if (role === 'host') dispatch({ ...action, playerId: myId });
+  else session.send({ type: 'action', action });
+}
+
+function performFlipStack(pileId, stackKey) {
+  if (isSessionEnded) return;
+  const action = { type: 'FLIP_STACK', pileId, stackKey };
+  if (role === 'host') dispatch({ ...action, playerId: myId });
+  else session.send({ type: 'action', action });
 }
 
 function performShuffle(pileId) {

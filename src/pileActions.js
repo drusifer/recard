@@ -176,8 +176,24 @@ export const ACTION_SPECS = {
   // Plain arrows rather than the previous ⇤/⇥ (arrow-to-BAR): those read
   // as tab stops as much as directions, which is most of why this took
   // three passes to get right. There is nothing to misread about ← and →.
-  tighten: { label: 'Tighten', destructive: false, hint: 'Overlap this pile\'s cards more tightly.', icon: '←' },
-  loosen: { label: 'Loosen', destructive: false, hint: 'Spread this pile\'s cards further apart.', icon: '→' },
+  // D129 (direct user request): spread belongs to a STACK now, so the
+  // pile-level pair became "all" - they ROUTE to every stack's own
+  // tighten/loosen rather than writing one pile-wide number, which is
+  // what lets columns that have been adjusted apart keep their
+  // relative differences. The per-stack pair below is what the gear
+  // emblem on each stack opens.
+  tightenAll: { label: 'Tighten All', destructive: false, hint: 'Overlap every stack in this pile more tightly.', icon: '←' },
+  loosenAll: { label: 'Loosen All', destructive: false, hint: 'Spread every stack in this pile further apart.', icon: '→' },
+  tightenStack: { label: 'Tighten', destructive: false, hint: 'Overlap this stack\'s cards more tightly.', icon: '←' },
+  loosenStack: { label: 'Loosen', destructive: false, hint: 'Spread this stack\'s cards further apart.', icon: '→' },
+  flipStack: { label: 'Flip', destructive: false, hint: 'Run this stack the other way - a row becomes a column.', icon: '↕' },
+  // D129 (direct user request: "add stackaction for tap/untap, keep
+  // pile level for all stacks") - `untapAll` above stays pile-wide and
+  // untouched; these act on one stack only. Not destructive, same
+  // reasoning `untapAll` already gives: tapping/untapping loses
+  // nothing and the other direction trivially reverses it.
+  tapStack: { label: 'Tap', destructive: false, hint: 'Tap every permanent in this stack.', icon: '⤵' },
+  untapStack: { label: 'Untap', destructive: false, hint: 'Untap every permanent in this stack.', icon: '⇧' },
   // D91/D92 (direct user request: "we're missing... split pile", then
   // "split should always fan the pile to allow the guided picker" -
   // deck included, no exceptions): the old `'split'` (roughly-in-half,
@@ -412,14 +428,14 @@ export function pileLevelActions(kind, context = {}) {
  * @param {number} count
  * @returns {string[]} action ids currently disabled
  */
-export function disabledPileActionsFor(kind, count, { spread, cards } = {}) {
+export function disabledPileActionsFor(kind, count, { spread, cards, stacks } = {}) {
   // `cards` matters as much as `count`: `pileForKind` builds a BARE
   // instance of the kind, so anything reading `this.cards` sees an empty
   // pile. `ChipPile`'s break-is-disabled rule did exactly that and
   // disabled the button on every tray, however many breakable chips it
   // held - found by clicking it in a real browser, where the control
   // simply wasn't there.
-  return pileForKind(kind)?.disabledActions(count, { spread, cards }) ?? [];
+  return pileForKind(kind)?.disabledActions(count, { spread, cards, stacks }) ?? [];
 }
 
 /**

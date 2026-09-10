@@ -14,7 +14,7 @@
  * reads as broken. `sortActions` staying empty is what enforces that it
  * is a label and not a rank.
  */
-import { Pileable } from './Pileable.js';
+import { Stackable } from './Stackable.js';
 
 /**
  * Denomination by colour, in the conventional casino order.
@@ -51,7 +51,7 @@ export function breakInto(denom) {
   return CHIP_DENOMINATIONS.findLast((value) => value < denom && denom % value === 0);
 }
 
-export class ChipPileable extends Pileable {
+export class ChipPileable extends Stackable {
   /** A denomination is a real ordering, so a chip pile sorts by it.
    * This was `[]` while chips carried no value - the empty list was a
    * consequence of that ruling, not an independent decision, so it

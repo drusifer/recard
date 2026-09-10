@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PILE_TYPES, CHANGE_PILE_TYPE_KINDS, pileKindLabel } from '../src/piles/pileTypes.js';
+import { VERTICAL, HORIZONTAL, FAN } from '../src/pileables/Stackable.js';
+import { MAX_SPREAD } from '../src/piles/Pile.js';
+import { stacksOf } from '../src/piles/Stack.js';
 import { Pile } from '../src/piles/Pile.js';
 import { DeckPile } from '../src/piles/DeckPile.js';
 import { HandPile } from '../src/piles/HandPile.js';
@@ -21,13 +24,14 @@ import { SetPile } from '../src/piles/SetPile.js';
 // methods, matching how `state.js`/`pileActions.js`/`ui.js` actually
 // call them now (`revivePile(pile).method(...)`).
 
-// D79 (US-82) added battlefield/exile/stack. Kept as an EXACT list
-// rather than relaxed to a subset check: knowing precisely which kinds
-// ship is the guard's whole value, so a new kind should have to be
-// added here on purpose.
-test('the registry exposes exactly the fourteen pile kinds', () => {
+// D79 (US-82) added battlefield/exile/stack; `lands` (direct user
+// request, "organize my lands by color... stacked vertically") is the
+// most recent addition. Kept as an EXACT list rather than relaxed to a
+// subset check: knowing precisely which kinds ship is the guard's
+// whole value, so a new kind should have to be added here on purpose.
+test('the registry exposes exactly the fifteen pile kinds', () => {
   assert.deepEqual(Object.keys(PILE_TYPES).toSorted(),
-    ['battlefield', 'cascade', 'chip', 'deck', 'discard', 'exile', 'foundation', 'hand', 'plain', 'rankAdjacent', 'run', 'set', 'stack', 'token']);
+    ['battlefield', 'cascade', 'chip', 'deck', 'discard', 'exile', 'foundation', 'hand', 'lands', 'plain', 'rankAdjacent', 'run', 'set', 'stack', 'token']);
   assert.equal(PILE_TYPES.deck, DeckPile);
   assert.equal(PILE_TYPES.hand, OpponentHandPile);
   assert.equal(PILE_TYPES.plain, Pile);
@@ -236,10 +240,10 @@ test('deck disabledActions: deal disabled at 0 cards, split disabled below 2', (
 test('hand pileActions: sort + changePileType, owner only - pass removed (direct user request, not a requirement)', () => {
   const cards = [{ pileableType: 'card', rank: 'A' }];
   assert.deepEqual(new HandPile(myHand).pileActions({ isOwner: true, cards }),
-    ['sortRank', 'sortSuit', 'changePileType', 'tighten', 'loosen']);
+    ['sortRank', 'sortSuit', 'changePileType', 'tightenAll', 'loosenAll']);
   assert.deepEqual(new HandPile(myHand).pileActions({ isOwner: false, cards }), []);
   assert.deepEqual(new HandPile(myHand).pileActions({ isOwner: true, cards: [] }),
-    ['changePileType', 'tighten', 'loosen'], 'an empty hand has nothing to sort');
+    ['changePileType', 'tightenAll', 'loosenAll'], 'an empty hand has nothing to sort');
 });
 
 test('cascade/rankAdjacent pileActions: none of the multi-card-sequence actions target either - D71 (US-74) adds changePileType as the one exception', () => {
@@ -277,16 +281,65 @@ test('plain pile removePileable/insertPileable: pure, round-trips a card', () =>
   assert.deepEqual(reinserted.cards.map((c) => c.id), ['b', 'a'], 'no placement - appends');
 });
 
-test('plain pile insertPileable: placement before/after a target, layout on the correct card (Smith Gate 2 direction rule)', () => {
+// D129 replaces D21's "layout belongs to whichever card ends up
+// SECOND" rule, and the rule is gone with the field. Which stack a card
+// is in does not depend on which side of its target it landed - only
+// where in the order it sits does - so both sides now place the card
+// in the target's stack and nothing has to be moved between cards.
+test('plain pile insertPileable: placement before/after a target puts BOTH in one stack', () => {
   const pile = { id: 'z', kind: 'plain', cards: [{ id: 'a' }, { id: 'b' }] };
+
   const before = new Pile(pile).insertPileable({ id: 'x' }, { targetCardId: 'b', side: 'before', layout: 'overlap' });
   assert.deepEqual(before.cards.map((c) => c.id), ['a', 'x', 'b']);
-  assert.equal(before.cards.find((c) => c.id === 'b').layout, 'overlap', 'before-drop: layout lands on the TARGET, not the dropped card');
-  assert.equal(before.cards.find((c) => c.id === 'x').layout, undefined);
+  assert.equal(
+    before.cards.find((c) => c.id === 'x').stackId,
+    before.cards.find((c) => c.id === 'b').stackId,
+    'a before-drop joins the target\'s stack, same as an after-drop',
+  );
 
   const after = new Pile(pile).insertPileable({ id: 'x' }, { targetCardId: 'a', side: 'after', layout: 'stack' });
   assert.deepEqual(after.cards.map((c) => c.id), ['a', 'x', 'b']);
-  assert.equal(after.cards.find((c) => c.id === 'x').layout, 'stack');
+  assert.equal(
+    after.cards.find((c) => c.id === 'x').stackId,
+    after.cards.find((c) => c.id === 'a').stackId,
+  );
+});
+
+// *fix (real bug, direct user report): "cards and tokens get stuck over
+// the left edge of their panel". Under the old per-card `layout` field
+// ("overlap onto whoever precedes me") a removal could leave the new
+// FIRST card stranded, still pulled toward a predecessor that had just
+// left - so `removePileable` carried a dedicated strip for it.
+//
+// D129 removes the failure mode rather than the symptom: membership
+// names the stack itself, so a card whose neighbours leave is just a
+// shorter stack and needs no fixup. This test now guards that no fixup
+// is REQUIRED, which is the stronger property.
+test('removePileable needs no layout fixup - a shorter stack is still correct', () => {
+  const pile = {
+    id: 'z',
+    kind: 'plain',
+    cards: [{ id: 'a', stackId: 's' }, { id: 'b', stackId: 's' }, { id: 'c', stackId: 's' }],
+    stacks: { s: { direction: 'vertical' } },
+  };
+  const removed = new Pile(pile).removePileable('a');
+  assert.deepEqual(removed.cards.map((c) => c.id), ['b', 'c']);
+  for (const card of removed.cards) {
+    assert.equal(card.stackId, 's', 'the survivors are still the same stack, untouched');
+  }
+});
+
+test('removePileable emptying a stack leaves no phantom behind', () => {
+  const pile = {
+    id: 'z',
+    kind: 'plain',
+    cards: [{ id: 'a' }, { id: 'b', stackId: 's' }],
+    stacks: { s: { direction: 'vertical' } },
+  };
+  const removed = new Pile(pile).removePileable('b');
+  // The metadata entry may survive; what matters is that no stack is
+  // built from it, because stacks are built from the cards.
+  assert.deepEqual(stacksOf(removed).map((stack) => stack.id), [undefined]);
 });
 
 // D102: was "PLAY authorized on PlayerHandPile, never on
@@ -337,7 +390,7 @@ test('discard pileableActions: inherited from Pile, unmodified - same as any oth
 });
 
 test('discard pileActions: take/split/hide/show, inherited from Pile unmodified - same shared/owner-open rule', () => {
-  assert.deepEqual(new DiscardPile(discard).pileActions({ isShared: true }), ['take', 'split', 'changePileType', 'remove', 'tighten', 'loosen']);
+  assert.deepEqual(new DiscardPile(discard).pileActions({ isShared: true }), ['take', 'split', 'changePileType', 'remove', 'tightenAll', 'loosenAll']);
   assert.deepEqual(new DiscardPile(discard).pileActions({}), []);
 });
 
@@ -405,7 +458,7 @@ test('foundation: append-only insert; card actions are the SAME as any other pil
 
 test('foundation: split/changePileType are the pile-level actions offered, inherited from MeldPile (D71/US-74, D91)', () => {
   assert.deepEqual(new FoundationPile({}).pileActions({}), []);
-  assert.deepEqual(new FoundationPile({}).pileActions({ isShared: true }), ['split', 'changePileType', 'tighten', 'loosen']);
+  assert.deepEqual(new FoundationPile({}).pileActions({ isShared: true }), ['split', 'changePileType', 'tightenAll', 'loosenAll']);
 });
 
 test('foundation: tableSide true (inherited from Pile), resolveDropTarget always empty (no halo geometry, from MeldPile)', () => {
@@ -440,7 +493,7 @@ test('set: inherits MeldPile\'s append-only insert, single-slot drop target, and
   const inserted = new SetPile(pile).insertPileable({ id: 'b', rank: 'K', suit: 'hearts' });
   assert.deepEqual(inserted.cards.map((c) => c.id), ['a', 'b']);
   assert.deepEqual(new SetPile(pile).resolveDropTarget([{ pileableId: 'a' }], { x: 0, y: 0 }), {});
-  assert.deepEqual(new SetPile(pile).pileActions({ isShared: true }), ['split', 'changePileType', 'tighten', 'loosen']);
+  assert.deepEqual(new SetPile(pile).pileActions({ isShared: true }), ['split', 'changePileType', 'tightenAll', 'loosenAll']);
   assert.equal(SetPile.reparentable, false);
 });
 
@@ -530,5 +583,201 @@ test('pileKindLabel: plain reads "Pile" (D55 own-word rule), everything else jus
 test('pileKindLabel: every CHANGE_PILE_TYPE_KINDS kind has a real, non-empty label', () => {
   for (const kind of CHANGE_PILE_TYPE_KINDS) {
     assert.ok(pileKindLabel(kind).length > 0, kind);
+  }
+});
+
+// ---------------------------------------------------------------------
+// D129: which way a Stack inside this pile kind overlaps. The PILE
+// decides - a cascade runs vertically, a run horizontally - so this
+// stays polymorphic in the class hierarchy rather than becoming a flag
+// anything branches on at render time.
+// ---------------------------------------------------------------------
+
+test('D129: every pile kind declares a real stack layout', () => {
+  for (const [kind, PileClass] of Object.entries(PILE_TYPES)) {
+    assert.ok(
+      [VERTICAL, HORIZONTAL, FAN].includes(PileClass.stackDirection),
+      `${kind} must declare one of the three real layouts, got ${PileClass.stackDirection}`,
+    );
+  }
+});
+
+test('D129: a grouped tray stacks VERTICALLY, a card row HORIZONTALLY', () => {
+  // The two real cases the direction exists to separate: a chip/token/
+  // land tray is columns of stacked pieces; an ordinary card pile is
+  // one overlapping row.
+  assert.equal(PILE_TYPES.chip.stackDirection, VERTICAL);
+  assert.equal(PILE_TYPES.lands.stackDirection, VERTICAL);
+  // NOT tokens: a token supply was deliberately reverted from a
+  // grouped tray back to an ordinary pile by direct user correction
+  // ("instead of a stack it can be just a pile", US-112), so it is a
+  // plain `Pile` and stacks horizontally like any other card row.
+  assert.equal(PILE_TYPES.token.stackDirection, HORIZONTAL);
+  assert.equal(PILE_TYPES.plain.stackDirection, HORIZONTAL);
+  // A hand is the third layout: a horizontal stack that arcs. It is a
+  // real layout rather than a decoration over one, which is what let
+  // `applyFanOffset` and the `fan: true` render flag be deleted.
+  assert.equal(PILE_TYPES.hand.stackDirection, FAN);
+});
+
+test('D129: direction is INHERITED, not restated by every subclass', () => {
+  // Guards the polymorphism: if a subclass had to name its own
+  // direction we would be back to a per-kind table that drifts.
+  assert.ok(!Object.hasOwn(PILE_TYPES.lands, 'stackDirection'), 'lands should inherit from GroupedPile');
+  assert.ok(!Object.hasOwn(PILE_TYPES.discard, 'stackDirection'), 'discard should inherit from Pile');
+});
+
+// Smith usability defect (iteration 2 UX gate): a lands cascade was
+// unreadable. `LandsPile` inherited `GroupedPile.defaultSpread` (0.963),
+// a value derived for CHIPS - identical discs where only the top one
+// carries meaning and the edges below are pure depth cue. Lands are
+// CARDS: their identity is the name and cost strip, and at 0.963 each
+// buried land showed a 2-3px sliver, so a 7-mana column told a player
+// how many lands they had but not which.
+test('a lands cascade stays readable - card spread, not chip spread', () => {
+  const spread = PILE_TYPES.lands.defaultSpread;
+  assert.ok(spread <= MAX_SPREAD,
+    `a pile of CARDS must not default tighter than the card-legibility ceiling ` +
+    `(${MAX_SPREAD}), got ${spread}`);
+  assert.notEqual(spread, PILE_TYPES.chip.defaultSpread,
+    'lands must not inherit the chip-calibrated default - that is the defect');
+});
+
+test('chips keep their own tight stacking - the fix is scoped to cards', () => {
+  // Guards against "fixing" this by loosening GroupedPile itself, which
+  // would make a chip tray read as a spread-out row instead of a stack.
+  assert.equal(PILE_TYPES.chip.defaultSpread, 0.963);
+  assert.ok(PILE_TYPES.chip.defaultSpread > MAX_SPREAD, 'a chip stack is deliberately tighter than any card pile');
+});
+
+// ---------------------------------------------------------------------
+// D129 unification: a drop's `layout` intent is TRANSLATED into stack
+// membership plus that stack's direction, and the per-card `layout`
+// field stops existing. One mechanism, not two.
+//
+// The old field could only say "overlap onto whoever precedes me",
+// which is why it needed a dedicated strip when a predecessor left
+// (`removePileable`), a recompute on every grouped insert, and a
+// separate CSS formula per value. Membership says which stack, the
+// stack says which way it runs, and the one offset formula does the
+// rest.
+// ---------------------------------------------------------------------
+
+const plainPile = (cards) => new PILE_TYPES.plain({ id: 'p', kind: 'plain', cards });
+
+test('D129: a COLUMN drop joins the target\'s stack and makes it vertical', () => {
+  const pile = plainPile([{ id: 'a', pileableType: 'card' }]);
+  const after = pile.insertPileable({ id: 'b', pileableType: 'card' }, { targetCardId: 'a', layout: 'column' });
+
+  const [a, b] = ['a', 'b'].map((id) => after.cards.find((card) => card.id === id));
+  assert.equal(b.stackId, a.stackId, 'the dropped card joins the target\'s own stack');
+  assert.ok(a.stackId !== undefined, 'and the target is given a real stack to be joined to');
+  assert.equal(after.stacks[a.stackId].direction, VERTICAL, 'that stack now runs vertically');
+  assert.ok(!('layout' in b), 'the per-card layout field is gone entirely');
+});
+
+test('D129: an OVERLAP drop joins the target\'s stack horizontally', () => {
+  const pile = plainPile([{ id: 'a', pileableType: 'card' }]);
+  const after = pile.insertPileable({ id: 'b', pileableType: 'card' }, { targetCardId: 'a', layout: 'overlap' });
+
+  const [a, b] = ['a', 'b'].map((id) => after.cards.find((card) => card.id === id));
+  assert.equal(b.stackId, a.stackId);
+  assert.equal(after.stacks[a.stackId].direction, HORIZONTAL);
+});
+
+test('D129: a drop with NO layout leaves the pile in its one default stack', () => {
+  // An ordinary row needs no placement data at all - that is what keeps
+  // a plain pile plain.
+  const pile = plainPile([{ id: 'a', pileableType: 'card' }]);
+  const after = pile.insertPileable({ id: 'b', pileableType: 'card' }, {});
+  assert.equal(after.cards.find((card) => card.id === 'b').stackId, undefined);
+});
+
+test('D129: a THIRD card dropped onto a column joins the SAME stack, not a new one', () => {
+  // The original bug's shape, now at the model level: a third card must
+  // extend the existing column rather than start a second one beside it.
+  const pile = plainPile([{ id: 'a', pileableType: 'card' }]);
+  const two = pile.insertPileable({ id: 'b', pileableType: 'card' }, { targetCardId: 'a', layout: 'column' });
+  const three = new PILE_TYPES.plain(two).insertPileable(
+    { id: 'c', pileableType: 'card' }, { targetCardId: 'b', layout: 'column' },
+  );
+
+  const ids = new Set(three.cards.map((card) => card.stackId));
+  assert.equal(ids.size, 1, `all three must share one stack, got ${[...ids]}`);
+  assert.equal(Object.keys(three.stacks).length, 1, 'and exactly one stack is recorded');
+});
+
+test('D129: one pile can hold a vertical column AND a horizontal run at once', () => {
+  // The case a pile-wide direction could not express, and the last
+  // thing forcing a second layout mechanism to exist.
+  const pile = plainPile([{ id: 'a', pileableType: 'card' }, { id: 'x', pileableType: 'card' }]);
+  const withColumn = pile.insertPileable({ id: 'b', pileableType: 'card' }, { targetCardId: 'a', layout: 'column' });
+  const both = new PILE_TYPES.plain(withColumn).insertPileable(
+    { id: 'y', pileableType: 'card' }, { targetCardId: 'x', layout: 'overlap' },
+  );
+
+  const directions = Object.values(both.stacks).map((stack) => stack.direction);
+  assert.deepEqual(directions.toSorted(), [HORIZONTAL, VERTICAL]);
+});
+
+
+// The view shape is an EXPLICIT field list, so a new pile-level field
+// is invisible to every client until it is named there. That has now
+// bitten twice - `spread` (Tighten/Loosen did nothing on screen) and
+// `stacks` (a battlefield column rendered flat) - both times with a
+// fully green model suite. This guards the whole category rather than
+// the two fields that happened to get caught.
+test('every field the LAYOUT depends on crosses into the view', () => {
+  const pile = new Pile({
+    id: 'z',
+    kind: 'plain',
+    cards: [{ id: 'a', stackId: 's' }],
+    spread: 0.4,
+    stacks: { s: { direction: VERTICAL } },
+  });
+  const view = pile.getView();
+  for (const field of ['cards', 'spread', 'stacks', 'kind']) {
+    assert.ok(Object.hasOwn(view, field),
+      `${field} must reach the client - the renderer lays out from the view, not the record`);
+  }
+  assert.deepEqual(view.stacks, { s: { direction: VERTICAL } });
+});
+
+// Model-level mirror of the browser cascade test - the cheapest level
+// that can see the whole lands pipeline: insert -> membership ->
+// stacks -> offsets. When the browser says "the cascade is flat", this
+// says which step flattened it.
+test('D129: a lands pile lays its colour columns out VERTICALLY', () => {
+  const lands = new PILE_TYPES.lands({ id: 'l', kind: 'lands', cards: [] });
+  const cards = [
+    { id: 'w1', pileableType: 'card', face: 'rtg', cost: '{W}' },
+    { id: 'w2', pileableType: 'card', face: 'rtg', cost: '{W}' },
+    { id: 'w3', pileableType: 'card', face: 'rtg', cost: '{W}' },
+  ];
+  // Through a REAL drop placement (a target plus a direction hint),
+  // which is what a player actually does - a bare append would not
+  // exercise the metadata `Pile.insertPileable` records.
+  let pile = new PILE_TYPES.lands(lands.insertPileable(cards[0]));
+  for (const card of cards.slice(1)) {
+    const target = pile.cards.at(-1).id;
+    pile = new PILE_TYPES.lands(pile.insertPileable(card, { targetCardId: target, layout: 'overlap' }));
+  }
+
+  const stacks = stacksOf({
+    cards: pile.cards,
+    stacks: pile.stacks,
+    direction: PILE_TYPES.lands.stackDirection,
+    spread: PILE_TYPES.lands.defaultSpread,
+  });
+
+  const deepest = stacks.toSorted((a, b) => b.pileables.length - a.pileables.length)[0];
+  assert.equal(deepest.pileables.length, 3, 'same-colour lands share one column');
+  assert.equal(deepest.direction, VERTICAL,
+    `a cascade must run vertically - pile default ${PILE_TYPES.lands.stackDirection}, ` +
+    `recorded metadata ${JSON.stringify(pile.stacks)}`);
+
+  const ys = deepest.layout().map((position) => position.y);
+  for (const [index, y] of ys.slice(1).entries()) {
+    assert.ok(y > ys[index], `each land must cascade further down, got ${ys.join(', ')}`);
   }
 });

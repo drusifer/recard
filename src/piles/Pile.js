@@ -52,6 +52,8 @@
  * back-compat shim).
  */
 import { resolveDropTarget as resolveHaloTarget } from '../dropTarget.js';
+import { HORIZONTAL, VERTICAL } from '../pileables/Stackable.js';
+import { stacksOf } from './Stack.js';
 
 /**
  * How far a pile's cards overlap each other, as a fraction of a card's
@@ -75,9 +77,62 @@ export const MAX_SPREAD = 0.85;
 export const SPREAD_STEP = 0.1;
 
 
-function withLayout(card, layout) {
-  const { layout: _previous, ...rest } = card;
-  return layout ? { ...rest, layout } : rest;
+/**
+ * D129: a drop's `layout` intent, translated into the STACK the card
+ * lands in and which way that stack runs.
+ *
+ * `layout` used to be a per-card field meaning "overlap onto whoever
+ * precedes me". Everything awkward about it followed from that
+ * relative phrasing: it needed a dedicated strip when a predecessor
+ * left (`removePileable`), a recompute on every grouped insert, a
+ * separate CSS formula per value, and it could not describe a stack at
+ * all - only a relationship between two neighbours. It is gone; these
+ * three values are now purely a DIRECTION HINT at the moment of the
+ * drop, and nothing persists them.
+ *
+ * `column` is the vertical intent; `stack` and `overlap` are both
+ * horizontal (they always differed only in HOW MUCH they overlapped,
+ * which is `--pile-spread`'s job, not a layout's). A drop with no
+ * layout at all joins nothing and stays in the pile's one default
+ * stack, which is what keeps an ordinary row free of any placement
+ * data whatsoever.
+ */
+const DIRECTION_FOR_LAYOUT = new Map([['column', VERTICAL], ['stack', HORIZONTAL], ['overlap', HORIZONTAL]]);
+
+/** The direction a drop's layout hint asks for, or `undefined` for a
+ * drop that asks for nothing (which lands in the pile's default
+ * stack). A Map rather than an object literal so an unrecognised hint
+ * can never collide with something inherited from Object.prototype. */
+const directionForLayout = (layout) => DIRECTION_FOR_LAYOUT.get(layout);
+
+/** A stack id for a newly-formed stack, derived from the card the drop
+ * landed ON - stable, readable in a state dump, and unique because a
+ * card id already is. */
+const stackIdFor = (targetCardId) => `stack-${targetCardId}`;
+
+/**
+ * Place `card` into the same stack as `targetCardId`, creating that
+ * stack if the target was not in one yet, and recording the direction
+ * the drop asked for.
+ *
+ * Returns the new `cards` and `stacks` together because they change
+ * together: joining a stack that does not exist yet has to stamp the
+ * TARGET too, or the "stack" would have one member and the card would
+ * appear to be overlapping nothing.
+ */
+function joinedStack(cards, card, targetCardId, layout) {
+  const direction = directionForLayout(layout);
+  const target = cards.find((c) => c.id === targetCardId);
+  const stackId = target?.stackId ?? stackIdFor(targetCardId);
+  return {
+    stackId,
+    direction,
+    // Stamping the target is idempotent: a third card dropped onto the
+    // second finds the stack already there and extends it rather than
+    // starting a second one beside it.
+    cards: cards.map((c) => (c.id === targetCardId ? { ...c, stackId } : c)),
+    card: { ...card, stackId },
+  };
 }
 
 /**
@@ -102,6 +157,17 @@ export class Pile {
    * overridable so `CREATE_ZONE`'s eligibility guard stays meaningful
    * (`HandPile` overrides it `false`). */
   static tableSide = true;
+
+  /**
+   * Whether a STACK in this pile kind can be tapped/untapped on its
+   * own (direct user request: "add stackaction for tap/untap, keep
+   * pile level for all stacks"). `false` by default - tapping a chip
+   * or a hand card is not a real concept, the same "no false
+   * affordance" reasoning `homePileKind`/`groupBadge` already apply.
+   * `BattlefieldPile`/`LandsPile` opt in - the two kinds that already
+   * declare pile-level `untapAll`.
+   */
+  static supportsStackTap = false;
 
   /**
    * How this kind of pile arranges a batch of pileables it is STOCKED
@@ -190,6 +256,25 @@ export class Pile {
    * legitimately share one tag (D56). */
   static component = 'pile-panel';
 
+  /**
+   * Which way a `Stack` inside this pile overlaps (D129) - a cascade
+   * runs vertically, a run horizontally.
+   *
+   * HORIZONTAL is the base default because an ordinary card pile is
+   * one overlapping row. `GroupedPile` overrides it once for every
+   * tray kind (chips, tokens, lands - columns of stacked pieces), and
+   * nothing else needs to name it: the point of putting this on the
+   * class is that it is INHERITED, not restated per kind. A per-kind
+   * table of directions is exactly the shape that drifts out of step
+   * with the classes, which is how the four competing overlap formulas
+   * this replaces got out of step in the first place.
+   *
+   * Read by the renderer to build `Stack`s; never branched on - a
+   * caller passes it through to `stacksOf`/`Stack` and the direction
+   * decides only which axis the offset multiplier lands on.
+   */
+  static stackDirection = HORIZONTAL;
+
   /** D55/US-63: eligible for `MOVE_PILE` (reparenting into a different
    * Zone). True by default (this base class and `DiscardPile`);
    * `HandPile`/`CascadePile`/`RankAdjacentPile`/`MeldPile` override it
@@ -202,7 +287,7 @@ export class Pile {
    * whatever the caller passes (matches the pre-D93 record shape
    * exactly, so `revivePile(existingPlainPile)` round-trips unchanged).
    */
-  constructor({ id, kind, name, ownerId = null, cards = [], zoneId, spread } = {}) {
+  constructor({ id, kind, name, ownerId = null, cards = [], zoneId, spread, stacks = {} } = {}) {
     this.id = id;
     this.kind = kind;
     this.name = name;
@@ -217,6 +302,23 @@ export class Pile {
     // field missing from either one is silently wiped the next time a
     // card moves in or out of the pile.
     this.spread = spread;
+    /**
+     * D129: per-stack metadata, `{ [stackId]: { direction } }`.
+     *
+     * Direction only - never membership and never order. Membership is
+     * each pileable's own `stackId` and order is `cards`, so this map
+     * cannot desynchronise from the cards: it does not describe them.
+     * An entry whose stack has emptied is simply unused, because
+     * `stacksOf` builds stacks FROM the cards and only consults this
+     * for the direction of one it already found.
+     *
+     * Carried here AND in `toJSON` for the reason `spread`'s comment
+     * above gives - `insertPileable`/`removePileable` rebuild a pile
+     * from `toJSON()`, so a field missing from either is silently
+     * wiped the next time a card moves. That is not hypothetical: it
+     * is exactly how this field failed its own first test.
+     */
+    this.stacks = stacks;
   }
 
   /** Free serialization - `JSON.stringify` calls this automatically on
@@ -227,7 +329,7 @@ export class Pile {
   toJSON() {
     return {
       id: this.id, kind: this.kind, name: this.name, ownerId: this.ownerId,
-      cards: this.cards, zoneId: this.zoneId, spread: this.spread,
+      cards: this.cards, zoneId: this.zoneId, spread: this.spread, stacks: this.stacks,
     };
   }
 
@@ -256,6 +358,12 @@ export class Pile {
       // precisely the wiring gap D104's browser layer exists to catch,
       // and is how this was actually found.
       spread: this.spread,
+      // D129: and `stacks` for the same reason, found the same way -
+      // the reducer wrote per-stack directions correctly, every model
+      // test passed, and a battlefield column still rendered flat
+      // because the renderer never received them. Anything the LAYOUT
+      // depends on has to be named here.
+      stacks: this.stacks,
     };
   }
 
@@ -356,7 +464,7 @@ export class Pile {
     // are is a dead control, same rule as `disabledActions` elsewhere.
     const restriction = this.constructor.convertibleKinds?.();
     const convertible = restriction === undefined || restriction.length > 1 ? ['changePileType'] : [];
-    return ['take', 'split', ...convertible, 'remove', 'tighten', 'loosen', ...orientationActions(cards)];
+    return ['take', 'split', ...convertible, 'remove', 'tightenAll', 'loosenAll', ...orientationActions(cards)];
   }
 
   /**
@@ -370,7 +478,8 @@ export class Pile {
    * D91: `split` disabled below 2 cards - `splitPileAt` (state.js)
    * throws under that minimum, same reasoning as `remove`.
    */
-  disabledActions(count, { spread } = {}) {
+  disabledActions(count, context = {}) {
+    const { spread } = context;
     const disabled = count > 0 ? ['remove'] : [];
     if (count < 2) disabled.push('split');
     // *nit: a Tighten at maximum spread (or a Loosen at minimum) can't
@@ -379,8 +488,22 @@ export class Pile {
     // effective value, resolved by the caller (`disabledPileActionsFor`)
     // since only it knows whether the pile has been adjusted yet.
     if (spread !== undefined) {
-      if (spread >= this.constructor.maxSpread) disabled.push('tighten');
-      if (spread <= MIN_SPREAD) disabled.push('loosen');
+      // D129: "All" is disabled only when EVERY stack has hit the
+      // limit - one column already at the ceiling must not stop the
+      // others being tightened, which is the whole point of routing.
+      //
+      // An EMPTY pile counts as one stack at the pile's own spread,
+      // matching where `ADJUST_PILE_SPREAD` routes in that case. Left
+      // to `every()` on an empty list this would be vacuously true and
+      // disable BOTH directions on a pile that adjusts perfectly well.
+      // From the CONTEXT, never `this`: `pileForKind` builds a bare
+      // instance, so `this.cards`/`this.stacks` are empty here. That
+      // is the same trap `ChipPile`'s break rule fell into, documented
+      // on `disabledPileActionsFor`.
+      const stacks = stacksOf({ cards: context.cards ?? [], stacks: context.stacks, spread });
+      const spreads = stacks.length > 0 ? stacks.map((stack) => stack.spread) : [spread];
+      if (spreads.every((value) => value >= this.constructor.maxSpread)) disabled.push('tightenAll');
+      if (spreads.every((value) => value <= MIN_SPREAD)) disabled.push('loosenAll');
     }
     return disabled;
   }
@@ -397,9 +520,33 @@ export class Pile {
   /** Returns a plain NEW pile shape (not `this` mutated, not a new
    * instance) - the reducer stores plain records at rest; this result
    * re-enters `state.piles` exactly the same way a pre-D93 `{...pile,
-   * cards: […]}` spread did. */
+   * cards: […]}` spread did.
+   *
+   * *fix (real bug, direct user report): "cards and tokens get stuck
+   * over the left edge of their panel". `layout` ('stack'/'overlap'/
+   * 'column' - D21/D-nit) means "overlap onto whichever card ends up
+   * immediately before me" - the first card in a pile never has one,
+   * by definition. Removing a card can leave its successor as the new
+   * first card while that successor still carries the `layout` it had
+   * relative to the card that just left - rendered as if still
+   * overlapping a predecessor that no longer exists, which pulls it
+   * left (or, for a `column` card, down) past the panel's own edge
+   * instead of onto a sibling. Stripping it here, at the one place a
+   * pile's first card can change, covers every removal path (pickup,
+   * discard, exile, move away, merge-in) rather than a stale-layout
+   * check bolted onto each one separately. */
   removePileable(pileableId) {
-    return { ...this.toJSON(), cards: this.cards.filter((c) => c.id !== pileableId) };
+    const cards = this.cards.filter((c) => c.id !== pileableId);
+    // D129: no stale-`layout` strip any more. `layout` meant "overlap
+    // onto whoever precedes me", so removing a card could leave its
+    // successor overlapping a predecessor that no longer existed - the
+    // real bug ("cards and tokens get stuck over the left edge of their
+    // panel") this line used to patch. Stack MEMBERSHIP names the stack
+    // itself, so a card whose neighbours leave is simply a shorter
+    // stack, correct with no fixup at all. A stack that empties leaves
+    // an unused `stacks` entry, which `stacksOf` ignores by
+    // construction: stacks come from the cards, never from the map.
+    return { ...this.toJSON(), cards };
   }
 
   /**
@@ -413,18 +560,36 @@ export class Pile {
   insertPileable(card, placement = {}) {
     const { targetCardId, side = 'after', layout } = placement;
     const base = this.toJSON();
-    if (!targetCardId) return { ...base, cards: [...this.cards, withLayout(card, layout)] };
+    // No target, or no direction asked for: the card joins the pile's
+    // one default stack and carries no placement data at all.
+    const direction = directionForLayout(layout);
+    if (!targetCardId || !direction) {
+      const plain = { ...card };
+      delete plain.stackId;
+      if (!targetCardId) return { ...base, cards: [...this.cards, plain] };
+      const at = this.cards.findIndex((c) => c.id === targetCardId);
+      if (at === -1) throw new Error(`Target card ${targetCardId} is not in the destination zone`);
+      const offset = side === 'before' ? at : at + 1;
+      return { ...base, cards: [...this.cards.slice(0, offset), plain, ...this.cards.slice(offset)] };
+    }
 
-    const { cards } = this;
-    const index = cards.findIndex((c) => c.id === targetCardId);
+    const index = this.cards.findIndex((c) => c.id === targetCardId);
     if (index === -1) {
       throw new Error(`Target card ${targetCardId} is not in the destination zone`);
     }
 
-    if (side === 'before') {
-      const placed = [...cards.slice(0, index), withLayout(card, null), ...cards.slice(index)];
-      return { ...base, cards: placed.map((c) => (c.id === targetCardId ? withLayout(c, layout) : c)) };
-    }
-    return { ...base, cards: [...cards.slice(0, index + 1), withLayout(card, layout), ...cards.slice(index + 1)] };
+    // D129: the drop's direction hint becomes the stack's direction.
+    // Both the dropped card and its target end up in that stack -
+    // dropping BEFORE the target does not change which stack either is
+    // in, only where in the order the card sits, so the old
+    // "whichever card ends up second carries the layout" dance (D21) is
+    // gone with the field it existed to place.
+    const joined = joinedStack(this.cards, card, targetCardId, layout);
+    const offset = side === 'before' ? index : index + 1;
+    return {
+      ...base,
+      cards: [...joined.cards.slice(0, offset), joined.card, ...joined.cards.slice(offset)],
+      stacks: { ...base.stacks, [joined.stackId]: { direction: joined.direction } },
+    };
   }
 }

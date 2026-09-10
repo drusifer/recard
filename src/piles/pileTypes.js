@@ -26,6 +26,7 @@ import { ExilePile } from './ExilePile.js';
 import { StackPile } from './StackPile.js';
 import { ChipPile } from './ChipPile.js';
 import { TokenPile } from './TokenPile.js';
+import { LandsPile } from './LandsPile.js';
 
 export const PILE_TYPES = {
   plain: Pile,
@@ -48,6 +49,11 @@ export const PILE_TYPES = {
   // (one overlapping row, no home to return to on drop) - now their own
   // kind, grouped-by-colour, sharing `GroupedPile` with `ChipPile`.
   token: TokenPile,
+  // Direct user request: "I want to organize my lands by color, each
+  // color stacked vertically, overlapped" - the same GroupedPile shape
+  // chips/tokens already use ("one stack per group, side by side"),
+  // grouped by colour instead.
+  lands: LandsPile,
 };
 
 /**

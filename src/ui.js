@@ -4,6 +4,8 @@ import {
   disabledPileActionsFor, componentFor,
 } from './pileActions.js';
 import { seatPosition } from './seating.js';
+import { stacksOf, stackKeyFor } from './piles/Stack.js';
+import { MAX_SPREAD } from './piles/Pile.js';
 import { PILE_TYPES } from './piles/pileTypes.js';
 import { ZONE_TYPES } from './zones/zoneTypes.js';
 import { pileableFor } from './pileables/pileableTypes.js';
@@ -606,17 +608,8 @@ function performReveal(card, viewerId, onReveal) {
  * now, and every row gets the property written from this one function -
  * no second "unadjusted" rendering path anywhere.
  */
-function effectiveSpread(pileView) {
+export function effectiveSpread(pileView) {
   return pileView.spread ?? PILE_TYPES[pileView.kind]?.defaultSpread ?? 0;
-}
-
-/** The fan's per-card rotate/droop offset (US-107, cognitive-complexity
- * extraction) - same formula `renderPileCards` used inline, unchanged;
- * see its own call site comment for why the droop is squared. */
-function applyFanOffset(wrapper, index, cardCount) {
-  const center = (cardCount - 1) / 2;
-  const offset = index - center;
-  wrapper.style.setProperty('--raise-base', `rotate(${offset * 5}deg) translateY(${offset * offset * 0.08}rem)`);
 }
 
 /** Card-lift cue wiring (US-22/D13, US-107 extraction) - mouse only,
@@ -671,6 +664,64 @@ function faceOptionsFor(canReveal, canRotate, isBack, card, options) {
   return { disabled: true, back: isBack };
 }
 
+/**
+ * The gear emblem a stack carries (direct user request: "since this is
+ * universal for stacks use an additional emblem using the gear symbols
+ * to pull up the stack action menu").
+ *
+ * Universal - every stack that has anything to offer gets the same
+ * emblem, unlike the mana badge beside it, which is one pile kind's
+ * opt-in decoration. It sits ON the stack because that is the object
+ * it acts on: a stack has no header of its own, and giving it one
+ * would put a second title bar inside every pile (a plain pile IS one
+ * stack, so it would duplicate the pile header exactly).
+ *
+ * Absent on a stack of one, where `stackActions` offers nothing -
+ * tighten, loosen and flip on a single card are three controls that
+ * visibly do nothing, the same "no false affordance" rule
+ * `ChipPile` applies to `changePileType`.
+ */
+function stackGearFor(stack, pileView, options) {
+  const { ids, disabled } = stack.stackActions({
+    maxSpread: PILE_TYPES[pileView.kind]?.maxSpread ?? MAX_SPREAD,
+    canTap: PILE_TYPES[pileView.kind]?.supportsStackTap === true,
+  });
+  if (ids.length === 0) return null;
+  const gear = document.createElement('button');
+  gear.type = 'button';
+  gear.className = 'stack-gear';
+  gear.dataset.stackKey = stackKeyFor(stack.id);
+  gear.textContent = '⚙';
+  gear.title = 'Stack actions';
+  gear.setAttribute('aria-label', 'Stack actions');
+  gear.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const at = gear.getBoundingClientRect();
+    openStackActionMenu(at.left, at.bottom, ids, disabled, pileView.id, stackKeyFor(stack.id), options);
+  });
+  return gear;
+}
+
+/** The box one `Stack` lays itself out inside (D129): its own
+ * positioning origin, sized from the stack's real extent so it
+ * reserves exactly the room it uses and no more - a stack claiming
+ * more than it draws is what pushes a table past the viewport. */
+function stackElementFor(stack) {
+  const element = document.createElement('div');
+  element.className = 'card-stack';
+  if (stack.id !== undefined) element.dataset.stackId = String(stack.id);
+  // D129: spread is the STACK's, so it is published here rather than on
+  // the row. It no longer drives the layout (that is `offsetIn`, in
+  // JS) - it is what the drop-ghost preview reads to place itself one
+  // step along, and what a test can read back to see what a control
+  // actually did.
+  element.style.setProperty('--pile-spread', String(stack.spread));
+  const { x, y } = stack.extent();
+  element.style.setProperty('--stack-extent-x', String(x));
+  element.style.setProperty('--stack-extent-y', String(y));
+  return element;
+}
+
 export function renderPileCards(container, pileView, allPiles, options = {}) {
   const { onCardLift } = options;
   container.replaceChildren();
@@ -695,7 +746,44 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
   // The fan math (rotate + arc, pivoting from the bottom like cards
   // actually held in a hand) is exactly `renderHand`'s old formula,
   // just applied generically by index instead of being hand-specific.
-  for (const [index, card] of pileView.cards.entries()) {
+  // *fix (real bug, direct user report): "adding additional cards to
+  // the vertical layout blocks the second one instead of offsetting
+  // from the previous card". `margin-top` (style.css's own `[data-
+  // layout='column']` rule) is a CROSS-axis margin in this row - unlike
+  // `margin-left`'s negative pull (which shrinks the main-axis space
+  // every LATER sibling's own position is computed from, so horizontal
+  // overlap chains for free), each flex item's own cross-axis margin
+  // offsets it from the LINE's shared top independently of its
+  // siblings' margins. A third column card landed at exactly the same
+  // depth as the second, not one step further down, because both
+  // margins were being measured from the same shared reference point,
+  // never from each other. `--column-depth` makes the chain explicit
+  // instead of assuming flex will do it: how many CONSECUTIVE cards
+  // (this one included) have carried `layout: 'column'` back to the
+  // nearest card that doesn't - style.css multiplies its one per-step
+  // offset by this count, so depth 2 lands exactly one more step below
+  // depth 1, same step size, chained by arithmetic instead of by flow.
+  // D129: ONE layout for every pile. A pile is a row of `Stack`s, each
+  // running in its OWN direction (`pile.stacks[stackId].direction`,
+  // falling back to the kind's default), and every pileable is
+  // positioned from its own index within its stack. This replaced four
+  // hand-written CSS overlap formulas plus a `--column-depth` counter
+  // that existed only because cross-axis flex margins do not chain.
+  const stacks = stacksOf({
+    cards: pileView.cards,
+    stacks: pileView.stacks,
+    direction: PILE_TYPES[pileView.kind]?.stackDirection,
+    spread: effectiveSpread(pileView),
+  });
+  const renderedStacks = [];
+  for (const stack of stacks) {
+    const stackElement = stackElementFor(stack);
+    container.append(stackElement);
+    stackElement.append(...[stackGearFor(stack, pileView, options)].filter(Boolean));
+    const positions = stack.layout();
+    renderedStacks.push({ stack, element: stackElement });
+
+  for (const [index, card] of stack.pileables.entries()) {
     const wrapper = document.createElement('div');
     // *nit (2026-08-26): `pile-hover-host` used to arrive via the now-
     // deleted `attachActionRow` (the popup mechanism) as a side effect
@@ -708,31 +796,25 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
     // focusable the way `cardEl`'s `<button>` face already is).
     wrapper.className = 'middle-card pile-hover-host';
     wrapper.tabIndex = 0;
-    if (options.fan) {
-      // UX follow-up (direct user request): "lower the peak a bit so
-      // it's a more gradual curve" - then, immediately after: "it still
-      // looks triangular rather than a steady curve." The rotation
-      // (5deg/card) was already linear in `offset`, which is correct - a
-      // real fanned hand's cards ARE spaced at roughly equal angles. The
-      // droop wasn't: `Math.abs(offset) * k` is linear too, and a linear
-      // vertical drop paired with a pivot around each card's OWN
-      // bottom-center reads as a sharp V (two straight edges meeting at
-      // the center card), not a rounded arc. Squaring `offset` instead
-      // is what actually curves it - small offsets near the center barely
-      // droop, larger ones toward the ends droop increasingly more,
-      // tracing a parabola instead of two lines. `.fan-row`'s own bottom
-      // padding (style.css) is sized to this exact formula's max droop,
-      // not just eyeballed - see that rule's own comment if this changes
-      // again.
-      applyFanOffset(wrapper, index, pileView.cards.length);
-    }
     // US-32/33: `data-pileable-id` makes the wrapper hit-testable for
-    // drop-region detection; `data-layout` is what style.css keys the
-    // stacked/overlapped rendering off, so the visual is driven straight
-    // from authoritative state rather than a separate UI-side flag that
-    // could drift out of sync with it.
+    // drop-region detection.
     wrapper.dataset.pileableId = card.id;
-    if (card.layout) wrapper.dataset.layout = card.layout;
+    // D129: where this pileable sits in its stack, as unitless stride
+    // multipliers. One CSS rule turns them into lengths; nothing here
+    // knows a pixel, which is what keeps the rem-based sizing (and its
+    // per-preset runtime overrides) working.
+    wrapper.style.setProperty('--stack-x', String(positions[index].x));
+    wrapper.style.setProperty('--stack-y', String(positions[index].y));
+    // A fan's lean comes from the same layout call as its position -
+    // `applyFanOffset` and the `options.fan` flag it needed are gone.
+    // Written unconditionally (0deg for the two layouts that do not
+    // rotate) so there is one path, not a branch that has to agree
+    // with the CSS fallback.
+    wrapper.style.setProperty('--stack-rotate', `${positions[index].rotate ?? 0}deg`);
+    // Depth within the stack - a decorative lean for tray stacks
+    // (style.css), deliberately separate from the overlap geometry so
+    // the two can be tuned apart.
+    wrapper.style.setProperty('--stack-index', String(index));
     // D48/D40: same "state drives the visual" reasoning as `layout` -
     // style.css rotates the card face when this is 'landscape'.
     if (card.orientation) wrapper.dataset.orientation = card.orientation;
@@ -841,8 +923,10 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
     // pick (`beginCardTargetPick`).
     attachCardContextMenu(wrapper, card, pileableActions, piles, pileView.id, options);
 
-    container.append(wrapper);
+    stackElement.append(wrapper);
   }
+  }
+  return renderedStacks;
 }
 
 /**
@@ -875,6 +959,52 @@ function attachCardContextMenu(wrapper, card, pileableActions, piles, fromPileId
  * the card's own wrapper so it's never clipped by a pile's overflow, same
  * reasoning `pileElement` lookups already rely on for cross-cutting UI.
  */
+/**
+ * One stack's own action menu, opened by its gear emblem.
+ *
+ * Reuses the card context menu's own list styling and dismissal
+ * (`.pile-action-menu`/`.card-context-menu`, `clampMenuPosition`) - the
+ * same "reuse the existing *Actions look, don't invent a parallel one"
+ * rule D101 followed. What differs is only WHAT it acts on: a stack,
+ * addressed by its key, rather than a card.
+ */
+function openStackActionMenu(clientX, clientY, actionIds, disabled, pileId, stackKey, options) {
+  closeCardContextMenu();
+  const menu = document.createElement('div');
+  menu.className = 'pile-action-menu card-context-menu stack-action-menu';
+  for (const id of actionIds) {
+    const spec = ACTION_SPECS[id];
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'pile-action-menu-item';
+    button.textContent = `${spec.icon} ${spec.label}`;
+    button.title = spec.hint;
+    button.setAttribute('aria-label', spec.label);
+    button.dataset.action = id;
+    button.disabled = disabled.includes(id);
+    button.addEventListener('click', (event) => {
+      event.stopPropagation();
+      closeCardContextMenu();
+      options.onStackAction?.(pileId, stackKey, id);
+    });
+    menu.append(button);
+  }
+  document.body.append(menu);
+  const rect = menu.getBoundingClientRect();
+  const pos = clampMenuPosition(clientX, clientY, { width: rect.width, height: rect.height },
+    { width: globalThis.innerWidth, height: globalThis.innerHeight });
+  menu.style.left = `${pos.x}px`;
+  menu.style.top = `${pos.y}px`;
+  // Same dismissal the card menu uses - `closeCardContextMenu` finds it
+  // by the shared `.card-context-menu` class, so there is one closer,
+  // not two that can leave each other's menu open. Bound on the NEXT
+  // tick so the click that OPENED this menu is not itself read as the
+  // outside click that closes it.
+  setTimeout(() => {
+    document.addEventListener('click', closeCardContextMenu, { once: true });
+  }, 0);
+}
+
 function openCardContextMenu(clientX, clientY, actionIds, card, piles, fromPileId, options) {
   closeCardContextMenu();
 
@@ -967,9 +1097,10 @@ function onContextMenuKeydown(event) {
  * and cards only ever had native drag). Reuses the SAME
  * `highlightDragTargets` a native drag already calls on `dragstart` -
  * one lit-pile vocabulary for "where can this go", not a second one for
- * clicks - and completes through `options.onMoveCard(pileableId, pileId)`,
- * the exact callback `dragstart`'s own presence-check already gates on.
- * No new reducer/commit path.
+ * clicks - and completes through `options.onMoveCard(pileableId, pileId,
+ * placement)`, the exact callback `dragstart`'s own presence-check
+ * already gates on (`placement` added below - see the fix note further
+ * down). No new reducer/commit path.
  *
  * The commit listener runs in the CAPTURE phase and calls
  * `stopPropagation` when the click lands on a lit pile - otherwise a
@@ -977,24 +1108,54 @@ function onContextMenuKeydown(event) {
  * cards would also fire that other card's own tap gesture (reveal/
  * rotate) in the same click. A click that misses every lit pile just
  * cancels silently, same as dismissing the menu by clicking outside it.
+ *
+ * *fix (direct user request): "use the Move card action to reveal the
+ * ACTUAL targets within the piles" - lighting up a whole pile told you
+ * WHERE you could go, but not what would actually happen once you got
+ * there (onto/below/beside/adjacent a specific card - the same real
+ * geometry a native drag already resolves via `resolveDropTargetFor`/
+ * `showDropPreview`). A non-empty lit pile now shows that same live
+ * preview as the mouse moves over it, and commits with the SAME
+ * placement a drop there would have produced - one real target
+ * vocabulary for both gestures, not a second, cruder one for clicks.
  */
 function beginCardTargetPick(actionId, card, piles, fromPileId, options) {
   highlightDragTargets([actionId], piles, { viewerId: options.viewerId, fromPileId });
 
+  function rowUnder(event) {
+    const target = event.target.closest?.('.pile-section.pile-target[data-pile-id]');
+    return target ? { pileElement: target, row: target.querySelector('.card-row') } : {};
+  }
+  function placementAt(pileElement, row, event) {
+    if (!row) return {};
+    return resolveDropTargetFor(pileElement.dataset.kind, cardBoxesIn(row), { x: event.clientX, y: event.clientY });
+  }
+
+  const onMouseMove = (event) => {
+    const { pileElement, row } = rowUnder(event);
+    if (row) showDropPreview(row, placementAt(pileElement, row, event));
+    else clearDropPreview();
+  };
+
   const cancelOnEscape = (event) => {
     if (event.key !== 'Escape') return;
     document.removeEventListener('click', commit, true);
+    document.removeEventListener('mousemove', onMouseMove);
+    clearDropPreview();
     clearPileTargets();
   };
   const commit = (event) => {
     document.removeEventListener('keydown', cancelOnEscape);
-    const pileElement = event.target.closest?.('.pile-section.pile-target[data-pile-id]');
+    document.removeEventListener('mousemove', onMouseMove);
+    const { pileElement, row } = rowUnder(event);
     if (pileElement) {
       event.stopPropagation();
       event.preventDefault();
     }
+    const placement = pileElement ? placementAt(pileElement, row, event) : {};
+    clearDropPreview();
     clearPileTargets();
-    if (pileElement) options.onMoveCard?.(card.id, pileElement.dataset.pileId);
+    if (pileElement) options.onMoveCard?.(card.id, pileElement.dataset.pileId, placement);
   };
   // Same next-tick deferral as the menu's own dismiss listener - the
   // click that closed the menu (or the escape-hatch from a `contextmenu`
@@ -1002,6 +1163,7 @@ function beginCardTargetPick(actionId, card, piles, fromPileId, options) {
   setTimeout(() => {
     document.addEventListener('click', commit, { once: true, capture: true });
     document.addEventListener('keydown', cancelOnEscape, { once: true });
+    document.addEventListener('mousemove', onMouseMove);
   }, 0);
 }
 
@@ -1030,26 +1192,86 @@ function cardBoxesIn(rowElement) {
   });
 }
 
-const DROP_HINTS = ['drop-onto', 'drop-before', 'drop-after'];
-
-function clearDropHints(rowElement) {
-  for (const element of rowElement.querySelectorAll('.middle-card')) element.classList.remove(...DROP_HINTS);
-}
-
 /**
  * Smith Gate 1 (Nielsen #1/#6): native drag-and-drop gives no feedback
  * until release, so the *mode* a drop is about to use has to be visible
- * during the drag or it isn't discoverable at all. A glow on the card
- * body reads "will stack here"; an insertion line beside it reads "will
- * slot in here".
+ * during the drag or it isn't discoverable at all.
+ *
+ * *fix (direct user report): "I expect to see the overlap targets
+ * ACTUALLY overlap the card so one can SEE where the card will go
+ * before they select that target" - four separate decorations (a glow,
+ * a bar, two kinds of line) told you WHICH zone you were in, but never
+ * showed the actual outcome, so telling them apart under a moving
+ * cursor was still guesswork ("it almost always overlaps" - direct
+ * quote). One reusable ghost card, inserted as a REAL sibling with the
+ * SAME `data-layout` a real drop would set, replaces all four: it
+ * renders through the exact CSS rules (`.middle-card[data-layout=...]`)
+ * an actual card would, so "will this overlap or sit beside it" is
+ * answered by literally seeing a card-shaped outline do exactly that,
+ * not by recognizing which decoration means which.
+ *
+ * D129: the ghost is POSITIONED rather than tagged. It used to copy
+ * the target's `data-layout` so it rendered through whichever of the
+ * four CSS overlap formulas applied; there is one formula now, driven
+ * by `--stack-x`/`--stack-y`, so the ghost simply takes the target's
+ * own offset plus one step in the direction the drop is asking for.
+ * That also retires the `side: 'before'` special case entirely - the
+ * old D21 rule put `layout` on whichever card ended up SECOND, so a
+ * before-drop had to temporarily retag the TARGET and restore it
+ * afterwards. Membership does not depend on which side a card landed,
+ * so there is nothing to toggle and nothing to restore.
  */
-function showDropHint(rowElement, placement) {
-  clearDropHints(rowElement);
-  if (!placement.targetCardId) return;
+let dropGhost = null;
+
+/** One step along a stack, in the same unitless stride multipliers
+ * `Stackable.offsetIn` returns - `1 - spread`, read from the row's own
+ * `--pile-spread` so the preview matches whatever Tighten/Loosen has
+ * been set to. */
+function stackStepIn(element) {
+  const raw = Number.parseFloat(getComputedStyle(element).getPropertyValue('--pile-spread'));
+  return 1 - Math.min(1, Math.max(0, Number.isNaN(raw) ? 0 : raw));
+}
+
+function ghostElement() {
+  if (dropGhost) return dropGhost;
+  dropGhost = document.createElement('div');
+  dropGhost.className = 'middle-card drop-ghost';
+  const face = document.createElement('div');
+  face.className = 'card card-ghost';
+  dropGhost.append(face);
+  return dropGhost;
+}
+
+function clearDropPreview() {
+  dropGhost?.remove();
+}
+
+function showDropPreview(rowElement, placement) {
+  clearDropPreview();
+  const ghost = ghostElement();
+  ghost.style.removeProperty('--stack-x');
+  ghost.style.removeProperty('--stack-y');
+  if (!placement.targetCardId) {
+    // No target: the card lands in the pile's own default stack, so the
+    // ghost goes at the end of the row exactly as a plain drop would.
+    rowElement.append(ghost);
+    return;
+  }
   const target = rowElement.querySelector(`.middle-card[data-pileable-id="${CSS.escape(placement.targetCardId)}"]`);
   if (!target) return;
-  if (placement.layout === 'stack') target.classList.add('drop-onto');
-  else target.classList.add(placement.side === 'before' ? 'drop-before' : 'drop-after');
+
+  // The ghost joins the target's own stack, one step further along in
+  // whichever direction the drop is asking for - which is exactly what
+  // the real drop will do (`Pile.insertPileable`).
+  // The TARGET's own stack, not the row: spread is per stack now, so a
+  // preview measured against the row would be a step of the wrong size
+  // in any pile whose stacks have been adjusted apart.
+  const step = stackStepIn(target.parentElement) * (placement.side === 'before' ? -1 : 1);
+  const at = (axis) => Number.parseFloat(target.style.getPropertyValue(axis)) || 0;
+  const vertical = placement.layout === 'column';
+  ghost.style.setProperty('--stack-x', String(at('--stack-x') + (vertical ? 0 : step)));
+  ghost.style.setProperty('--stack-y', String(at('--stack-y') + (vertical ? step : 0)));
+  target.parentElement.append(ghost);
 }
 
 /**
@@ -1070,12 +1292,12 @@ function showDropHint(rowElement, placement) {
  */
 function showPileDragOver(pileElement, row, point, kind) {
   pileElement.classList.add('drag-over');
-  showDropHint(row, resolveDropTargetFor(kind, cardBoxesIn(row), point));
+  showDropPreview(row, resolveDropTargetFor(kind, cardBoxesIn(row), point));
 }
 
 function clearPileDragOver(pileElement, row) {
   pileElement.classList.remove('drag-over');
-  clearDropHints(row);
+  clearDropPreview();
 }
 
 function performPileDrop(pileElement, row, pileId, pileableId, point, onDropCard, kind) {
@@ -1276,8 +1498,13 @@ export function renderPileShell(container, pile, allPiles, options, buildRow) {
       // rather than being a dead click there. `?? defaultSpread` is
       // resolved here because only this layer knows whether this pile
       // has ever been adjusted; the class only knows its type's default.
+      // D129: `stacks` for the same reason `cards` is here - spread
+      // lives on each stack now, and `pileForKind` builds a BARE
+      // instance whose `this.stacks` is empty. Without it, Tighten
+      // All/Loosen All read the pile's stale fallback spread and never
+      // disable at the limits, which is a dead control at both ends.
       disabled: disabledPileActionsFor(pile.kind, pile.count ?? pile.cards.length,
-        { spread: effectiveSpread(pile), cards: pile.cards }),
+        { spread: effectiveSpread(pile), cards: pile.cards, stacks: pile.stacks }),
       // US-61 (Sprint 23), Smith's ruling (Phase 70): `take` confirms
       // unconditionally EXCEPT a 1-card pile, where it's identical in
       // effect to that card's own un-confirmed single-card `pickup`.
@@ -2329,8 +2556,14 @@ export function applyCardSize(size) {
   if (size) {
     root.setProperty('--card-w', size.w);
     root.setProperty('--card-h', size.h);
+    // `--card-aspect` (style.css's `.rtg-inspect-art`) needs a plain
+    // number ratio, not lengths - `aspect-ratio` can't consume
+    // `--card-w`/`--card-h` directly, so this derives the same ratio
+    // numerically alongside them rather than leaving it to drift.
+    root.setProperty('--card-aspect', `${Number.parseFloat(size.w)} / ${Number.parseFloat(size.h)}`);
   } else {
     root.removeProperty('--card-w');
     root.removeProperty('--card-h');
+    root.removeProperty('--card-aspect');
   }
 }

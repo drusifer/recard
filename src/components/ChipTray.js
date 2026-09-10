@@ -36,60 +36,42 @@ export class ChipTrayElement extends HTMLElement {
 
     renderPileShell(this, pile, allPiles, options, (container) => {
       const tray = document.createElement('div');
-      tray.className = 'chip-tray';
+      // *nit (direct user request, "align cascades to the top"):
+      // `stacksDownward` (`GroupedPile`, opt-in - `LandsPile` only) flips
+      // the tray from chips' own bottom-aligned/grows-up default to
+      // top-aligned/grows-down, the same direction a cascade already
+      // reads in. One modifier class, not a second component.
+      tray.className = PILE_TYPES[pile.kind]?.stacksDownward ? 'chip-tray chip-tray-downward' : 'chip-tray';
       container.append(tray);
 
-      for (const [groupValue, group] of groupByValue(pile)) {
-        const column = document.createElement('div');
-        // `card-row` so every rule that styles a row of pileables still
-        // applies; `chip-stack` only turns the direction vertical.
-        column.className = 'card-row chip-stack';
-        if (groupValue !== undefined) column.dataset.denom = String(groupValue);
-        tray.append(column);
-        renderPileCards(column, { ...pile, cards: group }, allPiles, options);
-        // *nit ("a slight diagonal from lower left to upper right"):
-        // each chip's position in its own stack, so CSS can drift it
-        // sideways progressively. A margin cannot do this - margins do
-        // not accumulate down a flex column, so every chip after the
-        // first would shift by the same amount. Set here rather than in
-        // `renderPileCards`, which knows nothing about stacking.
-        for (const [index, chip] of [...column.children].entries()) {
-          chip.style.setProperty('--stack-index', String(index));
+      // D129: the tray no longer builds its own columns or positions
+      // anything. `renderPileCards` renders EVERY pile as a row of
+      // `Stack`s now - which is exactly what a tray already was - and
+      // hands back the stack elements it made. All this component adds
+      // is the per-stack badge.
+      tray.className += ' card-row';
+      const renderedStacks = renderPileCards(tray, pile, allPiles, options);
+
+      for (const { stack, element } of renderedStacks) {
+        // *nit (direct user request): "display the total manacount in a
+        // cool way, when tapping" - `groupBadge` is opt-in (`LandsPile`
+        // only; the `GroupedPile` default is absent, so chips/tokens are
+        // unaffected). Derived fresh from this stack's own cards every
+        // render, so it always reflects the real tapped/untapped state,
+        // never a separately-tracked count that could drift from it.
+        if (stack.id !== undefined) element.dataset.denom = String(stack.id);
+        const badge = PILE_TYPES[pile.kind]?.groupBadge?.(stack.pileables);
+        if (badge) {
+          const badgeElement = document.createElement('span');
+          badgeElement.className = `chip-stack-badge ${badge.className}`;
+          badgeElement.textContent = badge.text;
+          badgeElement.title = badge.title;
+          element.append(badgeElement);
         }
       }
       return tray;
     });
   }
-}
-
-/**
- * A pile's own cards grouped by whatever `PILE_TYPES[pile.kind]`
- * declares as its `sortValue` (`GroupedPile`, `src/piles/`) - denomination
- * for a chip tray, colour for a token supply, generalized rather than
- * hardcoded to `card.denom` (US-112: that hardcoding is exactly why
- * adding a SECOND grouped kind meant duplicating this whole component
- * instead of it just working). Anything with no group value (a card
- * dropped onto a tray - the Core invariant means this pile accepts
- * anything, `GroupedPile` doesn't override `canAccept`) lands in one
- * final group of its own rather than vanishing.
- *
- * @param {{kind: string, cards: object[]}} pile
- * @returns {[unknown, object[]][]}
- */
-function groupByValue(pile) {
-  const sortValue = PILE_TYPES[pile.kind]?.sortValue ?? (() => {});
-  const groups = new Map();
-  for (const card of pile.cards) {
-    const key = sortValue(card);
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(card);
-  }
-  return Iterator.from(groups).toArray().toSorted(([a], [b]) => {
-    if (a === b) return 0;
-    if (a === undefined) return 1;
-    if (b === undefined) return -1;
-    return a > b ? -1 : 1;
-  });
 }
 
 customElements.define('chip-tray', ChipTrayElement);

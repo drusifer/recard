@@ -8,10 +8,10 @@
  * it. That delegation is what makes it structurally impossible for this
  * sprint to change how any existing card looks.
  */
-import { Pileable } from './Pileable.js';
+import { Stackable } from './Stackable.js';
 import { faceFor } from '../cards/cardFaces.js';
 
-export class CardPileable extends Pileable {
+export class CardPileable extends Stackable {
   /** Rank and suit are the two orderings a standard deck of cards has.
    * A pile offers these because of what it HOLDS, not because it is a
    * hand - `HandPile` used to hardcode both (US-104). Kept as the

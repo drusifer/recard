@@ -20,6 +20,13 @@ test('a drop on a card body stacks onto that card', () => {
   });
 });
 
+// *nit (direct user request): "can we collapse the overlap css? we
+// just need 3 (full, part-vertical, and part-horizontal) and we can
+// adjust the %overlap with tighten/loosen" - the halo beside a card is
+// ALWAYS `overlap` now (no near/far split, no separate `adjacent`
+// outcome reached only by hovering a precise distance from the edge).
+// How much it visually overlaps is style.css's `--pile-spread` job,
+// not this geometry's.
 test('a drop in the halo LEFT of a card overlaps before it', () => {
   // x=45 sits in the gap: right of A, left of B, nearer B.
   assert.deepEqual(resolveDropTarget(ROW, { x: 47, y: 30 }), {
@@ -39,6 +46,9 @@ test('a drop in the halo RIGHT of a card overlaps after it', () => {
 });
 
 test('past the last card, still within one card-width, overlaps after it', () => {
+  // C's halo runs 140-180 (one card-width, 40px). x=170 is 30px past
+  // C's right edge - anywhere in the halo is `overlap` now, regardless
+  // of exact distance.
   assert.deepEqual(resolveDropTarget(ROW, { x: 170, y: 30 }), {
     targetCardId: 'C',
     side: 'after',
@@ -75,4 +85,50 @@ test('side is decided by which edge the point is past, not by card index', () =>
     side: 'before',
     layout: 'overlap',
   });
+});
+
+// D-nit: "vertical drop targets... like how lands are normally arranged
+// in a game of mtg" - the lower half of a card's own box is a THIRD
+// on-card outcome (column), not just stack/overlap. Same ROW fixture -
+// each box spans y 0..60, so its midline is y=30.
+test('a drop on the LOWER half of a card body columns below it', () => {
+  assert.deepEqual(resolveDropTarget(ROW, { x: 20, y: 45 }), {
+    targetCardId: 'A',
+    side: 'after',
+    layout: 'column',
+  });
+  assert.deepEqual(resolveDropTarget(ROW, { x: 120, y: 59 }), {
+    targetCardId: 'C',
+    side: 'after',
+    layout: 'column',
+  });
+});
+
+test('the upper half (including exactly the midline) still stacks, not columns', () => {
+  assert.deepEqual(resolveDropTarget(ROW, { x: 20, y: 0 }), {
+    targetCardId: 'A',
+    side: 'after',
+    layout: 'stack',
+  });
+  // Exactly on the midline: an existing test above already asserts
+  // this point (x:20, y:30) resolves to 'stack' - this just names WHY,
+  // so a future off-by-one in `isLowerHalf`'s `>` vs `>=` fails loudly
+  // here instead of silently flipping that other test's meaning.
+  assert.deepEqual(resolveDropTarget(ROW, { x: 20, y: 30 }).layout, 'stack');
+});
+
+// *fix (direct user report): "why no side by side in the battlefield
+// pile?" - the ORIGINAL report this whole simplification traces back
+// to. Two cards at their real resting gap (~8px) used to leave no
+// reachable "adjacent" at all under the old near/far-split model. Now
+// there's nothing to reach for - the whole gap is just `overlap`,
+// and it's up to the pile's OWN `--pile-spread` (not this geometry)
+// whether that overlap is visually zero (looks adjacent) or tight.
+test('a real battlefield-style TIGHT gap: still resolves to overlap, both sides', () => {
+  const TIGHT = [box('X', 0), box('Y', 48)]; // 40-wide cards, 8px gap
+  assert.deepEqual(resolveDropTarget(TIGHT, { x: 44, y: 30 }), {
+    targetCardId: 'X',
+    side: 'after',
+    layout: 'overlap',
+  }, 'the gap\'s own midpoint - no near/far split left to fall foul of');
 });

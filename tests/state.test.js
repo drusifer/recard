@@ -10,7 +10,13 @@ const HAND_DEFAULT_SPREAD = PILE_TYPES.hand.defaultSpread;
 // compare equal to MAX_SPREAD and so would never disable the button).
 // Expectations have to round the same way or they test the drift.
 const spreadAfter = (steps) => Math.round((HAND_DEFAULT_SPREAD + steps * SPREAD_STEP) * 1000) / 1000;
+// D129: spread lives on the STACK now, not the pile - a pile-level
+// Tighten All routes to every stack rather than writing one pile-wide
+// number. These read where it actually lands.
+const stackSpreadOf = (pile, key = DEFAULT_STACK_KEY) => pile.stacks?.[key]?.spread;
 import { PlayerHandPile } from '../src/piles/PlayerHandPile.js';
+import { HORIZONTAL } from '../src/pileables/Stackable.js';
+import { DEFAULT_STACK_KEY } from '../src/piles/Stack.js';
 
 function withPlayers(state, ids) {
   let s = state;
@@ -1523,12 +1529,19 @@ function threeCardsOnTable(rng = () => 0.5) {
 
 const tableCards = (state) => pilesOf(state).find((z) => z.id === 'table').cards;
 const tableIds = (state) => tableCards(state).map((c) => c.id);
-const layoutOf = (state, pileableId) => tableCards(state).find((c) => c.id === pileableId)?.layout;
+// D129: the per-card `layout` field is gone. What a drop's direction
+// hint produces now is stack MEMBERSHIP plus that stack's direction,
+// so these read the stack a card is in rather than a relationship to
+// whoever happens to precede it.
+const stackOf = (state, pileableId) => tableCards(state).find((c) => c.id === pileableId)?.stackId;
+const stacksMetaOf = (state) => pilesOf(state).find((p) => p.id === 'table')?.stacks ?? {};
+const directionOf = (state, pileableId) => stacksMetaOf(state)[stackOf(state, pileableId)]?.direction;
 
-test('PLAY/MOVE with no target still appends, with no layout (D21 back-compat)', () => {
+test('PLAY/MOVE with no target still appends, carrying no placement data at all', () => {
   const { state, ids } = threeCardsOnTable();
   assert.deepEqual(tableIds(state), ids, 'plain PLAY appends in order, exactly as pre-D21');
-  assert.equal(layoutOf(state, ids[0]), undefined, 'a plainly-played card carries no layout key');
+  assert.equal(stackOf(state, ids[0]), undefined, 'a plainly-played card is in the pile default stack');
+  assert.ok(!('layout' in tableCards(state)[0]), 'and carries no layout key - that field no longer exists');
 });
 
 test('MOVE side:after inserts directly after the target and stacks the DROPPED card', () => {
@@ -1540,11 +1553,13 @@ test('MOVE side:after inserts directly after the target and stacks the DROPPED c
     targetCardId: a, side: 'after', layout: 'stack'
   });
   assert.deepEqual(tableIds(next), [a, c, b], 'C is reinserted immediately after A');
-  assert.equal(layoutOf(next, c), 'stack', 'the dropped card carries the layout');
-  assert.equal(layoutOf(next, a), undefined, 'the target keeps its own (unchanged) relationship');
+  assert.equal(stackOf(next, c), stackOf(next, a), 'the dropped card joins the target\'s stack');
+  assert.ok(stackOf(next, c) !== undefined, 'and that stack is real, not the pile default');
+  assert.equal(directionOf(next, c), HORIZONTAL, 'a stack/overlap drop is the horizontal intent');
+  assert.equal(stackOf(next, b), undefined, 'the untouched card stays in the pile default stack');
 });
 
-test('MOVE side:before puts the layout on the TARGET, not the dropped card (Smith Gate 2)', () => {
+test('MOVE side:before joins the target\'s stack too - no side-dependent placement', () => {
   const { state, ids } = threeCardsOnTable();
   const [a, b, c] = ids;
   // Drop C in the halo BEFORE B -> order becomes A, C, B and the newly
@@ -1554,11 +1569,12 @@ test('MOVE side:before puts the layout on the TARGET, not the dropped card (Smit
     targetCardId: b, side: 'before', layout: 'overlap'
   });
   assert.deepEqual(tableIds(next), [a, c, b], 'C is reinserted immediately before B');
-  assert.equal(
-    layoutOf(next, b), 'overlap',
-    'the TARGET carries the layout on a before-side drop - putting it on the dropped card would visually overlap the wrong pair',
-  );
-  assert.equal(layoutOf(next, c), undefined, 'the dropped card does not carry it');
+  // D21's "the layout belongs to whichever card ends up SECOND" rule is
+  // gone with the field it existed to place. Which STACK a card is in
+  // does not depend on which side of its target it landed - only where
+  // in the order it sits does - so both sides read the same now.
+  assert.equal(stackOf(next, c), stackOf(next, b), 'both ends of the newly adjacent pair are one stack');
+  assert.equal(directionOf(next, c), HORIZONTAL);
 });
 
 test('MOVE: a same-zone move actually reorders (D21 removes the old no-op)', () => {
@@ -1579,10 +1595,10 @@ test('MOVE to empty zone space clears a previously-set layout (US-32/33 un-stack
     type: 'MOVE', playerId: 'p1', pileableId: c, toPileId: 'table',
     targetCardId: a, side: 'after', layout: 'stack'
   });
-  assert.equal(layoutOf(next, c), 'stack');
+  assert.ok(stackOf(next, c) !== undefined, 'stacked onto A');
 
   next = reduce(next, { type: 'MOVE', playerId: 'p1', pileableId: c, toPileId: 'table' });
-  assert.equal(layoutOf(next, c), undefined, 'dragging back out to open space returns it to flat spacing');
+  assert.equal(stackOf(next, c), undefined, 'dragging back out to open space returns it to the pile default stack');
 });
 
 test('PLAY straight from hand can stack onto a card already on the table', () => {
@@ -1595,7 +1611,8 @@ test('PLAY straight from hand can stack onto a card already on the table', () =>
     targetCardId: first, side: 'after', layout: 'overlap'
   });
   assert.deepEqual(tableIds(state), [first, second]);
-  assert.equal(layoutOf(state, second), 'overlap');
+  assert.equal(stackOf(state, second), stackOf(state, first), 'the played card joins the table card\'s stack');
+  assert.equal(directionOf(state, second), HORIZONTAL);
 });
 
 test('PICKUP strips layout, so a stacked card does not carry it back into a hand', () => {
@@ -1634,7 +1651,9 @@ test('MOVE: a non-owner moving someone else\'s still-hidden card still gets real
     targetCardId: visible, side: 'after', layout: 'stack'
   });
   assert.deepEqual(tableOf(moved).cards.map((c) => c.id), [visible, hidden]);
-  assert.equal(tableOf(moved).cards[1].layout, 'stack');
+  const [target, dropped] = tableOf(moved).cards;
+  assert.equal(dropped.stackId, target.stackId, 'real placement applied: the moved card joined the target\'s stack');
+  assert.ok(dropped.stackId !== undefined, 'and it is a real stack, not the pile default');
 });
 
 test('MOVE: throws for a target card that is not in the destination zone', () => {
@@ -1660,8 +1679,8 @@ test('removing a card from mid-stack leaves the rest stacked, it does not flatte
 
   next = reduce(next, { type: 'PICKUP', playerId: 'p2', pileableId: b });
   assert.equal(
-    layoutOf(next, c), 'stack',
-    'pulling one card out of a pile must not silently flatten the cards above it - C now stacks onto A',
+    stackOf(next, c), stackOf(next, a),
+    'pulling one card out of a pile must not silently flatten the cards above it - C is still in A\'s stack',
   );
 });
 
@@ -2486,10 +2505,10 @@ test('TAKE_PILE: fully permissive - deck/hand are eligible too now, no kind allo
 // "there is not supposed to be a pickupSplit" - `take`, already in this
 // list, already covers "everything into my hand".)
 test('zonePile/discardPile pileActions: take open to any player on a shared pile, owner-only on a personal one', () => {
-  assert.deepEqual(new PILE_TYPES.plain({}).pileActions({ isShared: true }), ['take', 'split', 'changePileType', 'remove', 'tighten', 'loosen']);
-  assert.deepEqual(new PILE_TYPES.plain({}).pileActions({ isOwner: true }), ['take', 'split', 'changePileType', 'remove', 'tighten', 'loosen']);
+  assert.deepEqual(new PILE_TYPES.plain({}).pileActions({ isShared: true }), ['take', 'split', 'changePileType', 'remove', 'tightenAll', 'loosenAll']);
+  assert.deepEqual(new PILE_TYPES.plain({}).pileActions({ isOwner: true }), ['take', 'split', 'changePileType', 'remove', 'tightenAll', 'loosenAll']);
   assert.deepEqual(new PILE_TYPES.plain({}).pileActions({ isOwner: false, isShared: false }), []);
-  assert.deepEqual(new PILE_TYPES.discard({}).pileActions({ isShared: true }), ['take', 'split', 'changePileType', 'remove', 'tighten', 'loosen']);
+  assert.deepEqual(new PILE_TYPES.discard({}).pileActions({ isShared: true }), ['take', 'split', 'changePileType', 'remove', 'tightenAll', 'loosenAll']);
   assert.deepEqual(new PILE_TYPES.discard({}).pileActions({}), []);
 });
 
@@ -3171,21 +3190,21 @@ test('ADJUST_PILE_SPREAD: loosening lowers the overlap factor from the pile type
   state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
   state = reduce(state, { type: 'ADJUST_PILE_SPREAD', pileId: 'hand:p1', delta: -SPREAD_STEP });
   const hand = state.piles.find((p) => p.id === 'hand:p1');
-  assert.equal(hand.spread, spreadAfter(-1));
+  assert.equal(stackSpreadOf(hand), spreadAfter(-1));
 });
 
 test('ADJUST_PILE_SPREAD: tightening raises it, and repeated steps accumulate', () => {
   let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
   state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
   state = reduce(state, { type: 'ADJUST_PILE_SPREAD', pileId: 'hand:p1', delta: SPREAD_STEP });
-  assert.equal(state.piles.find((p) => p.id === 'hand:p1').spread, spreadAfter(1));
+  assert.equal(stackSpreadOf(state.piles.find((p) => p.id === 'hand:p1')), spreadAfter(1));
 
   // Accumulation checked downward: a hand starts near the tight end of
   // the range, so two steps UP would hit MAX_SPREAD and prove clamping
   // rather than accumulation (which the clamp tests below cover).
   state = reduce(state, { type: 'ADJUST_PILE_SPREAD', pileId: 'hand:p1', delta: -SPREAD_STEP });
   state = reduce(state, { type: 'ADJUST_PILE_SPREAD', pileId: 'hand:p1', delta: -SPREAD_STEP });
-  assert.equal(state.piles.find((p) => p.id === 'hand:p1').spread, spreadAfter(-1));
+  assert.equal(stackSpreadOf(state.piles.find((p) => p.id === 'hand:p1')), spreadAfter(-1));
 });
 
 // Each pile TYPE brings its own starting spread - a hand fans by
@@ -3198,7 +3217,7 @@ test('ADJUST_PILE_SPREAD: a flat pile starts from ITS default (no overlap), not 
   state = reduce(state, { type: 'CREATE_ZONE', name: 'Meld', kind: 'run' });
   const meld = pilesOf(state).find((z) => z.name === 'Meld');
   state = reduce(state, { type: 'ADJUST_PILE_SPREAD', pileId: meld.id, delta: SPREAD_STEP });
-  assert.equal(pilesOf(state).find((z) => z.id === meld.id).spread, SPREAD_STEP);
+  assert.equal(stackSpreadOf(pilesOf(state).find((z) => z.id === meld.id)), SPREAD_STEP);
 });
 
 test('ADJUST_PILE_SPREAD: clamps at fully tightened - further tightening is a no-op, never past the max', () => {
@@ -3207,7 +3226,7 @@ test('ADJUST_PILE_SPREAD: clamps at fully tightened - further tightening is a no
   for (let index = 0; index < 50; index++) {
     state = reduce(state, { type: 'ADJUST_PILE_SPREAD', pileId: 'hand:p1', delta: SPREAD_STEP });
   }
-  assert.equal(state.piles.find((p) => p.id === 'hand:p1').spread, MAX_SPREAD);
+  assert.equal(stackSpreadOf(state.piles.find((p) => p.id === 'hand:p1')), MAX_SPREAD);
 });
 
 test('ADJUST_PILE_SPREAD: clamps at fully loosened - never negative, which would push cards apart', () => {
@@ -3216,7 +3235,7 @@ test('ADJUST_PILE_SPREAD: clamps at fully loosened - never negative, which would
   for (let index = 0; index < 50; index++) {
     state = reduce(state, { type: 'ADJUST_PILE_SPREAD', pileId: 'hand:p1', delta: -SPREAD_STEP });
   }
-  assert.equal(state.piles.find((p) => p.id === 'hand:p1').spread, MIN_SPREAD);
+  assert.equal(stackSpreadOf(state.piles.find((p) => p.id === 'hand:p1')), MIN_SPREAD);
 });
 
 test('ADJUST_PILE_SPREAD: throws for a pile that does not exist', () => {
@@ -3247,14 +3266,14 @@ test('ADJUST_PILE_SPREAD: the spread survives cards moving in and out of the pil
   let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
   state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
   state = reduce(state, { type: 'ADJUST_PILE_SPREAD', pileId: 'hand:p1', delta: -SPREAD_STEP });
-  const adjusted = state.piles.find((p) => p.id === 'hand:p1').spread;
+  const adjusted = stackSpreadOf(state.piles.find((p) => p.id === 'hand:p1'));
 
   const pileableId = handOf(state, 'p1')[0].id;
   state = reduce(state, { type: 'MOVE', playerId: 'p1', pileableId, toPileId: 'table' });
-  assert.equal(state.piles.find((p) => p.id === 'hand:p1').spread, adjusted, 'survives a card leaving');
+  assert.equal(stackSpreadOf(state.piles.find((p) => p.id === 'hand:p1')), adjusted, 'survives a card leaving');
 
   state = reduce(state, { type: 'PICKUP', playerId: 'p1', pileableId });
-  assert.equal(state.piles.find((p) => p.id === 'hand:p1').spread, adjusted, 'and a card arriving');
+  assert.equal(stackSpreadOf(state.piles.find((p) => p.id === 'hand:p1')), adjusted, 'and a card arriving');
 });
 
 test('ADJUST_PILE_SPREAD: the spread reaches the VIEW, not just the state - the wiring the reducer tests cannot see', () => {
@@ -3263,7 +3282,7 @@ test('ADJUST_PILE_SPREAD: the spread reaches the VIEW, not just the state - the 
   state = reduce(state, { type: 'ADJUST_PILE_SPREAD', pileId: 'hand:p1', delta: -SPREAD_STEP });
 
   const pileView = viewFor(state, 'p1').piles.find((p) => p.id === 'hand:p1');
-  assert.equal(pileView.spread, spreadAfter(-1));
+  assert.equal(pileView.stacks?.[DEFAULT_STACK_KEY]?.spread, spreadAfter(-1));
 });
 
 test('an unadjusted pile carries spread: undefined in its view, so the type default applies', () => {
@@ -3478,4 +3497,101 @@ test('MOVE_PILE: a hand pile can be moved between zones now', () => {
   state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 2 });
   state = reduce(state, { type: 'MOVE_PILE', pileId: 'hand:p1', targetZoneId: 'table-zone' });
   assert.equal(pilesOf(state).find((p) => p.id === 'hand:p1').zoneId, 'table-zone');
+});
+
+// ---------------------------------------------------------------------
+// D129 Condition 1 (Morpheus, iteration-1 review): `stackId` is a
+// placement stamp and must be stripped everywhere `layout` is, or a
+// card carries a stale stack membership into its next pile and lands
+// in a PHANTOM stack there - a stack with no cards a player ever put
+// in it. `stackId` subsumes the old per-card `layout: 'column'` flag,
+// so it has to inherit that flag's strip sites too; the two helpers
+// (`toHandCard`/`toDeckCard`) are the only choke points, and these
+// tests go through the real actions rather than calling them directly.
+// ---------------------------------------------------------------------
+
+/**
+ * Put a card carrying a stale stackId on the table, ready to move.
+ */
+function withStackedTableCard(state, stackId = 'left') {
+  const table = tableOf(state);
+  const card = { id: 'stacked-1', rank: 'A', suit: 'spades', pileableType: 'card', stackId };
+  return {
+    ...state,
+    piles: state.piles.map((pile) => (pile.id === table.id ? { ...pile, cards: [card] } : pile)),
+  };
+}
+
+test('D129: PICKUP into a hand strips stackId, same as layout', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = withStackedTableCard(state);
+
+  state = reduce(state, { type: 'PICKUP', playerId: 'p1', pileableId: 'stacked-1' });
+
+  const [picked] = handOf(state, 'p1');
+  assert.equal(picked.id, 'stacked-1');
+  assert.ok(!('stackId' in picked), `a hand card must carry no stackId, got ${picked.stackId}`);
+});
+
+test('D129: TAKE_PILE into a hand strips stackId from every card', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  const table = tableOf(state);
+  const cards = [
+    { id: 's1', rank: 'A', suit: 'spades', pileableType: 'card', stackId: 'left' },
+    { id: 's2', rank: 'K', suit: 'hearts', pileableType: 'card', stackId: 'right' },
+  ];
+  state = {
+    ...state,
+    piles: state.piles.map((pile) => (pile.id === table.id ? { ...pile, cards } : pile)),
+  };
+
+  state = reduce(state, { type: 'TAKE_PILE', playerId: 'p1', pileId: table.id });
+
+  const hand = handOf(state, 'p1');
+  assert.equal(hand.length, 2);
+  for (const card of hand) {
+    assert.ok(!('stackId' in card), `${card.id} must carry no stackId into a hand`);
+  }
+});
+
+test('D129: a re-DEAL reclaiming hand cards strips stackId back off', () => {
+  // `toDeckCard`'s own path: cards still in a hand are folded back into
+  // the rebuilt deck, and must return to a plain deck card's shape.
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  // A REAL deck card, drawn into the hand - a synthetic one would be
+  // rejected by `assertCardsConserved` when DEAL rebuilds the deck,
+  // which is the reducer correctly refusing to invent cards.
+  state = reduce(state, { type: 'DRAW', pileId: 'deck', playerId: 'p1' });
+  // Then stamp it: this is the shape a card would have if it had been
+  // placed into a stack and then picked up.
+  state = {
+    ...state,
+    piles: state.piles.map((pile) => (pile.kind === 'hand'
+      ? { ...pile, cards: pile.cards.map((card) => ({ ...card, stackId: 'stale' })) }
+      : pile)),
+  };
+
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 2 });
+
+  for (const card of deckOf(state)) {
+    assert.ok(!('stackId' in card), `${card.id} must carry no stackId in the deck`);
+  }
+});
+
+test('D129: a plain move to another pile clears membership - a stackId is PILE-scoped', () => {
+  // Corrected from an earlier version of this test that asserted the
+  // opposite. A `stackId` names a stack WITHIN one pile, and `stacks`
+  // metadata lives on that pile - so carrying it to a different pile
+  // would point at a stack that does not exist there. A plain move
+  // (no direction hint) lands the card in the destination's own
+  // default stack, which is what "dropped in open space" means.
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = withStackedTableCard(state, 'left');
+  state = reduce(state, { type: 'CREATE_ZONE', playerId: 'p1', name: 'Elsewhere' });
+  const destination = pilesOf(state).find((pile) => pile.name === 'Elsewhere');
+
+  state = reduce(state, { type: 'MOVE', playerId: 'p1', pileableId: 'stacked-1', toPileId: destination.id });
+
+  const moved = pilesOf(state).flatMap((pile) => pile.cards).find((card) => card.id === 'stacked-1');
+  assert.equal(moved.stackId, undefined, 'the old pile\'s stack does not follow it');
 });
