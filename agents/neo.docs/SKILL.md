@@ -164,6 +164,46 @@ bobp make -vv test    # shows failure lines live; no tail needed
 If a tool has no make target (e.g. `bandit`, `py_compile`), add one to this project's own
 `Makefile` — do not call `.venv/bin/` directly.
 
+**2026-09-10 regression**: despite the rule above already being written with "real teeth" since
+2026-07-10, a single session (9069c7ff) still produced **106** `bobp make <target> 2>&1 | grep/tail
+...` calls — worse than the original 39-instance finding that motivated writing this section at
+all. Restating the rule harder didn't fix it the first time; the actual fix is behavioral: **the
+instant you catch yourself typing `bobp make` followed by `2>&1`, stop and use `test-q` or a
+follow-up `tail`/`grep` on `build/build.out` instead**, every single time, not just when you
+remember to check this doc.
+
+## No One-Off Validation (HARD — write it into `tests/`, not a throwaway probe)
+
+**Never verify behavior with a probe you're going to discard.** That includes: a `node -e`/REPL
+one-liner poking at a function, a temporary `console.log` dropped into source to eyeball output, an
+env-gated debug hook (`if (process.env.SOME_FLAG) { ...screenshot/log... }`) spliced into
+test/production code, a throwaway git-worktree checkout to run a lint/build check outside the
+working tree, or a hand-rolled bash mutation loop (backup a file to scratch, mutate it with
+sed/python, re-run, diff, restore) to "prove" a test can fail.
+
+**Why:** a probe costs the same tokens as writing the assertion into `tests/` once, but is deleted
+immediately — the next session (or the next reviewer) gets nothing back for that cost, and the
+property it checked is guarded by nothing going forward. A mutation-check bash loop is the *same*
+violation wearing a QA-process costume, not an exception to it: "4 mutations, 4 killed" typed into
+a chat message is worth nothing next time this code changes.
+
+**How to apply:**
+- Tempted to probe? Write the assertion into `tests/` instead — unit if pure, `*.browser.mjs` if it
+  needs real layout/DOM.
+- Mutation-check only the specific regression tests that need proving they can fail (a new
+  load-bearing guard, a bug-fix regression test) — and even then, prefer temporarily reverting the
+  real fix in actual source and watching the real suite fail, over a bespoke backup/restore script.
+  If a hand-written mutation loop feels necessary, that's a signal the assertions themselves aren't
+  specific enough yet — tighten them instead of building tooling to compensate.
+- Don't mutation-check routine, on-pattern additions at all — the existing suite plus review is
+  enough.
+- A baseline question ("was this already broken?") gets answered by adding the test and watching it
+  fail, not by diffing against a worktree checkout.
+- This rule doesn't relax once you've applied it once in a session — a repeat later in the same
+  session is worse than the first instance, not a pass. (Confirmed regression case: 2026-09-10,
+  session 9069c7ff — the user corrected this exact pattern once, then caught it again later in the
+  same session.)
+
 **This has real teeth now, not just in theory**: `python3 agents/tools/trace_annotate.py` (see
 `agents/skills/judge/SKILL.md`) reads real Claude Code session transcripts and counts these
 exact patterns. It was orphaned (missing dependency, no make target) until 2026-07-10 — the

@@ -340,4 +340,12 @@ sequenceDiagram
     Note right of Trin: "trin: vectorized fix<br/>worked - 77s total (was<br/>10+min killed twice).<br/>But the DATA itself<br/>surfaced a real<br/>methodology bug:<br/>80158/305590 pairs…"
     Trin->>All: "report"
     Note right of Trin: "trin: audit DONE. 80.7%<br/>unit coverage of touched<br/>files, 21 files with<br/>real gaps, healthy 17:1<br/>unit:integration case<br/>ratio. Redundancy: the…"
+    Trin->>Smith: "qa handoff"
+    Note right of Trin: "judge tool-use run:<br/>trace generated (729<br/>calls, session<br/>9069c7ff), manual review<br/>done in agents/trin.docs<br/>/judge_tool_use_trace.md<br/>. @Smith *…"
+    Smith->>Bob: "user feedback"
+    Note right of Smith: "TES 0/100 (106 AP-MAKE-<br/>PIPE + 5 AP-ONEOFF-<br/>VALIDATION confirmed,<br/>AP-MAKE-BYPASS/AP-VIA-<br/>GREP/AP-RAW-VENV<br/>overridden as false<br/>positives). No c…"
+    Bob->>Trin: "prompt update"
+    Note right of Bob: "Updated<br/>agents/neo.docs/SKILL.md<br/>(No One-Off Validation<br/>section + AP-MAKE-PIPE<br/>regression note) and age<br/>nts/trin.docs/SKILL.md<br/>(UAT gate: No…"
+    Trin->>All: "qa verify"
+    Note right of Trin: "Verified: both SKILL.md<br/>files carry the new<br/>rule, no re-score<br/>attempted on this live<br/>session per protocol<br/>(would just count this<br/>judge run'…"
 ```
