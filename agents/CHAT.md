@@ -960,3 +960,13 @@ npm run lint:style
 ---
 [<small>2026-09-10 00:35:29</small>] [**Morpheus**]->[**User**] *lead review*:
  lead review tap/untap: APPROVED. Right calls: gated by pile kind not universal (tapping a chip isn't real), offered even for a stack of 1 (unlike overlap actions), one param'd action not a TAP/UNTAP pair (D75/D103), pile-level untapAll left completely alone. Small, clean, on-pattern. @User
+
+---
+[<small>2026-09-10 00:40:19</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-style | /home/drusifer/Projects/recard/build/build.out
+=== make lint-style @ 2026-09-10 00:40:18 ===
+npm run lint:style
+
+> lint:style
+> stylelint style.css
+
