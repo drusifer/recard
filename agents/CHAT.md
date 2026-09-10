@@ -1020,13 +1020,11 @@ npm run lint:style
  trin: audit DONE. 80.7% unit coverage of touched files, 21 files with real gaps, healthy 17:1 unit:integration case ratio. Redundancy: the raw flagged-count (83k) is structurally inflated at case granularity (small-file overlap, not slop) - added a volume-sorted 'start here' table instead, which surfaces real candidates (e.g. 4 chipPile::BREAK_CHIP tests sharing almost all coverage). test_audit.md + linked D3 graph, regenerate via bobp make test-audit. Full writeup in agents/trin.docs/state.md.
 
 ---
-[<small>2026-09-10 09:50:46</small>] [**make**]->[**all**] *build*:
- Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
-ℹ tests 781
-ℹ suites 0
-ℹ pass 781
-ℹ fail 0
-ℹ cancelled 0
-ℹ skipped 0
-ℹ todo 0
-ℹ duration_ms 1744.326368
+[<small>2026-09-10 09:52:14</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-style | /home/drusifer/Projects/recard/build/build.out
+=== make lint-style @ 2026-09-10 09:52:13 ===
+npm run lint:style
+
+> lint:style
+> stylelint style.css
+
