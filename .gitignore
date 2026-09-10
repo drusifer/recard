@@ -52,6 +52,20 @@ htmlcov/
 .cache
 nosetests.xml
 coverage.xml
+
+# tools/testAudit - regenerated on demand (`bobp make test-audit`),
+# never committed: a stale audit against changed code is worse than
+# none, since it looks authoritative.
+/coverage/
+/test_audit.md
+/test_audit_graph.html
+
+# tools/codeConnectome - graph.json is pure intermediate data
+# (`buildGraph.mjs` output, fed into `render.mjs`); connectome.html
+# (the actual published artifact source) and the template ARE
+# committed, since regenerating an identical polished page isn't a
+# one-line command a stale-data warning would cover the same way.
+/tools/codeConnectome/graph.json
 *.cover
 *.py.cover
 .hypothesis/
