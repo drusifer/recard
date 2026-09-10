@@ -970,3 +970,63 @@ npm run lint:style
 > lint:style
 > stylelint style.css
 
+
+---
+[<small>2026-09-10 00:53:33</small>] [**User**]->[**all**] *request*:
+ *trin: run an audit on unit tests to eliminate wasteful/duplicative tests - per-file coverage in isolation (src only, not deps), a pandas tool analyzing which code each test covers, generating a rich test_audit.md dashboard (heatmap/D3 connections graph) for eliminating test slop.
+
+---
+[<small>2026-09-10 00:53:38</small>] [**Trin**]->[**all**] *init*:
+ trin init: starting the unit-test coverage audit (direct request). Plan: c8 per-test-file coverage (Istanbul JSON, src/** only) -> pandas analyzer -> test_audit.md with redundancy/gap tables + heatmap + a linked D3 connections graph. Granularity is per-FILE, not per-case (documented tradeoff).
+
+---
+[<small>2026-09-10 01:01:34</small>] [**Trin**]->[**all**] *update*:
+ trin update: file-level coverage pipeline (c8, src/tools/designLint.mjs scoped) validated end to end - 29/29 unit test files, 0 crashed, pass-count sums to 781 exactly matching the real suite. Before building the pandas analyzer at that granularity, checking whether node's own --test-name-pattern + c8 can give real PER-TEST-CASE granularity cheaply (no invasive edits to the 29 test files) - timing it now.
+
+---
+[<small>2026-09-10 01:04:26</small>] [**Trin**]->[**all**] *update*:
+ trin update: --test-name-pattern + c8 gives real per-CASE coverage (verified: an isolated case covers fewer statements than its full file, e.g. 108-123/131 vs 131/131). No duplicate case names in the suite, so all 781 are cleanly isolable. Smoke-tested (11/11 correct, 5s). Kicking off the full 781-case collection in background now, ~6min estimated.
+
+---
+[<small>2026-09-10 01:10:54</small>] [**User**]->[**all**] *request*:
+ *smith: make a cool modern viz of the code's 'connect-ome' - interactive code overlay and/or nested heatmap, go for the wow factor (side-quest, parallel to the trin coverage audit).
+
+---
+[<small>2026-09-10 01:11:07</small>] [**Trin**]->[**Smith**] *handoff*:
+ trin: pausing mid-audit for a Smith side-quest, not done - the real 781-case collection is running in background (~6min, on track). Resume point + full state in agents/trin.docs/state.md. @Smith *user viz
+
+---
+[<small>2026-09-10 01:11:16</small>] [**Smith**]->[**all**] *init*:
+ smith init: side-quest - a 'code connectome' viz, wow factor requested. Plan: static import-graph extraction over src/** (real module wiring, not test coverage - Trin's tool already covers that angle), published as a polished interactive Artifact (force graph + treemap toggle, modern dark UI, hover/click ego-highlighting). Loading design/diagramming/dataviz skills before building.
+
+---
+[<small>2026-09-10 01:15:16</small>] [**Trin**]->[**all**] *update*:
+ trin: background collection finished clean - 781/781 cases, 0 notable (no inter-test coupling surfaced). Data ready at coverage/per-case/. Will generate the real test_audit.md once the Smith side-quest artifact is done.
+
+---
+[<small>2026-09-10 09:06:06</small>] [**Smith**]->[**Trin**] *handoff*:
+ smith: 'Recard Connectome' published - real import-graph data (67 files/120 edges/0 cycles, DFS-verified), force graph + nested-heatmap treemap toggle, ego-highlighting, click-through detail panel with real dependents/dependencies. Caught 2 real bugs via one Playwright look (not the declined Chrome ext): force layout drifting off-viewport at 67 nodes, treemap inheriting the graph's zoom transform. Link: https://claude.ai/code/artifact/856a2991-470b-434a-8a99-299f5b689e30 @Trin *qa resume audit
+
+---
+[<small>2026-09-10 09:06:11</small>] [**Trin**]->[**all**] *resume*:
+ trin: resuming - real 781-case data ready, generating test_audit.md now.
+
+---
+[<small>2026-09-10 09:29:42</small>] [**Trin**]->[**all**] *update*:
+ trin: vectorized fix worked - 77s total (was 10+min killed twice). But the DATA itself surfaced a real methodology bug: 80158/305590 pairs (26%) flagged as 'redundant' - swamped by src/decks/rtg/catalog.js, a GENERATED 3584-line card-data file every deck test trivially iterates in full. Excluded it from 'our code' scope (real scope correction, not number-tuning) and re-running the full collection now.
+
+---
+[<small>2026-09-10 09:39:37</small>] [**Trin**]->[**all**] *report*:
+ trin: audit DONE. 80.7% unit coverage of touched files, 21 files with real gaps, healthy 17:1 unit:integration case ratio. Redundancy: the raw flagged-count (83k) is structurally inflated at case granularity (small-file overlap, not slop) - added a volume-sorted 'start here' table instead, which surfaces real candidates (e.g. 4 chipPile::BREAK_CHIP tests sharing almost all coverage). test_audit.md + linked D3 graph, regenerate via bobp make test-audit. Full writeup in agents/trin.docs/state.md.
+
+---
+[<small>2026-09-10 09:50:46</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 781
+ℹ suites 0
+ℹ pass 781
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1744.326368

@@ -52,3 +52,46 @@ inheriting the chip value - but that is the user's call.
   fan and hover-raise both compose `transform`, and moving wrappers
   to absolute positioning frees that property - a likely regression
   site for the hover-raise cue specifically.
+
+---
+
+## Side-quest: Recard Connectome (2026-09-10)
+
+Direct user request: "make a cool modern viz of the code's connect-ome
+... interactive code overlay and/or nested heatmap, go for the wow
+factor." Published: https://claude.ai/code/artifact/856a2991-470b-434a-8a99-299f5b689e30
+
+**Real data, not decoration.** `tools/codeConnectome/buildGraph.mjs`
+statically extracts the actual import graph of `src/**` (regex-based,
+verified against the real import style first - single-line
+`import ... from '...'`/`export ... from '...'`, both forms present
+and both captured) - 67 files, 120 edges, plus real fan-in/fan-out per
+file and a genuine DFS cycle check (0 cycles - a real, verifiable fact
+about this codebase, not a placeholder number).
+
+**Design**: dark-first instrument-panel aesthetic (IBM Plex Mono +
+IBM Plex Sans, both themes built properly per the artifact-design
+skill), a validated 7-hue categorical palette (dataviz skill's
+validator, both light/dark surfaces, PASS with the documented
+light-mode contrast WARN mitigated by real text labels everywhere -
+never color-alone). Two views: force-directed connectome (drag/zoom,
+hover ego-network highlighting, click pins a detail panel with real
+dependents/dependencies) and a nested-heatmap treemap (sized by LOC,
+grouped by directory, same category colors).
+
+**One look, one edit pass** (per the skill's own process, using the
+project's own already-installed Playwright rather than the declined
+Chrome extension): caught and fixed two real bugs neither showed up
+in code review - (1) the force layout drifted subgraphs off the
+bottom of the viewport at 67 nodes (fixed: boundary-clamped tick
+handler + a proper zoom-to-fit after the simulation settles, not
+more force-tuning), (2) switching to the treemap rendered through the
+force view's leftover zoom transform (a wall of giant cropped
+rectangles) - fixed with an explicit identity-transform reset on
+entry to tree mode.
+
+Minor, left as-is (did not keep iterating past the one edit pass): a
+little label crowding near a few adjacent hubs in the force view, and
+the legend panel corner-overlaps one treemap tile at certain window
+sizes. Real polish, not correctness bugs - the user's to ask for if
+it matters to them.

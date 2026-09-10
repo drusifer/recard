@@ -1,0 +1,768 @@
+<title>Recard Connectome</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --surface-0: #f8f6f1;
+    --surface-1: #ffffff;
+    --surface-2: #efece4;
+    --border: #dcd7cb;
+    --text-primary: #15181f;
+    --text-secondary: #5b6472;
+    --text-muted: #8b8f96;
+    --accent: #b96e08;
+    --accent-ink: #2a1900;
+    --accent-soft: #f3dfb8;
+    --danger: #c53a30;
+    --cat-piles: #2a78d6;
+    --cat-root: #eb6834;
+    --cat-components: #1baf7a;
+    --cat-decks: #eda100;
+    --cat-pileables: #e87ba4;
+    --cat-zones: #008300;
+    --cat-cards: #4a3aa7;
+    --edge: #cdc8ba;
+    --edge-active: #15181f;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    --font-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface-0: #0d1117;
+      --surface-1: #141b24;
+      --surface-2: #1a222d;
+      --border: #29323e;
+      --text-primary: #edf1f7;
+      --text-secondary: #9aa6b6;
+      --text-muted: #647082;
+      --accent: #f0a83c;
+      --accent-ink: #241300;
+      --accent-soft: #3a2a10;
+      --danger: #e66767;
+      --cat-piles: #3987e5;
+      --cat-root: #d95926;
+      --cat-components: #199e70;
+      --cat-decks: #c98500;
+      --cat-pileables: #d55181;
+      --cat-zones: #008300;
+      --cat-cards: #9085e9;
+      --edge: #29323e;
+      --edge-active: #edf1f7;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-0: #0d1117;
+    --surface-1: #141b24;
+    --surface-2: #1a222d;
+    --border: #29323e;
+    --text-primary: #edf1f7;
+    --text-secondary: #9aa6b6;
+    --text-muted: #647082;
+    --accent: #f0a83c;
+    --accent-ink: #241300;
+    --accent-soft: #3a2a10;
+    --danger: #e66767;
+    --cat-piles: #3987e5;
+    --cat-root: #d95926;
+    --cat-components: #199e70;
+    --cat-decks: #c98500;
+    --cat-pileables: #d55181;
+    --cat-zones: #008300;
+    --cat-cards: #9085e9;
+    --edge: #29323e;
+    --edge-active: #edf1f7;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--surface-0);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    overflow: hidden;
+    height: 100vh;
+  }
+  ::selection { background: var(--accent-soft); }
+
+  .app {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    height: 100vh;
+  }
+
+  /* ---- Header ---------------------------------------------------- */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    padding: 14px 22px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-1);
+    flex-wrap: wrap;
+    z-index: 5;
+  }
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    white-space: nowrap;
+  }
+  .brand-mark {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 19px;
+    letter-spacing: -0.02em;
+  }
+  .brand-mark span { color: var(--accent); }
+  .brand-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+  .stats {
+    display: flex;
+    gap: 20px;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+  .stat { display: flex; flex-direction: column; gap: 1px; }
+  .stat-value { font-size: 16px; font-weight: 600; line-height: 1.1; }
+  .stat-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .stat-value.zero { color: var(--cat-components); }
+
+  .toggle-group {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    overflow: hidden;
+    margin-left: auto;
+  }
+  .toggle-group button {
+    font: inherit;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 7px 13px;
+    background: var(--surface-1);
+    color: var(--text-secondary);
+    border: none;
+    cursor: pointer;
+  }
+  .toggle-group button + button { border-left: 1px solid var(--border); }
+  .toggle-group button[aria-pressed="true"] {
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+  .toggle-group button:focus-visible,
+  input:focus-visible,
+  #search:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  .search-wrap { position: relative; }
+  #search {
+    font: inherit;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    border-radius: 7px;
+    padding: 7px 10px 7px 28px;
+    width: 190px;
+  }
+  #search::placeholder { color: var(--text-muted); }
+  .search-icon {
+    position: absolute;
+    left: 9px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+    font-size: 12px;
+  }
+
+  /* ---- Stage ------------------------------------------------------ */
+  .stage {
+    position: relative;
+    min-height: 0;
+  }
+  svg#viz { width: 100%; height: 100%; display: block; cursor: grab; }
+  svg#viz:active { cursor: grabbing; }
+
+  .legend {
+    position: absolute;
+    left: 18px;
+    bottom: 18px;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+  }
+  .legend-title {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+  }
+  .legend-row { display: flex; align-items: center; gap: 7px; }
+  .swatch { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .legend-row span:last-child { color: var(--text-secondary); font-family: var(--font-mono); font-size: 11.5px; }
+
+  .hint {
+    position: absolute;
+    right: 18px;
+    bottom: 18px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    max-width: 220px;
+    text-align: right;
+    line-height: 1.5;
+  }
+
+  /* ---- Detail panel ------------------------------------------------ */
+  #panel {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    width: 300px;
+    max-height: calc(100% - 36px);
+    overflow-y: auto;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.16);
+    transform: translateX(calc(100% + 30px));
+    transition: transform 0.28s cubic-bezier(.2,.8,.2,1);
+  }
+  #panel.open { transform: translateX(0); }
+  #panel .panel-head {
+    padding: 16px 16px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  #panel .panel-dir {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  #panel .panel-file {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 600;
+    word-break: break-all;
+    line-height: 1.35;
+  }
+  #panel .panel-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  #panel .metric-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  #panel .metric-value { font-family: var(--font-mono); font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  #panel .panel-section { padding: 12px 16px; }
+  #panel .panel-section-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+  #panel .panel-list { display: flex; flex-direction: column; gap: 5px; }
+  #panel .panel-list button {
+    font: inherit;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    text-align: left;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    border-radius: 6px;
+    padding: 5px 8px;
+    cursor: pointer;
+    word-break: break-all;
+  }
+  #panel .panel-list button:hover { border-color: var(--accent); }
+  #panel .empty-note { font-size: 11.5px; color: var(--text-muted); font-style: italic; }
+  #panel .close-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 15px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 4px;
+  }
+  #panel .close-btn:hover { color: var(--text-primary); }
+
+  #tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: var(--text-primary);
+    color: var(--surface-0);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 5px 8px;
+    border-radius: 5px;
+    opacity: 0;
+    transform: translate(-50%, -130%);
+    white-space: nowrap;
+    z-index: 20;
+    transition: opacity 0.1s;
+  }
+
+  .node-label {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    fill: var(--text-secondary);
+    pointer-events: none;
+    paint-order: stroke;
+    stroke: var(--surface-0);
+    stroke-width: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition-duration: 0.001ms !important; animation-duration: 0.001ms !important; }
+  }
+</style>
+
+<div class="app">
+  <header>
+    <div class="brand">
+      <span class="brand-mark">recard<span>::</span>connectome</span>
+      <span class="brand-sub">import graph of src/</span>
+    </div>
+    <div class="stats">
+      <div class="stat"><span class="stat-value" id="stat-files">–</span><span class="stat-label">files</span></div>
+      <div class="stat"><span class="stat-value" id="stat-edges">–</span><span class="stat-label">imports</span></div>
+      <div class="stat"><span class="stat-value" id="stat-hub">–</span><span class="stat-label">top hub</span></div>
+      <div class="stat"><span class="stat-value zero" id="stat-cycles">–</span><span class="stat-label">cycles</span></div>
+    </div>
+    <div class="search-wrap">
+      <span class="search-icon">⌕</span>
+      <input id="search" type="text" placeholder="filter by filename…" autocomplete="off">
+    </div>
+    <div class="toggle-group" role="group" aria-label="visualization mode">
+      <button id="mode-graph" aria-pressed="true">Connectome</button>
+      <button id="mode-tree" aria-pressed="false">Nested heatmap</button>
+    </div>
+  </header>
+
+  <div class="stage">
+    <svg id="viz" role="img" aria-label="Interactive force-directed graph of import relationships between recard's source files"></svg>
+
+    <div class="legend" id="legend">
+      <div class="legend-title">Directory</div>
+    </div>
+
+    <div class="hint" id="hint">drag to reposition · scroll to zoom · hover to trace · click to pin</div>
+
+    <aside id="panel" aria-live="polite">
+      <button class="close-btn" id="panel-close" aria-label="Close">✕</button>
+      <div class="panel-head">
+        <div class="panel-dir" id="panel-dir"></div>
+        <div class="panel-file" id="panel-file"></div>
+      </div>
+      <div class="panel-metrics">
+        <div><div class="metric-label">Lines</div><div class="metric-value" id="panel-loc"></div></div>
+        <div><div class="metric-label">Exports</div><div class="metric-value" id="panel-exports"></div></div>
+        <div><div class="metric-label">Fan-in</div><div class="metric-value" id="panel-fanin"></div></div>
+        <div><div class="metric-label">Fan-out</div><div class="metric-value" id="panel-fanout"></div></div>
+      </div>
+      <div class="panel-section">
+        <div class="panel-section-title">Depended on by</div>
+        <div class="panel-list" id="panel-dependents"></div>
+      </div>
+      <div class="panel-section">
+        <div class="panel-section-title">Depends on</div>
+        <div class="panel-list" id="panel-dependencies"></div>
+      </div>
+    </aside>
+
+    <div id="tooltip"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script>
+const GRAPH = __GRAPH_JSON__;
+
+const CAT_ORDER = ['piles', '(root)', 'components', 'decks', 'pileables', 'zones', 'cards'];
+const CAT_VAR = {
+  'piles': '--cat-piles', '(root)': '--cat-root', 'components': '--cat-components',
+  'decks': '--cat-decks', 'pileables': '--cat-pileables', 'zones': '--cat-zones', 'cards': '--cat-cards',
+};
+const CAT_LABEL = {
+  'piles': 'piles/', '(root)': 'src/ (root)', 'components': 'components/',
+  'decks': 'decks/', 'pileables': 'pileables/', 'zones': 'zones/', 'cards': 'cards/',
+};
+
+const root = getComputedStyle(document.documentElement);
+function catColor(dir) { return root.getPropertyValue(CAT_VAR[dir] || '--cat-root').trim() || '#888'; }
+
+// ---- derived indices -------------------------------------------------
+const nodeById = new Map(GRAPH.nodes.map(n => [n.id, n]));
+const neighbors = new Map(GRAPH.nodes.map(n => [n.id, new Set()]));
+const outgoing = new Map(GRAPH.nodes.map(n => [n.id, []]));
+const incoming = new Map(GRAPH.nodes.map(n => [n.id, []]));
+for (const l of GRAPH.links) {
+  neighbors.get(l.source).add(l.target);
+  neighbors.get(l.target).add(l.source);
+  outgoing.get(l.source).push(l.target);
+  incoming.get(l.target).push(l.source);
+}
+
+const maxLoc = Math.max(...GRAPH.nodes.map(n => n.loc));
+const radiusScale = d3.scaleSqrt().domain([0, maxLoc]).range([4.5, 26]);
+
+// ---- header stats ------------------------------------------------
+const topHub = [...GRAPH.nodes].sort((a, b) => b.fanIn - a.fanIn)[0];
+document.getElementById('stat-files').textContent = GRAPH.nodes.length;
+document.getElementById('stat-edges').textContent = GRAPH.links.length;
+document.getElementById('stat-hub').textContent = topHub.id.split('/').pop().replace('.js', '');
+document.getElementById('stat-hub').title = topHub.id + ' — fan-in ' + topHub.fanIn;
+document.getElementById('stat-cycles').textContent = GRAPH.cycles.length;
+if (GRAPH.cycles.length > 0) document.getElementById('stat-cycles').classList.remove('zero');
+
+// ---- legend --------------------------------------------------------
+const legendEl = document.getElementById('legend');
+for (const dir of CAT_ORDER) {
+  if (!GRAPH.nodes.some(n => n.dir === dir)) continue;
+  const row = document.createElement('div');
+  row.className = 'legend-row';
+  const count = GRAPH.nodes.filter(n => n.dir === dir).length;
+  row.innerHTML = '<span class="swatch" style="background:' + catColor(dir) + '"></span><span>' + CAT_LABEL[dir] + ' (' + count + ')</span>';
+  legendEl.appendChild(row);
+}
+
+// ---- tooltip ---------------------------------------------------------
+const tooltip = document.getElementById('tooltip');
+function showTooltip(event, text) {
+  tooltip.textContent = text;
+  tooltip.style.left = event.clientX + 'px';
+  tooltip.style.top = event.clientY + 'px';
+  tooltip.style.opacity = 1;
+}
+function hideTooltip() { tooltip.style.opacity = 0; }
+
+// ---- svg setup ---------------------------------------------------------
+const svg = d3.select('#viz');
+const zoomLayer = svg.append('g');
+const linkLayer = zoomLayer.append('g').attr('class', 'links');
+const nodeLayer = zoomLayer.append('g').attr('class', 'nodes');
+const labelLayer = zoomLayer.append('g').attr('class', 'labels');
+
+const zoomBehavior = d3.zoom().scaleExtent([0.25, 4]).on('zoom', (event) => {
+  zoomLayer.attr('transform', event.transform);
+});
+svg.call(zoomBehavior);
+
+/** Frames the current node set inside the stage, once the force layout
+ * has had time to settle - an organic cluster rarely fills a
+ * rectangular viewport on its own, and re-fighting force-strength
+ * numbers to coax it into doing so is the wrong tool. Standard
+ * technique: measure the real bounding box, then drive the SAME zoom
+ * behavior the user's own scroll/drag already uses, so this is one
+ * mechanism, not a second positioning system living beside it. */
+function fitToView(nodesCopy) {
+  const { w, h } = dims();
+  const xs = nodesCopy.map(n => n.x); const ys = nodesCopy.map(n => n.y);
+  const x0 = Math.min(...xs) - 30, x1 = Math.max(...xs) + 30;
+  const y0 = Math.min(...ys) - 30, y1 = Math.max(...ys) + 30;
+  const scale = Math.min(3, 0.92 / Math.max((x1 - x0) / w, (y1 - y0) / h));
+  const tx = w / 2 - scale * (x0 + x1) / 2;
+  const ty = h / 2 - scale * (y0 + y1) / 2;
+  svg.transition().duration(500)
+    .call(zoomBehavior.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
+}
+
+function dims() {
+  const rect = svg.node().getBoundingClientRect();
+  return { w: rect.width || 900, h: rect.height || 600 };
+}
+
+// ==== CONNECTOME (force-directed) VIEW ===================================
+let simulation = null;
+let linkSel, nodeSel, labelSel;
+let pinnedId = null;
+
+function buildForceView() {
+  const { w, h } = dims();
+  linkLayer.selectAll('*').remove();
+  nodeLayer.selectAll('*').remove();
+  labelLayer.selectAll('*').remove();
+
+  const nodesCopy = GRAPH.nodes.map(n => ({ ...n }));
+  const nodeMap = new Map(nodesCopy.map(n => [n.id, n]));
+  const linksCopy = GRAPH.links.map(l => ({ source: l.source, target: l.target }));
+
+  // Seed positions on a circle so the FIRST frame already reads as
+  // structure, not a pile at the origin waiting for physics.
+  nodesCopy.forEach((n, i) => {
+    const a = (i / nodesCopy.length) * Math.PI * 2;
+    n.x = w / 2 + Math.cos(a) * Math.min(w, h) * 0.32;
+    n.y = h / 2 + Math.sin(a) * Math.min(w, h) * 0.32;
+  });
+
+  // Bounded, not merely centered: with 67 nodes a purely physics-driven
+  // layout (weak centering pull vs. strong mutual repulsion) drifts
+  // subgraphs past the visible stage before it settles, which breaks
+  // "show the page at rest" - found in the one look this skill's own
+  // process calls for, not guessed at. Strong x/y pull keeps the WHOLE
+  // thing gathered; the tick handler below hard-clamps to the stage
+  // as a floor under that, so nothing can end up off-canvas even
+  // mid-simulation.
+  simulation = d3.forceSimulation(nodesCopy)
+    .force('link', d3.forceLink(linksCopy).id(d => d.id).distance(42).strength(0.4))
+    .force('charge', d3.forceManyBody().strength(-90))
+    .force('center', d3.forceCenter(w / 2, h / 2))
+    .force('collide', d3.forceCollide(d => radiusScale(d.loc) + 7))
+    .force('x', d3.forceX(w / 2).strength(0.09))
+    .force('y', d3.forceY(h / 2).strength(0.11));
+
+  linkSel = linkLayer.selectAll('line').data(linksCopy).join('line')
+    .attr('stroke', 'var(--edge)')
+    .attr('stroke-width', 1)
+    .attr('opacity', 0);
+
+  nodeSel = nodeLayer.selectAll('circle').data(nodesCopy, d => d.id).join('circle')
+    .attr('r', d => radiusScale(d.loc))
+    .attr('fill', d => catColor(d.dir))
+    .attr('stroke', 'var(--surface-0)')
+    .attr('stroke-width', 1.5)
+    .attr('opacity', 0)
+    .style('cursor', 'pointer')
+    .call(drag(simulation))
+    .on('mouseenter', (event, d) => { highlightEgo(d.id); showTooltip(event, d.id); })
+    .on('mousemove', (event) => { tooltip.style.left = event.clientX + 'px'; tooltip.style.top = event.clientY + 'px'; })
+    .on('mouseleave', () => { if (!pinnedId) clearHighlight(); hideTooltip(); })
+    .on('click', (event, d) => { event.stopPropagation(); pinnedId = d.id; openPanel(d.id); highlightEgo(d.id); });
+
+  labelSel = labelLayer.selectAll('text').data(nodesCopy, d => d.id).join('text')
+    .attr('class', 'node-label')
+    .attr('text-anchor', 'middle')
+    .attr('opacity', 0)
+    .text(d => d.id.split('/').pop().replace('.js', ''));
+
+  nodeSel.transition().duration(500).delay((_, i) => i * 4).attr('opacity', 1);
+  linkSel.transition().duration(600).delay(150).attr('opacity', 0.55);
+  labelSel.transition().duration(500).delay((_, i) => i * 4 + 200).attr('opacity', d => radiusScale(d.loc) > 9 ? 1 : 0);
+
+  // Run the simulation forward synchronously before the first paint
+  // settles, then frame it - so the visible motion is a brief SETTLE
+  // into an already-composed layout, not a multi-second drift the
+  // viewer has to wait out to see the real shape.
+  for (let i = 0; i < 220; i++) simulation.tick();
+  fitToView(nodesCopy);
+  simulation.on('end', () => fitToView(nodesCopy));
+
+  simulation.on('tick', () => {
+    const pad = 24;
+    for (const n of nodesCopy) {
+      const r = radiusScale(n.loc);
+      n.x = Math.max(pad + r, Math.min(w - pad - r, n.x));
+      n.y = Math.max(pad + r, Math.min(h - pad - r, n.y));
+    }
+    linkSel.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+           .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    nodeSel.attr('cx', d => d.x).attr('cy', d => d.y);
+    labelSel.attr('x', d => d.x).attr('y', d => d.y - radiusScale(d.loc) - 5);
+  });
+
+  window.__nodeMapForce = nodeMap;
+}
+
+function drag(sim) {
+  return d3.drag()
+    .on('start', (event, d) => { if (!event.active) sim.alphaTarget(0.25).restart(); d.fx = d.x; d.fy = d.y; })
+    .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
+    .on('end', (event, d) => { if (!event.active) sim.alphaTarget(0); d.fx = null; d.fy = null; });
+}
+
+function highlightEgo(id) {
+  const keep = new Set([id, ...neighbors.get(id)]);
+  if (nodeSel) {
+    nodeSel.attr('opacity', d => keep.has(d.id) ? 1 : 0.12)
+           .attr('stroke', d => d.id === id ? 'var(--accent)' : 'var(--surface-0)')
+           .attr('stroke-width', d => d.id === id ? 3 : 1.5);
+  }
+  if (linkSel) {
+    linkSel.attr('opacity', l => (l.source.id === id || l.target.id === id) ? 0.95 : 0.05)
+           .attr('stroke', l => (l.source.id === id || l.target.id === id) ? 'var(--edge-active)' : 'var(--edge)')
+           .attr('stroke-width', l => (l.source.id === id || l.target.id === id) ? 1.8 : 1);
+  }
+  if (labelSel) labelSel.attr('opacity', d => keep.has(d.id) ? 1 : 0);
+}
+function clearHighlight() {
+  if (nodeSel) nodeSel.attr('opacity', 1).attr('stroke', 'var(--surface-0)').attr('stroke-width', 1.5);
+  if (linkSel) linkSel.attr('opacity', 0.55).attr('stroke', 'var(--edge)').attr('stroke-width', 1);
+  if (labelSel) labelSel.attr('opacity', d => radiusScale(d.loc) > 9 ? 1 : 0);
+}
+
+svg.on('click', () => { pinnedId = null; clearHighlight(); closePanel(); });
+
+// ==== NESTED HEATMAP (treemap) VIEW =======================================
+function buildTreeView() {
+  const { w, h } = dims();
+  linkLayer.selectAll('*').remove();
+  nodeLayer.selectAll('*').remove();
+  labelLayer.selectAll('*').remove();
+  if (simulation) { simulation.stop(); simulation = null; }
+  // The treemap lays out in raw [0,w]x[0,h] stage coordinates and
+  // draws through the SAME zoomLayer the force view pans/scales - so
+  // without resetting here it renders through whatever transform the
+  // connectome view left behind (found in the one look: a wall of
+  // giant cropped rectangles, not a treemap). Force view is
+  // self-correcting (fitToView sets its own transform); tree view
+  // isn't, so it resets explicitly on entry.
+  svg.call(zoomBehavior.transform, d3.zoomIdentity);
+
+  const byDir = d3.groups(GRAPH.nodes, d => d.dir);
+  const hierarchyData = {
+    id: 'root',
+    children: byDir.map(([dir, files]) => ({
+      id: dir,
+      children: files.map(f => ({ ...f, value: Math.max(f.loc, 8) })),
+    })),
+  };
+  const rootNode = d3.hierarchy(hierarchyData).sum(d => d.value || 0);
+  d3.treemap().size([w, h]).paddingOuter(6).paddingTop(22).paddingInner(2)(rootNode);
+
+  const groupSel = nodeLayer.selectAll('g.leaf').data(rootNode.leaves(), d => d.data.id).join('g')
+    .attr('class', 'leaf')
+    .attr('transform', d => `translate(${d.x0},${d.y0})`)
+    .style('cursor', 'pointer')
+    .on('mouseenter', (event, d) => showTooltip(event, d.data.id + '  ·  ' + d.data.loc + ' lines'))
+    .on('mousemove', (event) => { tooltip.style.left = event.clientX + 'px'; tooltip.style.top = event.clientY + 'px'; })
+    .on('mouseleave', hideTooltip)
+    .on('click', (event, d) => { event.stopPropagation(); openPanel(d.data.id); });
+
+  groupSel.append('rect')
+    .attr('width', d => Math.max(d.x1 - d.x0, 0))
+    .attr('height', d => Math.max(d.y1 - d.y0, 0))
+    .attr('rx', 3)
+    .attr('fill', d => catColor(d.data.dir))
+    .attr('opacity', 0)
+    .attr('stroke', 'var(--surface-0)')
+    .attr('stroke-width', 1.5)
+    .transition().duration(450).delay((_, i) => i * 6).attr('opacity', 0.88);
+
+  groupSel.filter(d => (d.x1 - d.x0) > 46 && (d.y1 - d.y0) > 20).append('text')
+    .attr('x', 6).attr('y', 15)
+    .attr('class', 'node-label')
+    .attr('fill', 'var(--surface-0)')
+    .style('stroke', 'none')
+    .style('font-weight', 600)
+    .text(d => (d.x1 - d.x0) > 90 ? d.data.id.split('/').pop() : d.data.id.split('/').pop().slice(0, Math.floor((d.x1 - d.x0) / 6)));
+
+  // Directory group outline + label.
+  const dirGroups = nodeLayer.selectAll('g.dirband').data(rootNode.children, d => d.data.id).join('g').attr('class', 'dirband');
+  dirGroups.append('text')
+    .attr('x', d => d.x0 + 2).attr('y', d => d.y0 + 14)
+    .attr('class', 'node-label')
+    .style('font-weight', 700)
+    .style('font-size', '10.5px')
+    .attr('fill', d => catColor(d.data.id))
+    .text(d => CAT_LABEL[d.data.id] || d.data.id);
+}
+
+function relayoutCurrentView() {
+  if (currentMode === 'graph') buildForceView(); else buildTreeView();
+}
+
+// ==== panel =============================================================
+function openPanel(id) {
+  const n = nodeById.get(id);
+  if (!n) return;
+  document.getElementById('panel-dir').innerHTML =
+    '<span class="swatch" style="background:' + catColor(n.dir) + '"></span>' + (CAT_LABEL[n.dir] || n.dir);
+  document.getElementById('panel-file').textContent = n.id;
+  document.getElementById('panel-loc').textContent = n.loc;
+  document.getElementById('panel-exports').textContent = n.exportCount;
+  document.getElementById('panel-fanin').textContent = n.fanIn;
+  document.getElementById('panel-fanout').textContent = n.fanOut;
+
+  fillList('panel-dependents', incoming.get(id));
+  fillList('panel-dependencies', outgoing.get(id));
+
+  document.getElementById('panel').classList.add('open');
+}
+function fillList(elId, ids) {
+  const el = document.getElementById(elId);
+  el.innerHTML = '';
+  if (!ids || ids.length === 0) {
+    el.innerHTML = '<div class="empty-note">none</div>';
+    return;
+  }
+  for (const id of ids) {
+    const btn = document.createElement('button');
+    btn.textContent = id;
+    btn.addEventListener('click', () => { pinnedId = id; openPanel(id); if (currentMode === 'graph') highlightEgo(id); });
+    el.appendChild(btn);
+  }
+}
+function closePanel() { document.getElementById('panel').classList.remove('open'); }
+document.getElementById('panel-close').addEventListener('click', closePanel);
+
+// ==== mode toggle =========================================================
+let currentMode = 'graph';
+const graphBtn = document.getElementById('mode-graph');
+const treeBtn = document.getElementById('mode-tree');
+graphBtn.addEventListener('click', () => setMode('graph'));
+treeBtn.addEventListener('click', () => setMode('tree'));
+function setMode(mode) {
+  currentMode = mode;
+  graphBtn.setAttribute('aria-pressed', mode === 'graph');
+  treeBtn.setAttribute('aria-pressed', mode === 'tree');
+  document.getElementById('hint').textContent = mode === 'graph'
+    ? 'drag to reposition · scroll to zoom · hover to trace · click to pin'
+    : 'sized by lines of code · grouped by directory · click a tile for detail';
+  pinnedId = null;
+  closePanel();
+  if (mode === 'graph') buildForceView(); else buildTreeView();
+}
+
+// ==== search filter =========================================================
+document.getElementById('search').addEventListener('input', (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  if (currentMode !== 'graph' || !nodeSel) return;
+  if (!q) { clearHighlight(); return; }
+  const matches = new Set(GRAPH.nodes.filter(n => n.id.toLowerCase().includes(q)).map(n => n.id));
+  nodeSel.attr('opacity', d => matches.has(d.id) ? 1 : 0.08)
+         .attr('stroke', d => matches.has(d.id) ? 'var(--accent)' : 'var(--surface-0)')
+         .attr('stroke-width', d => matches.has(d.id) ? 2.5 : 1.5);
+  linkSel.attr('opacity', l => (matches.has(l.source.id) || matches.has(l.target.id)) ? 0.5 : 0.03);
+  labelSel.attr('opacity', d => matches.has(d.id) ? 1 : 0);
+});
+
+// ==== boot =========================================================
+buildForceView();
+window.addEventListener('resize', () => relayoutCurrentView());
+</script>

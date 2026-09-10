@@ -7,7 +7,7 @@
 #
 # Adding a task: add the npm script first, then a one-line target here.
 
-.PHONY: help test test-ui test-rtg test-hostsetup test-newgame lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev
+.PHONY: help test test-ui test-rtg test-hostsetup test-newgame lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome
 
 help:
 	@echo "Recard targets (all front npm scripts):"
@@ -97,3 +97,24 @@ check: cards test lint-decks
 
 dev:
 	npm run dev
+
+coverage-unit:
+	npm run coverage:unit
+
+coverage-unit-deep: coverage-unit
+	npm run coverage:unit:deep
+
+# Python, not npm - deviates from this file's own "add the npm script
+# first" rule on purpose: pandas/matplotlib have no natural home in
+# package.json, and routing them through an npm script would just be an
+# extra layer of indirection with nothing on the other side. Bootstraps
+# .venv on first run (already gitignored, same as node_modules) so this
+# works from a clean checkout with no separate setup step.
+test-audit:
+	test -d .venv || python3 -m venv .venv
+	.venv/bin/pip install -q -r tools/testAudit/requirements.txt
+	.venv/bin/python3 tools/testAudit/analyze.py
+
+connectome:
+	node tools/codeConnectome/buildGraph.mjs
+	node tools/codeConnectome/render.mjs

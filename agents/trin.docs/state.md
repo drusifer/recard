@@ -224,3 +224,147 @@ most, and where I should NOT accept unit tests as sufficient:
    wrappers become absolutely positioned — that chain currently shares
    `transform` with nothing else and the wiring plan frees it, so it's
    a likely regression site.
+
+---
+
+## CHECKPOINT (2026-09-10, paused mid-task for a Smith side-quest)
+
+Unit test coverage audit: pipeline complete and validated end-to-end
+(dry run at file-level produced a real, sensible report). The real
+per-CASE 781-case collection is running in the BACKGROUND right now
+(`node tools/testAudit/collectCoverageByCase.mjs`, log at
+`/tmp/case-collect2.log`, ~6min total, started ~01:08).
+
+**Resume**: `tail /tmp/case-collect2.log` - if it shows `Done in`,
+run `bobp make test-audit` (or `.venv/bin/python3
+tools/testAudit/analyze.py` directly) to generate the real
+`test_audit.md` against per-case data, review its content for
+sense (redundancy table, gaps, heatmaps), then report to the user
+and post the QA-decision summary to chat (methodology limitations
+already baked into the report itself - line overlap is a heuristic,
+not proof; module-level shared-fixture code will still show SOME
+false-positive similarity even at case granularity, expected and
+already caveated).
+
+Everything built so far: `tools/testAudit/{collectCoverage.mjs,
+collectCoverageByCase.mjs, analyze.py, requirements.txt}`,
+`package.json` scripts (`coverage:unit`, `coverage:unit:deep`), three
+new Makefile targets (`coverage-unit`, `coverage-unit-deep`,
+`test-audit`), `.gitignore` additions (`/coverage/`, `/test_audit.md`,
+`/test_audit_graph.html` - regenerate-on-demand, never committed
+stale). `c8` added as a real devDependency (audit-fixed, 0
+vulnerabilities). `.venv` bootstrapped for pandas/matplotlib.
+
+---
+
+## Unit test coverage audit (2026-09-10) — direct user request
+
+"Run an audit on our unit tests to eliminate wasteful duplicative
+tests" - per-file coverage in isolation, a pandas tool mapping code to
+tests, a rich `test_audit.md` dashboard for eliminating test slop.
+
+### Built
+
+- `tools/testAudit/collectCoverage.mjs` - per-test-FILE coverage (c8,
+  scoped to "our code": `src/**`, `tools/**`, `tests/designLint.mjs`,
+  explicitly excluding `src/decks/rtg/catalog.js` - see below). Also
+  harvests every case's real runtime NAME from TAP output (`# Subtest:
+  <name>`), which the case-level pass needs.
+- `tools/testAudit/collectCoverageByCase.mjs` - per-test-CASE coverage
+  (781 real cases), isolating each with node's own official
+  `--test-name-pattern` flag - no invasive edits to the 29 test files.
+  Verified this actually isolates (not just runs everything anyway)
+  before trusting it at scale: a single case covered fewer statements
+  than its whole file. Bounded worker pool (default 8 concurrent).
+- `tools/testAudit/analyze.py` (pandas/numpy/matplotlib, `.venv`
+  bootstrapped by `make test-audit`) - builds the coverage-to-test
+  mapping and generates `test_audit.md`: headline metrics, a pyramid
+  shape chart, a redundancy-candidates table (Jaccard similarity +
+  containment ratio + a plain-language verdict), a lowest-unique-value
+  table, real coverage gaps, fan-in, two heatmaps, and a linked D3
+  connections graph (`test_audit_graph.html`).
+- Wired via `bobp make coverage-unit` / `coverage-unit-deep` /
+  `test-audit`. Output (`coverage/`, `test_audit.md`,
+  `test_audit_graph.html`) is gitignored - regenerated on demand,
+  never committed stale.
+
+### Two real engineering problems, found by actually running it at
+### scale - not by reasoning about the code
+
+**1. The naive pairwise algorithm didn't scale from 29 units to 781.**
+Two implementations were correct and both had to be killed after 10+
+minutes: `matrix.loc[a,b] = j` inside a 305,590-pair loop (label-
+indexed pandas writes), then per-unit PYTHON SETS intersected/unioned
+pairwise (same pair count, ~4-9k-element sets). Neither problem showed
+up in the 29-file dry run, which finished instantly either way - real
+scale is what surfaced it. Fixed by building a boolean (unit x
+coverage_key) membership matrix once and computing every pairwise
+Jaccard as ONE BLAS matrix multiply (`membership @ membership.T`)
+instead of 305k Python-level operations: 10+ minutes (killed twice) ->
+**77 seconds**, same math. Added permanent per-stage timing output to
+`analyze.py` so the NEXT slow stage (if this ever runs at 5,000+
+units) is diagnosable in one run instead of another blind kill-and-
+guess cycle - this is now standing tooling, not a one-off fix.
+
+**2. The redundancy signal itself was wrong before the data was even
+looked at closely enough.** The first real run flagged 80,158 of
+305,590 pairs (26%) as "redundant" - technically correct math, but
+useless: `src/decks/rtg/catalog.js` (3,584 lines, marked "GENERATED...
+do not edit" in its own header - compiled from YAML by `cards:build`)
+was in scope, and every deck-touching test trivially iterates all of
+it. Two tests asserting completely unrelated things looked 100%
+redundant because they both happened to construct a deck. Excluded it
+from "our code" scope for both collectors - a real scope correction
+(a compiled data file was never what "coverage of our logic" meant),
+not a threshold tuned to make the number look better. Re-ran the full
+collection after the fix.
+
+### A third finding, once the first two were fixed: the redundancy
+### COUNT itself doesn't mean what it looks like it means
+
+Excluding `catalog.js` cut total covered-line rows nearly in half
+(3.46M -> 1.9M) but the flagged-pair count went UP slightly (80,158 ->
+83,429) - proof the count was never the useful number. Line-overlap
+Jaccard sits near 1.0 for almost any two tests that touch a small or
+simple module, close to regardless of what they actually assert - a
+property of the METRIC at fine (per-case) granularity, not a defect
+excluding one file could fix.
+
+Added a second, separately-sorted table rather than keep chasing the
+count: same underlying data, filtered to containment >= 0.9 and sorted
+by ABSOLUTE shared lines instead of the ratio. That reordering alone
+turned the top of the report from `cardFaces` trivia (a 197-line file
+where any two tests are near-identical almost by construction) into a
+real, actionable finding: four separate `chipPile :: BREAK_CHIP` tests
+("a 5 becomes five 1s", "breaks into the largest smaller denomination",
+"total value is unchanged", "new chips get their own ids") sharing
+almost all their coverage - plausibly one shared setup with four
+genuinely valuable property assertions (fine as-is), or a real
+consolidation candidate. Either way, a real human question, not
+volume-driven noise.
+
+### Numbers (final, catalog.js excluded, case-level, 781 units)
+
+- 60 src files touched by unit tests, 10,893 coverable statements,
+  8,790 covered (**80.7%** line coverage of touched files)
+- Test pyramid: 29 unit files / 781 unit cases vs 4 integration files /
+  46 cases (static count, not executed) - a healthy shape, unit-heavy
+  by roughly 17:1 on cases
+- 21 src files carry >=1 uncovered line (real gaps, not a heuristic)
+- 83,429 pairs clear the Jaccard >= 0.6 flag threshold, but see above -
+  the report's own "start here" table (containment >= 0.9, sorted by
+  absolute shared lines) is the actionable 25, not this count
+
+### Not done, flagged rather than silently skipped
+
+- Redundancy candidates are still a HEURISTIC even after the
+  catalog.js fix - the report's own Methodology section says so, and
+  every "REDUNDANT" verdict needs a human read of both tests before
+  deleting either. This tool finds candidates; it does not delete
+  tests, and I have not gone through the candidate list myself to
+  actually retire anything - that is real follow-up work, not done as
+  part of building the tool.
+- Integration/browser suite (4 files, ~46 cases) is a STATIC count
+  only, never executed for this audit - the project's own standing
+  rule (run e2e frugally) plus the fact that browser coverage needs a
+  live server+Chromium, a different pipeline entirely.
