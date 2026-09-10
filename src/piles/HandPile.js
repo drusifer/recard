@@ -27,11 +27,18 @@
  * card's real identity, always, hands included).
  */
 import { Pile } from './Pile.js';
+import { FAN } from '../pileables/Stackable.js';
 import { sortActionsFor } from '../pileables/pileableTypes.js';
 
 export class HandPile extends Pile {
   static visibility = 'in-hand';
   static component = 'fan-pile';
+
+  /** A hand is a FAN - a horizontal stack that arcs (D129). Declared
+   * here beside the component that renders it, so "a hand fans" is one
+   * fact in one place rather than a `component` string and a separate
+   * `fan: true` render flag that had to agree. */
+  static stackDirection = FAN;
   // A hand IS tableSide (D51: it renders at its owner's seat through
   // the same generic <zone-panel> machinery every other table-side pile
   // uses, and must appear in pilesOf()/view.piles for that). It is
@@ -93,6 +100,6 @@ export class HandPile extends Pile {
     //
     // *nit (Tighten/Loosen): those two are listed explicitly because
     // this method fully overrides the base one rather than inheriting.
-    return [...sortActionsFor(cards), 'changePileType', 'tighten', 'loosen'];
+    return [...sortActionsFor(cards), 'changePileType', 'tightenAll', 'loosenAll'];
   }
 }

@@ -15,7 +15,8 @@ sequenceDiagram
     participant Morpheus
     participant Mouse
     participant User
-    Note over Oracle,User: 📅 2026-09-05
+    participant Bob
+    Note over Oracle,Bob: 📅 2026-09-05
     Oracle->>Smith: "ora handoff"
     Note right of Oracle: "*ora groom complete:<br/>CHAT.md archived (237<br/>msgs -> agents/chat_arch<br/>ive/CHAT_TECHDEBT2_D114.<br/>md), USER_STORIES.md<br/>sprint-status entry<br/>added,…"
     Smith->>Cypher: "user test"
@@ -186,10 +187,10 @@ sequenceDiagram
     Note right of Cypher: "Cypher retro: story/AC<br/>quality held up through<br/>all 3 phases with no<br/>rework - the<br/>scores/chips-reset call<br/>and the Restart-game-<br/>distinction r…"
     Cypher->>All: "pm launch"
     Note right of Cypher: "*pm launch US-116 New<br/>Game: host can now swap<br/>to a different preset<br/>mid-table via a new<br/>host-only button, same<br/>table code, no re-host.<br/>Scor…"
-    Note over Oracle,User: 📅 2026-09-06
+    Note over Oracle,Bob: 📅 2026-09-06
     Neo->>Neo: "queue"
     Note right of Neo: "*queue nit: add a drop<br/>zone on the lower half<br/>of a card that snaps it<br/>into vertical alignment<br/>with the card<br/>above/below, so lands<br/>(or anyth…"
-    Note over Oracle,User: 📅 2026-09-07
+    Note over Oracle,Bob: 📅 2026-09-07
     Neo->>Trin: "swe handoff"
     Note right of Neo: "swe fix: reapplied<br/>deck/discard double-wide<br/>fix, min-content->max-<br/>content (avoids the<br/>button-per-line trap<br/>min-content caused).<br/>lint:design…"
     Trin->>Neo: "qa check"
@@ -258,4 +259,61 @@ sequenceDiagram
     Note right of Neo: "nit fix: cascades<br/>(LandsPile) now align to<br/>the top and grow<br/>downward instead of<br/>inheriting the chip<br/>tray's bottom-up<br/>physical-stack default…"
     Trin->>Neo: "qa check"
     Note right of Trin: "qa check PASSED: re-ran<br/>full suite + lint,<br/>chip/token bottom-up<br/>behavior confirmed<br/>unaffected (own test<br/>guards it). No Morpheus<br/>step - nit."
+    Note over Oracle,Bob: 📅 2026-09-08
+    User->>All: "request"
+    Note right of User: "init *bloop stackable"
+    User->>Neo: "decision"
+    Note right of User: "D: StackableElement is<br/>VIEW-ONLY - addCard/remo<br/>veCard/setSpread<br/>reconcile DOM to state<br/>that flows in via the<br/>normal render path.<br/>Rejected '…"
+    Morpheus->>Neo: "lead decision"
+    Note right of Morpheus: "D129: Table->Zone->Pile-<br/>>Stack. Stackable<br/>extends Pileable (leaves<br/>Pileable free for future<br/>free-form piles), CardPi<br/>leable/ChipPileable/Tok…"
+    Neo->>Trin: "swe impl"
+    Note right of Neo: "swe impl stackable:<br/>starting TDD. Deleting<br/>src/cardStacking.js +<br/>its tests - wrong model<br/>(axis-based math module<br/>was routing around the<br/>mis…"
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "swe impl stackable<br/>(iteration 1/2): domain<br/>model DONE, green.<br/>Stackable extends<br/>Pileable (offsetIn: ONE<br/>formula, both<br/>directions, absolute…"
+    Trin->>Morpheus: "qa handoff"
+    Note right of Trin: "qa uat stackable (iter<br/>1) PASSED. 9 mutations<br/>attempted, 9 killed -<br/>incl. the two design-<br/>intent guards I'd have<br/>missed by reading the<br/>diff:…"
+    Morpheus->>Neo: "lead review"
+    Note right of Morpheus: "lead review stackable<br/>(iter 1): APPROVED WITH<br/>CONDITIONS. Hierarchy +<br/>one absolute-from-origin<br/>formula are right -<br/>makes the depth bug<br/>unre…"
+    Neo->>Trin: "swe fix"
+    Note right of Neo: "swe impl stackable: both<br/>review conditions DONE,<br/>same iteration. (1)<br/>offsetIn now returns<br/>unitless stride<br/>multipliers, no metrics<br/>arg - dir…"
+    Trin->>Morpheus: "qa handoff"
+    Note right of Trin: "qa test conditions<br/>PASSED. 11 mutations<br/>total, 11 killed. Strip<br/>guards confirmed load-<br/>bearing: removing<br/>toHandCard strip fails<br/>4, toDeckCar…"
+    Morpheus->>Neo: "lead review"
+    Note right of Morpheus: "lead review conditions:<br/>APPROVED, conditional<br/>approval now clean.<br/>offsetIn taking NO<br/>metrics is better than<br/>what I asked for -<br/>direction se…"
+    Note over Oracle,Bob: 📅 2026-09-09
+    User->>All: "request"
+    Note right of User: "*bloop stackable"
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "swe impl stackable iter<br/>2 DONE - the cascade bug<br/>is FIXED. Tray path<br/>(chips/tokens/lands) now<br/>renders from real<br/>Stacks: withColumnLayout<br/>de…"
+    Trin->>Smith: "qa handoff"
+    Note right of Trin: "qa uat stackable iter 2<br/>PASSED. Mutation-proved<br/>the LIVE tests catch<br/>BOTH original bugs:<br/>depth-compounding -> 0px<br/>gap, sign flip -><br/>'lands…"
+    Smith->>Morpheus: "user handoff"
+    Note right of Smith: "user test stackable<br/>PASSED on the real<br/>running app (live<br/>LandsPile screenshot, 9<br/>real draws via the real<br/>drop path): cascade top-<br/>down, step…"
+    Morpheus->>User: "lead review"
+    Note right of Morpheus: "lead review stackable<br/>iter 2: APPROVED. Tray<br/>path genuinely unified -<br/>one formula, bespoke<br/>calcs deleted not<br/>corrected, CSS does unit<br/>conve…"
+    User->>All: "request"
+    Note right of User: "clean up the smith<br/>defect and remove and<br/>make direction per stack<br/>so we can all use one<br/>happy layout consider if<br/>StackActions are<br/>required…"
+    Neo->>Bob: "queue"
+    Note right of Neo: "queue (direct user<br/>request): @Bob *learn no<br/>one-off tests - use the<br/>automation test pyramid.<br/>Institutionalize as a<br/>team-wide lesson, not<br/>ju…"
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "swe impl stackable<br/>COMPLETE - one layout<br/>everywhere. Smith defect<br/>fixed (LandsPile spread<br/>0.85, chips still<br/>tighter, guarded).<br/>Direction no…"
+    Trin->>Morpheus: "qa handoff"
+    Note right of Trin: "qa uat stackable iter 3<br/>PASSED. 761/18/13 green,<br/>check PASSED, lint-js 10<br/>(3 below baseline). No<br/>synthetic mutation run -<br/>the tests earned…"
+    Morpheus->>User: "lead review"
+    Note right of Morpheus: "lead review stackable<br/>iter 3: APPROVED. Four<br/>layout mechanisms<br/>collapsed to one and the<br/>source SHRANK (-24 non-<br/>comment lines) -<br/>applyFanOff…"
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "swe impl StackActions<br/>DONE per user's GUI<br/>decision. Gear emblem on<br/>every stack (universal,<br/>badge-sized) opens<br/>tighten/loosen/flip for<br/>THAT…"
+    Trin->>Morpheus: "qa handoff"
+    Note right of Trin: "qa uat stackactions<br/>PASSED. 770/20/13 green,<br/>check PASSED, lint-js<br/>10. Browser suite caught<br/>2 real bugs in the new<br/>control itself: the<br/>gear…"
+    Morpheus->>User: "lead review"
+    Note right of Morpheus: "lead review<br/>stackactions: APPROVED.<br/>Routing is sound -<br/>Tighten All fans out per<br/>stack so columns<br/>adjusted apart keep<br/>their differences, spr…"
+    Note over Oracle,Bob: 📅 2026-09-10
+    User->>All: "request"
+    Note right of User: "add stackaction for<br/>tap/untap, only if easy"
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "swe impl stackaction<br/>tap/untap DONE - it was<br/>easy. Same shape as FLIP<br/>_STACK/ADJUST_PILE_SPREA<br/>D. Pile.supportsStackTap<br/>opt-in (Battlefield/L…"
+    Trin->>Morpheus: "qa handoff"
+    Note right of Trin: "qa uat tap/untap PASSED.<br/>4 mutations, 4 killed:<br/>canTap gate removed<br/>(would false-offer tap<br/>on chip/hand stacks),<br/>tapStack disabled-check<br/>in…"
+    Morpheus->>User: "lead review"
+    Note right of Morpheus: "lead review tap/untap:<br/>APPROVED. Right calls:<br/>gated by pile kind not<br/>universal (tapping a<br/>chip isn't real),<br/>offered even for a stack<br/>of 1 (…"
 ```

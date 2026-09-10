@@ -1,4 +1,5 @@
 import { buildDeck, shuffle, RANKS, SUITS } from './deck.js';
+import { stacksOf, stackKeyFor, DEFAULT_STACK_KEY } from './piles/Stack.js';
 import { PILE_TYPES, revivePile, pileInstanceFor } from './piles/pileTypes.js';
 import { MIN_SPREAD, MAX_SPREAD } from './piles/Pile.js';
 import { survivorsOfReset } from './pileables/pileableTypes.js';
@@ -558,17 +559,25 @@ function resolveHandPileId(piles, playerId) {
  * describe, same as before).
  */
 function toHandCard(card, playerId) {
-  const { layout: _layout, ...rest } = card;
+  // D129: `stackId` strips alongside `layout` - it is the same class of
+  // stamp (which STACK within a pile this thing was placed in) and it
+  // subsumes the old per-card `layout: 'column'` flag, so it inherits
+  // that flag's strip sites. Without this a card carries a stale
+  // membership into its next pile and lands in a PHANTOM stack there -
+  // a stack no player ever put a card in. Caught in review, not by a
+  // failing test, which is why the tests now exist (state.test.js,
+  // "D129: ..." - one per strip site, going through the real actions).
+  const { layout: _layout, stackId: _stackId, ...rest } = card;
   return { ...rest, owner: playerId, faceUp: false };
 }
 
 /** The inverse of `toHandCard` - strips every hand-only stamp
- * (`owner`/`faceUp`/`layout`) back to a plain deck card's shape
+ * (`owner`/`faceUp`/`layout`/`stackId`) back to a plain deck card's shape
  * (`buildDeck`'s own `{id, rank, suit}`). Used by a fresh `DEAL` (D88)
  * to reclaim cards still sitting in a hand before re-dealing - a
  * re-deal must never destroy them, only redistribute them. */
 function toDeckCard(card) {
-  const { owner: _owner, faceUp: _faceUp, layout: _layout, ...rest } = card;
+  const { owner: _owner, faceUp: _faceUp, layout: _layout, stackId: _stackId, ...rest } = card;
   return rest;
 }
 
@@ -1367,15 +1376,68 @@ const ACTIONS = {
     const pile = state.piles.find((p) => p.id === action.pileId);
     if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
     const kind = PILE_TYPES[pile.kind];
-    const current = pile.spread ?? kind?.defaultSpread ?? MIN_SPREAD;
     // The ceiling is the pile TYPE's (*nit: chip stacks go tighter than
     // a card fan may, because a stack reads by its top chip).
     const ceiling = kind?.maxSpread ?? MAX_SPREAD;
-    // Rounded to the step: floating-point addition of 0.1 otherwise
-    // drifts (0.65 + 0.1 + 0.1 = 0.8500000000000001), which would never
-    // compare equal to MAX_SPREAD and so never disable the button.
-    const next = Math.round(Math.min(ceiling, Math.max(MIN_SPREAD, current + action.delta)) * 1000) / 1000;
-    return { ...state, piles: state.piles.map((p) => (p.id === action.pileId ? { ...p, spread: next } : p)) };
+    const fallback = pile.spread ?? kind?.defaultSpread ?? MIN_SPREAD;
+
+    // D129 (direct user request): spread is a STACK's, not a pile's -
+    // a gear emblem on each stack adjusts that one. A pile-level
+    // Tighten All / Loosen All omits `stackKey` and ROUTES to every
+    // stack instead of writing one pile-wide number, so columns that
+    // have been adjusted apart keep their relative differences.
+    //
+    // Omitting the key means ALL - it cannot mean "the default stack",
+    // because that stack has a real key (`DEFAULT_STACK_KEY`) precisely
+    // so the two are never confused.
+    const routed = stacksOf({ cards: pile.cards, stacks: pile.stacks, spread: fallback })
+      .map((stack) => stackKeyFor(stack.id));
+    // An EMPTY pile has no stacks to route to, but adjusting one is
+    // still meaningful - it sets what the cards will arrive into.
+    // Without this the adjustment is a silent no-op that the pile then
+    // forgets, which is what the old pile-wide `spread` did correctly
+    // and this routing would otherwise have lost.
+    const everyStack = routed.length > 0 ? routed : [DEFAULT_STACK_KEY];
+    const keys = action.stackKey === undefined ? everyStack : [action.stackKey];
+
+    const stacks = { ...pile.stacks };
+    for (const key of keys) {
+      const current = stacks[key]?.spread ?? fallback;
+      // Rounded to the step: floating-point addition of 0.1 otherwise
+      // drifts (0.65 + 0.1 + 0.1 = 0.8500000000000001), which would
+      // never compare equal to MAX_SPREAD and so never disable the
+      // button.
+      const next = Math.round(Math.min(ceiling, Math.max(MIN_SPREAD, current + action.delta)) * 1000) / 1000;
+      stacks[key] = { ...stacks[key], spread: next };
+    }
+    return { ...state, piles: state.piles.map((p) => (p.id === action.pileId ? { ...p, stacks } : p)) };
+  },
+
+  /**
+   * D129 (direct user request): turn one stack's run the other way -
+   * a horizontal run becomes a vertical cascade and back. The
+   * capability per-stack direction unlocked, and the reason the gear
+   * emblem is worth its pixels.
+   *
+   * Replicated like every other presentation change (see
+   * `ADJUST_PILE_SPREAD`): everyone at the table is looking at the same
+   * cards, so they must see the same arrangement.
+   */
+  FLIP_STACK(state, action) {
+    const pile = state.piles.find((p) => p.id === action.pileId);
+    if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
+    const kind = PILE_TYPES[pile.kind];
+    const stack = stacksOf({
+      cards: pile.cards,
+      stacks: pile.stacks,
+      direction: kind?.stackDirection,
+      spread: pile.spread ?? kind?.defaultSpread ?? MIN_SPREAD,
+    }).find((candidate) => stackKeyFor(candidate.id) === action.stackKey);
+    if (!stack) throw new Error(`Stack ${action.stackKey} is not in pile ${action.pileId}`);
+
+    const key = action.stackKey;
+    const stacks = { ...pile.stacks, [key]: { ...pile.stacks?.[key], direction: stack.flippedDirection() } };
+    return { ...state, piles: state.piles.map((p) => (p.id === action.pileId ? { ...p, stacks } : p)) };
   },
 
   /**
@@ -1545,6 +1607,32 @@ const ACTIONS = {
     }
     return replacePile(state, action.pileId, (p) =>
       withCards(p, p.cards.map((card) => ({ ...card, orientation: 'portrait' }))),
+    );
+  },
+
+  /**
+   * D129 (direct user request: "add stackaction for tap/untap, keep
+   * pile level for all stacks"). `UNTAP_ALL` above is untouched and
+   * still acts on the whole pile - this is the stack-scoped sibling
+   * the gear's Tap/Untap buttons dispatch, mirroring `FLIP_STACK`'s own
+   * shape: find the real stack by key, act on only its cards.
+   *
+   * ONE action taking `orientation` rather than a `TAP_STACK`/
+   * `UNTAP_STACK` pair - the same D75/D103 "there can be only 1"
+   * correction `ADJUST_PILE_SPREAD` already follows.
+   */
+  SET_STACK_ORIENTATION(state, action) {
+    const pile = state.piles.find((p) => p.id === action.pileId);
+    if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
+    const isOwner = pile.ownerId === action.playerId;
+    const isShared = pile.ownerId == undefined;
+    if (!isOwner && !isShared) {
+      throw new Error(`Player ${action.playerId} is not authorized to tap pile ${action.pileId}`);
+    }
+    const key = action.stackKey;
+    return replacePile(state, action.pileId, (p) =>
+      withCards(p, p.cards.map((card) =>
+        (stackKeyFor(card.stackId) === key ? { ...card, orientation: action.orientation } : card))),
     );
   },
 

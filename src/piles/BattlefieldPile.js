@@ -20,6 +20,10 @@ export class BattlefieldPile extends Pile {
   /** Permanents spread rather than stack, so a drop lands beside its
    * neighbours (base `Pile` halo behaviour) - inherited deliberately. */
 
+  /** A column's own stack can be tapped/untapped without touching the
+   * rest of the board - see `Pile.supportsStackTap`. */
+  static supportsStackTap = true;
+
   /** *nit (direct user request): "add tighter/looser actions to the
    * battlefield pile" - offered by the base class already (D21/US-32),
    * this override just wasn't including them. `split`/`take` stay
@@ -29,7 +33,7 @@ export class BattlefieldPile extends Pile {
    * battlefield's cards have exactly as much as any other pile's. */
   pileActions({ isOwner, isShared } = {}) {
     if (!isOwner && !isShared) return [];
-    return ['untapAll', 'changePileType', 'remove', 'tighten', 'loosen'];
+    return ['untapAll', 'changePileType', 'remove', 'tightenAll', 'loosenAll'];
   }
 
   /** `remove`/`changePileType` stay empty-only, `untapAll` is never

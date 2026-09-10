@@ -6,6 +6,7 @@ import { PILE_TYPES, convertibleKindsFor } from '../src/piles/pileTypes.js';
 import { ChipPile } from '../src/piles/ChipPile.js';
 import { CHIP_DENOMINATIONS } from '../src/pileables/ChipPileable.js';
 import { PRESETS } from '../src/presets.js';
+import { stacksOf } from '../src/piles/Stack.js';
 
 /**
  * *fix (direct user request): "we need a good default piletype for chips
@@ -214,26 +215,50 @@ test('a stocked deck is NOT sorted - stocking order is the pile kind\'s own busi
 // whole column sideways.
 //
 // A tray's arrangement is the KIND's (by denomination), never the drop
-// point's, so the layout is stripped rather than respected.
-test('ChipPile strips a drop layout - the tray decides arrangement, not the drop point', () => {
+// point's - the drop's own `layout` is discarded and replaced with a
+// `stackId` naming the group the chip actually landed in (D129).
+//
+// `stackId` REPLACES the old per-card `layout: 'column'` flag here. The
+// flag could only ever say "overlap onto whoever precedes me", which is
+// why it had to be recomputed from scratch on every insert and why it
+// went wrong the moment the predecessor changed. Membership names the
+// stack itself, so it survives a reorder and needs no recomputation to
+// stay true.
+test('ChipPile overrides a drop layout with its own group-based stack membership', () => {
   const pile = chipPile([{ id: 'a', pileableType: 'chip', denom: 25 }]);
   const after = pile.insertPileable({ id: 'b', pileableType: 'chip', denom: 25 }, { layout: 'stack' });
-  assert.equal(after.cards.find((chip) => chip.id === 'b').layout, undefined);
+  const [a, b] = ['a', 'b'].map((id) => after.cards.find((chip) => chip.id === id));
+  assert.equal(b.stackId, a.stackId, 'joins a\'s stack - not the dropped stack/overlap hint');
+  assert.equal(b.stackId, 25, 'the stack is named by the group value');
 });
 
-test('ChipPile strips an overlap layout too, and still sorts', () => {
+test('ChipPile puts a different denomination in a DIFFERENT stack, and still sorts', () => {
   const pile = chipPile([{ id: 'a', pileableType: 'chip', denom: 5 }]);
   const after = pile.insertPileable({ id: 'b', pileableType: 'chip', denom: 100 }, { layout: 'overlap' });
-  assert.equal(after.cards.find((chip) => chip.id === 'b').layout, undefined);
+  const [a, b] = ['a', 'b'].map((id) => after.cards.find((chip) => chip.id === id));
+  assert.notEqual(b.stackId, a.stackId, 'a 100 does not join the 5s');
   assert.deepEqual(after.cards.map((chip) => chip.denom), [100, 5], 'sorted regardless of where it was dropped');
 });
 
-// Chips that arrived carrying a layout from somewhere else must not
-// stay misaligned either - the whole tray is normalised.
-test('ChipPile clears a layout an existing chip was already carrying', () => {
-  const pile = chipPile([{ id: 'a', pileableType: 'chip', denom: 5, layout: 'stack' }]);
+// Chips that arrived carrying a stale placement from somewhere else
+// must not stay misaligned either - the whole tray is normalised.
+test('ChipPile recomputes membership for the whole tray, not just the dropped chip', () => {
+  const pile = chipPile([{ id: 'a', pileableType: 'chip', denom: 5, layout: 'stack', stackId: 'stale' }]);
   const after = pile.insertPileable({ id: 'b', pileableType: 'chip', denom: 5 });
-  assert.ok(after.cards.every((chip) => chip.layout === undefined), 'every chip in the tray is unlaid-out');
+  const [a, b] = ['a', 'b'].map((id) => after.cards.find((chip) => chip.id === id));
+  assert.equal(a.stackId, 5, 'the stale membership is replaced, not kept');
+  assert.equal(b.stackId, 5);
+  assert.ok(!('layout' in a), 'the old per-card layout flag is gone entirely, not left beside stackId');
+});
+
+// The first chip of a group is IN the stack, not outside it. Under the
+// old flag the first card deliberately carried no `layout` (nothing to
+// overlap onto) - membership is the opposite: a stack of one is still
+// that chip's stack, which is what lets a second chip join it.
+test('ChipPile gives the FIRST chip of a group a stackId too', () => {
+  const pile = chipPile([]);
+  const after = pile.insertPileable({ id: 'only', pileableType: 'chip', denom: 5 });
+  assert.equal(after.cards[0].stackId, 5);
 });
 
 test('ChipPile still places a chip relative to a target when one is given', () => {
@@ -268,7 +293,12 @@ test('ADJUST_PILE_SPREAD clamps a chip tray at ITS ceiling, not the card one', (
   for (let index = 0; index < 30; index++) {
     state = reduce(state, { type: 'ADJUST_PILE_SPREAD', pileId: 'tray', delta: 0.1 });
   }
-  assert.equal(pilesOf(state).find((p) => p.id === 'tray').spread, ChipPile.maxSpread);
+  // D129: spread lives on each STACK now; Tighten All routes to every
+  // one, so every stack in the tray must have hit the chip ceiling.
+  const tray = pilesOf(state).find((p) => p.id === 'tray');
+  const spreads = Object.values(tray.stacks).map((stack) => stack.spread);
+  assert.ok(spreads.length > 0, 'the tray has stacks to route to');
+  for (const spread of spreads) assert.equal(spread, ChipPile.maxSpread);
 });
 
 test('a card pile still clamps at the card ceiling - chips did not raise it for everyone', () => {
@@ -278,7 +308,9 @@ test('a card pile still clamps at the card ceiling - chips did not raise it for 
   for (let index = 0; index < 30; index++) {
     state = reduce(state, { type: 'ADJUST_PILE_SPREAD', pileId: 'flat', delta: 0.1 });
   }
-  assert.equal(pilesOf(state).find((p) => p.id === 'flat').spread, PILE_TYPES.plain.maxSpread);
+  const flat = pilesOf(state).find((p) => p.id === 'flat');
+  const spreads = Object.values(flat.stacks).map((stack) => stack.spread);
+  for (const spread of spreads) assert.equal(spread, PILE_TYPES.plain.maxSpread);
 });
 
 
@@ -376,4 +408,42 @@ test('RESET drops an ordinary hand entirely, exactly as before', () => {
 // LandsPile opts into the downward cascade direction.
 test('ChipPile keeps GroupedPile\'s default stacksDownward: false', () => {
   assert.equal(ChipPile.stacksDownward, false);
+});
+
+// Integration guard for the whole tray pipeline, at the cheapest level
+// that can see it: preset -> stocked pile -> stacks -> offsets. The
+// browser test that covers the same ground can only say "the chips are
+// in the wrong place"; this says WHICH step lost them.
+test('a preset-built chip tray produces one stack per denomination, with real offsets', () => {
+  const declaration = PRESETS
+    .flatMap((preset) => preset.piles ?? [])
+    .find((pile) => pile.kind === 'chip');
+  assert.ok(declaration, 'some preset declares a chip tray');
+
+  // The same stocking call `state.js` makes when it builds a declared
+  // pile - so this covers the real path, not a hand-assembled fixture.
+  const built = { cards: ChipPile.stock(buildDeck({ type: declaration.deckType, deckList: declaration.deckList })) };
+  assert.ok(built.cards.length >= 4, 'a stocked tray has chips in it');
+
+  for (const chip of built.cards) {
+    assert.ok(chip.stackId !== undefined,
+      `every stocked chip must carry its stack membership, ${chip.id} did not`);
+  }
+
+  const stacks = stacksOf({
+    cards: built.cards,
+    stacks: built.stacks,
+    direction: PILE_TYPES.chip.stackDirection,
+    spread: PILE_TYPES.chip.defaultSpread,
+  });
+  assert.ok(stacks.length > 1, 'a mixed tray is more than one stack');
+
+  const deepest = stacks.toSorted((a, b) => b.pileables.length - a.pileables.length)[0];
+  assert.ok(deepest.pileables.length >= 2, 'at least one denomination has several chips');
+
+  const ys = deepest.layout().map((position) => position.y);
+  assert.equal(ys[0], 0, 'the first chip sits at its stack origin');
+  for (const [index, y] of ys.slice(1).entries()) {
+    assert.ok(y > ys[index], `each chip must sit further along than the last, got ${ys.join(', ')}`);
+  }
 });

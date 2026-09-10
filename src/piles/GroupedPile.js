@@ -13,11 +13,13 @@
  * everything groups and sorts by (`ChipPile`: `chip.denom`; `TokenPile`:
  * `token.colour`). Everything else - tight stacking spread, arriving
  * pre-sorted, an insert re-sorting instead of merely appending, and
- * stripping a drop's own `layout` hint (the tray's own arrangement is
- * this KIND's business, not the drop point's - see `insertPileable`
+ * stamping every pileable with the stack it belongs to (D129)
+ * instead of respecting a drop's own hint (the tray's own arrangement
+ * is this KIND's business, not the drop point's - see `insertPileable`
  * below) - is identical between the two and lives here exactly once.
  */
 import { Pile } from './Pile.js';
+import { VERTICAL } from '../pileables/Stackable.js';
 
 /** `PileClass.sortValue` (a real static method lookup, so a subclass's
  * override is picked up correctly) descending, undefined-last. A plain
@@ -37,8 +39,32 @@ function sortedByGroupValue(PileClass, pileables) {
   });
 }
 
-function stripLayout(cards) {
-  return cards.map(({ layout, ...card }) => card);
+/**
+ * Stamp each pileable with the STACK it belongs to (D129) - its group
+ * value, which for a tray is exactly what a stack is: one column per
+ * denomination/colour.
+ *
+ * This REPLACES the old `withColumnLayout`, which stamped a per-card
+ * `layout: 'column'` flag on every card whose group matched the one
+ * immediately before it. That flag could only ever say "overlap onto
+ * whoever precedes me", and everything wrong with it followed from
+ * that relative phrasing: it had to be recomputed from scratch on
+ * every insert, it went stale the moment a predecessor moved or left
+ * (`Pile.removePileable` still carries a dedicated strip for exactly
+ * that), and the first card of each group deliberately carried NO
+ * flag, so a stack of one was not represented at all.
+ *
+ * Membership names the stack itself, so none of that applies: it
+ * survives a reorder untouched, and the first pileable of a group is
+ * IN its stack rather than outside it - which is what lets a second
+ * one join. `layout` is stripped rather than left beside it; there is
+ * one way a tray's arrangement is described, not two.
+ */
+function withStackIds(PileClass, pileables) {
+  return pileables.map((pileable) => {
+    const { layout: _layout, ...rest } = pileable;
+    return { ...rest, stackId: PileClass.sortValue(pileable) };
+  });
 }
 
 export class GroupedPile extends Pile {
@@ -49,6 +75,11 @@ export class GroupedPile extends Pile {
    * - `ChipTrayElement` groups by whatever `PILE_TYPES[pile.kind]`
    * itself defines, never by a hardcoded field. */
   static component = 'chip-tray';
+
+  /** A tray is COLUMNS of stacked pieces, so its stacks run vertically
+   * (D129) - overridden once here for every grouped kind (chips,
+   * tokens, lands) rather than restated by each subclass. */
+  static stackDirection = VERTICAL;
 
   /** Tighter stacking than a card fan may go (`Pile.maxSpread`, 0.85) -
    * a grouped supply reads by its TOP piece plus the coloured/valued
@@ -79,25 +110,39 @@ export class GroupedPile extends Pile {
    * still groups everything into one bucket, just not usefully. */
   static sortValue() {}
 
-  /** A tray arrives sorted, not in shuffled/declared stock order - the
-   * same fix `ChipPile` needed once a real stocked tray (D81) arrived
-   * grouped only AFTER the first manual insert. */
+  /** A tray arrives sorted (and already carrying its own overlap
+   * layout - `withColumnLayout`) - the same fix `ChipPile` needed once
+   * a real stocked tray (D81) arrived grouped only AFTER the first
+   * manual insert. */
   static stock(pileables) {
-    return sortedByGroupValue(this, pileables);
+    return withStackIds(this, sortedByGroupValue(this, pileables));
   }
 
   /**
    * Delegates to the base insert first (identical placement/authorization
    * handling for every pile kind), then re-sorts by `sortValue` and
-   * strips whatever `layout` the drop carried - a drop's stack/overlap
-   * intent (US-32/33) is a CARD-pile concept; a grouped tray's own
-   * arrangement, by group, is what actually decides position here, so
-   * respecting the drop's `layout` would fight it (found live: a
-   * dropped chip landed out of line with the stack it joined, and
-   * shifted the whole column when it landed first in one).
+   * reassigns stack membership (`withStackIds`) - a
+   * drop's own stack/overlap intent (US-32/33) is a CARD-pile concept;
+   * a grouped tray's own arrangement, by group, is what actually
+   * decides position here, so respecting the drop's `layout` would
+   * fight it (found live: a dropped chip landed out of line with the
+   * stack it joined, and shifted the whole column when it landed first
+   * in one).
    */
   insertPileable(pileable, placement = {}) {
     const inserted = super.insertPileable(pileable, placement);
-    return { ...inserted, cards: stripLayout(sortedByGroupValue(this.constructor, inserted.cards)) };
+    return {
+      ...inserted,
+      cards: withStackIds(this.constructor, sortedByGroupValue(this.constructor, inserted.cards)),
+      // D129: a grouped tray's stacks ALL run the kind's own direction,
+      // so the drop's direction hint is discarded exactly as its
+      // membership hint already is - "organize by group" IS the
+      // placement here. Without this, dropping a card onto one already
+      // in a column recorded that column as horizontal (the base class
+      // faithfully honouring a hint this pile kind does not take), and
+      // a lands cascade laid itself out sideways while every model
+      // test that inserted without a placement still passed.
+      stacks: this.stacks,
+    };
   }
 }

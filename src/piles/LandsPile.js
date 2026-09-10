@@ -20,6 +20,7 @@
  * because "organize by colour" IS the placement.
  */
 import { GroupedPile } from './GroupedPile.js';
+import { MAX_SPREAD } from './Pile.js';
 import { derivedColors, PIP_CLASS } from '../cards/RtgCardFace.js';
 
 /** Colourless (a land with no derivable mana symbol at all) sorts last,
@@ -29,11 +30,41 @@ import { derivedColors, PIP_CLASS } from '../cards/RtgCardFace.js';
 const COLORLESS = 'C';
 
 export class LandsPile extends GroupedPile {
+  /** A colour column's own stack can be tapped/untapped without
+   * touching the other columns - see `Pile.supportsStackTap`. */
+  static supportsStackTap = true;
+
   /** *nit (direct user request, "align cascades to the top"): a cascade
    * of lands reads top-down - the first one played at the top, later
    * ones cascading below it - not bottom-up like a physical chip stack
    * (`GroupedPile`'s own default). See that flag's own comment. */
   static stacksDownward = true;
+
+  /**
+   * Smith usability defect (iteration-2 UX gate): a lands cascade was
+   * unreadable at the inherited default.
+   *
+   * `GroupedPile.defaultSpread` is 0.963, and that number was derived
+   * for CHIPS - identical discs where only the top one carries meaning
+   * and the edges below it are pure depth cue. Lands are CARDS: their
+   * identity is the name and cost strip, and at 0.963 each buried land
+   * showed a 2-3px sliver, so a 7-mana column told a player how many
+   * lands they had but not WHICH. Recognition over recall - reading
+   * your own board should not need a tap or a Loosen first.
+   *
+   * `MAX_SPREAD` (`Pile.maxSpread`, 0.85) is the value this codebase
+   * already picked for exactly this question - the tightest a pile of
+   * cards may go while a covered card's own cost/name strip stays
+   * visible. Nobody re-derived it when a CARD pile was first added
+   * under the chip base class; this is that derivation.
+   *
+   * Scoped to lands rather than loosened on `GroupedPile`, because a
+   * chip tray SHOULD stay tighter than any card pile - that is what
+   * makes it read as a stack rather than a spread-out row. The
+   * inherited `maxSpread` (0.97) is untouched, so a player who wants
+   * the chip-tight look can still Tighten all the way to it.
+   */
+  static defaultSpread = MAX_SPREAD;
 
   /** A land's real colour identity (`derivedColors`, RtgCardFace.js) -
    * the FIRST one, same "primary colour" simplification `state.js`'s
@@ -51,7 +82,7 @@ export class LandsPile extends GroupedPile {
    * cards to scoop or cut. */
   pileActions({ isOwner, isShared } = {}) {
     if (!isOwner && !isShared) return [];
-    return ['untapAll', 'changePileType', 'remove', 'tighten', 'loosen'];
+    return ['untapAll', 'changePileType', 'remove', 'tightenAll', 'loosenAll'];
   }
 
   /**

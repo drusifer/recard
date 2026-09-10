@@ -89,6 +89,31 @@ const tableCards = () => fixture.page.locator('.pile-section[data-pile-id="table
  * Open a card's context menu and return its rows.
  */
 async function openMenu(locator) {
+  // Report a page error rather than timing out on its consequences.
+  if (fixture.pageErrors.length > 0) {
+    assert.fail(`the page threw before this interaction:\n${fixture.pageErrors.join('\n')}`);
+  }
+  // A card that is not actionable produces a 30-second timeout whose
+  // message ("element never became visible, enabled and stable") says
+  // nothing about WHY. Report the geometry that decides it instead.
+  const box = await locator.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const stack = element.closest('.card-stack');
+    return {
+      card: { w: rect.width, h: rect.height, x: rect.x, y: rect.y },
+      display: getComputedStyle(element).display,
+      visibility: getComputedStyle(element).visibility,
+      stack: stack && {
+        w: stack.getBoundingClientRect().width,
+        h: stack.getBoundingClientRect().height,
+        extentX: stack.style.getPropertyValue('--stack-extent-x'),
+        extentY: stack.style.getPropertyValue('--stack-extent-y'),
+      },
+    };
+  });
+  assert.ok(box.card.w > 0 && box.card.h > 0,
+    `a card must have a real box to be clickable, got ${JSON.stringify(box)}`);
+
   await locator.click({ button: 'right' });
   await fixture.page.waitForSelector('.card-context-menu', { timeout: 5000 });
   return fixture.page.locator('.card-context-menu .pile-action-menu-item');
@@ -103,6 +128,19 @@ before(async () => {
   await new Promise((resolve) => server.listen(PORT, resolve));
   fixture.browser = await launchChromium();
   fixture.page = await (await fixture.browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+
+  // Surface page errors instead of swallowing them. A rendering
+  // exception leaves the DOM half-built, so every later test fails as
+  // a 30-second "element never became stable" timeout that says
+  // nothing about the actual cause - which is exactly how a whole
+  // suite can go red with no usable signal. Collected rather than
+  // thrown so one broken render does not mask the rest of the run.
+  fixture.pageErrors = [];
+  fixture.page.on('pageerror', (error) => { fixture.pageErrors.push(String(error)); });
+  fixture.page.on('console', (message) => {
+    if (message.type() === 'error') fixture.pageErrors.push(`console: ${message.text()}`);
+  });
+
   await fixture.page.goto(BASE);
   await fixture.page.click('#show-host');
   await fixture.page.fill('#host-name', 'Alice');
@@ -234,57 +272,65 @@ test('a card menu never opens empty', async () => {
 // `Pile.getView()`'s explicit field list, so it never crossed into the
 // view. Nothing below the browser could have seen that.
 const handRow = () => fixture.page.locator('[data-kind="hand"] .card-row').first();
-const spreadOf = () => handRow().evaluate((row) => row.style.getPropertyValue('--pile-spread'));
-const overlapPx = () => handRow().evaluate((row) => {
-  const second = row.querySelectorAll('.middle-card')[1];
-  return Number.parseFloat(getComputedStyle(second).marginLeft);
+// D129: spread is the STACK's now, published on the stack element -
+// the row carries the pile-wide fallback, which a per-stack adjustment
+// no longer writes.
+const spreadOf = () => handRow().evaluate((row) => row.querySelector('.card-stack')?.style.getPropertyValue('--pile-spread'));
+// D129: measure where the card actually IS, not the margin that used
+// to put it there. Overlap is no longer a margin at all - every
+// pileable is positioned from its own index within its stack - so the
+// honest question is how far apart two neighbours sit on screen. That
+// is also the property a player can see, which a margin never was.
+const gapPx = () => handRow().evaluate((row) => {
+  const [first, second] = row.querySelectorAll('.middle-card');
+  return second.getBoundingClientRect().x - first.getBoundingClientRect().x;
 });
 
 test('Loosen really spreads the cards apart on screen, not just in state', async () => {
-  const before = await overlapPx();
-  await fixture.page.locator('[data-kind="hand"] button[title="Loosen"]').click();
+  const before = await gapPx();
+  await fixture.page.locator('[data-kind="hand"] button[title="Loosen All"]').click();
   await fixture.page.waitForFunction(
     (previous) => {
       const row = document.querySelector('[data-kind="hand"] .card-row');
-      const second = row?.querySelectorAll('.middle-card')[1];
-      return second && Number.parseFloat(getComputedStyle(second).marginLeft) > previous;
+      const [first, second] = row?.querySelectorAll('.middle-card') ?? [];
+      return second && second.getBoundingClientRect().x - first.getBoundingClientRect().x > previous;
     },
     before, { timeout: 5000 },
   );
-  assert.ok(await overlapPx() > before, 'cards overlap less than they did');
+  assert.ok(await gapPx() > before, 'cards overlap less than they did');
   assert.notEqual(await spreadOf(), '', 'the row really carries the pile\'s own spread');
 });
 
 test('Tighten is the exact inverse - one of each returns to where it started', async () => {
-  const before = await overlapPx();
-  await fixture.page.locator('[data-kind="hand"] button[title="Tighten"]').click();
+  const before = await gapPx();
+  await fixture.page.locator('[data-kind="hand"] button[title="Tighten All"]').click();
   await fixture.page.waitForFunction(
     (previous) => {
       const row = document.querySelector('[data-kind="hand"] .card-row');
-      const second = row?.querySelectorAll('.middle-card')[1];
-      return second && Number.parseFloat(getComputedStyle(second).marginLeft) < previous;
+      const [first, second] = row?.querySelectorAll('.middle-card') ?? [];
+      return second && second.getBoundingClientRect().x - first.getBoundingClientRect().x < previous;
     },
     before, { timeout: 5000 },
   );
-  await fixture.page.locator('[data-kind="hand"] button[title="Loosen"]').click();
+  await fixture.page.locator('[data-kind="hand"] button[title="Loosen All"]').click();
   await fixture.page.waitForTimeout(200);
-  assert.ok(Math.abs(await overlapPx() - before) < 0.5, 'back to the same overlap');
+  assert.ok(Math.abs(await gapPx() - before) < 0.5, 'back to the same overlap');
 });
 
 // The disabled-at-the-limit rule, which only exists so a player never
 // clicks a control that cannot do anything.
 test('Loosen disappears at minimum spread, and Tighten still works from there', async () => {
   for (let index = 0; index < 12; index++) {
-    const loosen = fixture.page.locator('[data-kind="hand"] button[title="Loosen"]');
+    const loosen = fixture.page.locator('[data-kind="hand"] button[title="Loosen All"]');
     if (await loosen.count() === 0 || await loosen.isDisabled()) break;
     await loosen.click();
     await fixture.page.waitForTimeout(80);
   }
-  const loosen = fixture.page.locator('[data-kind="hand"] button[title="Loosen"]');
+  const loosen = fixture.page.locator('[data-kind="hand"] button[title="Loosen All"]');
   assert.ok(await loosen.count() === 0 || await loosen.isDisabled(), 'no dead Loosen at the floor');
   assert.equal(await spreadOf(), '0', 'fully loosened means no overlap at all');
 
-  const tighten = fixture.page.locator('[data-kind="hand"] button[title="Tighten"]');
+  const tighten = fixture.page.locator('[data-kind="hand"] button[title="Tighten All"]');
   assert.ok(await tighten.count() > 0 && !(await tighten.isDisabled()), 'the other direction is still open');
 });
 
@@ -419,12 +465,12 @@ test('a poker chip tray is stacked by denomination, highest first, with values s
     // column per value, highest first, and within a column the chips
     // overlap almost entirely - asserted as GEOMETRY, since a class name
     // proves nothing about what a player sees.
-    const denoms = await page.locator('.chip-stack').evaluateAll((stacks) => stacks.map((s) => Number(s.dataset.denom)));
+    const denoms = await page.locator('.chip-tray .card-stack').evaluateAll((stacks) => stacks.map((s) => Number(s.dataset.denom)));
     assert.ok(denoms.length > 1, `one stack per denomination, got ${denoms}`);
     assert.deepEqual(denoms, denoms.toSorted((a, b) => b - a), 'stacks run highest value first');
     assert.equal(new Set(denoms).size, denoms.length, 'and no value is split across two stacks');
 
-    const biggest = page.locator('.chip-stack').filter({ has: page.locator('.card-chip') }).last();
+    const biggest = page.locator('.chip-tray .card-stack').filter({ has: page.locator('.card-chip') }).last();
     const chipBoxes = await biggest.locator('.middle-card').evaluateAll(
       (chips) => chips.map((chip) => chip.getBoundingClientRect()).map((r) => ({ x: r.x, y: r.y, h: r.height })),
     );
@@ -463,7 +509,7 @@ test('a poker chip tray is stacked by denomination, highest first, with values s
     // was written to catch was a stack fanning by a whole CARD WIDTH
     // (a CSS specificity bug that made every column spread sideways),
     // not a few pixels of perspective.
-    const columns = await page.locator('.chip-stack').evaluateAll(
+    const columns = await page.locator('.chip-tray .card-stack').evaluateAll(
       (stacks) => stacks.map((stack) => [...stack.querySelectorAll('.middle-card')]
         .map((chip) => chip.getBoundingClientRect().x)),
     );
@@ -473,8 +519,73 @@ test('a poker chip tray is stacked by denomination, highest first, with values s
       assert.ok(spread < cardWidth / 3,
         `stack ${index} must stay a column, not fan: spread ${spread} of width ${cardWidth}`);
     }
-    const laidOut = await page.locator('.chip-stack .middle-card[data-layout]').count();
-    assert.equal(laidOut, 0, 'no chip in a tray carries a drop layout - the tray arranges itself');
+    // D129: assert real GEOMETRY, not a flag.
+    //
+    // What used to be here counted `[data-layout="column"]` attributes.
+    // That is why the original bug shipped: the attribute was present
+    // and correct on every chip while the actual rendered positions
+    // were wrong (a stack at spread 0.963 sitting 69px APART instead of
+    // overlapping), and a third chip landing at the second one's exact
+    // offset was invisible because nothing ever compared three.
+    //
+    // So: measure, and require a stack deep enough for a compounding
+    // error to show up in the first place.
+    const stacks = await page.locator('.chip-tray .card-stack').all();
+    let hasDeepStack = false;
+
+    for (const stack of stacks) {
+      // `.middle-card` (the wrapper), not `[data-pileable-id]`: that
+      // attribute is stamped on the card element INSIDE each wrapper
+      // too, so an unscoped query returns each chip twice and compares
+      // a wrapper against its own child - which reads as a 0px gap and
+      // would have made this whole assertion vacuous.
+      // Carry the inputs to the layout alongside the measured result,
+      // so a failure says WHY rather than just "0px". A geometry
+      // assertion that cannot explain itself sends the next person
+      // back to hand-probing computed styles, which is exactly the
+      // loop this suite exists to end.
+      const chips = await stack.evaluate((element) => [...element.children]
+        .filter((child) => child.classList.contains('middle-card'))
+        .map((child) => ({
+          y: child.getBoundingClientRect().y,
+          height: child.getBoundingClientRect().height,
+          stackY: child.style.getPropertyValue('--stack-y'),
+          position: getComputedStyle(child).position,
+          top: getComputedStyle(child).top,
+          bottom: getComputedStyle(child).bottom,
+        })));
+      const why = () => JSON.stringify(chips);
+      const boxes = chips;
+      if (boxes.length < 2) continue;
+
+      // Chips grow UP from the tray's bottom edge, so a later chip sits
+      // at a SMALLER y. Compare successive gaps rather than positions:
+      // equal gaps is what "every step is the same size" means, and it
+      // is the property the old margin formulas could not hold.
+      const gaps = boxes.slice(1).map((box, index) => boxes[index].y - box.y);
+
+      for (const gap of gaps) {
+        assert.ok(gap > 0, `a chip must sit above the one before it, got a gap of ${gap}px from ${why()}`);
+        assert.ok(gap < boxes[0].height,
+          `a stack at the tray's tight default spread must OVERLAP - got ${gap}px between chips ` +
+          `${boxes[0].height}px tall (the original bug: 69px apart where ~5px was wanted)`);
+      }
+
+      if (gaps.length >= 2) {
+        hasDeepStack = true;
+        // The 3+ assertion the old test never made. A half-pixel
+        // tolerance for subpixel layout, nothing more - this must not
+        // be loose enough to hide a compounding step.
+        const [first] = gaps;
+        for (const gap of gaps) {
+          assert.ok(Math.abs(gap - first) < 0.5,
+            `every step in a ${boxes.length}-chip stack must be the same size, got ${gaps.join(', ')}`);
+        }
+      }
+    }
+
+    assert.ok(hasDeepStack,
+      'this assertion is worthless without a stack of 3+ chips - the depth where the real bug lived');
 
     // *nit: the badge is the tray's total VALUE, not its chip count.
     const badge = Number(await tray.locator('.pile-count-badge').textContent());
@@ -515,7 +626,7 @@ test('a chip dropped on empty zone space joins the existing tray instead of spaw
     const chipsBefore = await page.locator('.card-chip').count();
 
     await page.evaluate(() => {
-      const chip = document.querySelector('.chip-stack .middle-card[data-pileable-id]');
+      const chip = document.querySelector('.chip-tray .card-stack .middle-card[data-pileable-id]');
       const zone = document.querySelector('zone-panel.seat-zone');
       const gutter = zone.querySelector('.zone-drop-gutter') ?? zone;
       const box = gutter.getBoundingClientRect();
@@ -608,7 +719,7 @@ test('deck and chip stacks climb at the same slight angle, lower-left to upper-r
     const steps = await page.evaluate(() => {
       const deck = document.querySelector('.pile-section[data-pile-id="deck"] .deck-stack');
       const layers = [...deck.querySelectorAll('.deck-stack-layer')].map((l) => l.getBoundingClientRect());
-      const columns = [...document.querySelectorAll('.chip-stack')]
+      const columns = [...document.querySelectorAll('.chip-tray .card-stack')]
         .map((column) => [...column.querySelectorAll('.middle-card')].map((chip) => chip.getBoundingClientRect()));
       const tall = columns.find((column) => column.length > 2) ?? [];
       return {
@@ -645,5 +756,59 @@ test('deck and chip stacks climb at the same slight angle, lower-left to upper-r
       `same perspective: deck drift ${steps.deck.drift} vs chips ${steps.chips.drift}`);
   } finally {
     await page.close();
+  }
+});
+
+// D129 (direct user request): every stack carries a gear emblem that
+// opens its OWN actions, and pile-level Tighten/Loosen became "All",
+// routing to each stack rather than writing one pile-wide number.
+test('a stack gear opens that stack\'s own actions, and flipping it turns the run', async () => {
+  const page = fixture.page;
+  // The HAND, not a chip tray: it always holds the five dealt cards in
+  // one stack, whereas the trays are redistributed (and eventually
+  // replaced) by earlier tests - "some tray with 2+ chips" is not a
+  // guarantee this late in a shared-table suite.
+  const stack = page.locator('[data-kind="hand"] .card-stack').first();
+  const gear = stack.locator('.stack-gear');
+  assert.equal(await gear.count(), 1, 'a stack with something to offer carries exactly one gear');
+
+  const runsVertically = () => page.evaluate(() => {
+    const cards = document.querySelectorAll('[data-kind="hand"] .card-stack > .middle-card');
+    const [a, b] = [...cards].map((card) => card.getBoundingClientRect());
+    return Math.abs(b.y - a.y) > Math.abs(b.x - a.x);
+  });
+  assert.equal(await runsVertically(), false, 'a hand fans sideways to begin with');
+
+  await gear.click();
+  const menu = page.locator('.stack-action-menu');
+  assert.equal(await menu.count(), 1, 'the gear opens a stack action menu');
+  await menu.locator('[data-action="flipStack"]').click();
+  await page.waitForFunction(() => {
+    const cards = document.querySelectorAll('[data-kind="hand"] .card-stack > .middle-card');
+    if (cards.length < 2) return false;
+    const [a, b] = [...cards].map((card) => card.getBoundingClientRect());
+    return Math.abs(b.y - a.y) > Math.abs(b.x - a.x);
+  }, undefined, { timeout: 5000 });
+
+  // Flip it BACK. This suite shares one browser and one dealt table
+  // (see the file header), so "each test independent within it" means
+  // a test that changes replicated state has to put it back.
+  await gear.click();
+  await page.locator('.stack-action-menu [data-action="flipStack"]').click();
+  await page.waitForFunction(() => {
+    const cards = document.querySelectorAll('[data-kind="hand"] .card-stack > .middle-card');
+    if (cards.length < 2) return false;
+    const [a, b] = [...cards].map((card) => card.getBoundingClientRect());
+    return Math.abs(b.x - a.x) > Math.abs(b.y - a.y);
+  }, undefined, { timeout: 5000 });
+});
+
+test('a stack of one offers no gear - three controls that would visibly do nothing', async () => {
+  const page = fixture.page;
+  const singles = await page.locator('.card-stack').evaluateAll((stacks) => stacks
+    .filter((stack) => stack.querySelectorAll(':scope > .middle-card').length === 1)
+    .map((stack) => stack.querySelectorAll('.stack-gear').length));
+  for (const gears of singles) {
+    assert.equal(gears, 0, 'a single-card stack has nothing to tighten, loosen or flip');
   }
 });

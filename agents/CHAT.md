@@ -726,3 +726,237 @@ lint:decks — 15 deck(s) balanced
 ---
 [<small>2026-09-07 20:54:51</small>] [**Trin**]->[**Neo**] *qa check*:
  qa check PASSED: re-ran full suite + lint, chip/token bottom-up behavior confirmed unaffected (own test guards it). No Morpheus step - nit.
+
+---
+[<small>2026-09-08 22:16:27</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make lint | /home/drusifer/Projects/recard/build/build.out
+> lint:design
+make: *** [Makefile:47: lint] Error 1
+> node tests/designLint.check.mjs
+
+
+---
+[<small>2026-09-08 22:36:35</small>] [**User**]->[**all**] *request*:
+ init *bloop stackable
+
+---
+[<small>2026-09-08 22:37:55</small>] [**User**]->[**Neo**] *decision*:
+ D: StackableElement is VIEW-ONLY - addCard/removeCard/setSpread reconcile DOM to state that flows in via the normal render path. Rejected 'Stackable owns dispatch' (self-contained component, smaller render path) because it splits state-mutation ownership between reducer and view; state.js stays single source of truth. Interface now fixed, TDD can start. @Neo *swe impl stackable
+
+---
+[<small>2026-09-08 22:57:19</small>] [**Morpheus**]->[**Neo**] *lead decision*:
+ D129: Table->Zone->Pile->Stack. Stackable extends Pileable (leaves Pileable free for future free-form piles); CardPileable/ChipPileable/TokenPileable re-parent onto it. Stack is LIVE, membership PERSISTED as a stackId on each Stackable. Rejected nested pile.stacks=[[id]] (duplicates pile.cards ordering, two-places-to-update invariant) and pure derivation (sortValue only works when membership is a function of the pileable - breaks for player-formed stacks). @Neo *swe impl stackable
+
+---
+[<small>2026-09-08 22:57:19</small>] [**Neo**]->[**Trin**] *swe impl*:
+ swe impl stackable: starting TDD. Deleting src/cardStacking.js + its tests - wrong model (axis-based math module was routing around the missing domain object). Order: Stackable offset tests -> Stackable -> Stack tests -> Stack -> component wiring -> rip CSS formulas -> fold correct staged parts. layout:'column' gets subsumed by stackId.
+
+---
+[<small>2026-09-08 23:01:52</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make lint-js | /home/drusifer/Projects/recard/build/build.out
+
+✖ 13 problems (13 errors, 0 warnings)
+3 errors and 0 warnings potentially fixable with the `--fix` option.
+
+
+---
+[<small>2026-09-08 23:02:36</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ swe impl stackable (iteration 1/2): domain model DONE, green. Stackable extends Pileable (offsetIn: ONE formula, both directions, absolute from origin so depth cannot compound); Stack + stacksOf in src/piles/Stack.js (live, groups flat list by persisted stackId, has extent()); Card/Chip/Token re-parented. 27 new tests, 727/727 suite, lint at baseline. Bug NOT fixed yet - wiring is iteration 2 (35 CSS refs, 39 rules). @Trin *qa uat stackable
+
+---
+[<small>2026-09-08 23:03:18</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 727
+ℹ suites 0
+ℹ pass 727
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1781.689834
+
+---
+[<small>2026-09-08 23:03:46</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ qa uat stackable (iter 1) PASSED. 9 mutations attempted, 9 killed - incl. the two design-intent guards I'd have missed by reading the diff: offsetIn pushed up onto Pileable (would silently lose the free-form room) and stackId as a class field (a REAL bug that happened, class fields clobber Object.assign). 5x repeat, no flake. 727/727. NOT verified: nothing live (nothing wired yet), lint-design still red 9. @Morpheus *lead review stackable
+
+---
+[<small>2026-09-08 23:04:50</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ lead review stackable (iter 1): APPROVED WITH CONDITIONS. Hierarchy + one absolute-from-origin formula are right - makes the depth bug unrepresentable, not just fixed. TWO blocking conditions for iter 2: (1) stackId must strip everywhere layout strips (state.js toHandCard/toDeckCard) or a moved card lands in a phantom stack - would have shipped silently; (2) offsetIn must return unitless stride MULTIPLIERS not px - metrics are rem and rewritten per preset at runtime. @Neo *swe impl stackable iter 2
+
+---
+[<small>2026-09-08 23:09:27</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make lint-js | /home/drusifer/Projects/recard/build/build.out
+
+✖ 13 problems (13 errors, 0 warnings)
+3 errors and 0 warnings potentially fixable with the `--fix` option.
+
+
+---
+[<small>2026-09-08 23:09:55</small>] [**Neo**]->[**Trin**] *swe fix*:
+ swe impl stackable: both review conditions DONE, same iteration. (1) offsetIn now returns unitless stride multipliers, no metrics arg - direction picks the axis only, CSS does the unit conversion; Stack.layout/extent follow. (2) stackId strips in toHandCard+toDeckCard (the only 2 choke points) + 4 reducer-level tests incl. an over-stripping guard: stackId must SURVIVE a table-to-table MOVE. 733/733, lint at baseline. @Trin *qa test conditions
+
+---
+[<small>2026-09-08 23:09:55</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ qa test conditions PASSED. 11 mutations total, 11 killed. Strip guards confirmed load-bearing: removing toHandCard strip fails 4, toDeckCard fails 2. Best guard is the over-stripping one - it catches a 'fix' that drops stackId unconditionally, which would silently kill player-formed stacks (the whole point of D129). Still NOT verified: nothing live/wired, lint-design still red 9. Iteration 2 (wiring) needs Smith. @Morpheus *lead review conditions
+
+---
+[<small>2026-09-08 23:10:09</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ lead review conditions: APPROVED, conditional approval now clean. offsetIn taking NO metrics is better than what I asked for - direction selects an axis and nothing else, so the last per-direction arithmetic is gone from JS. extent() deriving from the same layout() the rendering uses closes the second-path risk. Iteration 2 is wiring ONLY. D129 still needs writing up in docs/ARCHITECTURE.md (not DECISIONS.md - it already drifted, stops at D20). @Neo *swe impl stackable iter 2
+
+---
+[<small>2026-09-08 23:10:12</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 733
+ℹ suites 0
+ℹ pass 733
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1913.080991
+
+---
+[<small>2026-09-09 19:25:22</small>] [**User**]->[**all**] *request*:
+ *bloop stackable
+
+---
+[<small>2026-09-09 19:43:21</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-rtg | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9250.196587
+
+---
+[<small>2026-09-09 19:43:29</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ swe impl stackable iter 2 DONE - the cascade bug is FIXED. Tray path (chips/tokens/lands) now renders from real Stacks: withColumnLayout deleted for withStackIds, Pile.stackDirection, chip-tray writes --stack-x/y, both bespoke overlap formulas ripped from CSS. 2 real bugs found wiring: CSS specificity (row rule beat the stack rule, fanned every stack sideways) and data-pileable-id being stamped on inner elements too (double-counted pieces). @Trin *qa uat stackable iter 2
+
+---
+[<small>2026-09-09 19:43:54</small>] [**Trin**]->[**Smith**] *qa handoff*:
+ qa uat stackable iter 2 PASSED. Mutation-proved the LIVE tests catch BOTH original bugs: depth-compounding -> 0px gap; sign flip -> 'lands 101.7px between cards 97.6px tall', ie the user's own 'cards FARTHER apart' verbatim. Closed a real gap: LandsPile (the reported surface, sole user of the downward CSS) had NO live test at all. Also caught my own vacuous assertion (queried an id stamped on inner elements too, compared a wrapper to its child). 737/18/13 green. @Smith *user test stackable
+
+---
+[<small>2026-09-09 19:45:31</small>] [**Smith**]->[**Morpheus**] *user handoff*:
+ user test stackable PASSED on the real running app (live LandsPile screenshot, 9 real draws via the real drop path): cascade top-down, steps visibly even, cards overlap, badges correct. Reported defect visibly gone. ONE usability defect filed, deliberately NOT fixed: LandsPile inherits GroupedPile.defaultSpread 0.963 (calibrated for CHIPS) so a 7-land column shows ~2px slivers - you see how many, not which. Details: agents/smith.docs/state.md. @Morpheus *lead review
+
+---
+[<small>2026-09-09 19:45:49</small>] [**Morpheus**]->[**User**] *lead review*:
+ lead review stackable iter 2: APPROVED. Tray path genuinely unified - one formula, bespoke calcs deleted not corrected, CSS does unit conversion only. Trustworthy because the live tests are mutation-proved against both original bugs, and because LandsPile's total lack of live coverage (the real reason it broke twice) is closed. Smith's spread defect accepted as real but out of scope - user's call. Battlefield/row path still on the old mechanism: mixed-direction stacks is a genuine fork, ASK. @User
+
+---
+[<small>2026-09-09 22:05:32</small>] [**User**]->[**all**] *request*:
+ clean up the smith defect and remove and make direction per stack so we can all use one happy layout consider if StackActions are required for consistancy
+
+---
+[<small>2026-09-09 22:18:57</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 758
+ℹ suites 0
+ℹ pass 758
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1910.507112
+
+---
+[<small>2026-09-09 22:19:20</small>] [**Neo**]->[**Bob**] *queue*:
+ queue (direct user request): @Bob *learn no one-off tests - use the automation test pyramid. Institutionalize as a team-wide lesson, not just my own memory: ad-hoc probes (temporary console dumps, env-gated screenshot hooks, node -e traces, hand-run mutation loops, throwaway worktree runs) are banned - encode the check at the right pyramid level (unit for pure math, integration for wiring, browser only for real layout) so it is repeatable. Queued, not started.
+
+---
+[<small>2026-09-09 22:29:42</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-rtg | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9474.407872
+
+---
+[<small>2026-09-09 22:30:14</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ swe impl stackable COMPLETE - one layout everywhere. Smith defect fixed (LandsPile spread 0.85, chips still tighter, guarded). Direction now PER STACK via pile.stacks metadata (direction only - cannot desync from cards). layout field DELETED from state+DOM; drops translate to membership+direction. FAN is the third layout - applyFanOffset and options.fan deleted. Net -24 lines of non-comment code. 761/18/13 green, check PASSED, lint-js 10 (was 13). @Trin *qa uat stackable iter 3
+
+---
+[<small>2026-09-09 22:30:41</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-rtg | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9403.217889
+
+---
+[<small>2026-09-09 22:30:58</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ qa uat stackable iter 3 PASSED. 761/18/13 green, check PASSED, lint-js 10 (3 below baseline). No synthetic mutation run - the tests earned it organically, catching FOUR real regressions a green model suite missed: getView dropping stacks (battlefield flat), GroupedPile honouring a drop's direction hint (lands sideways), a class rename broadening test selectors, CSS specificity fanning stacks. Geometry assertions now self-diagnose. Smith's defect is a permanent test. @Morpheus *lead review
+
+---
+[<small>2026-09-09 22:31:17</small>] [**Morpheus**]->[**User**] *lead review*:
+ lead review stackable iter 3: APPROVED. Four layout mechanisms collapsed to one and the source SHRANK (-24 non-comment lines) - applyFanOffset, options.fan, --column-depth, the layout field, D21's second-card rule, withColumnLayout and all four CSS formulas deleted outright, no aliases. FAN as a real layout was the right call: a hand's position and its arc were two mechanisms describing one thing. Per-stack direction as metadata-only is the load-bearing bit. StackActions still OPEN - see neo state. @User
+
+---
+[<small>2026-09-09 23:20:43</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-rtg | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9686.394123
+
+---
+[<small>2026-09-09 23:21:17</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ swe impl StackActions DONE per user's GUI decision. Gear emblem on every stack (universal, badge-sized) opens tighten/loosen/flip for THAT stack; pile-level is now Tighten All/Loosen All, ROUTING to each stack so columns adjusted apart keep their differences. spread moved onto stack metadata beside direction. FLIP_STACK is new. Two bugs found: empty-pile routing was a silent no-op, and a 44px gear covered a 43px card and swallowed every click. Details: agents/neo.docs/state.md. @Trin *qa uat
+
+---
+[<small>2026-09-09 23:43:55</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make lint-js | /home/drusifer/Projects/recard/build/build.out
+
+✖ 10 problems (10 errors, 0 warnings)
+1 error and 0 warnings potentially fixable with the `--fix` option.
+
+
+---
+[<small>2026-09-09 23:44:13</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ qa uat stackactions PASSED. 770/20/13 green, check PASSED, lint-js 10. Browser suite caught 2 real bugs in the new control itself: the gear covered the cards (hover-raise fought the cursor, 30s timeouts) then the pile header (intercepted Loosen All) - it sits BELOW the stack now; and Tighten All/Loosen All never disabled at the limits because pileForKind builds a BARE instance, the trap that file already documents. Also 3 defects in my own tests. @Morpheus *lead review
+
+---
+[<small>2026-09-09 23:44:38</small>] [**Morpheus**]->[**User**] *lead review*:
+ lead review stackactions: APPROVED. Routing is sound - Tighten All fans out per stack so columns adjusted apart keep their differences; spread joining direction in the same map means no new persistence shape. Optional stackKey over a sibling action follows D75/D103, and DEFAULT_STACK_KEY makes 'omitted means all' unambiguous. Two lessons: bare instances (pileForKind) and every() on [] being vacuously true. Details: agents/morpheus.docs/state.md. @User
+
+---
+[<small>2026-09-10 00:34:54</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-style | /home/drusifer/Projects/recard/build/build.out
+=== make lint-style @ 2026-09-10 00:34:52 ===
+npm run lint:style
+
+> lint:style
+> stylelint style.css
+
+
+---
+[<small>2026-09-10 00:35:08</small>] [**User**]->[**all**] *request*:
+ add stackaction for tap/untap, only if easy
+
+---
+[<small>2026-09-10 00:35:08</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ swe impl stackaction tap/untap DONE - it was easy. Same shape as FLIP_STACK/ADJUST_PILE_SPREAD. Pile.supportsStackTap opt-in (Battlefield/Lands only, mirrors untapAll's own scope); Stack.stackActions gained tapStack/untapStack offered even for a stack of ONE; SET_STACK_ORIENTATION reducer (one action + orientation param, D75/D103 shape); UNTAP_ALL untouched per your instruction. 11 new tests + 1 live browser test on a real battlefield column. 781/20/14 green, lint baseline. @Trin *qa uat
+
+---
+[<small>2026-09-10 00:35:29</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ qa uat tap/untap PASSED. 4 mutations, 4 killed: canTap gate removed (would false-offer tap on chip/hand stacks), tapStack disabled-check inverted, SET_STACK_ORIENTATION scope widened to whole pile, authorization removed. 781/20/14 green, lint baseline, check PASSED. @Morpheus *lead review
+
+---
+[<small>2026-09-10 00:35:29</small>] [**Morpheus**]->[**User**] *lead review*:
+ lead review tap/untap: APPROVED. Right calls: gated by pile kind not universal (tapping a chip isn't real), offered even for a stack of 1 (unlike overlap actions), one param'd action not a TAP/UNTAP pair (D75/D103), pile-level untapAll left completely alone. Small, clean, on-pattern. @User

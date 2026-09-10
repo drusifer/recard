@@ -66,7 +66,7 @@ test('reshuffleDeal is marked destructive and deal is not', () => {
 test('D34/D87: the hand offers pile-level actions to its own owner - sort + changePileType (pass removed, direct user request)', () => {
   // US-104: `cards` now decides whether the sorts appear at all.
   assert.deepEqual(pileLevelActions('hand', { isHost: false, isOwner: true, cards: [{ pileableType: 'card' }] }),
-    ['sortRank', 'sortSuit', 'changePileType', 'tighten', 'loosen']);
+    ['sortRank', 'sortSuit', 'changePileType', 'tightenAll', 'loosenAll']);
 });
 
 test('D34: a hand pile offers nothing to a viewer who does not own it', () => {
@@ -185,16 +185,16 @@ test('Phase 57: move stays unmarked even in that exact one-target shape - no sho
 test('tighten/loosen are offered by a hand - the fan the *nit was actually about', () => {
   const actions = new PlayerHandPile({ id: 'hand:me', kind: 'hand', ownerId: 'me' })
     .pileActions({ isOwner: true, isShared: false, cards: [] });
-  assert.ok(actions.includes('tighten'), `got ${JSON.stringify(actions)}`);
-  assert.ok(actions.includes('loosen'), `got ${JSON.stringify(actions)}`);
+  assert.ok(actions.includes('tightenAll'), `got ${JSON.stringify(actions)}`);
+  assert.ok(actions.includes('loosenAll'), `got ${JSON.stringify(actions)}`);
 });
 
 test('tighten/loosen are offered by melds and runs too - any pile that lays its cards out in a row', () => {
   for (const kind of ['run', 'set', 'foundation', 'plain', 'discard']) {
     const actions = new PILE_TYPES[kind]({ id: `p:${kind}`, kind, ownerId: null })
       .pileActions({ isOwner: true, isShared: true, cards: [] });
-    assert.ok(actions.includes('tighten'), `${kind} should offer tighten, got ${JSON.stringify(actions)}`);
-    assert.ok(actions.includes('loosen'), `${kind} should offer loosen, got ${JSON.stringify(actions)}`);
+    assert.ok(actions.includes('tightenAll'), `${kind} should offer tighten, got ${JSON.stringify(actions)}`);
+    assert.ok(actions.includes('loosenAll'), `${kind} should offer loosen, got ${JSON.stringify(actions)}`);
   }
 });
 
@@ -204,25 +204,25 @@ test('tighten/loosen are offered by melds and runs too - any pile that lays its 
 test('a deck offers neither - a stack has no spread to adjust', () => {
   const actions = new PILE_TYPES.deck({ id: 'deck', kind: 'deck', ownerId: null })
     .pileActions({ isHost: true, isOwner: true, isShared: true, cards: [] });
-  assert.ok(!actions.includes('tighten'), `got ${JSON.stringify(actions)}`);
-  assert.ok(!actions.includes('loosen'), `got ${JSON.stringify(actions)}`);
+  assert.ok(!actions.includes('tightenAll'), `got ${JSON.stringify(actions)}`);
+  assert.ok(!actions.includes('loosenAll'), `got ${JSON.stringify(actions)}`);
 });
 
 // Clicking an action that cannot move anything is a dead control - the
 // same reason `split` is disabled below 2 cards.
 test('tighten is disabled at maximum spread, loosen at minimum - no dead clicks at the limits', () => {
   const pile = new PILE_TYPES.plain({ id: 'p', kind: 'plain', ownerId: null });
-  assert.ok(pile.disabledActions(3, { spread: MAX_SPREAD }).includes('tighten'));
-  assert.ok(!pile.disabledActions(3, { spread: MAX_SPREAD }).includes('loosen'));
-  assert.ok(pile.disabledActions(3, { spread: MIN_SPREAD }).includes('loosen'));
-  assert.ok(!pile.disabledActions(3, { spread: MIN_SPREAD }).includes('tighten'));
+  assert.ok(pile.disabledActions(3, { spread: MAX_SPREAD }).includes('tightenAll'));
+  assert.ok(!pile.disabledActions(3, { spread: MAX_SPREAD }).includes('loosenAll'));
+  assert.ok(pile.disabledActions(3, { spread: MIN_SPREAD }).includes('loosenAll'));
+  assert.ok(!pile.disabledActions(3, { spread: MIN_SPREAD }).includes('tightenAll'));
 });
 
 test('neither is disabled in the middle of the range', () => {
   const disabled = new PILE_TYPES.plain({ id: 'p', kind: 'plain', ownerId: null })
     .disabledActions(3, { spread: (MIN_SPREAD + MAX_SPREAD) / 2 });
-  assert.ok(!disabled.includes('tighten'));
-  assert.ok(!disabled.includes('loosen'));
+  assert.ok(!disabled.includes('tightenAll'));
+  assert.ok(!disabled.includes('loosenAll'));
 });
 
 

@@ -88,7 +88,6 @@
      resting face already does, instead of an unrelated fixed box. */
   --card-aspect: 2.7 / 3.68;
   --card-gap: 0.5rem;
-  --card-peek: 0.85rem;
   --radius-sm: 0.45rem;
   --radius-md: 0.75rem;
   --radius-lg: 1.1rem;
@@ -588,15 +587,63 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   flex-wrap: wrap;
 }
 
-/* `column-reverse` so the FIRST chip in the group sits at the bottom of
-   the stack and later ones pile on top, matching both the DOM order and
-   how a physical stack grows. */
-.chip-stack {
-  position: relative; /* anchors an opt-in `.chip-stack-badge` (LandsPile) */
-  display: flex;
-  flex-direction: column-reverse;
-  align-items: center;
-  min-height: 0;
+/* D129: a stack POSITIONS its own pieces - `<chip-tray>` writes each
+   one's `--stack-x`/`--stack-y` from `Stack.layout()`, and the only
+   arithmetic left here is turning those unitless stride multipliers
+   into lengths. Every piece is placed from its OWN index, absolutely,
+   so nothing chains: the "3 cards cascades weird" family of bugs (a
+   third card landing at the second one's offset) is unrepresentable
+   rather than fixed.
+
+   This REPLACED a flex `column-reverse` whose overlap came from
+   margins. Margins were the whole problem: the same property was a
+   cross-axis margin in a card row and a main-axis margin here, with
+   opposite baselines and opposite signs, so the two contexts needed
+   two different hand-written formulas that inevitably disagreed.
+
+   The column must reserve the space its stack really uses, or an
+   absolutely-positioned stack collapses to zero and every tray below
+   rides up - `--stack-extent-*` is the LAST piece's offset (from the
+   same `layout()` the pieces themselves use, never recomputed from the
+   count), plus the one piece itself. */
+.card-stack {
+  position: relative; /* the stack's own origin, and anchors `.chip-stack-badge` */
+  width: calc(var(--stack-extent-x, 0) * (var(--card-w) + var(--card-gap)) + var(--card-w));
+  height: calc(var(--stack-extent-y, 0) * (var(--card-h) + var(--card-gap)) + var(--card-h));
+  flex: none;
+}
+
+/* Every pileable in every pile is placed here, from its own index
+   within its own stack. There is no other overlap rule in this file -
+   `stack`/`overlap`/`column`/tray each used to have their own, with
+   different baselines and even different signs, which is why they
+   disagreed. */
+.card-stack > .middle-card {
+  position: absolute;
+  margin: 0;
+  left: calc(var(--stack-x, 0) * (var(--card-w) + var(--card-gap)));
+  top: calc(var(--stack-y, 0) * (var(--card-h) + var(--card-gap)));
+  /* A fan's lean comes from the layout, through the SAME `--raise-base`
+     seam the hover-raise already composes on top of - so a raised card
+     in a hand keeps its angle instead of snapping upright. Not a
+     fan-specific rule, because a fan is a stack layout like any other
+     now; `--stack-rotate` is simply absent (and the default applies)
+     for the two layouts that do not rotate. The token pile's own
+     scatter still overrides this with a more specific selector, as it
+     always did. */
+  --raise-base: rotate(var(--stack-rotate, 0deg));
+}
+
+/* Which END a stack grows from. Everything grows down/right, except a
+   chip tray: chips pile UP from the tray's bottom edge, the way a
+   physical stack sits on a table (`GroupedPile.stacksDownward` opts
+   `LandsPile` back out, because a cascade of cards reads top-down).
+   Only the edge the SAME offsets are measured from differs - anchoring
+   rather than reversing the flow keeps DOM order = visual order either
+   way, so the first piece is always the first child. */
+.chip-tray:not(.chip-tray-downward) .card-stack > .middle-card {
+  top: auto;
+  bottom: calc(var(--stack-y, 0) * (var(--card-h) + var(--card-gap)));
 }
 
 /* *nit (direct user request, "align cascades to the top"): the opt-in
@@ -608,8 +655,64 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   align-items: flex-start;
 }
 
-.chip-tray-downward .chip-stack {
-  flex-direction: column;
+/* D129 (direct user request): the gear emblem every stack carries -
+   "since this is universal for stacks use an additional emblem using
+   the gear symbols to pull up the stack action menu".
+
+   Universal, unlike `.chip-stack-badge` beside it, which is one pile
+   kind's opt-in decoration - so it takes the opposite corner and the
+   two never collide.
+
+   Sized to the badge (1.3rem), NOT to the 44px interactive floor. A
+   card is about 43px wide, so a 44px control anchored to a stack
+   covers the entire stack and swallows every click meant for the
+   cards under it - which is exactly what happened: five card-menu
+   tests went from passing to 30-second timeouts. The floor is
+   enforced on `.pile-action-btn`/`.pile-action-menu-item` (see the
+   design-lint selector), and this UI pass is mouse-only by standing
+   decision, so a pointer-sized emblem is the right call here; revisit
+   if touch parity is ever taken on. */
+/* BELOW the stack, and this position was arrived at by elimination -
+   an interactive emblem anchored anywhere else covers something that
+   has to stay clickable:
+
+   - INSIDE the stack box (any corner): it sits on the cards' own hit
+     area, and the hover-raise then fights the cursor - the card
+     lifts, the pointer lands on the gear, the card drops back.
+     Playwright reported "element never became visible, enabled and
+     stable" and every card-menu test timed out at 30 seconds.
+   - ABOVE it (`bottom: 100%`): straight over the pile's own action
+     header, where it intercepted the clicks meant for Loosen All and
+     Make change.
+
+   Below is the pile's own empty space, so it covers neither. The
+   unclickable-card bug this control exists to help with must not be
+   reintroduced BY it, which is what both earlier placements did. */
+.stack-gear {
+  position: absolute;
+  top: calc(100% + 0.15rem);
+  right: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(12, 16, 26, 0.75);
+  font-size: 0.7rem;
+  line-height: 1;
+  color: var(--ink-dim, #cfd6e4);
+  opacity: 0.5;
+  cursor: pointer;
+}
+
+.card-stack:hover .stack-gear,
+.stack-gear:hover,
+.stack-gear:focus-visible {
+  opacity: 1;
 }
 
 /* *nit (direct user request): "display the total manacount in a cool
@@ -648,7 +751,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    chip's position in its own stack, set by `<chip-tray>`, and the
    transform turns it into a per-chip drift using the same token the
    deck's layers use. */
-.card-row.chip-stack .middle-card {
+.chip-tray .card-stack .middle-card {
   transform: translateX(calc(var(--stack-index, 0) * var(--stack-step-x)));
 }
 
@@ -752,51 +855,13 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   transform: var(--raise-base, none);
 }
 
-/* UX follow-up (direct user request): "tighten up that fan... more
-   overlap." Same formula shape as the table's own overlap layout
-   (`.middle-card[data-layout='overlap']` below) - proportional to
-   `--card-w` (not a fixed rem) so this stays correct if the card size
-   ever changes again, unlike that rule's own fixed `1.7rem`. Reveals
-   35% of each covered card - still enough for the corner rank/suit and
-   an individual click target, just a tighter fan than the first pass. */
-/* *nit (direct user request): "pile actions for tighten/loosen to adjust
-   the overlap on fan and meld piles or runs or whatever."
-
-   ONE rule for every row, with no literal in it. The 0.65 that used to
-   be hardcoded here is `HandPile.defaultSpread` now, and `--pile-spread`
-   is written on EVERY row by `renderPileCards` from the pile's own
-   effective value - there is no "unadjusted piles take the old path"
-   branch, because that would be two ways to lay out a row and the
-   second one would be the thing nobody remembers to update.
-
-   The pitch is `card-w + card-gap`, so `--pile-spread` reads as the
-   fraction of one card's stride that the next card covers: 0 is a plain
-   gap-separated row (the base `Pile` default - a meld or a plain pile,
-   unchanged), and 0.85 (MAX_SPREAD) still leaves a readable sliver.
-
-   `:not([data-layout])` because a card placed with an explicit
-   stack/overlap intent (US-32/33, dropped that way by a player) owns
-   its own margin below - the pile's spread is the default for cards
-   that were never given one, never an override of a real placement. */
-.card-row .middle-card + .middle-card:not([data-layout]) {
-  margin-left: calc(-1 * (var(--card-w) + var(--card-gap)) * var(--pile-spread, 0));
-}
-
-/* The chip stacking itself, deliberately placed AFTER the generic
-   horizontal overlap rule above and matched with equal specificity
-   (`.card-row.chip-stack`) so it actually wins. It did not, the first
-   time: the generic rule carries a `:not(...)` that outranked a bare
-   `.chip-stack` selector, so every stack still fanned sideways - caught
-   by asserting the chips' real x coordinates rather than trusting the
-   class to have had an effect.
-
-   A tray stacks vertically, so the horizontal margin goes back to zero
-   and `--pile-spread` drives the VERTICAL overlap instead - which keeps
-   Tighten/Loosen working on the axis that matters here. */
-.card-row.chip-stack .middle-card + .middle-card {
-  margin-left: 0;
-  margin-bottom: calc(-1 * (var(--card-h) + var(--card-gap)) * var(--pile-spread, 0.963));
-}
+/* D129: the generic row overlap rule that used to live here is GONE.
+   A row's spacing is no longer a margin at all - a pile is a row of
+   `Stack`s and every pileable is positioned from its own index by
+   `.card-stack > .middle-card` above. `--pile-spread` still drives how
+   much they overlap; it now reaches the layout through
+   `Stackable.offsetIn` (unit-tested JS) instead of through a `calc()`
+   nobody could test. */
 
 /* D91: the Split picker (`renderSplitPicker`, ui.js) - a `fan-row` used
    OUTSIDE a hand's own `.seat-zone` (any pile can be split, not just a
@@ -1093,80 +1158,27 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   cursor: pointer;
 }
 
-/* Stacked / overlapped cards (US-32/33, D21). The negative margin has to
-   swallow `.card-row`'s own 0.6rem gap as well as the intended overlap,
-   which is why these aren't simply "card width minus what shows".
-   Driven off `data-layout`, which ui.js copies straight from
-   authoritative state - so every player sees the same arrangement. */
-.middle-card[data-layout] {
-  position: relative; /* so :hover can lift it above its neighbours */
-}
-
-/* Tight pile for a SET: only a corner index of each buried card shows -
-   enough to still identify it at a glance (US-32 AC explicitly rules out
-   fully hiding a lower card). */
-.middle-card[data-layout='stack'] { margin-left: calc(-1 * (var(--card-w) - var(--card-peek)) - var(--card-gap)); }
-
-/* Fanned run: every card keeps enough of its left edge to read rank+suit
-   from the corner index, so a sequence stays legible end to end. */
-.middle-card[data-layout='overlap'] { margin-left: calc(-1 * (var(--card-w) - 1.7rem) - var(--card-gap)); }
-
-/* *nit (direct user request): "vertical drop targets for making piles
-   that stack vertically like how lands are normally arranged in a game
-   of mtg" - a column: the dropped card sits at the SAME x as its target
-   (full horizontal pull-back, like `stack` but with no peek left over -
-   the offset here is entirely vertical, not sideways) and slides DOWN
-   from it instead of sideways, so a whole column still reads as roughly
-   one card wide in the row's own flow, not one card per member.
-
-   *nit (direct user request, follow-up): "add tighter/looser actions to
-   the battlefield pile and tighter/looser also effects the column
-   layout" - the downward push used to be a fixed fraction of the
-   card's own height; it's `--pile-spread`-driven now, the same
-   variable Tighten/Loosen already writes for every OTHER pile's
-   default row spacing (`renderPileCards`/`effectiveSpread`, ui.js) -
-   one shared control for "how much overlap", not a second slider that
-   only happens to look similar. Shaped the opposite way from the
-   horizontal default-row rule below (`1 -` instead of a bare
-   multiply): that rule PULLS a card left as spread rises from 0 (no
-   overlap); this one's unadjusted state (spread 0, same "never
-   touched" default every pile starts at) should read as no overlap
-   EITHER - the two full card-heights (this card's own plus the gap)
-   showing in full - and Tighten (rising spread) should uncover LESS,
-   not more, the same direction chip-stack's own vertical formula
-   already established. Un-tightened, this looks like a plain vertical
-   list, not "lands" - hit Tighten (now offered, see BattlefieldPile.js)
-   a few times for the classic overlapping look; `MAX_SPREAD` (0.85)
-   still leaves the covered card's own cost/name strip visible, same
-   AC as the horizontal `stack` rule below.
-
-   *fix (real bug, direct user report): "adding additional cards to the
-   vertical layout blocks the second one instead of offsetting from
-   the previous card" - `margin-top` is a CROSS-axis margin here, and
-   flex measures every item's cross-axis position from the shared LINE
-   top independently, not from the previous sibling's own (already
-   offset) position the way a negative `margin-left` compounds along
-   the main axis. A third column card landed at the SAME depth as the
-   second instead of one step further, because both were being measured
-   from that same shared reference point rather than from each other.
-   `--column-depth` (ui.js, counted per card: how many consecutive
-   `layout: 'column'` cards back to the nearest non-column one,
-   inclusive) makes the chain explicit instead of relying on flex to
-   produce it: multiplying the one-step offset by depth puts the Nth
-   column card N steps below the anchor, which IS "one step further
-   than the (N-1)th" when every step is the same size. */
-.middle-card[data-layout='column'] {
-  margin-left: calc(-1 * (var(--card-w) + var(--card-gap)));
-  margin-top: calc(var(--column-depth, 1) * (var(--card-h) + var(--card-gap)) * (1 - var(--pile-spread, 0)));
-}
+/* D129: `data-layout` is gone from the DOM and from state. It was a
+   per-card field meaning "overlap onto whoever precedes me", and the
+   four inconsistent formulas keyed off it (a fixed `--card-peek` for
+   `stack`, a fixed `1.7rem` for `overlap`, a `--pile-spread`-driven
+   `--column-depth`-chained one for `column`, and a bespoke one for the
+   chip tray) are what this whole rewrite replaced. A drop's direction
+   hint now becomes stack membership plus that stack's direction, and
+   `.card-stack > .middle-card` above is the only rule that positions
+   anything. */
 
 /* Overlapping necessarily covers the buried cards' own Pick up / Move
    to… controls. Raising the hovered/focused card (and its controls)
    above its neighbours keeps every card individually operable, so the
    44px touch-target floor still holds in practice and not just on paper.
    `:focus-within` carries the same escape hatch to keyboard users. */
-.middle-card[data-layout]:hover,
-.middle-card[data-layout]:focus-within {
+/* D129: "is this card overlapped?" is now "does its stack hold more
+   than one card?" - which is the honest question, and one that stays
+   true for the FIRST card of a stack too (the old `data-layout` was
+   absent on it by construction, so it never got these). */
+.card-stack:has(> .middle-card ~ .middle-card) > .middle-card:hover,
+.card-stack:has(> .middle-card ~ .middle-card) > .middle-card:focus-within {
   z-index: 4;
 }
 
@@ -1175,12 +1187,12 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    (measured, not guessed - see the Phase 31 screenshot). Still one
    hover/focus away, and the cards' own overlap already communicates
    that they're a group. */
-.middle-card[data-layout] > :not(.card) {
+.card-stack:has(> .middle-card ~ .middle-card) > .middle-card > :not(.card) {
   display: none;
 }
 
-.middle-card[data-layout]:hover > :not(.card),
-.middle-card[data-layout]:focus-within > :not(.card) {
+.card-stack:has(> .middle-card ~ .middle-card) > .middle-card:hover > :not(.card),
+.card-stack:has(> .middle-card ~ .middle-card) > .middle-card:focus-within > :not(.card) {
   display: revert;
 }
 
