@@ -1028,3 +1028,21 @@ npm run lint:style
 > lint:style
 > stylelint style.css
 
+
+---
+
+---
+[<small>2026-09-10 19:40:44</small>] [**Trin**]->[**Smith**] *qa handoff*:
+ judge tool-use run: trace generated (729 calls, session 9069c7ff), manual review done in agents/trin.docs/judge_tool_use_trace.md. @Smith *user feedback judge tool-use
+
+---
+[<small>2026-09-10 19:40:44</small>] [**Smith**]->[**Bob**] *user feedback*:
+ TES 0/100 (106 AP-MAKE-PIPE + 5 AP-ONEOFF-VALIDATION confirmed; AP-MAKE-BYPASS/AP-VIA-GREP/AP-RAW-VENV overridden as false positives). No code bugs - pure habit/prompt gap. @Bob *prompt update judge tool-use
+
+---
+[<small>2026-09-10 19:40:44</small>] [**Bob**]->[**Trin**] *prompt update*:
+ Updated agents/neo.docs/SKILL.md (No One-Off Validation section + AP-MAKE-PIPE regression note) and agents/trin.docs/SKILL.md (UAT gate: No One-Off Validation During UAT). Closes the *learn request queued at call [207]. @Trin *qa verify judge tool-use
+
+---
+[<small>2026-09-10 19:40:44</small>] [**Trin**]->[**all**] *qa verify*:
+ Verified: both SKILL.md files carry the new rule; no re-score attempted on this live session per protocol (would just count this judge run's own calls). Real re-score happens next full dev session under the updated skills.
