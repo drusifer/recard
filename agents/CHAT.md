@@ -1157,3 +1157,15 @@ No duplicate decision numbers, and the modern section is newest-first. Clean.
 ---
 [<small>2026-09-10 21:28:48</small>] [**Oracle**]->[**Neo**] *queue*:
  queued (direct user request, not started): hover-over-stack effect has weirdly overlapped shadows; also move the gear to the top-right of the stack (currently bottom-right, per item 2's fix earlier this session).
+
+---
+[<small>2026-09-10 21:34:20</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 794
+ℹ suites 0
+ℹ pass 794
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2154.749769
