@@ -328,6 +328,17 @@ test('NEW_GAME: rebuilds a NEW preset\'s perPlayer piles for every existing play
   }
 });
 
+test('NEW_GAME: every existing player still has their own perPlayer Zone record in the new preset (queued 2026-09-10 report)', () => {
+  let state = createInitialState({}, () => 0.5);
+  state = withPlayers(state, ['p1', 'p2']);
+
+  const next = reduce(state, { type: 'NEW_GAME', deckConfig: {}, gameConfig: {} });
+
+  for (const id of ['p1', 'p2']) {
+    assert.ok(next.zones.some((z) => z.ownerId === id), `${id} should have a perPlayer Zone record after New Game, same as a fresh JOIN gives`);
+  }
+});
+
 test('NEW_GAME: does not trip the card-conservation guard - a preset swap is a new deck epoch, like RESET', () => {
   let state = createInitialState({ numDecks: 1, jokers: 0 }, () => 0.5);
   state = withPlayers(state, ['p1']);
@@ -3594,4 +3605,26 @@ test('D129: a plain move to another pile clears membership - a stackId is PILE-s
 
   const moved = pilesOf(state).flatMap((pile) => pile.cards).find((card) => card.id === 'stacked-1');
   assert.equal(moved.stackId, undefined, 'the old pile\'s stack does not follow it');
+});
+
+// *fix (queued 2026-09-10, direct user report: "cant re-fan my hand
+// stack after flip") - `FLIP_STACK` only ever toggled a stack's stored
+// direction between VERTICAL and HORIZONTAL, so a hand (whose Pile-kind
+// default is FAN) that got flipped once could never flip its way back
+// to FAN - it dead-ended at HORIZONTAL on the second flip instead.
+// Fixed by having `Stack.flippedDirection` accept the owning pile
+// kind's own default direction, so FAN-default piles get a genuine
+// 2-state FAN<->VERTICAL toggle (see stack.test.js for the pure-Stack
+// coverage) - this is the reducer-level wiring proof that FLIP_STACK
+// actually passes that default through.
+test('FLIP_STACK: a hand (FAN-default) flips to vertical then back to fan - not on to horizontal', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
+  const handPileId = state.piles.find((p) => p.kind === 'hand' && p.ownerId === 'p1').id;
+
+  state = reduce(state, { type: 'FLIP_STACK', pileId: handPileId, stackKey: DEFAULT_STACK_KEY });
+  assert.equal(state.piles.find((p) => p.id === handPileId).stacks[DEFAULT_STACK_KEY].direction, 'vertical');
+
+  state = reduce(state, { type: 'FLIP_STACK', pileId: handPileId, stackKey: DEFAULT_STACK_KEY });
+  assert.equal(state.piles.find((p) => p.id === handPileId).stacks[DEFAULT_STACK_KEY].direction, 'fan', 'a second flip must restore the fan, not advance to horizontal');
 });

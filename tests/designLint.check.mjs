@@ -199,8 +199,16 @@ try {
       // *nit (2026-08-27): `.score-adjust-btn` (each player's own
       // +/-1/+/-10 row, `ScoreZone.js`) is the same small-content-sized
       // control, same exemption reasoning.
+      // *fix (queued 2026-09-10, D129/StackActions): `.stack-gear` is
+      // style.css's own documented exemption ("Sized to the badge
+      // (1.3rem), NOT to the 44px interactive floor... this UI pass is
+      // mouse-only by standing decision") - the CSS comment predates
+      // this selector ever being added here, which is exactly why the
+      // gear silently rendered at 44px all along (the missing
+      // min-width/min-height override this same *fix restored) instead
+      // of the exemption ever actually being exercised/verified.
       buttons: [...document.querySelectorAll(
-        'button:not([hidden]):not(.card):not(.action-btn):not(.pile-action-btn):not(.score-adjust-btn)',
+        'button:not([hidden]):not(.card):not(.action-btn):not(.pile-action-btn):not(.score-adjust-btn):not(.stack-gear)',
       )]
         .filter((b) => {
           const r = b.getBoundingClientRect();

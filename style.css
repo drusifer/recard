@@ -698,6 +698,17 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   justify-content: center;
   width: 1.3rem;
   height: 1.3rem;
+  /* *fix (queued 2026-09-10, "No Gears on RTG stacks?"): the comment
+     above already documented "sized to the badge, not the 44px floor",
+     but never actually added the override needed to defeat the global
+     `button { min-height/min-width: 44px }` rule - so this rendered at
+     44px all along (confirmed via getBoundingClientRect), 3.4x its
+     intended footprint, which is what pushed it far enough past its
+     own stack to get clipped by a battlefield's scrollable card-row
+     (see that rule's own comment). Actually applying the stated intent
+     fixes both: right-sized AND back inside its reserved space. */
+  min-width: 1.3rem;
+  min-height: 1.3rem;
   padding: 0;
   border: none;
   border-radius: 50%;
@@ -2404,6 +2415,28 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .pile-title {
   display: block;
   width: max-content;
+  /* *fix (queued 2026-09-10, direct user reports: "deck/pile split...
+     super wide because of all the actions" / "fold pile actions into
+     rows"): `width: max-content` (above) means "as wide as an
+     UNWRAPPED line of content" by definition, so a pile with many
+     actions (Deck: 6 icons + the changePileType control) always forced
+     the whole panel open wide enough for one unbroken row, rather than
+     ever actually using the "buttons wrap like words" behavior this
+     rule's own history already established. Capping it lets max-
+     content still govern the common 1-3-action case exactly as before
+     (well under this cap, nothing changes) while forcing a many-action
+     header to wrap onto multiple rows instead of stretching the whole
+     panel - a fixed value, not a percentage, so it carries no risk of
+     reopening D118's own shrink-to-fit circularity.
+     11rem, matching `.pile-section`'s own `min-width` two rules below:
+     tried 9rem first (measured narrower - Deck panel 176px vs this
+     rule's 194px), but it also wrapped panels that fit comfortably on
+     one row today, adding a row's worth of height to enough of them at
+     once to measurably worsen `lint:design`'s existing scroll-overflow
+     baseline (56px -> 78px on the smallest tested viewport). 11rem
+     reproduces the pre-existing baseline byte-for-byte while still
+     narrowing Deck (was 210px) and every other many-action header. */
+  max-width: 11rem;
 }
 .pile-title .pile-action-btn,
 .pile-title .pile-action-enum {
@@ -2992,6 +3025,17 @@ body.panel-resize-active {
   max-height: 15rem;
   overflow-y: auto;
   align-content: flex-start;
+  /* *fix (queued 2026-09-10, "No Gears on RTG stacks?"): `.stack-gear`
+     sits BELOW its own stack's box (`top: calc(100% + 0.15rem)`), which
+     is never part of this row's own auto-sized flow-content height -
+     an auto-height `overflow:auto` box only ever sizes to its IN-FLOW
+     children, so anything positioned past 100% of the last row's
+     content is clipped by definition, regardless of the gear's own
+     size (confirmed empirically: fixing the gear's oversized 44px
+     footprint below alone did NOT stop the clipping). Reserving the
+     gear's real footprint (now 1.3rem + the 0.15rem gap) as bottom
+     padding gives the last row real, always-available room for it. */
+  padding-bottom: 1.45rem;
 }
 
 /* ---- RtG art fallback (US-79) ---------------------------------------
