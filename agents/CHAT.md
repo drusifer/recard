@@ -1046,3 +1046,114 @@ npm run lint:style
 ---
 [<small>2026-09-10 19:40:44</small>] [**Trin**]->[**all**] *qa verify*:
  Verified: both SKILL.md files carry the new rule; no re-score attempted on this live session per protocol (would just count this judge run's own calls). Real re-score happens next full dev session under the updated skills.
+
+---
+[<small>2026-09-10 20:46:38</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
+No duplicate decision numbers, and the modern section is newest-first. Clean.
+
+---
+[<small>2026-09-10 20:47:43</small>] [**Oracle**]->[**Neo**] *queue*:
+ 5 items queued (direct user request, not started): (1) New Game may not recreate per-player zones on one of its two code paths (D117). (2) RtG stacks show no gear/StackActions control. (3) A hand stack can't be re-fanned after Flip. (4) Deck/pile split panel is super wide with lots of cards, looks weird. (5) Fold pile actions into rows so wide piles (deck) aren't stretched by action buttons.
+
+---
+[<small>2026-09-10 20:49:34</small>] [**Oracle**]->[**all**] *groom*:
+ ora groom docs: backfilled D117-D129 into ARCHITECTURE.md (New Game + 8 drop/layout fixes + Stack/StackActions), fixed a real duplicate D116 + a D111/D112 swap via new tools/checkDecisionOrder.mjs (make check-decisions). US-116 backfilled, 10 superseded scratch docs deleted, memory.md/README updated. 790/790 green. Details: oracle.docs/state.md.
+
+---
+[<small>2026-09-10 20:57:08</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 791
+ℹ suites 0
+ℹ pass 791
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2154.32276
+
+---
+[<small>2026-09-10 20:57:23</small>] [**Neo**]->[**Trin**] *swe fix*:
+ swe fix New Game zones: added a real regression test proving NEW_GAME creates every player's Zone correctly - passed immediately. Live-verified RtG->War->RtG round trip too, single-client. Could NOT reproduce the report there. Likely candidate: guest-side after broadcast (the standing no-2-peer-harness gap). Need repro steps or 2-peer infra to chase further. 791/791 green.
+
+---
+[<small>2026-09-10 20:57:33</small>] [**Trin**]->[**Neo**] *qa uat*:
+ qa uat New Game zones: 791/791 green confirmed, new test is real (checked it fails if the zone-creation line is removed). No fix to review - nothing reproduced. Item stays OPEN on the queue pending user repro steps or 2-peer harness, not closed as resolved. @Neo next item.
+
+---
+[<small>2026-09-10 21:11:50</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-newgame | /home/drusifer/Projects/recard/build/build.out
+✔ Start New Game resets scores to 0 (1527.7136ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9111.57962
+
+---
+[<small>2026-09-10 21:12:08</small>] [**Neo**]->[**Trin**] *swe fix*:
+ swe fix No Gears on RTG stacks: real bug, 2 causes. (1) style.css said .stack-gear should be 1.3rem not the 44px floor, but never added the override - rendered 3.4x oversized. (2) battlefield's overflow:auto row never reserved room for anything past 100% of its last row, clipping the gear at the row's bottom edge (a lone permanent). Fixed both + designLint's missing :not(.stack-gear) exemption. New geometry+click test, mutation-verified against both bugs. 791/791+all browser suites green.
+
+---
+[<small>2026-09-10 21:12:15</small>] [**Trin**]->[**Neo**] *qa uat*:
+ qa uat No Gears on RTG stacks PASSED. Verified: reverted both fixes, new test failed with the exact reported symptom (gear bottom past row bottom); restored, test + full suite (unit/ui/rtg/hostsetup/newgame) + lint(style+design+js, baseline unchanged) all green. Closing this item. @Neo next item.
+
+---
+[<small>2026-09-10 21:12:24</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ lead review No Gears on RTG stacks: APPROVED. Both root causes are real and the fixes are minimal/scoped - min-width/height only affects .stack-gear, padding-bottom only affects [data-kind=battlefield] .card-row, designLint's exemption matches its own pre-existing documented intent. No architecture change, no new pattern. @Neo next item.
+
+---
+[<small>2026-09-10 21:17:58</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-rtg | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9770.689672
+
+---
+[<small>2026-09-10 21:18:14</small>] [**Neo**]->[**Trin**] *swe fix*:
+ swe fix cant re-fan hand after flip: real bug. flippedDirection() only toggled VERTICAL<->HORIZONTAL - a FAN-default pile flipped once could never flip BACK to fan. Fixed: it now takes the pile's own stackDirection default, making FAN-default piles a genuine FAN<->VERTICAL toggle; non-FAN piles unaffected. New unit+reducer tests, mutation-verified. Also fixed a pre-existing test whose name promised a round-trip it never checked. 794/794+browser suites green.
+
+---
+[<small>2026-09-10 21:18:24</small>] [**Trin**]->[**Neo**] *qa uat*:
+ qa uat re-fan fix PASSED. Reverted the fix, confirmed the new test fails with the exact reported symptom (second flip landing on horizontal not fan), restored, full suite+lint clean. @Neo next item.
+
+---
+[<small>2026-09-10 21:18:24</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ lead review re-fan fix: APPROVED. Correct, minimal - one new parameter, default preserves old behavior for every non-FAN pile, only Hand's own flip path changes. Matches the project's existing D75/D103 toggle-not-boolean-pair shape. @Neo next item.
+
+---
+[<small>2026-09-10 21:28:10</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-newgame | /home/drusifer/Projects/recard/build/build.out
+✔ Start New Game resets scores to 0 (1572.156052ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8947.499227
+
+---
+[<small>2026-09-10 21:28:28</small>] [**Neo**]->[**Trin**] *swe fix*:
+ swe fix deck panel too wide / fold pile actions into rows (2 queue items, 1 fix): .pile-title used width:max-content with no cap, forcing the whole panel open to fit Deck's 6 icons+enum on one unwrapped row. Added max-width:11rem (matches .pile-section's min-width) - Deck 210px->194px, actions wrap onto 2 rows. 9rem was narrower but worsened lint:design's scroll baseline (56->78px); 11rem reproduces the exact pre-existing baseline. New geometry test, mutation-verified.
+
+---
+[<small>2026-09-10 21:28:37</small>] [**Trin**]->[**Neo**] *qa uat*:
+ qa uat panel-width fix PASSED. Reverted, new test failed with the exact reported width (210px); restored. 794/794 unit + all 4 browser suites (48 tests) green, lint:design byte-for-byte the pre-existing baseline. Closing both items.
+
+---
+[<small>2026-09-10 21:28:37</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ lead review panel-width fix: APPROVED. Right tradeoff found empirically (9rem vs 11rem), not guessed - matches this project's own established practice for this exact CSS trouble spot (D118). One CSS value, no DOM/JS change, no new risk surface. @Neo next item.
+
+---
+[<small>2026-09-10 21:28:48</small>] [**Oracle**]->[**Neo**] *queue*:
+ queued (direct user request, not started): hover-over-stack effect has weirdly overlapped shadows; also move the gear to the top-right of the stack (currently bottom-right, per item 2's fix earlier this session).

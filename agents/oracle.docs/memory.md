@@ -33,6 +33,9 @@ This file serves as a consolidated index of project-wide decisions, historical c
 | 2026-09-01 | D92-D99: split/pickup guided picker generalized to every kind incl. Deck; "THERE SHOULD BE NO CANONICAL PILES" - `DRAW`/`DEAL`/`SHUFFLE_DECK` made `pileId`-scoped and the entire `Pile` hierarchy converted to real ES class instances; `viewFor` reduced to a one-line polymorphic loop; universal per-pile count badges; a structural DnD-guarantee test; Deck's D34 `cardActions` exception struck; `HandPile` split into real `PlayerHandPile`/`OpponentHandPile` siblings (no pile method computes `this.ownerId === viewerId` anywhere any more); `MERGE_PILE` added then simplified (drop a pile onto another pile merges its cards, one order-preserving rule for every kind, no zone distinction); hand-size default sourced from preset data instead of two disagreeing hardcoded numbers | Nearly all direct user corrections mid-session, several reversing the immediately-prior implementation (deck cardActions, HandPile split, MERGE_PILE's order + zone-distinction) - each correction was a real redesign, not a patch, per this project's own standing lesson ("find what the correction is actually pointing at and fix that") | 514/514 unit green throughout, lint-js back at the unchanged 7-function cognitive-complexity baseline after each fix; multiple load-bearing points mutation-tested per change (PLAY authorization, merge order, source-removal); a `git stash` mid-session nearly lost real work (3rd violation of this project's own "never use git stash" rule, first time the pop actually conflicted) - recovered cleanly, see `neo.docs/state.md`; see `docs/ARCHITECTURE.md` D92-D99 |
 | 2026-09-01 | D100: `resolvePlayer` (identity.js) trusts a returning `playerKey` unconditionally now, removing the old anti-hijack guard that refused it while `peerToKey` still showed it "live" | Direct user bug report ("joiner's hand shows wrong name/obscured") traced live to WebRTC disconnect detection lagging indefinitely behind an abruptly-closed tab (held 25s in testing, never self-corrected), so the guard false-positived on ordinary reconnects far more than it ever caught a real hijack; asked the user directly since perfect old-vs-gone disambiguation isn't possible, not assumed | Real, disclosed trade-off: two tabs deliberately sharing one identity mid-game now silently evict each other instead of being refused - addressed the user's own resource-leak concern with a new `Session.closePeer` that actively closes the evicted connection; 513/513, mutation-tested, live-verified 3x for reconnect + once for genuine dual-tab eviction, see `docs/ARCHITECTURE.md` D100 |
 | 2026-09-02 | D101 (US-100): card actions (rotate/reveal/move/pickup/play) reachable via a right-click context menu instead of a header bar - reuses `.pile-action-menu`/`-item` verbatim and, for move/pickup/play, the existing `highlightDragTargets`+`onMoveCard` drag machinery for a click-to-commit destination pick | Direct user request, explicitly ruling out a `PileActions`-style top bar (would reopen the 2026-08-26 "cards are Movable not Actionable" nit); no click-based destination picker existed for cards before this (D52's radial was retired for piles/zones only, cards only ever had native drag) | Full sprint cycle (Cypher->Smith->Morpheus->Smith->Mouse->2 phases->Oracle), 517/517 unit green (+4 new for the pure `clampMenuPosition`), mutation-tested; DOM wiring itself has no jsdom coverage same as the rest of `ui.js`, verified by hand/Trin review instead, see `docs/ARCHITECTURE.md` D101 |
+| 2026-09-02 to 2026-09-07 | (table gap, D102-D115: RtG deck cards/GroupedPile/chip denominations, D111-D115's chip-reset/hand-merge/deck-visual/reshuffle-redeal/RESET-multi-deck fixes - tracked in `docs/ARCHITECTURE.md` rather than backfilled here, same convention as the D21-D52/D58-D91 gap rows above) | | |
+| 2026-09-06 to 2026-09-07 | D117-D125: New Game (host swaps preset, same table code); 8 same-day drop-target/layout fixes and additions - a flex shrink-to-fit CSS bug fixed properly (not routed around a third time), a persisted `layout: 'column'` drop target + its flex cross-axis chaining bug, a fourth deliberate "adjacent" (near/far halo split) target, the Move click-flow wired to reveal real per-card targets, one WYSIWYG ghost-preview replacing four abstract decorations, adjacent's own sandwiched-between-two-cards gap closed, and LandsPile (colour-grouped columns, `GroupedPile` not `CascadePile`) | Every item a direct user request or a bug the user found by playing, not invented backlog; several were multi-round corrections (LandsPile's parent class, ghost-preview's WYSIWYG framing) | Backfilled into `docs/ARCHITECTURE.md` this groom (2026-09-10) from `agents/neo.docs/*.md` scratch write-ups, which were deleted after merging (same "delete the scratch, keep the canonical doc" precedent as D101's own groom); **found+fixed a real duplicate decision number** while inserting (New Game had shipped mislabeled D116, colliding with GroupedPile's own D116) and a separate pre-existing D111/D112 ordering swap, both via a new `tools/checkDecisionOrder.mjs` (`make check-decisions`) written specifically because a human catching this by eye had just failed twice in one groom; US-116 (New Game) also backfilled into `docs/USER_STORIES.md`, which had never recorded it despite the architecture doc having it all along |
+| 2026-09-08 to 2026-09-10 | D129: `Stack`/`Stackable` — a real domain object (`Stackable extends Pileable`, `Stack`/`stacksOf`) replacing four independently-hand-written overlap formulas (chip-tray columns, battlefield `--column-depth`, the hand's fan curve, and a same-session pure-math module written and immediately deleted for "routing around the missing domain object"); StackActions (per-stack gear: tighten/loosen/flip, routed pile-level Tighten/Loosen All); tap/untap StackAction | Direct user bug report (LandsPile's overlap reading backwards) traced to the real root cause - no domain object had ever modeled a stack; user's own later follow-up ("make direction per stack... consider if StackActions are required for consistency") drove iteration 3 | 781/20/14 green throughout, `lint-js` net-improved (10, was 13); net -24 non-comment lines for what had been 4 mechanisms; **deletes outright** the `layout: 'column'` field, `--column-depth`, and all 4 CSS overlap formulas D118-D125 had introduced two days earlier - noted explicitly in ARCHITECTURE.md as superseded, not silently orphaned; @Smith `*user test D129` still queued, not yet run as of this groom; see `docs/ARCHITECTURE.md` D129 |
 
 ## Repository Structure Memory
 - `agents/`: Contains persona-specific documentation and state.
@@ -47,20 +50,38 @@ This file serves as a consolidated index of project-wide decisions, historical c
   qrcode.js, presets.js, rulesReference.js, handOrder.js (v1.2, D14),
   seating.js (v1.3, D18), panelLayout.js (local per-viewer panel
   move/resize + preset layout seeding), touchDrag.js, pileActions.js,
-  main.js; `src/piles/{Pile,DeckPile,HandPile,DiscardPile,CascadePile,
-  RankAdjacentPile,MeldPile,RunPile,FoundationPile,SetPile,pileTypes}.js`
-  (D42/D53/**D56**) - real `extends Pile` class hierarchy as of D56,
-  replacing the earlier flat-module-per-kind shape;
+  assetPath.js (`resolveAssetPath` - the one seam the standalone build,
+  see `tools/` below, and normal deploy both resolve `assets/` paths
+  through), main.js; `src/pileables/{Pileable,Stackable,CardPileable,
+  ChipPileable,TokenPileable,pileableTypes}.js` (D107/**D129**) -
+  `Stackable extends Pileable`, the domain object D129 introduced;
+  `src/piles/{Pile,DeckPile,HandPile,PlayerHandPile,OpponentHandPile,
+  DiscardPile,CascadePile,RankAdjacentPile,MeldPile,RunPile,
+  FoundationPile,GroupedPile,LandsPile,Stack,SetPile,pileTypes}.js`
+  (D42/D53/D56/D93/D116/D125/**D129**) - real `extends Pile` class
+  hierarchy, `Stack`/`stacksOf` (D129) grouping a pile's cards by
+  persisted `stackId`;
   `src/zones/{Zone,SharedZone,PerPlayerZone,ScoreZone,zoneTypes}.js`
   (D55/**D56**) - same treatment; `SetPile`/`ScoreZone` are documented,
   unwired placeholders, not live features.
   `src/components/` (D54) - `<zone-panel>`, `<pile-panel>`, `<fan-pile>`,
   `<deck-stack>`, `<score-zone>`, `<header-actions>` as native Web
-  Components.
-- `tests/`: unit tests (`*.test.js`, run via `npm test`, 358 passing as
-  of D60/the tech-debt sprint) + `designLint.mjs`/`designLint.check.mjs`
-  (`npm run lint:design`, real-browser layout/overlap/touch-target
-  checks across desktop viewports). `e2e.smoke.mjs` **removed 2026-08-27
+  Components. `src/cards/RtgCardFace.js` (RtG-specific card face,
+  `artUrl`/`derivedColors`, D125's colour derivation).
+- `tools/`: `testAudit/` (`make test-audit`, which test covers which
+  code, Python/pandas), `codeConnectome/` (`make connectome`, static
+  import graph as a published Artifact), `buildStandalone.mjs`/
+  `buildDistribution.mjs` (`make build-standalone`/`make dist` - a
+  single-file `file://`-runnable bundle vs. a plain static-host deploy
+  folder, added 2026-09-10, session preceding this groom),
+  `checkDecisionOrder.mjs` (`make check-decisions`, added THIS groom -
+  see the D116/D111-D112 groom note in the Major Decisions table above).
+- `tests/`: unit tests (`*.test.js`, run via `npm test`, **790 passing
+  as of this groom, 2026-09-10** - the 358/D60 figure below is long
+  stale, left for the historical record only) + `designLint.mjs`/
+  `designLint.check.mjs` (`npm run lint:design`, real-browser
+  layout/overlap/touch-target checks across desktop viewports).
+  `e2e.smoke.mjs` **removed 2026-08-27
   (D60)** - had drifted into asserting against DOM containers retired
   by D51/D52 and gone unexercised for an unknown stretch; no automated
   E2E suite exists until one is rebuilt against the current DOM (open

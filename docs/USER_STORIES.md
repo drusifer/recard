@@ -3187,3 +3187,37 @@ speculatively).
 
 672 unit + 8 RtG + 6 hostSetup + 18 uiActions green throughout both
 fixes, lint clean.
+
+## US-116: New Game (host reconfigures without a new table code) (2026-09-06)
+
+As a host mid-table, wants a "New Game" control to pick a different
+preset and restart under the SAME game code, so returning players don't
+need a new code and the host doesn't have to re-host from scratch -
+distinct from Restart Game (US-109's `RESET`), which stays within the
+CURRENT preset and preserves scores/chips; New Game replaces the preset
+wholesale, so old scores/chip denominations are dropped instead of kept.
+
+**Smith Gate 1 amendments, both incorporated:** (1) placement - host-only
+chrome near Scores/roster, NOT the deck panel's "Restart game" action,
+since sitting next to it would read as a flavor of the same button and
+invite a wrong click on the more destructive operation; (2) guest
+notice - the automatic transition to guests must show a visible notice
+naming the new game, not a silent hand-wipe.
+
+Full technical account, including the reducer design question this
+story originally left open for Morpheus, in `docs/ARCHITECTURE.md` D117.
+
+Acceptance criteria (all delivered): host-only control reachable from
+the live game screen; reuses the same preset picker as initial setup
+without a new code/session; rebuilds `gameConfig`/`deckConfig` fresh for
+the new preset; roster and connections preserved, no rejoin; scores/chips
+reset (not preserved, unlike Restart Game); guests cannot trigger it and
+transition automatically with a notice; a confirmation step gates the
+dispatch. Out of scope, as specified: changing the join/table code
+itself, any per-game history/undo, and new preset content.
+
+**Queued 2026-09-10, not yet triaged:** a report that New Game may not
+be recreating per-player zones on one of its two code paths (fresh
+`NEW_GAME` dispatch vs. host-restore) - see `agents/CHAT.md`.
+
+Sprint status: COMPLETE.

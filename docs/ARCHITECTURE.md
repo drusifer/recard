@@ -5,7 +5,8 @@
 D21-D23) is historical - decisions are numbered continuously now and
 the highest number is always the current binding state, not a
 particular sprint's scope.
-**Last updated:** 2026-09-05 (D92-D116)
+**Last updated:** 2026-09-10 (D92-D129; backfilled D117-D129 this groom
+- see D117's own "Groom note" and the D126-D128 gap entry)
 
 ## Core invariant (direct user request, stated repeatedly - binding on every Pile type, present and future)
 
@@ -35,68 +36,306 @@ card's real identity, always, not just whether it can be moved. As of
 D85, the same removal reaches the three BULK/pile-level actions that
 still had their own separate authorization gate.
 
-### D116. GroupedPile — a shared parent for "a stacked, grouped community supply"
+### D129. Stack/Stackable — a real domain object replacing four bespoke overlap formulas
 
-Direct user request, found by actually testing rather than reading
-code: "token piles have a lot of the same issues as the CardPiles did.
-They share a parent class though so let's push some of that up so
-TokenPiles are more playable." Confirmed live before fixing anything:
-dropping a token onto empty space in its own supply's zone took the
-table's pile count from 21 to 22 - a duplicate pile, the exact bug
-D110 already fixed for chips (`ChipPileable.homePileKind = 'chip'`).
-`TokenPileable` never declared one, so nothing named a home for a
-token to return to.
+Direct user report, LandsPile's own overlap reading backwards ("cards
+FARTHER apart" — the opposite of Tighten's intent). Root-caused as the
+predictable result of the project having FOUR independent places that
+each computed card/chip/token overlap by hand (chip-tray's own
+`withColumnLayout`, the battlefield's `--column-depth` CSS margin
+trick from D120, the hand's separate fan-curve math, and a short-lived
+pure-math `cardStacking.js` module written and immediately deleted
+this same session for "routing around the missing domain object"
+instead of naming it). Nothing had ever modeled a STACK as a thing.
 
-**Root cause was really two things sharing one shape.** RtG's Tokens
-supply was `kind: 'plain'` - the same generic pile every ordinary card
-zone uses - so it rendered as one overlapping row (read like a hand,
-not a tray) AND had no home-pile-kind to rejoin on drop. Both are
-D110's own fixes, just never applied here because tokens had no
-dedicated pile kind at all to carry them.
+**Domain model.** `Stackable extends Pileable` (leaves `Pileable`
+itself free for future non-stacking pile contents);
+`Card`/`Chip`/`TokenPileable` re-parent onto it. `Stack` + `stacksOf`
+(new `src/piles/Stack.js`) group a pile's flat card list by a
+persisted `stackId` on each Stackable — membership is real, stored
+state, not derived. Rejected up front: nested `pile.stacks = [[id]]`
+(duplicates `pile.cards`' own ordering — two places to keep in sync)
+and pure derivation from `sortValue` (works for auto-grouped piles
+like `GroupedPile`, but breaks the moment a PLAYER forms a stack by
+hand — there is no sort key for "these two cards happen to be
+together because someone dragged them that way").
 
-**Fix: extracted `GroupedPile` (`src/piles/`), the actual shared parent
-`ChipPile` and a new `TokenPile` both extend.** A subclass names ONE
-thing - `static sortValue(pileable)` (chip: `chip.denom`; token:
-`token.colour`) - and gets, for free: the tight stacking spread
-(0.963/0.97, previously duplicated per-preset via a `spread: 0.75`
-override on every token declaration, now deleted), arriving pre-sorted,
-and an insert that re-sorts by group and strips a drop's `layout` hint
-rather than merely appending. `ChipTray.js` (still `<chip-tray>` -
-renamed CSS classes weren't worth the regression risk) generalized
-from a hardcoded `card.denom` group-by to `PILE_TYPES[pile.kind]
-.sortValue`, so it renders BOTH kinds with no chip-specific code left
-in it. `TokenPileable.homePileKind = 'token'` is the one-line fix that
-actually closes the duplicate-pile bug; the rest is what makes the fix
-generalize instead of being a second copy-paste.
+**Morpheus's two blocking review conditions**, both closed same
+iteration: (1) `stackId` must be stripped at every site `layout`
+already was (`toHandCard`/`toDeckCard`) — a card carrying a stale
+`stackId` into a hand or back to the deck would land in a phantom
+stack on its next placement; a mutation-tested "must survive a
+table-to-table MOVE, must NOT survive into a hand" pair of guards
+proves the strip sites are both necessary and correctly scoped. (2)
+`offsetIn` (the one shared overlap formula) takes NO card-size
+argument and returns unitless STRIDE MULTIPLIERS, not pixels — card
+metrics are rem-based custom properties rewritten per-preset at
+runtime (`ui.js` sets `--card-w` directly), so a px-returning formula
+would force either a `getComputedStyle` read per card per render
+(layout thrash, untestable without a browser) or a frozen px value
+that silently goes stale on the next preset's card size. The
+component writes `--stack-x`/`--stack-y` (the multipliers); one CSS
+rule does the unit conversion (`calc(var(--stack-x) * (var(--card-w) +
+var(--card-gap)))`) and can no longer get the arithmetic wrong.
 
-**A real JS footgun caught before shipping, not after.** The first
-draft implemented the shared sort/strip logic as a private static
-method (`static #sorted`), called via `this.constructor.#sorted(...)`
-from an instance method. Static private members are NOT inherited by
-subclasses in JS - `Subclass.#method()` throws even when the subclass
-correctly extends the class that defines it - so this would have
-thrown the moment `ChipPile` or `TokenPile` actually exercised it,
-despite reading correct on review. Verified the failure mode directly
-(constructed a throwaway subclass, called the method) before rewriting
-it as a plain module-scoped function, which has no such inheritance
-rule to violate.
+**Iteration 2 (wiring): the tray path (chips/tokens/lands) now renders
+from real Stacks.** `withColumnLayout` deleted for `withStackIds`;
+both bespoke chip/lands overlap formulas ripped from `style.css`
+outright. Two real bugs found wiring it up, not before: a CSS
+specificity fight (a row rule beat the stack rule, fanning every stack
+sideways) and `data-pileable-id` being stamped onto inner elements
+too, double-counting pieces. The mutation-tested live test proved it
+catches BOTH the original depth-compounding bug (would regress to 0px
+gap) and the sign-flip bug (the user's own "cards FARTHER apart," now
+literally asserted against) — and closed the actual root cause of both
+historical bugs: LandsPile, the pile that kept breaking, had never had
+a live test at all.
 
-**Investigated, not found: "lots of preset problems too."** Swept
-every preset solo and 2-player for console errors and pile-count
-mismatches - all clean. Found one real but different-severity issue
-while screenshotting a deck-choice-filtered RtG table: the "Decks" zone
-is a fixed captured-pixel layout sized for all 15 decks, so choosing
-fewer leaves visible dead space. Deliberately NOT auto-sizing it here -
-panels are already user-resizable (drag + Save Layout, existing
-mechanism), this is cosmetic rather than broken, and dynamic
-content-based zone sizing is a real, separate architecture question
-nobody has actually asked for yet. Flagged to backlog rather than
-built speculatively.
+**Smith's UX finding, accepted then fixed one session later:**
+LandsPile inherited `GroupedPile.defaultSpread` (0.963, calibrated for
+chips) so a 7-land column only showed ~2px slivers per card —
+"you see how many, not which." Filed, not blocked on; fixed in
+iteration 3 (LandsPile's own spread, 0.85, guarded by a permanent
+regression test).
 
-@Smith *user test — no new UX surface (a bug fix + an internal
-refactor), flagging for awareness rather than a gate.
+**Iteration 3 (per the user's own follow-up: "clean up the smith
+defect and remove and make direction per stack so we can all use one
+happy layout, consider if StackActions are required for
+consistency"): direction moved onto PER-STACK metadata**
+(`pile.stacks`, alongside `spread`) instead of per-pile — a
+mixed-direction battlefield (a horizontal row beside a vertical
+column) can now exist as one pile, which the D120-era `--column-depth`
+mechanism could never express. **This is where D118-D125's
+`layout: 'column'` persisted field, the `--column-depth` CSS custom
+property, and all four hand-written overlap `calc()`s were deleted
+outright, no aliases** — FAN (the hand's own curve) became the third
+real layout kind alongside stack/column, `applyFanOffset` and
+`options.fan` deleted the same way. Net **-24 non-comment lines** for
+what had been four mechanisms. The drop-target VOCABULARY those
+sections established — stack/column/adjacent/overlap as four distinct,
+visually previewed outcomes (D121-D124) — is UNCHANGED and still
+current; only what a drop's outcome is stored AS changed, from a
+free-form `layout` string on the card to Stack membership + per-stack
+`direction`. Trin's suite (no synthetic mutation run needed — it
+earned trust organically) caught four real regressions a green model
+suite had missed: `getView` dropping stacks entirely, `GroupedPile`
+honouring a drop's stale direction hint, a class rename silently
+broadening test selectors, and the CSS specificity fight recurring.
 
-### D116. New Game — the host swaps to a different preset, same table code
+**StackActions**, added the same sprint per the user's own
+"consistency" question above: every stack gets a gear-emblem control
+(universal, badge-sized) opening Tighten/Loosen/Flip for THAT stack;
+pile-level Tighten All/Loosen All now ROUTES to each stack individually
+so columns already adjusted apart keep their differences rather than
+being forced back in sync. `spread` moved onto stack metadata beside
+`direction`. `FLIP_STACK` is a new reducer action. Two bugs found
+wiring the control itself: empty-pile routing was a silent no-op, and
+a 44px gear control covered a 43px card and swallowed every click
+(moved below the stack, past the pile header, which had also been
+intercepting Loosen All). `pileForKind` building a bare `Pile`
+instance (missing its config) was independently confirmed as a
+standing footgun, same trap already documented elsewhere in the file.
+
+**tap/untap StackAction**, added last, "only if easy" per the user —
+it was: `Pile.supportsStackTap` opt-in (Battlefield/Lands only,
+mirrors `untapAll`'s own scope), `Stack.stackActions` gains
+`tapStack`/`untapStack` offered even for a stack of ONE (unlike
+tighten/loosen/flip, gated on count>=2 — a lone permanent is still
+tappable), one `SET_STACK_ORIENTATION` reducer action taking an
+`orientation` param rather than a `TAP_STACK`/`UNTAP_STACK` pair (the
+same D75/D103 "one action, not a boolean pair" shape).
+`UNTAP_ALL` stays completely untouched per the user's own instruction
+("keep pile level for all stacks").
+
+**Verification, cumulative across all iterations:** 781 unit / 20
+browser (`test-ui`) / 14 RtG green at the end, `lint-js` at 10 (below
+its own 13-error baseline — this refactor net-removed lint debt, not
+added it), `lint-design` unchanged at its pre-existing 9-violation
+baseline throughout. Every load-bearing point mutation-tested: the
+`stackId` strip guards, the depth/sign bugs, all StackAction gating,
+`SET_STACK_ORIENTATION`'s authorization and scope.
+
+@Smith *user test D129 (queued, not yet run as of this groom).
+
+### D126-D128 (unrecorded). Several small same-day nits, 2026-09-07
+
+Shipped without individual write-ups the same day as D118-D125: a
+stale-layout fix (cards/tokens stranding past their panel's edge on
+resize), the RtG inspect-overlay's art aspect ratio, removing a card's
+native browser title tooltip, and aligning cascades to the top. See
+`git log` for the exact commits (`4132321`, `5b4a4c2`, `4460160`,
+`29b6fb6`) if the detail is ever needed — genuinely minor, not backing
+any later decision the way D118-D125 back D129.
+
+### D125. LandsPile — multiple colour columns side by side, extending GroupedPile not CascadePile
+
+Direct user request, refined through two rounds of correction: an
+initial "reuse CascadePile?" was rejected by the user themselves ("no
+i think you still don't get it, I need multiple cascades side by
+side") in favor of `GroupedPile` — chips/tokens' own "one stack per
+group, side by side" shape already matched; `CascadePile` is
+Solitaire-specific (horizontal-only, hardcoded rank/suit sequencing,
+no reparenting) and would have meant overriding everything it offers.
+
+`LandsPile extends GroupedPile`, grouping by `derivedColors(card)[0]`
+(extracted from the existing art-fallback logic so the pile and the
+card's own art panel can never disagree on a card's colour), with a
+real `'C'` colourless bucket rather than `undefined` so basic lands
+still get their own column. Per-column **live mana-count badge**
+(direct user follow-up), reusing the cost line's own `PIP_CLASS`
+colours, counted fresh from the column's actual cards every render —
+never a separately-tracked number that could drift from real
+tapped/untapped state.
+
+**Trade-off disclosed up front, accepted:** `GroupedPile.insertPileable`
+auto-sorts into the right colour column and strips whatever `layout` a
+drop carried — a land always lands in its colour's column
+automatically; the stack/column/adjacent/overlap placement geometry
+(D121-D124) doesn't apply here, because "organize by colour" IS the
+placement.
+
+6 new unit tests + the registry's exact-count guard updated
+(fourteen -> fifteen pile kinds), live-verified end-to-end (drop 6
+lands, tap one, badge live-updates 6->5). 702 unit green throughout.
+Superseded in one respect by D129 iteration 3: LandsPile's spread was
+still chip-calibrated (Smith's finding) until D129 gave it its own.
+
+### D124. "Adjacent" made reachable BETWEEN two already-placed cards, not just past a row's open end
+
+Direct user report ("why no side by side in the battlefield pile?")
+that exposed a real gap in D121: a fixed 14px "close to the edge" zone
+solved the open-end case but never covered two EXISTING cards at their
+normal ~8px resting gap — a point in the middle of that gap is well
+inside even a "small" zone, so `adjacent` was reachable only past a
+row's very end, never between two neighbours, which is exactly where a
+player naturally reaches for it. `isSandwiched()`: if a point is
+flanked by another card on the opposite side (within one card-width,
+the halo's own reach), overlap shrinks to a much smaller 3px zone
+instead of the ordinary 14px one — genuinely between two neighbours
+reads as "touching that edge on purpose." The open-end case is
+unaffected. 3 new mutation-tested unit tests plus a live 8px-gap
+battlefield reproduction of the exact reported scenario.
+
+### D123. One ghost-card drop preview replaces four abstract decorations
+
+Direct user report: four separate CSS decorations (a glow, a bar, a
+line, a hollow line) each meant a different drop outcome, but none of
+them SHOWED the outcome — telling them apart under a moving cursor
+required recognizing which small decoration was active. Replaced all
+four with one reusable, real `.middle-card[data-layout=...]` ghost
+element (`showDropPreview`/`clearDropPreview`) inserted as a genuine
+row sibling, so it renders through the exact same CSS margin rules a
+real drop would — WYSIWYG by construction rather than by four separate
+approximations staying in sync. One disclosed imperfection: a
+`side: 'before'` placement previews by transiently toggling the
+EXISTING target's own `data-layout` (restored after), which can
+briefly override that target's real layout if it's already a column
+member — a minor visual-only edge case, not chased further. Used by
+both drag-and-drop and the Move click-flow (D122) — one preview
+mechanism, not two. No unit-test changes needed (`resolveDropTarget`'s
+own geometry is unchanged; only its visualization is).
+
+### D122. The Move action reveals real, card-relative drop targets instead of a blind append
+
+Direct user correction of an earlier, reverted over-engineering
+attempt: "we already have all the layouts we need... K.I.S.S. Use the
+Move card action to reveal the ACTUAL targets within the piles." The
+right-click -> Move -> click-a-lit-pile flow (D101) always plain-
+appended on commit regardless of where in the lit pile you clicked;
+it now tracks mouse movement while a pile is lit and shows the SAME
+live drop hint a native drag already produces, committing with that
+SAME resolved placement — pure wiring of existing `resolveDropTargetFor`/
+`showDropHint` machinery into a flow that had never used it, no new
+geometry. Exposed (not caused) a real test-harness bug: a shared
+`moveTo()` helper clicked a lit pile's panel CENTER, previously
+harmless when clicks always blind-appended, but now capable of landing
+on an existing card in a crowded pile and mis-routing a later click.
+Fixed the helper to click the pile's title bar instead (guaranteed
+empty space) rather than changing the feature.
+
+### D121. A fourth, deliberate "adjacent" drop target — near/far halo split
+
+Direct user request, after clarifying the four outcomes they actually
+wanted: exactly-on-top (stack), overlap-from-below (column,
+D119/D120), overlap-on-the-side (the existing halo), and a genuinely
+new fourth case — "next to the target card with a little space in
+between," which previously only ever happened by accident if you
+missed every card's halo entirely. The halo now splits by distance:
+its near half still overlaps, its far half is the new `adjacent`
+target, resolving to a specific `targetCardId`/`side` but with no
+`layout` key at all — `insertPileable` already treated an undefined
+`layout` as "plain gap, no overlap" everywhere, so no reducer/state
+change was needed, only the halo's own branch had never produced that
+value. New hollow-ring hint distinguishes it visually from the
+overlap zone's solid bar. 2 new mutation-tested unit tests plus a live
+drag confirming a real `--card-gap` gap and `data-layout: null`.
+
+### D120. Battlefield gets Tighten/Loosen; a flex cross-axis bug is fixed, not routed around
+
+Direct user request ("add tighter/looser actions to the battlefield
+pile and tighter/looser also effects the column layout"), which
+immediately surfaced a real bug once tested with 3+ chained cards
+instead of 2: the 3rd card landed at the SAME depth as the 2nd, not
+one step further down. Root cause: `margin-top` is a flex CROSS-axis
+margin, computed from the row's own shared top, never from a sibling's
+already-offset position — unlike `margin-left`'s main-axis pull, which
+chains overlap "for free" the way horizontal stacking always had.
+Fixed with an explicit `columnDepth` counter tracked while building
+each row, written as `--column-depth` and multiplied into the CSS
+formula — chained by arithmetic instead of relying on flex to produce
+it. `BattlefieldPile.disabledActions` (a stale override predating the
+current spread-aware base implementation, silently dropping its
+`spread` argument) was deleted rather than hand-synced: the base
+`Pile.disabledActions` already did the right thing. New column-depth
+formula responds to Tighten/Loosen via the same `(1 - pile-spread)`
+shape chip-stacks already used, inverted so the unadjusted default is
+NO overlap, matching every other pile's own unadjusted spacing rather
+than a baked-in look. Mutation-tested against the actual chaining bug
+(reverted the multiply, watched the exact "each step should be the
+same size" assertion fail). **The `--column-depth` mechanism this
+introduced was deleted outright by D129** — noted here for the record,
+not as a live behavior.
+
+### D119. A card's lower half becomes a distinct "column" drop target
+
+Direct user request, resuming a queued nit: "add a drop zone on the
+lower half of a card that snaps it into vertical alignment with the
+card above/below, so lands (or anything) can be organized into color
+columns." `dropTarget.js`'s existing upper/lower-half split
+(`isLowerHalf`) gains a second outcome — lower half now returns
+`layout: 'column'` instead of the upper half's unchanged `stack` —
+riding the same free-form, unvalidated `layout` string every pile
+already accepted (D21). Works for ANY pile with no per-kind code,
+because `BattlefieldPile` inherits `Pile`'s base `resolveDropTarget`
+rather than overriding it. 2 new mutation-tested unit tests, plus a
+live drag confirming the visual column and its accent-bar hint.
+**Superseded by D129**: the persisted `layout: 'column'` field this
+entry introduced was deleted outright in D129's third iteration,
+replaced by real Stack membership + per-stack `direction` metadata —
+the drop-target OUTCOME (a card sliding into vertical alignment) is
+unchanged, only its representation changed.
+
+### D118. A shrink-to-fit pile header stops using flex's percentage-basis trick
+
+Resumed from a 2026-09-04 item that had been investigated and reverted
+as unresolved, not merely queued. The bug: a flex item's percentage
+`flex-basis` needs a definite container size to resolve against, but a
+shrink-to-fit container's size is defined BY its items — circular, and
+neither of two earlier attempted fixes (`width: min-content`, which
+overshot by wrapping every button onto its own line; `width:
+max-content`, which happened to measure correctly for one header
+configuration by coincidence and was proven wrong by testing a SECOND,
+differently-shaped header) actually broke that circularity correctly.
+The real fix: `.zone-name-text` becomes `display: block` — a block box
+always starts its own line with no percentage math at all — so the
+container's shrink-to-fit width becomes "the widest line," the same
+well-defined computation a paragraph already uses. Verified by cloning
+the title element outside its flex context to get its true natural
+width, confirming the fix (not either earlier attempt) actually
+matches it; `lint:design`'s violation set was unchanged from baseline
+throughout.
+
+### D117. New Game — the host swaps to a different preset, same table code
 
 Direct user request: a "New Game" button that lets the host pick a
 different game without making a new table code. Distinct from `RESET`
@@ -161,7 +400,79 @@ yet (standing backlog item). Verified by code review: the banner logic
 runs inside `renderGameFromView`, the single render funnel both host
 and guest go through.
 
-@Smith *user test D116.
+**Groom note (2026-09-10):** this entry originally shipped mislabeled
+`D116` (colliding with the GroupedPile entry below, itself dated a day
+earlier) — renumbered D117 here and the `@Smith *user test` line and
+`tests/newGame.browser.mjs` cross-reference elsewhere in this file
+updated to match. Three real bugs against New Game's own two code
+paths (fresh `NEW_GAME` dispatch vs. host-restore) and its stack
+controls were reported 2026-09-10, queued to `CHAT.md`, not yet
+triaged: (1) New Game may not recreate per-player zones on one of the
+two paths, (2) RtG stacks show no gear (StackActions) control, (3) a
+hand stack can't be re-fanned after Flip.
+
+@Smith *user test D117.
+
+### D116. GroupedPile — a shared parent for "a stacked, grouped community supply"
+
+Direct user request, found by actually testing rather than reading
+code: "token piles have a lot of the same issues as the CardPiles did.
+They share a parent class though so let's push some of that up so
+TokenPiles are more playable." Confirmed live before fixing anything:
+dropping a token onto empty space in its own supply's zone took the
+table's pile count from 21 to 22 - a duplicate pile, the exact bug
+D110 already fixed for chips (`ChipPileable.homePileKind = 'chip'`).
+`TokenPileable` never declared one, so nothing named a home for a
+token to return to.
+
+**Root cause was really two things sharing one shape.** RtG's Tokens
+supply was `kind: 'plain'` - the same generic pile every ordinary card
+zone uses - so it rendered as one overlapping row (read like a hand,
+not a tray) AND had no home-pile-kind to rejoin on drop. Both are
+D110's own fixes, just never applied here because tokens had no
+dedicated pile kind at all to carry them.
+
+**Fix: extracted `GroupedPile` (`src/piles/`), the actual shared parent
+`ChipPile` and a new `TokenPile` both extend.** A subclass names ONE
+thing - `static sortValue(pileable)` (chip: `chip.denom`; token:
+`token.colour`) - and gets, for free: the tight stacking spread
+(0.963/0.97, previously duplicated per-preset via a `spread: 0.75`
+override on every token declaration, now deleted), arriving pre-sorted,
+and an insert that re-sorts by group and strips a drop's `layout` hint
+rather than merely appending. `ChipTray.js` (still `<chip-tray>` -
+renamed CSS classes weren't worth the regression risk) generalized
+from a hardcoded `card.denom` group-by to `PILE_TYPES[pile.kind]
+.sortValue`, so it renders BOTH kinds with no chip-specific code left
+in it. `TokenPileable.homePileKind = 'token'` is the one-line fix that
+actually closes the duplicate-pile bug; the rest is what makes the fix
+generalize instead of being a second copy-paste.
+
+**A real JS footgun caught before shipping, not after.** The first
+draft implemented the shared sort/strip logic as a private static
+method (`static #sorted`), called via `this.constructor.#sorted(...)`
+from an instance method. Static private members are NOT inherited by
+subclasses in JS - `Subclass.#method()` throws even when the subclass
+correctly extends the class that defines it - so this would have
+thrown the moment `ChipPile` or `TokenPile` actually exercised it,
+despite reading correct on review. Verified the failure mode directly
+(constructed a throwaway subclass, called the method) before rewriting
+it as a plain module-scoped function, which has no such inheritance
+rule to violate.
+
+**Investigated, not found: "lots of preset problems too."** Swept
+every preset solo and 2-player for console errors and pile-count
+mismatches - all clean. Found one real but different-severity issue
+while screenshotting a deck-choice-filtered RtG table: the "Decks" zone
+is a fixed captured-pixel layout sized for all 15 decks, so choosing
+fewer leaves visible dead space. Deliberately NOT auto-sizing it here -
+panels are already user-resizable (drag + Save Layout, existing
+mechanism), this is cosmetic rather than broken, and dynamic
+content-based zone sizing is a real, separate architecture question
+nobody has actually asked for yet. Flagged to backlog rather than
+built speculatively.
+
+@Smith *user test — no new UX surface (a bug fix + an internal
+refactor), flagging for awareness rather than a gate.
 
 ### D115. RESET rebuilds every declared card deck, not just the canonical one
 
@@ -336,35 +647,6 @@ the stack identical — rather than any particular pixel value, so it
 survives future changes to the angle while still catching a
 discontinuity.
 
-### D111. A reset redeals cards; it does not confiscate chips
-Direct user *fix: "reshuffle and redeal is still busted - deals whole
-deck and all the chips disappear." Two unrelated causes behind one
-gesture.
-
-**The chips.** `RESET` emptied every surviving pile outright
-(`withCards(p, [])`), which is exactly right for cards — a reset gathers
-them into a rebuilt, reshuffled deck — and took every player's chips
-with them. `assertCardsConserved` skips `RESET`, so nothing caught it.
-
-Fixed as `static survivesReset` on the PILEABLE: `false` for a card,
-`true` for a chip or token, so `RESET` never asks what a chip is. A hand
-is still dropped outright, UNLESS its owner was holding something a
-reset does not destroy — the alternative is silently destroying chips
-someone picked up.
-
-**The whole deck.** `lastDealCount` (main.js) is seeded from the preset
-on the SHARE SCREEN, which a resumed table never shows — so a restored
-game kept the module-load default: the first preset's hand size, War's
-26, which between two players is the entire deck. `gameConfig` had no
-record of the preset's hand size to restore it from.
-
-`gameConfig.cardsPerPlayer` now carries it, and resume reads it back. It
-stays `undefined` when a preset does not set one, rather than defaulting
-to a hand size nobody chose.
-
-Both bugs only appear on a RESUMED table or a table with chips, which is
-why "still busted" was right — earlier passes fixed neither.
-
 ### D112. A hand is a pile you can move and merge like any other
 Direct user *fix: "Dropping a hand pile move all the cards to the target
 but does not remove the empty HandPile - remove block on moving hand
@@ -396,6 +678,35 @@ merged cards arrived on the table still owned and face-down — every card
 moved correctly and it still looked broken. Cards leaving a hand are now
 made public and face-up, and cards arriving in one are restamped, the
 same as every single-card transfer.
+
+### D111. A reset redeals cards; it does not confiscate chips
+Direct user *fix: "reshuffle and redeal is still busted - deals whole
+deck and all the chips disappear." Two unrelated causes behind one
+gesture.
+
+**The chips.** `RESET` emptied every surviving pile outright
+(`withCards(p, [])`), which is exactly right for cards — a reset gathers
+them into a rebuilt, reshuffled deck — and took every player's chips
+with them. `assertCardsConserved` skips `RESET`, so nothing caught it.
+
+Fixed as `static survivesReset` on the PILEABLE: `false` for a card,
+`true` for a chip or token, so `RESET` never asks what a chip is. A hand
+is still dropped outright, UNLESS its owner was holding something a
+reset does not destroy — the alternative is silently destroying chips
+someone picked up.
+
+**The whole deck.** `lastDealCount` (main.js) is seeded from the preset
+on the SHARE SCREEN, which a resumed table never shows — so a restored
+game kept the module-load default: the first preset's hand size, War's
+26, which between two players is the entire deck. `gameConfig` had no
+record of the preset's hand size to restore it from.
+
+`gameConfig.cardsPerPlayer` now carries it, and resume reads it back. It
+stays `undefined` when a preset does not set one, rather than defaulting
+to a hand size nobody chose.
+
+Both bugs only appear on a RESUMED table or a table with chips, which is
+why "still busted" was right — earlier passes fixed neither.
 
 ### D110. A chip tray is stacks, not a row — and a chip knows where it belongs
 Four *nits in a row on the same feature, each correcting the one before,
@@ -4429,7 +4740,7 @@ discard, the stack, life total, a reshuffle, and a full Restart) - the
 bug-hunt pattern that found D115. Both are `bobp make test-ui`/
 `test-rtg`. `npm run test:hostsetup` (`tests/hostSetup.browser.mjs`)
 covers the pre-game deck-choice/sticky-settings picker, and `npm run
-test:newgame` (`tests/newGame.browser.mjs`, D116) covers New Game -
+test:newgame` (`tests/newGame.browser.mjs`, D117) covers New Game -
 same single-client convention, same reason: no 2-peer harness exists
 yet for anything that needs a real guest.
 
