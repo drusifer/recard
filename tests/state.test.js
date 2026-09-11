@@ -2353,7 +2353,7 @@ test('SPLIT_PILE: a hand is eligible at the reducer level now (D102) - the old e
 // by the above - the guard that keeps this a reducer-only capability.
 test('SPLIT_PILE: a hand still never OFFERS split in the UI - the presentation layer is what excludes it (D102)', () => {
   const actions = new PlayerHandPile({ id: 'hand:me', kind: 'hand', ownerId: 'me', cards: [{ id: 'a' }, { id: 'b' }] })
-    .pileActions({ isOwner: true, isShared: false, cards: [{ id: 'a' }, { id: 'b' }] });
+    .pileActions({ cards: [{ id: 'a' }, { id: 'b' }] });
   assert.ok(!actions.includes('split'), `a hand offers no split: got ${JSON.stringify(actions)}`);
 });
 
@@ -2515,12 +2515,12 @@ test('TAKE_PILE: fully permissive - deck/hand are eligible too now, no kind allo
 // `pickupSplit` briefly existed too and was a direct user correction -
 // "there is not supposed to be a pickupSplit" - `take`, already in this
 // list, already covers "everything into my hand".)
-test('zonePile/discardPile pileActions: take open to any player on a shared pile, owner-only on a personal one', () => {
-  assert.deepEqual(new PILE_TYPES.plain({}).pileActions({ isShared: true }), ['take', 'split', 'changePileType', 'remove', 'tightenAll', 'loosenAll']);
-  assert.deepEqual(new PILE_TYPES.plain({}).pileActions({ isOwner: true }), ['take', 'split', 'changePileType', 'remove', 'tightenAll', 'loosenAll']);
-  assert.deepEqual(new PILE_TYPES.plain({}).pileActions({ isOwner: false, isShared: false }), []);
-  assert.deepEqual(new PILE_TYPES.discard({}).pileActions({ isShared: true }), ['take', 'split', 'changePileType', 'remove', 'tightenAll', 'loosenAll']);
-  assert.deepEqual(new PILE_TYPES.discard({}).pileActions({}), []);
+// *fix (queued 2026-09-10, "All players have access to all pile
+// actions no matter what"): take/split/etc. used to be owner-or-shared
+// only - gone, along with the isOwner/isShared flags.
+test('zonePile/discardPile pileActions: take/split/etc. are open to any player', () => {
+  assert.deepEqual(new PILE_TYPES.plain({}).pileActions({}), ['take', 'split', 'changePileType', 'remove', 'tightenAll', 'loosenAll']);
+  assert.deepEqual(new PILE_TYPES.discard({}).pileActions({}), ['take', 'split', 'changePileType', 'remove', 'tightenAll', 'loosenAll']);
 });
 
 // --- Sprint 23, Phase 69: SET_PILE_ORIENTATION (US-62, hide/show) ---
@@ -2584,9 +2584,9 @@ test('SET_PILE_ORIENTATION: fully permissive - a shared pile can be set by ANY p
 test('zonePile/discardPile pileActions: hide/show are mutually exclusive, keyed off the pile\'s own current orientation', () => {
   const faceUp = (n) => Array.from({ length: n }, (_, index) => ({ id: `c${index}`, faceUp: true }));
   const faceDown = (n) => Array.from({ length: n }, (_, index) => ({ id: `c${index}`, faceUp: false }));
-  assert.deepEqual(new PILE_TYPES.plain({}).pileActions({ isShared: true, cards: faceUp(2) }).filter((a) => a === 'hide' || a === 'show'), ['hide']);
-  assert.deepEqual(new PILE_TYPES.plain({}).pileActions({ isShared: true, cards: faceDown(2) }).filter((a) => a === 'hide' || a === 'show'), ['show']);
-  assert.deepEqual(new PILE_TYPES.plain({}).pileActions({ isShared: true, cards: [] }).filter((a) => a === 'hide' || a === 'show'), [], 'an empty pile offers neither');
+  assert.deepEqual(new PILE_TYPES.plain({}).pileActions({ cards: faceUp(2) }).filter((a) => a === 'hide' || a === 'show'), ['hide']);
+  assert.deepEqual(new PILE_TYPES.plain({}).pileActions({ cards: faceDown(2) }).filter((a) => a === 'hide' || a === 'show'), ['show']);
+  assert.deepEqual(new PILE_TYPES.plain({}).pileActions({ cards: [] }).filter((a) => a === 'hide' || a === 'show'), [], 'an empty pile offers neither');
 });
 
 // --- RENAME_PILE / RENAME_ZONE (*nit): any player may rename either -
@@ -3146,12 +3146,12 @@ test('SORT_PILE: rejects an unknown pile', () => {
   assert.throws(() => reduce(state, { type: 'SORT_PILE', pileId: 'nope', playerId: 'p1', by: 'rank' }), /nope/);
 });
 
-test('SORT_PILE: only the owner may sort their own hand', () => {
-  const state = handStateWith([{ id: 'a', rank: 'K', suit: 'clubs' }]);
-  assert.throws(
-    () => reduce(state, { type: 'SORT_PILE', pileId: 'hand:p1', playerId: 'someone-else', by: 'rank' }),
-    /authoriz/i,
-  );
+// *fix (queued 2026-09-10, "All players have access to all pile
+// actions no matter what"): sorting used to be owner-only - gone.
+test('SORT_PILE: any player may sort another player\'s hand', () => {
+  const state = handStateWith([{ id: 'a', rank: 'K', suit: 'clubs' }, { id: 'b', rank: '2', suit: 'clubs' }]);
+  const after = reduce(state, { type: 'SORT_PILE', pileId: 'hand:p1', playerId: 'someone-else', by: 'rank' });
+  assert.deepEqual(handOf(after, 'p1').map((c) => c.id), ['b', 'a'], 'rank ascending, sorted by a non-owner');
 });
 
 // US-113 (direct user request: "rtg hand sorting should be by color and

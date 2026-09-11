@@ -1460,13 +1460,10 @@ export function renderPileShell(container, pile, allPiles, options, buildRow) {
     // every pile's count actually shows now, not the title.
     pile.name,
     pileLevelActions(pile.kind, {
-      isOwner: pile.ownerId === options.viewerId,
-      isHost: options.isHost,
-      // US-60/61 (Sprint 23): a shared (ownerless) plain/discard pile's
-      // split/take are open to any player - `Pile`/`DiscardPile`'s
-      // own `pileActions` can't tell "shared" from "someone else's
-      // personal pile" from `isOwner` alone (both are simply `false`).
-      isShared: pile.ownerId == undefined,
+      // *fix (queued 2026-09-10, "All players have access to all pile
+      // actions no matter what"): `isOwner`/`isHost`/`isShared` used to
+      // gate which actions a pile OFFERED per viewer - removed along
+      // with the pile classes' own gates that read them.
       // US-62 (Sprint 23): hide/show are mutually exclusive, keyed off
       // the pile's OWN current orientation (`Pile`/`DiscardPile`'s
       // `orientationActions`) - needs the actual cards, not just counts.
@@ -2273,7 +2270,10 @@ export function renderDeckStack(container, count, options = {}) {
   // D52. UX follow-up (direct user request): "just make the split action
   // always split in half" - no count input for split any more, it's a
   // one-click action like every other deck action now.
-  const actions = pileLevelActions('deck', { isHost: options.isHost === true });
+  // *fix (queued 2026-09-10, "All players have access to all pile
+  // actions no matter what"): `deal`/`reshuffleDeal` are no longer
+  // host-only, so this input shows for every viewer now.
+  const actions = pileLevelActions('deck', {});
   if (actions.includes('deal') || actions.includes('reshuffleDeal')) {
     container.append(pileCountInput({
       value: options.dealCount ?? 1, onChange: options.onDealCountChange,

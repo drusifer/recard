@@ -1361,9 +1361,8 @@ function endSessionForGood(message, { retryable = false } = {}) {
     // UX follow-up (direct user request): "a Deck is a specific kind of
     // Pile" - the deck is a real pile in `latestView.piles` now, so this
     // one `renderZones` call renders it too (grouped into the Table
-    // Zone, inert - `frozenOpts` has no `isHost`/`onPileAction`, so
-    // `pileLevelActions('deck', {isHost: false})` offers only `draw`,
-    // and even that has nothing to dispatch to), matching every other
+    // Zone, inert - `frozenOptions` has no `onPileAction`, so its
+    // buttons have nothing to dispatch to), matching every other
     // control in this frozen re-render. No separate `<deck-zone>`
     // element to build here any more.
     renderZones(zonesElement, latestView.piles, seatedOrder(latestView.players, myId), latestView.zones, frozenOptions);
@@ -1596,7 +1595,6 @@ function buildZoneOptions(nameById) {
     // action, just without a live trigger since this was its only one).
     onMergePile: whenLive(performMergePile),
     onDropCardOnZone: whenLive(performCreatePileWithCard),
-    isHost: role === 'host',
     // US-41/D29: dealing lives on the deck, where the cards are - the
     // whole point of the story. Read/written here since the deck now
     // renders through the exact same generic pile pipeline (`<deck-
@@ -1814,7 +1812,16 @@ function performFlipStack(pileId, stackKey) {
 
 function performShuffle(pileId) {
   if (isSessionEnded) return;
-  dispatch({ type: 'SHUFFLE_DECK', pileId });
+  // *fix (queued 2026-09-10, "All players have access to all pile
+  // actions no matter what" - front-end constraints too): Shuffle used
+  // to be host-only at the pile-actions offer level (`DeckPile`), so a
+  // guest could never reach this function at all - it never needed the
+  // host-dispatch/guest-relay split every OTHER deck action here
+  // already has. Now that Shuffle is open to everyone, it needs the
+  // same split or a guest's click would call `dispatch` directly with
+  // no local `gameState` to reduce against.
+  if (role === 'host') dispatch({ type: 'SHUFFLE_DECK', pileId });
+  else session.send({ type: 'action', action: { type: 'SHUFFLE_DECK', pileId } });
 }
 
 // Sprint 12 (D34/D35/D36, T54.1): named so the deck's pile anchor - both
@@ -2094,28 +2101,46 @@ function dealFromDeck(pileId, action, count) {
   if (isSessionEnded) return;
   if (action === 'draw') return performDraw(pileId);
   if (action === 'shuffle') return performShuffle(pileId);
+  // *fix (queued 2026-09-10, "All players have access to all pile
+  // actions no matter what" - front-end constraints too): reset/
+  // reshuffleDeal/deal used to be host-only at the pile-actions offer
+  // level (`DeckPile`), so a guest could never reach this far - these
+  // two branches called `dispatch` directly with no host-dispatch/
+  // guest-relay split, unlike every other action in this file. Now that
+  // they're open to everyone, a guest's click needs the same split or
+  // it would call `dispatch` with no local `gameState` to reduce
+  // against. The try/catch only applies on the host side - a guest
+  // never runs the reducer itself, so it has no local exception to
+  // catch; it just waits for the host's broadcast like any other relay.
   if (action === 'reset') {
-    try {
-      dispatch({ type: 'RESET' });
-    } catch (error) {
-      showDeckError(error.message);
+    if (role === 'host') {
+      try {
+        dispatch({ type: 'RESET' });
+      } catch (error) {
+        showDeckError(error.message);
+      }
+    } else {
+      session.send({ type: 'action', action: { type: 'RESET' } });
     }
     return;
   }
   lastDealCount = count;
-  try {
-    if (action === 'reshuffleDeal') {
-      dispatch({ type: 'RESHUFFLE_DEAL', cardsPerPlayer: count, pileId });
-    } else {
-      dispatch({ type: 'DEAL_MORE', cardsPerPlayer: count, pileId });
+  const dealAction = action === 'reshuffleDeal'
+    ? { type: 'RESHUFFLE_DEAL', cardsPerPlayer: count, pileId }
+    : { type: 'DEAL_MORE', cardsPerPlayer: count, pileId };
+  if (role === 'host') {
+    try {
+      dispatch(dealAction);
+    } catch (error) {
+      // US-41 AC: "fail the way it already does - a clear message, no
+      // partial deal". It did NOT already do that: the reducer's throw ran
+      // straight out of the click handler as an uncaught error, so the host
+      // saw nothing at all. Only visible now because moving the control
+      // somewhere reachable made it easy to hit.
+      showDeckError(error.message);
     }
-  } catch (error) {
-    // US-41 AC: "fail the way it already does - a clear message, no
-    // partial deal". It did NOT already do that: the reducer's throw ran
-    // straight out of the click handler as an uncaught error, so the host
-    // saw nothing at all. Only visible now because moving the control
-    // somewhere reachable made it easy to hit.
-    showDeckError(error.message);
+  } else {
+    session.send({ type: 'action', action: dealAction });
   }
 }
 

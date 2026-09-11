@@ -37,10 +37,9 @@ export class CascadePile extends Pile {
    * (US-74): `changePileType` is the one exception - allowed on a
    * non-empty pile too as of a direct user request (2026-08-27), see
    * `state.js`'s `CHANGE_PILE_TYPE` doc comment for the risk that
-   * carries. Same `isOwner`/`isShared` gate `Pile`'s own
-   * `pileActions()` uses. */
-  pileActions({ isOwner, isShared } = {}) {
-    if (!isOwner && !isShared) return [];
+   * carries. No ownership gate (2026-09-10 fix) - every pile action is
+   * open to every player now. */
+  pileActions() {
     return ['changePileType'];
   }
 

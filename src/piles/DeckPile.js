@@ -63,23 +63,27 @@ export class DeckPile extends Pile {
   }
 
   /**
-  Draw is open to everyone; every other deck action is host-only.
+  *fix (queued 2026-09-10, direct user request: "every player should
+  have access to teh deck pile actions" - since generalized to "All
+  players have access to all pile actions no matter what"): every deck
+  action is now open to every player, host or not - the `isHost` split
+  this method used to make is gone, along with the parameter itself.
+
   D91 (direct user request, "add the split pile action to the Deck Pile
-  type"): `split` joins the host-only list. No `pickupSplit` here - that
-  action doesn't exist at all any more (direct user correction: "there
-  is not supposed to be a pickupSplit") - `take` already covers
-  "everything into my hand" for any pile, deck included.
+  type"): `split` joins the list. No `pickupSplit` here - that action
+  doesn't exist at all any more (direct user correction: "there is not
+  supposed to be a pickupSplit") - `take` already covers "everything
+  into my hand" for any pile, deck included.
 
   `changePileType` (D87, *nit "all pile types must be convertible to any
-  other pile type"): a deck is no longer exempt from the picker -
-  host-gated, matching every other deck-management action here.
+  other pile type"): a deck is no longer exempt from the picker.
   */
-  pileActions({ isHost } = {}) {
+  pileActions() {
     // D114 (US-106): `reset` restarts the whole game; `reshuffleDeal`
     // only touches this deck's own cards. Two different consequences,
     // so both stay reachable rather than one silently absorbing the
     // other's job.
-    return isHost ? ['draw', 'deal', 'reshuffleDeal', 'reset', 'shuffle', 'split', 'changePileType'] : ['draw'];
+    return ['draw', 'deal', 'reshuffleDeal', 'reset', 'shuffle', 'split', 'changePileType'];
   }
 
   /** A card moved/put back onto the deck lands on top, matching a

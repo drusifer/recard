@@ -1596,15 +1596,10 @@ const ACTIONS = {
    * step untaps: it does not flip an already-untapped permanent.
    */
   UNTAP_ALL(state, action) {
-    const pile = state.piles.find((p) => p.id === action.pileId);
-    if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
-    // Same owner-or-shared rule every pile-level action uses (D43: the
-    // read-side offer check IS the write-side authorization check).
-    const isOwner = pile.ownerId === action.playerId;
-    const isShared = pile.ownerId == undefined;
-    if (!isOwner && !isShared) {
-      throw new Error(`Player ${action.playerId} is not authorized to untap pile ${action.pileId}`);
-    }
+    if (state.piles.every((p) => p.id !== action.pileId)) throw new Error(`Pile ${action.pileId} does not exist`);
+    // *fix (queued 2026-09-10, "All players have access to all pile
+    // actions no matter what"): the owner-or-shared authorization gate
+    // is gone - every player may untap any pile.
     return replacePile(state, action.pileId, (p) =>
       withCards(p, p.cards.map((card) => ({ ...card, orientation: 'portrait' }))),
     );
@@ -1622,13 +1617,10 @@ const ACTIONS = {
    * correction `ADJUST_PILE_SPREAD` already follows.
    */
   SET_STACK_ORIENTATION(state, action) {
-    const pile = state.piles.find((p) => p.id === action.pileId);
-    if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
-    const isOwner = pile.ownerId === action.playerId;
-    const isShared = pile.ownerId == undefined;
-    if (!isOwner && !isShared) {
-      throw new Error(`Player ${action.playerId} is not authorized to tap pile ${action.pileId}`);
-    }
+    if (state.piles.every((p) => p.id !== action.pileId)) throw new Error(`Pile ${action.pileId} does not exist`);
+    // *fix (queued 2026-09-10, "All players have access to all pile
+    // actions no matter what"): the owner-or-shared authorization gate
+    // is gone - every player may tap/untap any stack.
     const key = action.stackKey;
     return replacePile(state, action.pileId, (p) =>
       withCards(p, p.cards.map((card) =>
@@ -1709,9 +1701,9 @@ const ACTIONS = {
   SORT_PILE(state, action) {
     const pile = state.piles.find((p) => p.id === action.pileId);
     if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
-    if (pile.ownerId !== action.playerId) {
-      throw new Error(`Player ${action.playerId} is not authorized to sort pile ${action.pileId}`);
-    }
+    // *fix (queued 2026-09-10, "All players have access to all pile
+    // actions no matter what"): the owner-only authorization gate is
+    // gone - every player may sort any pile, not just their own hand.
     // *fix (chips): a denomination is a plain number, not a position in
     // a named order, so it sorts on its own - highest first, the way a
     // tray reads. Kept as its own branch rather than forced into the

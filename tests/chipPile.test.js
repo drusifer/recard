@@ -138,7 +138,7 @@ test('BREAK_CHIP: the new chips get their own ids, never a duplicate', () => {
 
 test('a chip pile offers break, and sorting by denomination', () => {
   const actions = chipPile([{ id: 'a', pileableType: 'chip', denom: 5 }])
-    .pileActions({ isOwner: true, isShared: true, cards: [{ pileableType: 'chip', denom: 5 }] });
+    .pileActions({ cards: [{ pileableType: 'chip', denom: 5 }] });
   assert.ok(actions.includes('break'), `got ${JSON.stringify(actions)}`);
   assert.ok(actions.includes('sortDenom'), `got ${JSON.stringify(actions)}`);
 });
@@ -168,7 +168,7 @@ test('every other pile kind still offers the full set - the restriction is the c
 // A menu with one entry, which is what the pile already is, is a dead
 // control - the same reasoning `disabledActions` uses everywhere else.
 test('changePileType is not offered at all when there is nowhere to convert to', () => {
-  const actions = chipPile([]).pileActions({ isOwner: true, isShared: true, cards: [] });
+  const actions = chipPile([]).pileActions({ cards: [] });
   assert.ok(!actions.includes('changePileType'), `got ${JSON.stringify(actions)}`);
 });
 

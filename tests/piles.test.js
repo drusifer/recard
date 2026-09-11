@@ -222,9 +222,11 @@ test('cascade/rankAdjacent inherit the same pileableActions rule as the base Pil
 
 // --- pileActions: characterized against pileActions.js's pileLevelActions ---
 
-test('deck pileActions: draw open to everyone, deal/reshuffleDeal/reset/shuffle/split/changePileType host-only (D91: split joins, instant/always-half at the ui.js/main.js layer; D114: reset joins, standalone from reshuffleDeal)', () => {
-  assert.deepEqual(new DeckPile(deck).pileActions({ isHost: true }), ['draw', 'deal', 'reshuffleDeal', 'reset', 'shuffle', 'split', 'changePileType']);
-  assert.deepEqual(new DeckPile(deck).pileActions({ isHost: false }), ['draw']);
+// *fix (queued 2026-09-10, "All players have access to all pile
+// actions no matter what"): every deck action used to split on
+// `isHost` - gone, along with the flag. Every player gets the full list.
+test('deck pileActions: draw/deal/reshuffleDeal/reset/shuffle/split/changePileType, open to everyone (D91: split joins, instant/always-half at the ui.js/main.js layer; D114: reset joins, standalone from reshuffleDeal)', () => {
+  assert.deepEqual(new DeckPile(deck).pileActions(), ['draw', 'deal', 'reshuffleDeal', 'reset', 'shuffle', 'split', 'changePileType']);
 });
 
 test('deck disabledActions: deal disabled at 0 cards, split disabled below 2', () => {
@@ -237,20 +239,20 @@ test('deck disabledActions: deal disabled at 0 cards, split disabled below 2', (
 // derived from the pile's CONTENTS now, so they appear for a hand of
 // cards and not for an empty one. That is the story's point, not a
 // regression - two sort buttons on an empty hand were always dead.
-test('hand pileActions: sort + changePileType, owner only - pass removed (direct user request, not a requirement)', () => {
+// *fix (queued 2026-09-10, "All players have access to all pile
+// actions no matter what"): sort/changePileType used to be owner-only
+// (`isOwner`) - gone, along with the flag. Any player gets them now.
+test('hand pileActions: sort + changePileType, open to any viewer (pass removed, direct user request, not a requirement)', () => {
   const cards = [{ pileableType: 'card', rank: 'A' }];
-  assert.deepEqual(new HandPile(myHand).pileActions({ isOwner: true, cards }),
+  assert.deepEqual(new HandPile(myHand).pileActions({ cards }),
     ['sortRank', 'sortSuit', 'changePileType', 'tightenAll', 'loosenAll']);
-  assert.deepEqual(new HandPile(myHand).pileActions({ isOwner: false, cards }), []);
-  assert.deepEqual(new HandPile(myHand).pileActions({ isOwner: true, cards: [] }),
+  assert.deepEqual(new HandPile(myHand).pileActions({ cards: [] }),
     ['changePileType', 'tightenAll', 'loosenAll'], 'an empty hand has nothing to sort');
 });
 
-test('cascade/rankAdjacent pileActions: none of the multi-card-sequence actions target either - D71 (US-74) adds changePileType as the one exception', () => {
-  assert.deepEqual(new CascadePile(table).pileActions({}), []);
-  assert.deepEqual(new RankAdjacentPile(table).pileActions({}), []);
-  assert.deepEqual(new CascadePile(table).pileActions({ isShared: true }), ['changePileType']);
-  assert.deepEqual(new RankAdjacentPile(table).pileActions({ isShared: true }), ['changePileType']);
+test('cascade/rankAdjacent pileActions: changePileType is the one pile-level action either offers - D71 (US-74)', () => {
+  assert.deepEqual(new CascadePile(table).pileActions(), ['changePileType']);
+  assert.deepEqual(new RankAdjacentPile(table).pileActions(), ['changePileType']);
 });
 
 // --- Write-side (D43): canRemove/removePileable/insertPileable ---
@@ -389,9 +391,8 @@ test('discard pileableActions: inherited from Pile, unmodified - same as any oth
   assert.deepEqual(new DiscardPile(discard).pileableActions(faceUp, 'me'), ['conceal', 'pickup', 'move', 'rotate']);
 });
 
-test('discard pileActions: take/split/hide/show, inherited from Pile unmodified - same shared/owner-open rule', () => {
-  assert.deepEqual(new DiscardPile(discard).pileActions({ isShared: true }), ['take', 'split', 'changePileType', 'remove', 'tightenAll', 'loosenAll']);
-  assert.deepEqual(new DiscardPile(discard).pileActions({}), []);
+test('discard pileActions: take/split/hide/show, inherited from Pile unmodified, open to everyone', () => {
+  assert.deepEqual(new DiscardPile(discard).pileActions({}), ['take', 'split', 'changePileType', 'remove', 'tightenAll', 'loosenAll']);
 });
 
 test('discard canRemove: same per-card rule as the base Pile - not unconditionally false any more', () => {
@@ -457,8 +458,7 @@ test('foundation: append-only insert; card actions are the SAME as any other pil
 });
 
 test('foundation: split/changePileType are the pile-level actions offered, inherited from MeldPile (D71/US-74, D91)', () => {
-  assert.deepEqual(new FoundationPile({}).pileActions({}), []);
-  assert.deepEqual(new FoundationPile({}).pileActions({ isShared: true }), ['split', 'changePileType', 'tightenAll', 'loosenAll']);
+  assert.deepEqual(new FoundationPile({}).pileActions(), ['split', 'changePileType', 'tightenAll', 'loosenAll']);
 });
 
 test('foundation: tableSide true (inherited from Pile), resolveDropTarget always empty (no halo geometry, from MeldPile)', () => {
@@ -493,7 +493,7 @@ test('set: inherits MeldPile\'s append-only insert, single-slot drop target, and
   const inserted = new SetPile(pile).insertPileable({ id: 'b', rank: 'K', suit: 'hearts' });
   assert.deepEqual(inserted.cards.map((c) => c.id), ['a', 'b']);
   assert.deepEqual(new SetPile(pile).resolveDropTarget([{ pileableId: 'a' }], { x: 0, y: 0 }), {});
-  assert.deepEqual(new SetPile(pile).pileActions({ isShared: true }), ['split', 'changePileType', 'tightenAll', 'loosenAll']);
+  assert.deepEqual(new SetPile(pile).pileActions(), ['split', 'changePileType', 'tightenAll', 'loosenAll']);
   assert.equal(SetPile.reparentable, false);
 });
 

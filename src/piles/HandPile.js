@@ -68,26 +68,17 @@ export class HandPile extends Pile {
    * pitch is the same physical fan the 0.65 rule produced. */
   static defaultSpread = 0.7;
 
-  /** Sorting/converting on someone else's behalf has never been possible
-   * and isn't now either. This one stays here, shared, rather than
-   * splitting into the two subclasses below: unlike `pileableActions`/
-   * `showsFace`/`contributeToView` (which used to compute `this.ownerId
-   * === viewerId` themselves), `pileActions` has always taken a plain
-   * `{isOwner}` CONTEXT flag pre-computed by the caller - the exact same
-   * contract every other pile kind's `pileActions` already uses
-   * (`Pile`/`DeckPile`/`ExilePile`). That's not the "special ownership
-   * property" pattern the split above exists to remove; it's the
-   * ordinary, codebase-wide one. It also has to stay ctx-driven for a
-   * structural reason: `pileLevelActions` (`pileActions.js`), the one
-   * caller that has no real pile/viewerId in scope (the pre-game deck
-   * preview), can only ever construct the registry's default class
-   * (`OpponentHandPile`) via a bare `kind` string - it has no ownerId to
-   * compare, so the answer has to come from the ctx flag, not from which
-   * subclass got picked. `changePileType` (D87, *nit "all pile types
-   * must be convertible to any other pile type"): a hand is no longer
-   * exempt from the picker - owner-gated, matching sort's own rule. */
-  pileActions({ isOwner, cards = [] } = {}) {
-    if (!isOwner) return [];
+  /** *fix (queued 2026-09-10, "All players have access to all pile
+   * actions no matter what"): sorting/converting someone else's hand
+   * used to be blocked by an `isOwner` context flag - gone now, along
+   * with the flag itself. Shared here rather than split into the two
+   * subclasses below, same as before: `pileLevelActions`
+   * (`pileActions.js`)'s one caller with no real pile/viewerId in scope
+   * (the pre-game deck preview) still needs a plain method it can call
+   * on the registry's default class via a bare `kind` string alone.
+   * `changePileType` (D87, *nit "all pile types must be convertible to
+   * any other pile type"): a hand is no longer exempt from the picker. */
+  pileActions({ cards = [] } = {}) {
     // US-104 (sprint pileObjects, Smith Gate 1 condition B): the sorts
     // come from what this pile HOLDS, not from it being a hand. The
     // pair used to be hardcoded here, which was only ever correct

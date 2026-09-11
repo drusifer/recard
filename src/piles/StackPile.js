@@ -28,8 +28,7 @@ export class StackPile extends Pile {
     return { ...this.toJSON(), cards: [card, ...this.cards] };
   }
 
-  pileActions({ isOwner, isShared } = {}) {
-    if (!isOwner && !isShared) return [];
+  pileActions() {
     return ['changePileType', 'remove'];
   }
 }
