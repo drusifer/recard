@@ -16,6 +16,7 @@ import { RankAdjacentPile } from '../src/piles/RankAdjacentPile.js';
 import { ExilePile } from '../src/piles/ExilePile.js';
 import { RunPile } from '../src/piles/RunPile.js';
 import { SetPile } from '../src/piles/SetPile.js';
+import { TokenPile } from '../src/piles/TokenPile.js';
 
 // D42/D56: one CLASS per pile TYPE instead of a `kind` string switched
 // on in state.js/pileActions.js. D93: piles are real instances now
@@ -780,4 +781,18 @@ test('D129: a lands pile lays its colour columns out VERTICALLY', () => {
   for (const [index, y] of ys.slice(1).entries()) {
     assert.ok(y > ys[index], `each land must cascade further down, got ${ys.join(', ')}`);
   }
+});
+
+// Test-audit gap (2026-09-11): TokenPile.pileActions() had no direct
+// test at all - only exercised incidentally through whatever a preset
+// happened to declare. Confirms both halves of its own doc comment:
+// no `break`/`changePileType` (token-specific "no false affordance"
+// reasoning), but the universal pile actions are still offered.
+test('TokenPile: offers take/split/remove/tighten/loosen but no break or changePileType', () => {
+  const actions = new TokenPile({ id: 'tokens', kind: 'token', cards: [] }).pileActions({ cards: [] });
+  for (const id of ['take', 'split', 'remove', 'tightenAll', 'loosenAll']) {
+    assert.ok(actions.includes(id), `missing ${id}`);
+  }
+  assert.ok(!actions.includes('break'), 'break is a CHIP denomination concept, not a token one');
+  assert.ok(!actions.includes('changePileType'), 'converting a token supply to another kind is not a real choice');
 });

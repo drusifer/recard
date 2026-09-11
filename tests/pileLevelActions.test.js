@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ACTION_SPECS, pileLevelActions, actionsForPileable, targetsForAction } from '../src/pileActions.js';
+import { ACTION_SPECS, pileLevelActions, disabledPileActionsFor, componentFor, actionsForPileable, targetsForAction } from '../src/pileActions.js';
 import { PILE_TYPES } from '../src/piles/pileTypes.js';
 import { PlayerHandPile } from '../src/piles/PlayerHandPile.js';
 import { sortActionsFor } from '../src/pileables/pileableTypes.js';
@@ -20,6 +20,31 @@ test('the deck offers draw plus every dealing action, open to everyone - no host
 
 test('an unknown pile kind offers nothing', () => {
   assert.deepEqual(pileLevelActions('nonsense', {}), []);
+});
+
+// Test-audit gap (2026-09-11): `disabledPileActionsFor` and
+// `componentFor` are the same polymorphic-dispatch wrapper shape as
+// `pileLevelActions` above, reached the same way by `ui.js`/`main.js`,
+// but had no direct test of their own - only the pile CLASSES' own
+// `disabledActions`/`static component` were tested, never through this
+// seam. A typo here (e.g. the wrong method name after `?.`) would have
+// silently always returned the fallback and nothing would have caught it.
+test('disabledPileActionsFor: deck deal is disabled at 0 cards, split below 2', () => {
+  assert.deepEqual(disabledPileActionsFor('deck', 0), ['deal', 'split']);
+  assert.deepEqual(disabledPileActionsFor('deck', 1), ['split']);
+  assert.deepEqual(disabledPileActionsFor('deck', 2), []);
+});
+
+test('disabledPileActionsFor: an unknown pile kind disables nothing', () => {
+  assert.deepEqual(disabledPileActionsFor('nonsense', 0), []);
+});
+
+test('componentFor: a known kind returns its own declared component tag', () => {
+  assert.equal(componentFor('deck'), 'deck-stack');
+});
+
+test('componentFor: an unknown pile kind falls back to the generic pile-panel', () => {
+  assert.equal(componentFor('nonsense'), 'pile-panel');
 });
 
 // D34's own premise (deck's per-card table is empty, draw is the only
