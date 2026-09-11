@@ -334,3 +334,133 @@ guessing them. #4 is a protocol simplification, self-contained to
 `git`: `dev` and `main` both pushed and in sync, tree clean (only the
 pre-existing untracked screenshot and `test-results/` remain, neither
 from this session's work).
+
+---
+
+## US-117 Phase 111 (2026-09-11): table zoom - DONE, with a real mid-phase pivot
+
+Built auto-fit-to-content first (`src/tableFit.js`, `computeFitScale`,
+9 unit tests) exactly as originally planned. Wiring it in live exposed
+a real conflict: shrinking the table for real also shrinks buttons
+below the 44px floor, and `lint:design` caught it immediately at the
+same viewports it already tests. Put the trade-off to the user rather
+than picking a number - they rejected both proposed resolutions and
+replaced the whole mechanism: manual dial + S/M/L/XL presets, no
+content-based computation. See D132.
+
+**Deleted `tableFit.js` + its tests outright** (no back-compat, dead
+code) and built `src/tableZoom.js` instead: `TABLE_ZOOM_PRESETS`
+(S/M/L/XL), `TABLE_ZOOM_MIN/MAX`, `clampTableZoom`, `presetScale` - 8
+unit tests. `wireTableZoomControls` (`main.js`) wires a dial + 4 preset
+buttons once at startup (local-only view state, nothing per-render).
+
+**The 44px tension didn't vanish - same math, any zoom below 1,
+including the M default.** Fixed it at the RIGHT layer instead of
+picking a number: `tests/designLint.check.mjs` Check 4 now divides a
+button's rendered size by the player's own live `--table-zoom` before
+comparing to 44px, for any button inside `#zones`. This checks what
+the invariant always meant (was this control AUTHORED at >=44px), not
+"is it drawn at >=44px at whatever zoom the player picked right now" -
+the same category of fix as the existing `.card`/`.pile-action-btn`
+exemptions already documented there, generalized to a live scale
+instead of a fixed selector. Needed rounding before comparing: dividing
+a sub-pixel-rendered size back out by a non-integer scale (0.85) landed
+a fraction of a px under an exact 44 on a couple of buttons - a
+measurement artifact, not a real miss.
+
+New live-browser suite `tests/tableZoom.browser.mjs` (7 tests,
+`npm run test:tablezoom`/`bobp make test-tablezoom`) against a real
+solo table: default applies before interaction, all 4 presets set both
+the dial and the live scale, dragging the dial directly works, every
+control itself clears 44px. 795/795 unit green, lint-js at its
+pre-existing 10-error baseline, lint:design actually IMPROVED (10 -> 8
+violations, same pre-existing categories - scroll overflow, zone
+overlap - unrelated to this phase, not touched).
+
+## Next Steps
+Handed to Trin for Phase 111 UAT.
+
+---
+
+## US-117 Phase 113 (2026-09-11): focus-zoom overlay core mechanism - DONE
+
+Built the D131 grow-in-place mechanism: `src/focusZoom.js`
+(`clampOverlayPosition`, `FOCUS_ZOOM_SCALE`, `HOVER_INTENT_MS` - 7 unit
+tests) plus `main.js` wiring (`wireFocusZoom`, `applyFocusZoom`,
+`growPileInPlace`, `shrinkFocusedPile`, `reapplyFocusZoom`).
+
+**Correction to my own earlier design doc**: D130's Gate-1 review text
+said drag-suppression would "reuse `ui.js`'s `isDragging()` signal" -
+checked while implementing, no such function exists; `ui.js`'s drag
+tracking is a per-call closure variable passed as a callback parameter
+to `wireTouchDragEvents`, not a reusable exported predicate, and that
+whole path is touch-drag anyway (irrelevant here - desktop-only). Drag
+state is tracked directly via `document`-level `dragstart`/`dragend`
+in `main.js` instead, self-contained.
+
+**The real architectural constraint this phase had to solve**:
+`renderZones` rebuilds `#zones` wholesale on every state-driven render
+(any player's move can trigger one, not just the local player's own
+actions), which would silently orphan a focus-zoomed pile's DOM if
+nothing accounted for it. Solved by tracking `focusedPileId` (a pile
+ID, never a DOM reference) and calling `reapplyFocusZoom()` after every
+`renderZones` call - it discards whatever survived the old render and
+re-grows the same pile fresh from the new one, or drops focus if that
+pile no longer exists. This is exactly the class of bug D129 warns
+about (reads correct in isolation, breaks the moment a re-render lands
+mid-interaction) - caught by DESIGN here, not by a test finding it
+after the fact.
+
+**Honest mutation-testing finding, not glossed over**: the
+`isDragInProgress` guard inside `growPileInPlace` itself turned out
+unreachable via the test I wrote - `dragstart`'s own `clearTimeout`
+already cancels the pending hover-intent timer before growPileInPlace
+would ever be called, so removing that inner guard didn't fail the
+test. Kept it (real defense against a future caller that skips the
+pre-checks the current two call sites already do), but recorded as
+disclosed-not-proven rather than claimed as independently
+mutation-verified - the honest line project standards ask for.
+
+5 new live-browser tests (`test:focuszoom`), stress-run 3x clean.
+802/802 unit, lint-js baseline, lint:design unchanged (8).
+
+## Next Steps
+Handed to Trin for Phase 113 UAT.
+
+---
+
+## US-117 Phase 114 (2026-09-11): edge-case polish - DONE, found a real bug
+
+T114.1 (viewport clamp) was already wired into phase 113's
+`applyFocusZoom` from the start, per Morpheus's review note - but
+writing the small-viewport live test this phase called for FOUND A
+REAL BUG in it, not just confirmed it: the clamp math itself was
+correct, but it was clamping against a PREDICTED size (the pile's
+rect captured while still flex-constrained in `#zones`) that
+under-counted the pile's true natural size once freed from its old
+flex siblings - by ~70px in the worst case on a cramped layout, enough
+to clip a grown pile off the edge despite the clamp formula never
+being wrong.
+
+**Fixed at the root, not patched**: `applyFocusZoom` now reparents to
+`<body>` FIRST at scale 1, pinned to the pile's exact original screen
+position (a pure DOM move, no visible change - not a guess), measures
+its TRUE unconstrained size there, and only THEN computes the grown
+size and clamp from that real number. Replaced an earlier "predict,
+then re-measure and correct" two-pass attempt that only partially
+worked (residual ~1px rounding remained, which the live test's
+tolerance now correctly treats as measurement noise, not a real clip -
+same class of fix as phase 111's 44px-floor rounding).
+
+T114.2 (drag-out proof) reuses the synthetic dragover/drop mechanism
+`rtgPlaythrough.browser.mjs` already established as necessary
+(Playwright can't synthesise a real native HTML5 drag) - a card
+dragged out of an already-reparented, focus-zoomed pile lands in its
+destination with zero `dropTarget.js`/`touchDrag.js` changes, proving
+D130's claim live rather than by code inspection.
+
+2 new live-browser tests (8 total in the file), stress-run 3x clean.
+802/802 unit, lint-js/lint:design baselines held throughout.
+
+## Next Steps
+Handed to Trin for Phase 114 UAT.

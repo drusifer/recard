@@ -209,3 +209,6 @@ bobp make test   # confirm no regressions
 - Use **Grep + Read** in combination to cross-reference multiple sources before answering
 - Always cite the source file when answering (`agents/oracle.docs/state.md:42`)
 
+## On Entry
+Read `agents/oracle.docs/state.md` next — it has the current task, key decisions, and exact resume instructions. Do not start work before loading it.
+

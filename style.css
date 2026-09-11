@@ -1495,6 +1495,76 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
      bug) - every zone's height comes from its own content only now,
      never a sibling's. */
   align-items: flex-start;
+  /* US-117 phase 111 (D132, direct user correction - no auto-fit): the
+     table zoom is fully manual now, set by the dial/preset controls in
+     `#table-zoom-controls` (`main.js`'s `wireTableZoomControls`), not
+     computed from content. `top center` so zooming reads as the table
+     pulling back from/toward the player, not sliding toward a corner.
+     NOTE for phase 113: this transform makes `#zones` a containing
+     block for any `position: fixed` descendant (CSS Transforms spec) -
+     the D131 focus-zoom overlay must be appended to `<body>`, same as
+     `.rtg-inspect` already is, never nested inside `#zones`, or it
+     would be clipped to the table's own box instead of escaping to the
+     full viewport. */
+  transform: scale(var(--table-zoom, 1));
+  transform-origin: top center;
+}
+
+/* US-117 phase 111 (D132): the manual table-zoom control bar. Every
+   player has their own (not host-gated, unlike `.layout-controls`
+   above it) - local view state, D130. */
+.table-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.5rem;
+}
+
+.table-zoom-presets {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.table-zoom-presets button {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+#table-zoom-dial {
+  flex: 1 1 auto;
+  max-width: 12rem;
+}
+
+/* US-117 phase 113 (D131): grow a Pile in place on hover/click. Applied
+   to the pile's OWN element after it's reparented to `<body>`
+   (`main.js`'s `applyFocusZoom`) - appending to `<body>` rather than
+   leaving it inside `#zones` is required, not a style choice: `#zones`
+   carries a `transform` (the table-zoom rule above), which makes it a
+   containing block for any `position: fixed` descendant per the CSS
+   Transforms spec, so a fixed-position pile left inside `#zones` would
+   be constrained to the TABLE's box instead of escaping to the full
+   viewport - the same reasoning `.rtg-inspect` already documents for
+   the same reason (escaping a pile's own overflow/stacking context).
+   `--focus-left`/`--focus-top` are real fixed-position screen
+   coordinates (already clamped on-screen, `focusZoom.js`); the GROWTH
+   itself is a `scale()` from `top left` so the pile visibly grows from
+   the point it was anchored at, not from its own center. */
+.pile-section.focus-zoomed {
+  position: fixed;
+  left: var(--focus-left);
+  top: var(--focus-top);
+  transform: scale(var(--focus-scale, 1));
+  transform-origin: top left;
+  transition: left 0.15s ease, top 0.15s ease, transform 0.15s ease;
+  z-index: 9500;
+}
+
+/* An invisible spacer left behind in the pile's normal flex position
+   while it's reparented to `<body>` above - without this, removing the
+   pile from `#zones`'s flow would let siblings reflow to fill the gap,
+   which would violate "the rest of the table stays untouched" (D131). */
+.focus-zoom-placeholder {
+  visibility: hidden;
 }
 
 

@@ -142,3 +142,6 @@ Use **via** for symbol/header lookup; use **Grep** for content search inside fil
 
 ### Running Setup
 - **Bash** — run `python agents/tools/setup_agent_links.py` after creating new agents
+
+## On Entry
+Read `agents/bob.docs/state.md` next — it has the current task, key decisions, and exact resume instructions. Do not start work before loading it.

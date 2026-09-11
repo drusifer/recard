@@ -666,3 +666,26 @@ all 4 browser suites green.
 
 ### Next Steps
 Handed to Oracle for groom, then Smith for end-to-end user test.
+
+## Sprint: Infinity Table (2026-09-11) — planned, 5 phases
+
+US-117, phases 111-115 written to `task.md`. Split along the story's
+own AC boundaries rather than by file: auto-fit view (111), player
+zoom-out control (112), focus-zoom core mechanism (113), focus-zoom
+edge-case polish (114 - viewport clamping + the live proof that D130's
+"no drag/drop changes needed" claim holds), plus the standing reserved
+bug-fix slot (115).
+
+Split 113/114 rather than one phase because the core hover/click/drag-
+suppress mechanism and the edge-clamping math are separable concerns
+with separate live-browser checks - bundling them risks a big phase
+where a failure in the harder edge-case math (114's work) blocks
+sign-off on the core mechanism (113's work) that already works.
+
+Every phase carries its own live-browser check, not just unit tests -
+this whole story is interaction/visual behavior, and D129's own
+lesson (the numbers can agree while the screen is wrong) applies
+directly here.
+
+### Next Steps
+Handed to Morpheus for plan review. On approval, Neo starts Phase 111.

@@ -163,6 +163,21 @@
            discards the whole table for a DIFFERENT preset. -->
       <button id="new-game-btn" type="button">New Game…</button>
     </div>
+    <!-- US-117 phase 111 (D132): every player's own table zoom, fully
+         manual - no auto-fit, per the direct user correction after
+         auto-fit's forced shrinking conflicted with the 44px floor.
+         Not host-gated like `#layout-controls` above: this is local
+         view state per D130, every player has their own. -->
+    <div id="table-zoom-controls" class="table-zoom-controls">
+      <span id="table-zoom-label" class="table-zoom-label">Table size</span>
+      <div class="table-zoom-presets" role="group" aria-label="Quick table size presets">
+        <button type="button" data-zoom-preset="S">S</button>
+        <button type="button" data-zoom-preset="M">M</button>
+        <button type="button" data-zoom-preset="L">L</button>
+        <button type="button" data-zoom-preset="XL">XL</button>
+      </div>
+      <input type="range" id="table-zoom-dial" aria-labelledby="table-zoom-label" />
+    </div>
     <section class="panel panel-felt table-section">
       <h2 class="sr-only">Table</h2>
       <div id="table-surface" class="table-surface">

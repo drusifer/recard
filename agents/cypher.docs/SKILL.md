@@ -164,3 +164,6 @@ all tools:
 ### Coordinating
 - `bobp chat "<message>"` — post requirements updates and assign stories to the team
 
+## On Entry
+Read `agents/cypher.docs/state.md` next — it has the current task, key decisions, and exact resume instructions. Do not start work before loading it.
+

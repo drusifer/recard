@@ -8,6 +8,8 @@
     "test:rtg": "node --test tests/rtgPlaythrough.browser.mjs",
     "test:hostsetup": "node --test tests/hostSetup.browser.mjs",
     "test:newgame": "node --test tests/newGame.browser.mjs",
+    "test:tablezoom": "node --test tests/tableZoom.browser.mjs",
+    "test:focuszoom": "node --test tests/focusZoom.browser.mjs",
     "dev": "node tools/devserver.mjs",
     "build:standalone": "node tools/buildStandalone.mjs",
     "build:dist": "node tools/buildDistribution.mjs",

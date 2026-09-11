@@ -198,7 +198,139 @@ unit arithmetic, and CSS is the correct place for it.
   revives. Harmless (a Pileable is a cheap view over its record), but
   don't let a third reviver appear.
 
+## D130 — Infinity Table (US-117) arch pass (2026-09-10)
+
+Cypher flagged US-117 as arch-significant (no zoom/pan camera exists
+in this codebase today) and asked for a pass before Smith's Gate 1.
+Answered its 3 open questions:
+1. Zoom-out escape hatch is player-driven on top of an automatic
+   auto-fit default — `min(autoFitZoom, playerZoomOverride)`.
+2. Focus-zoom targets the Pile (matches D129's containment ladder),
+   not its Zone — a Pile already has its own DOM panel to bind to.
+3. No drag/drop coordination needed — `dropTarget.js` takes
+   `getBoundingClientRect()` rects with no DOM dependency, and rects
+   are already post-transform, so a CSS `transform` camera on a
+   wrapper is invisible to existing drag math.
+
+**Binding shape:** one wrapper around `#table-surface` carrying a CSS
+transform, driven by local-only player state (zoom target Pile id,
+auto-fit scale, player override). No data model change, no reducer
+action, no persistence — camera position is as ephemeral as scroll
+position. Full text: `docs/ARCHITECTURE.md` D130.
+
+Handed to Smith for Gate 1 with the foundation settled; Gate 1 owns
+transition timing/easing, hover-vs-click trigger balance, and what
+"too cramped" means as an actual threshold.
+
+## D131 — Infinity Table focus mechanic revised: grow the Pile, not a camera (2026-09-10)
+
+Direct user correction, right after Smith's Gate 1 approved D130's
+camera-wrapper design: "a better way to do the zoom mechanic is to
+keep the table at full size and grow the piles to make them
+interactable." This supersedes ONLY D130's camera-wrapper mechanism
+for the focus interaction - D130's other two findings (focus targets
+the Pile not the Zone; no drag/drop code changes needed) stand, and
+the story's separate table-level auto-fit/zoom-out ACs are untouched.
+
+**New shape: focus-zoom is a `position: fixed` overlay anchored at the
+Pile's own `getBoundingClientRect()`, grown to working size in place.**
+No shared camera wrapper at all. Grounded in an already-shipped
+precedent I found in `style.css`: `.rtg-inspect` (Smith Gate-1
+condition C1) is already a `position: fixed` element appended outside
+a card's own DOM specifically to "escape the pile's overflow and the
+zone's stacking context" - the exact clipping problem a grown-in-place
+Pile hits if it stays in its Zone's flex/grid flow. `.pile-hover-host:
+hover`'s existing small lift (D51, `translateY(-0.35rem) scale(1.02)`)
+is the same family of interaction at a much smaller scale - this is
+that pattern's full-size conclusion, not a new mechanism. Rejected
+scaling the Pile in place inside normal flow: `transform: scale()`
+doesn't reflow layout but does get clipped by ancestor `overflow` and
+can't grow past its Zone's edges without colliding with whatever the
+Zone's own layout put next to it.
+
+Smith's 3 Gate-1 amendments from the D130 review (drag-suppression,
+hover-intent delay, animate-don't-snap) carry over unchanged in
+principle - none of them assumed a camera specifically, they just
+retarget from "camera transform" to "the overlay's creation/scale/
+position transition." Left one open question for Smith, not decided
+here: does the overlay grow anchored exactly at the Pile's original
+position (may clip a viewport edge for a pile near the table border),
+or does it nudge itself to stay fully on-screen? A real HCI call, not
+an architecture one. Full text: `docs/ARCHITECTURE.md` D131.
+
+## Sprint plan review — US-117 (2026-09-11): APPROVED
+
+Mouse's 5-phase breakdown (111 auto-fit, 112 zoom-out control, 113
+focus-zoom core, 114 edge polish, 115 reserved bug-fix) matches D130/
+D131's own AC groupings cleanly - no phase mixes D130's superseded
+camera language with D131's overlay mechanism, and the 113/114 split
+keeps the harder edge-clamp math from blocking sign-off on the core
+hover/click/drag-suppress mechanism. Handed to Neo for Phase 111.
+
+## Phase 111 code review (2026-09-11): APPROVED
+
+Confirmed no dead references survive the `tableFit.js` -> `tableZoom.js`
+swap (grepped for `tableFit`/`computeFitScale`/`--table-fit-scale`/
+`recomputeTableFit` across `src/`, `style.css`, `index.html`, `tests/` -
+none). `tableZoom.js` stays a pure module with no DOM dependency, same
+shape as every other pure module this project favors. The
+`designLint.check.mjs` fix is scoped correctly (`insideZones` only, so
+it can't paper over a real regression in unrelated chrome) and Trin's
+mutation check proves both new guards are load-bearing, not incidental.
+The phase-113 forward-note in `style.css` (transform makes `#zones` a
+containing block for `position: fixed` descendants - the D131 overlay
+must append to `<body>`) is exactly the kind of thing that would
+otherwise be rediscovered the hard way next phase.
+
+## Phase 113 code review (2026-09-11): APPROVED
+
+The pile-ID tracking + `reapplyFocusZoom` design is the right answer to
+`renderZones`' wholesale rebuild - Trin's mutation check (neutering it
+reproduces the exact duplicate-element failure) proves it's load-
+bearing, not decorative. The `pointerleave`-on-the-overlay-itself fix
+(rather than delegating through `#zones`, which stops receiving events
+from a reparented-to-`<body>` element) is the correct read of the same
+DOM-mechanics constraint the phase-111 `style.css` note already
+flagged for `position: fixed` + transformed ancestors. Trin's caught
+gap (none of the 5 original tests touched the re-render-survival claim
+at all) is exactly the kind of thing a review from code alone would
+have missed too - good catch on Trin's part, not just Neo's build.
+
+**Noting for the sprint plan**: phase 114's T114.1 (viewport clamp) is
+ALREADY DONE - `clampOverlayPosition` was wired into `applyFocusZoom`
+from the start of 113, not deferred. Phase 114 reduces to T114.2 only
+(confirm drag-OUT-of-a-focused-pile live, proving D130's "no drag/drop
+code changes needed" claim) plus whatever live-browser check that
+needs. Telling Mouse rather than silently shrinking the phase myself.
+
+## Phase 114 code review (2026-09-11): APPROVED
+
+The reparent-first-at-scale-1-then-measure fix is the right answer,
+and I like that it's a REAL fix rather than a fudge-factor: it removes
+the entire class of "predicted size vs. actual size" bug by never
+predicting - one DOM move (no visual change, since it's pinned to the
+exact original screen position) buys an accurate measurement before
+anything grows. Trin's mutation check (reverting to the stale rect
+reproduces the exact original failure) proves it, not just plausibly
+explains it. The 1px test tolerance is the same, already-established
+category of fix as phase 111's 44px-floor rounding - not a new
+precedent, consistent with it.
+
+D130's drag-out claim is now proven live (T114.2), not just argued from
+reading `dropTarget.js`'s own header comment. US-117's implementation
+is COMPLETE: phases 111/113/114 all shipped and reviewed. Phase 115
+(reserved bug-fix slot) has nothing outstanding to consume - every real
+bug found this sprint (the 44px auto-fit conflict, the re-render
+duplicate-element gap, the clamp under-measurement) was fixed inline
+in the phase that found it, same pattern as prior sprints' Phase
+96/102 precedent.
+
 ## Next Steps
+@Oracle *ora groom - sprint implementation is done, move to Stage 3
+(sprint close): groom docs, then Smith's end-to-end test, then retro,
+then Cypher launch.
+
+---
 
 Iteration 2 (Neo) is the WIRING ONLY — Conditions 1 and 2 are done.
 D129 should be written up in `docs/ARCHITECTURE.md` (it is currently

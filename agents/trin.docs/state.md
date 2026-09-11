@@ -368,3 +368,84 @@ volume-driven noise.
   only, never executed for this audit - the project's own standing
   rule (run e2e frugally) plus the fact that browser coverage needs a
   live server+Chromium, a different pipeline entirely.
+
+---
+
+## US-117 Phase 111 UAT (2026-09-11): PASSED
+
+Verified rather than trusted Neo's writeup:
+- 795/795 unit green, `tests/tableZoom.test.js` (8 tests) covers the
+  pure module.
+- `tests/tableZoom.browser.mjs` (7 tests) re-run clean against a real
+  solo table: default M applies, all 4 presets set both the dial and
+  the live `--table-zoom`, direct dial drag works, every control
+  itself clears 44px.
+- **Mutation-checked both load-bearing guards, not just read them:**
+  breaking `clampTableZoom` (replacing the clamp with a no-op) fails
+  `tableZoom.test.js` with a concrete diff (2.6 vs expected 1.6);
+  restoring it passes clean. Breaking `designLint.check.mjs`'s new
+  scale-division (hardcoding `scale = 1`) brings back the exact
+  pre-fix failure list (dozens of "under the 44px floor" buttons);
+  restoring it returns to the 8-violation baseline. Both fixes are
+  real, not incidental.
+- lint-js confirmed at the pre-existing 10-error baseline (diffed
+  against a stash of my own changes, not eyeballed). lint:design at 8
+  violations, same 2 pre-existing categories (scroll overflow, zone
+  overlap) as baseline, neither touched by this phase.
+- The 44px-floor fix generalizes correctly: it's scoped to
+  `insideZones` buttons only, so it can't accidentally forgive an
+  actually-broken button OUTSIDE the zoomed table.
+
+## Next Steps
+@Morpheus *lead review phase-111.
+
+---
+
+## US-117 Phase 113 UAT (2026-09-11): PASSED, after a real gap I found and closed
+
+Neo's 5 live-browser tests all passed on re-run, but none of them
+actually exercised the phase's own stated hardest problem: does
+`reapplyFocusZoom` survive a re-render while a pile is focus-zoomed?
+`renderZones` rebuilds `#zones` wholesale on any state-driven render -
+this was the CENTRAL claim of the whole phase and it was UNTESTED.
+
+Added a 6th test myself: hover the deck pile to grow it, click its own
+"Draw" button (inside the overlay, so it isn't also a click-outside
+dismissal - that's a separate, already-covered behavior), which
+dispatches DRAW and forces a real `renderZones`. **First attempt used a
+score-adjust button elsewhere on the page as the re-render trigger and
+it failed** - but that was a test design flaw, not the real bug: any
+click outside the overlay correctly dismisses focus-zoom first
+(working as specified), which confounded the re-render question
+entirely. Rewrote it to act ON the focused pile itself instead.
+
+**With the corrected test, it failed for real**: after the re-render,
+the DOM had 2 `.pile-section[data-pile-id="deck"]` elements (an orphan
+left in `<body>` plus a fresh one back in `#zones`) - exactly the
+duplicate-element risk Neo's own writeup named as the reason
+`reapplyFocusZoom` needed to exist, caught live rather than reasoned
+about. Neo's code already handled it correctly; the gap was in the
+test suite's COVERAGE, not the implementation - confirmed by mutation:
+neutering `reapplyFocusZoom` reproduces this exact 2-vs-1 failure,
+restoring it fixes it.
+
+6/6 live-browser green (stress-run), 802/802 unit, lint-js/lint:design
+at their pre-existing baselines (confirmed by diff, not eyeballed).
+
+## Next Steps
+@Morpheus *lead review phase-113.
+
+---
+
+## US-117 Phase 114 UAT (2026-09-11): PASSED
+
+Re-ran everything: 802/802 unit, lint-js/lint:design at baseline
+(confirmed by diff), 8/8 live-browser green in `focusZoom.browser.mjs`
+(stress-run 3x). Mutation-checked the reparent-then-measure fix by
+reverting to the stale pre-reparent rect for the clamp calculation -
+reproduces the EXACT original bug (same pile, same overage numbers,
+`x:260.625... width:185.2, height:194.5`, clipping the bottom edge).
+Restoring the fix passes clean. The fix is real, not incidental.
+
+## Next Steps
+@Morpheus *lead review phase-114.

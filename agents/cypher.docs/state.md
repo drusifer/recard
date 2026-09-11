@@ -685,3 +685,78 @@ None pending. Standing backlog carries forward: reconnect-after-refresh
 and real QR (now 6 sprints running), 5+-player mobile density, builder
 screen, browser-automation tooling for Smith's OWN gate (distinct from
 Neo's test scripts), jsdom/e2e harness for ui.js, items 6-8 above.
+
+## Sprint: Infinity Table (2026-09-10) — QUEUED, NOT STARTED
+
+Direct user request (`*nreq infinity table`): auto-fit table view
+showing every Zone at once, a player-driven zoom-out to enlarge the
+virtual table canvas for big layouts, and hover/click-driven zoom into
+whatever Pile the pointer is on, returning to full-table view on
+pointer-out. Drafted **US-117** in USER_STORIES.md.
+
+Flagged explicitly as architecturally significant, not a routine
+story: **no zoom/pan/camera mechanism exists anywhere in this codebase
+today** - this introduces a new concept, unlike most stories which
+extend an existing one (Pileable, PileActions, etc.).
+
+Three open questions left for Smith/Morpheus rather than assumed (full
+text in the US-117 AC block):
+1. Is the "zoom out to make the table bigger" step player-driven or
+   fully automatic - the story assumes player-driven, since automatic
+   has no stated stopping condition.
+2. Focus-zoom targets the Pile, not its containing Zone (matches
+   D129's Pile/Stack model) - needs confirming.
+3. Whether drag-and-drop still works while focus-zoomed, or forces a
+   zoom-out first - affects whether this is pure camera work or must
+   coordinate with existing drag code.
+
+## Next Steps
+Start at `@Smith *user review US-117` (Gate 1). Given the "no existing
+precedent" flag, recommend Smith's review happen alongside, not before,
+a `@Morpheus *lead arch` pass - Morpheus should weigh in on the
+open questions above before Gate 1 locks interaction specifics, so the
+two probably want to run close together rather than strictly serial.
+
+---
+
+## Launch: Infinity Table, US-117 (2026-09-11)
+
+Full cycle, 2 design pivots before code (D130 camera -> D131 grow-in-
+place -> D132 manual dial+presets, each a direct user correction), then
+a clean 3-phase build (111 zoom controls, 113 focus-zoom core, 114
+clamp fix + drag-out proof), no rework at any gate after implementation
+started. Full history: `docs/ARCHITECTURE.md` D130-D132, `docs/
+USER_STORIES.md` US-117.
+
+Delivered: a manual table-zoom dial + S/M/L/XL presets (no auto-fit -
+the player decides, not an algorithm), and hover/click-to-grow-a-pile-
+in-place with hover-intent delay, drag suppression, viewport clamping,
+and animated transitions. 11 new source/test files, 802/802 unit + 21
+live-browser tests across 3 new suites (`test:tablezoom`,
+`test:focuszoom`), lint-js/lint:design baselines held or improved.
+
+Two real bugs found and fixed live during implementation (not by
+review): the 44px-floor conflict that drove the D132 pivot, and a
+clamp-math bug from measuring a pile's flex-constrained size instead
+of its true unconstrained one once reparented. Trin independently
+found and closed a real TEST-coverage gap (re-render survival was
+claimed but never actually tested) before approving either phase.
+
+### Backlog added this sprint (from retro)
+1. **Check story-number uniqueness** (Oracle) - a `check-decisions.mjs`
+   equivalent for `USER_STORIES.md`; this sprint's own US-110/US-117
+   collision would have been caught automatically.
+2. **XL table zoom pushes the player's own hand below the fold**
+   (Smith, non-blocking) - bends the standing "see table + hand
+   together" principle; an accepted trade-off for a deliberate
+   oversized view, not a defect, but worth a future look.
+3. **Focus-zoomed pile visually overlaps its parent Zone's own
+   chrome** (Smith, non-blocking) - reads slightly cluttered; a
+   shadow/dimmed-backdrop treatment would likely help, real design
+   call for the user.
+
+### Next Steps
+None pending on US-117. Standing backlog (reconnect/real QR, 5+-player
+mobile density, builder screen, browser-automation tooling for Smith's
+gate, jsdom/e2e harness) carries forward unchanged, plus items 1-3
+above.

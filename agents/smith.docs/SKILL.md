@@ -291,3 +291,6 @@ Use via to ground feedback in actual code — verify that the feature under revi
 
 ### Coordinating
 - `bobp chat "<message>"` — post reviews, approvals, and feedback to the team
+
+## On Entry
+Read `agents/smith.docs/state.md` next — it has the current task, key decisions, and exact resume instructions. Do not start work before loading it.
