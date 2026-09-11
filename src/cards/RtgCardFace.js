@@ -18,6 +18,8 @@
  * `--card-w`/`--card-h` are untouched, so no other preset changes size.
  */
 
+import { resolveAssetPath } from '../assetPath.js';
+
 /**
  * Mana pip colours, matching the art generator's palettes. Exported so
  * the host form's deck picker (US-110 follow-up: "show the deck
@@ -45,7 +47,7 @@ export function artUrl(card) {
   // `printedId` is the PRINTED id; `id` is this physical copy's instance id
   // (D80 - four copies of one card need four distinct ids). Art is per
   // printed card, so it must key off `printedId` or all four copies 404.
-  return `assets/cards/rtg/${card.printedId ?? card.id}.webp`;
+  return resolveAssetPath(`assets/cards/rtg/${card.printedId ?? card.id}.webp`);
 }
 
 /** Colour-to-CSS-class mapping (`.rtg-c-w` etc, style.css - each sets
