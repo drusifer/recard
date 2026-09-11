@@ -248,3 +248,89 @@ Identical 9 exist at HEAD. Separate responsive-layout task.
 
 **Uncommitted:** everything above, plus the original staged
 `dropTarget.js` simplification, which is correct and should stay.
+
+---
+## Session close (2026-09-10, evening) — bloop queue processing
+
+Long session: Oracle groom (D117-D129 backfill, a real duplicate D116
++ D111/D112 order bug found+fixed by a new `tools/checkDecisionOrder.mjs`),
+then a `*bloop queue till done` run through the accumulated CHAT.md
+queue. All committed and pushed (`dev` and `main` both up to date,
+tree clean).
+
+### Shipped, verified, closed
+- **RtG stack gear clipped/oversized** — `.stack-gear` was rendering at
+  the global 44px touch-target floor instead of its documented 1.3rem,
+  and the battlefield's `overflow-y:auto` row reserved no space for
+  anything outside a stack's own box. Fixed both.
+- **Gear moved to top-right** (was bottom-right) — mirrors
+  `.chip-stack-badge`'s pin-outside-the-card pattern.
+- **Stack-hover shadow overlap** — real bug: `.middle-card:hover` forced
+  `position:relative` over the stack's own `position:absolute` (D129),
+  same specificity + later source order. Hovering a stacked card fell
+  into flex flow, width ballooned to the unrelated 8.5rem max-width,
+  painting a giant disconnected shadow. Removed `position` from the
+  hover rule entirely.
+- **Found+fixed a real test flake** while stress-testing the gear fix:
+  a dismiss-click raced `openStackActionMenu`'s `setTimeout(0)`
+  listener in ~1/3 of runs. Zero-tolerance-for-flakes held - didn't
+  ship until 8/8 stress runs were clean.
+- **Can't re-fan hand after Flip** — `Stack.flippedDirection()` only
+  ever toggled vertical↔horizontal; a FAN-default pile (hand) flipped
+  once could never flip back. Now takes the pile's own default
+  direction, making FAN-default piles a genuine 2-state toggle.
+- **Deck panel too wide / fold actions into rows** — `.pile-title` had
+  no width cap, so Deck's 6 actions + enum forced the whole panel open
+  to fit one unbroken row. Capped at 11rem (tuned empirically against
+  `lint:design`'s scroll baseline, not guessed - 9rem was narrower but
+  regressed it).
+- **All players get all pile actions** (generalized mid-session from
+  "deck actions for every player" to a full authorization removal):
+  stripped `isOwner`/`isShared` from 10 pile classes' `pileActions()`
+  and `isHost` from `DeckPile`, plus 3 reducer checks (`SORT_PILE`,
+  `UNTAP_ALL`, `SET_STACK_ORIENTATION`). **Found two real latent bugs
+  this exposed**: Shuffle/Reset/Reshuffle-Deal had never been wired
+  with the host-dispatch/guest-relay split every other action uses -
+  invisible until removing the host gate let a guest reach them. Fixed
+  both. Full writeup: `agents/neo.docs/all-players-pile-actions.md`.
+- **New Game zone-recreation report** — investigated, could NOT
+  reproduce in the single-client path; added a real regression test
+  proving the reducer creates every player's Zone correctly. Left OPEN
+  - likely candidate is the guest-side broadcast path, blocked on the
+  standing no-2-peer-harness gap.
+
+Verification throughout: unit suite ended at 787/787 (net down from
+794 - 15 old restriction-tests deleted/rewritten, not just patched),
+all 4 browser suites green (68 tests), lint-js/lint:design both at
+their pre-existing baselines (unchanged byte-for-byte).
+
+### Queued, NOT started - real feature/design work, not fixes
+1. **Tighten/Loosen as a slider** — reusable Web Component, shared
+   between the pile-level menu and the per-stack gear menu.
+2. **Flip as a radio box with preview icons** — replace the single
+   Flip action with a radio control listing orientations directly,
+   each with a small icon/image showing the resulting arrangement.
+3. **Zone-level privacy** (architecture change) — a pile inside a
+   player's own PlayerZone should default to hidden-from-everyone-but-
+   owner (like a hand card), revealable via the existing hide/show
+   toggle. Explicitly a ZONE property, not a pile property - today's
+   model is pile-level. NOT touched by the pile-ACTIONS work above
+   (that was authorization; this is visibility/data-model).
+4. **Remote-cursor redesign** (no back-compat) — replace exact-
+   coordinate/transform mirroring with an animate-to-target model: on
+   pointer-enters-pile/zone, glide the OTHER clients' cursor indicator
+   onto that pile/zone rather than following live pixel coordinates.
+
+### Next steps
+Any of the 4 queued items above can start directly (`@Neo *swe impl
+<item>`). #3 (zone privacy) is the most architecturally significant -
+probably wants a `@Morpheus *lead arch` pass first given it moves a
+concept from Pile to Zone. #1/#2 are UI builds with real visual design
+decisions the user may want to weigh in on before implementation
+(slider styling, preview-icon rendering) rather than a fix-loop
+guessing them. #4 is a protocol simplification, self-contained to
+`session.js`/`protocol.js`/cursor-rendering in `ui.js`.
+
+`git`: `dev` and `main` both pushed and in sync, tree clean (only the
+pre-existing untracked screenshot and `test-results/` remain, neither
+from this session's work).

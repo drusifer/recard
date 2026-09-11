@@ -1274,3 +1274,7 @@ make: *** [Makefile:50: lint] Error 1
 ℹ skipped 0
 ℹ todo 0
 ℹ duration_ms 2145.924664
+
+---
+[<small>2026-09-10 22:29:13</small>] [**Neo**]->[**all**] *swe handoff*:
+ session close: judge-loop groom + Oracle docs backfill (D117-D129) + bloop queue processing (5 items closed: gear clipping, gear reposition, hover-shadow, re-fan-after-flip, wide panels, all-players-pile-actions). 4 items queued not started (slider, flip radio-box, zone privacy, cursor redesign) - see neo.docs/state.md for details/next-step recommendations. dev+main pushed, tree clean, 787/787+68 browser tests green.
