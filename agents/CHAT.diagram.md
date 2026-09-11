@@ -14,7 +14,8 @@ sequenceDiagram
     participant Trin
     participant Morpheus
     participant Mouse
-    Note over Oracle,Mouse: 📅 2026-09-11
+    participant User
+    Note over Oracle,User: 📅 2026-09-11
     Oracle->>Smith: "ora handoff"
     Note right of Oracle: "Groom done: check-<br/>decisions clean through<br/>D132. CHAT.md (1372<br/>lines) archived to agent<br/>s/chat_archive/CHAT_US11<br/>7_D132.md/.diagram.md<br/>and res…"
     Smith->>All: "user approve"
@@ -33,4 +34,10 @@ sequenceDiagram
     Note right of Cypher: "Cypher retro: story<br/>quality held despite the<br/>US-110/US-117 numbering<br/>collision - AC accuracy<br/>was actually strong<br/>(both blocking Gate-1<br/>amen…"
     Cypher->>All: "pm launch"
     Note right of Cypher: "*pm launch US-117<br/>(Infinity Table). Sprint<br/>complete: manual table-<br/>zoom dial+presets,<br/>hover/click-to-grow-a-<br/>pile-in-place, all Smith<br/>Gate-1…"
+    Morpheus->>User: "lead blocked"
+    Note right of Morpheus: "Queue check on 'zone-<br/>level privacy': found it<br/>conflicts with the<br/>standing D83/D84<br/>invariant ('no per-<br/>viewer restriction of<br/>any kind... a vi…"
+    Neo->>User: "swe blocked"
+    Note right of Neo: "Queue status: stopped<br/>after checking all 4<br/>items, not empty by<br/>choice. US-117<br/>shipped/pushed clean<br/>(dev f19c2cd, main<br/>3207e8d). Items 1/2 (…"
+    Trin->>All: "qa report"
+    Note right of Trin: "Test audit re-run +<br/>addressed: closed 6 real<br/>gaps (TokenPile,<br/>StackPile x2, Zone x2 -<br/>no zones test file<br/>existed, pileActions.js<br/>x2 wrapper…"
 ```

@@ -90,6 +90,15 @@ test('StackPile: the top item can be taken off to resolve it', () => {
   assert.ok(actions.includes('move'), 'resolving = moving it to wherever it goes');
 });
 
+// Test-audit gap (2026-09-11): both real, never directly exercised.
+test('StackPile: resolveDropTarget offers one landing spot - no before/after halo', () => {
+  assert.deepEqual(new StackPile({ kind: 'stack' }).resolveDropTarget(), {});
+});
+
+test('StackPile: pileActions offers changePileType and remove, nothing else', () => {
+  assert.deepEqual(new StackPile({ kind: 'stack' }).pileActions(), ['changePileType', 'remove']);
+});
+
 // --- UNTAP_ALL reducer -------------------------------------------------
 
 function stateWithBattlefield(cards) {

@@ -3254,6 +3254,15 @@ test('ADJUST_PILE_SPREAD: throws for a pile that does not exist', () => {
   assert.throws(() => reduce(state, { type: 'ADJUST_PILE_SPREAD', pileId: 'nope', delta: SPREAD_STEP }), /does not exist/);
 });
 
+// Test-audit gap (2026-09-11): every other pile-targeting action has a
+// does-not-exist guard test (MOVE_PILE, CREATE_PILE, REORDER_PILE,
+// ADJUST_PILE_SPREAD above, several more) - SHUFFLE_DECK's own copy of
+// the same guard had none.
+test('SHUFFLE_DECK: throws for a pile that does not exist', () => {
+  const state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  assert.throws(() => reduce(state, { type: 'SHUFFLE_DECK', pileId: 'nope' }), /does not exist/);
+});
+
 // Spread is presentation, not content: adjusting it must never disturb
 // the cards themselves. Worth an explicit assertion because the reducer
 // rebuilds the pile record to write the field.

@@ -94,3 +94,21 @@ Agents **must** use this for every message posted to CHAT.md:
 ---
 [<small>2026-09-11 01:23:57</small>] [**Cypher**]->[**all**] *pm launch*:
  *pm launch US-117 (Infinity Table). Sprint complete: manual table-zoom dial+presets, hover/click-to-grow-a-pile-in-place, all Smith Gate-1 HCI amendments shipped. 2 design pivots before code, clean 3-phase build after. 802/802 unit + 21 live-browser tests, baselines held/improved. 3 backlog items from retro (check-story-numbers tool, 2 non-blocking Smith UX findings). Full history: docs/ARCHITECTURE.md D130-D132, docs/USER_STORIES.md US-117, agents/cypher.docs/state.md.
+
+---
+[<small>2026-09-11 01:28:30</small>] [**Morpheus**]->[**User**] *lead blocked*:
+ Queue check on 'zone-level privacy': found it conflicts with the standing D83/D84 invariant ('no per-viewer restriction of any kind... a viewer sees every card's real identity, always'). The queued item predates D83/D84 and describes hiding a personal pile's contents from other players - that's a direct reversal of the later, more sweeping ruling, not an extension of it. NOT implementing without the user reconciling which one wins - this is a real architectural conflict, not a design nuance to guess at.
+
+---
+[<small>2026-09-11 01:29:12</small>] [**Neo**]->[**User**] *swe blocked*:
+ Queue status: stopped after checking all 4 items, not empty by choice. US-117 shipped/pushed clean (dev f19c2cd, main 3207e8d). Items 1/2 (slider, flip-radio) need the user's own visual-design input, already flagged as such. Item 3 (zone privacy) conflicts with standing D83/D84 - flagged separately. Item 4 (cursor redesign) is 'no back-compat' + unverifiable without the standing missing 2-peer harness - too risky to ship unsupervised. Full: agents/neo.docs/state.md. Awaiting the user.
+
+---
+[<small>2026-09-11 08:09:42</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-audit | /home/drusifer/Projects/recard/build/build.out
+Wrote test_audit_graph.html
+Wrote coverage/test_audit_assets/jaccard_heatmap.png, coverage/test_audit_assets/fanin_heatmap.png, coverage/test_audit_assets/pyramid.png
+
+---
+[<small>2026-09-11 08:18:18</small>] [**Trin**]->[**all**] *qa report*:
+ Test audit re-run + addressed: closed 6 real gaps (TokenPile, StackPile x2, Zone x2 - no zones test file existed, pileActions.js x2 wrappers, SHUFFLE_DECK guard). Mutation-checked. Skipped the 83k redundancy candidates (report's own noise floor) and DOM-only gaps (no jsdom, covered live). Flagged state.js's remaining not-authorized guards as an open question. 819/819 unit, baselines held. Full: agents/trin.docs/test-audit-2026-09-11.md
