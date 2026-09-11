@@ -5,7 +5,7 @@
 D21-D23) is historical - decisions are numbered continuously now and
 the highest number is always the current binding state, not a
 particular sprint's scope.
-**Last updated:** 2026-09-10 (D92-D130; backfilled D117-D129 this groom
+**Last updated:** 2026-09-11 (D92-D132; backfilled D117-D129 this groom
 - see D117's own "Groom note" and the D126-D128 gap entry)
 
 ## Core invariant (direct user request, stated repeatedly - binding on every Pile type, present and future)
@@ -36,9 +36,121 @@ card's real identity, always, not just whether it can be moved. As of
 D85, the same removal reaches the three BULK/pile-level actions that
 still had their own separate authorization gate.
 
+### D132. Infinity Table overview — manual dial + S/M/L/XL presets, no auto-fit
+
+Direct user correction, found while implementing phase 111's original
+auto-fit design: shrinking the table to fit content also shrinks
+buttons below the 44px touch-target floor for real, at viewport sizes
+the design-lint suite already covers - a genuine conflict with no
+clean resolution while the scale is computed FOR the player rather
+than BY them. Put to the user as an explicit choice (cap auto-fit's
+shrink at the floor, vs. accept a sub-44px overview since focus-zoom
+is the real interaction surface); the user rejected both and replaced
+the mechanism outright: **"no autofit - use a dial for manual control
+plus s/m/l/xl setting for quick toggle with sane defaults."**
+
+**Supersedes US-117 AC1/AC2 (auto-fit-to-content, and the escape-hatch
+zoom-out for big layouts) entirely.** `src/tableFit.js`
+(`computeFitScale`, content-bounding-box math) is deleted along with
+its tests - dead code, not kept as an unused alternative. Replaced by
+`src/tableZoom.js`: four named presets (`S`/`M`/`L`/`XL`, values
+0.6/0.85/1.1/1.4) plus a continuous dial clamped to
+`TABLE_ZOOM_MIN`..`TABLE_ZOOM_MAX` (0.4-1.6). `M` is the sane default,
+applied once at startup. Local-only per player (unchanged from D130),
+wired once (`wireTableZoomControls`) rather than recomputed per render
+- nothing about a manual dial depends on `latestView`/`gameState`.
+
+**The 44px-floor tension does not disappear - it is exactly the same
+math at any zoom below 1, including the M default.** What changes is
+who owns the trade-off: previously an algorithm silently produced
+whatever scale content demanded; now the player explicitly turns a
+dial they can see the effect of, the same way "make cards smaller if
+you need to" (a standing prior user instruction) already authorizes
+`.card` to duck the floor. `tests/designLint.check.mjs`'s Check 4 was
+updated to match: a button inside `#zones` divides the player's
+current `--table-zoom` back out before comparing against 44px, so the
+check verifies a control was AUTHORED at >=44px (the invariant it
+always meant to protect) rather than treating the player's own chosen
+zoom as a regression. Rounded before comparing - dividing a rendered,
+sub-pixel-rounded size back out by a non-integer scale (0.85) can land
+a fraction of a px under an exactly-44px authored size, a measurement
+artifact rather than a real miss.
+
+D130's camera-vs-not-camera framing and D131's grow-the-Pile-in-place
+focus mechanism are both untouched by this - this decision is scoped
+to the OVERVIEW scale only, not the per-pile focus-zoom overlay.
+
+### D131. Infinity Table focus interaction — grow the Pile in place, not a camera zoom
+
+Direct user correction to D130, immediately after Smith's Gate 1: "a
+better way to do the zoom mechanic is to keep the table at full size
+and grow the piles to make them interactable." **This supersedes only
+D130's camera-wrapper mechanism for the FOCUS interaction** (hover/
+click a pile -> work it at full size). D130's other two technical
+findings from the arch pass stand unchanged: focus still targets the
+Pile, not its Zone, and no drag/drop code changes are needed — the
+reasons given below are a variant of the same reasoning, not a
+reversal of it. The story's OTHER two ACs (default auto-fit view
+showing every Zone, and the player's own zoom-out control to enlarge
+the table for big layouts) are a separate, still-needed table-level
+scale-to-fit and are untouched by this decision — the user's comment
+was specifically about the interaction that fires per-pile on hover/
+click, not the overall table framing.
+
+**Decision: focus-zoom is an enlarged, `position: fixed` overlay
+anchored at the Pile's own on-screen rect, not a transform on a shared
+camera wrapper.** On trigger, capture the Pile's `getBoundingClientRect()`
+(the same rect shape `dropTarget.js` already consumes — no new
+geometry concept), render the Pile at working size as a fixed overlay
+positioned from that rect, and animate the scale/position change. The
+rest of `#table-surface` is untouched — no wrapper, no shared
+transform, nothing else on the table moves or rescales. This is a
+close cousin of an existing, already-shipped pattern: `.rtg-inspect`
+(`style.css`, "Inspect overlay", Smith Gate-1 condition C1) is already
+a `position: fixed` element appended outside the card's own DOM
+specifically so it "escapes the pile's overflow and the zone's
+stacking context" — the identical clipping problem a grown-in-place
+Pile would hit if it stayed positioned inside its Zone's flex/grid
+flow. `.pile-hover-host:hover`'s existing lift (`translateY(-0.35rem)
+scale(1.02)`, D51) is the same family of interaction at a much smaller
+scale — this is that pattern taken to its full-size conclusion, not a
+new mechanism.
+
+**Rejected: scaling the Pile in place within the normal document
+flow.** A `transform: scale()` on an element still inside its Zone's
+flex/grid container doesn't reflow layout (transforms don't affect
+box geometry) but DOES get clipped by any ancestor's `overflow`
+boundary and can't grow past its Zone's own edges without visually
+colliding with whatever the Zone's layout put next to it. The fixed-
+overlay approach sidesteps this the same way `.rtg-inspect` already
+does, rather than fighting the layout system to keep an oversized
+element visually free.
+
+**Smith's Gate 1 amendments from the D130 review carry over unchanged
+in principle, retargeted to the new mechanism**: hover-intent delay
+and drag-suppression apply to when the fixed overlay is created/shown,
+not to a camera transform; the "animate, don't snap" rule applies to
+the overlay's scale/position transition instead of a camera transform.
+None of the three amendments assumed a camera specifically, so none
+need to be re-litigated — Smith should confirm this reading, not
+necessarily re-run the whole gate.
+
+**Resolved by Smith (Gate 1 follow-up, 2026-09-10): clamp-nudge, not
+exact anchor.** An overlay that grows exactly at a pile's original
+position and clips off the viewport edge fails the feature's entire
+purpose for every edge/corner pile (personal zones and hand trays are
+disproportionately likely to sit near an edge) - Heuristic #5 (Error
+Prevention) rules out shipping a working-size view the player can't
+actually see all of. The overlay clamps the MINIMUM translation needed
+to stay fully on-screen, not a full re-center - it should still read
+as growing from where the player pointed (Heuristic #6, Recognition
+over Recall), not teleporting to an unrelated spot on screen. A pile
+already fully on-screen at its auto-fit size needs no nudge at all;
+only edge/corner piles pay the translation cost.
+
 ### D130. Infinity Table — camera is a pure CSS transform layer, no drag/drop changes
 
-Arch pass on US-110 (Infinity Table: auto-fit table view, player-driven
+Arch pass on US-117 (Infinity Table: auto-fit table view, player-driven
 zoom-out for big layouts, hover/click zoom-into-pile), requested by
 Cypher ahead of Smith's Gate 1. Answers the three open questions the
 story left unresolved rather than letting Gate 1 lock interaction

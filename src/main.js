@@ -5,6 +5,7 @@ import { breakInto } from './pileables/ChipPileable.js';
 import { homePileKindFor } from './pileables/pileableTypes.js';
 import { makeStateMessage, makeMotionMessage, createMotionThrottler, cardDragPayload } from './protocol.js';
 import { renderShareCode, wireCopyCode } from './qrcode.js';
+import { TABLE_ZOOM_PRESETS, TABLE_ZOOM_DEFAULT, TABLE_ZOOM_MIN, TABLE_ZOOM_MAX, clampTableZoom } from './tableZoom.js';
 import {
   renderZones,
   renderRoster,
@@ -20,7 +21,9 @@ import {
   updateDragGhost,
   removeDragGhost,
   pileDragFromDrop,
+  pileElement,
 } from './ui.js';
+import { clampOverlayPosition, FOCUS_ZOOM_SCALE, HOVER_INTENT_MS } from './focusZoom.js';
 import { PRESETS, filterDeckChoicePiles } from './presets.js';
 import { RULES_REFERENCE } from './rulesReference.js';
 import { seatedOrder } from './seating.js';
@@ -78,6 +81,8 @@ zonesElement.addEventListener('drop', (event) => {
   const pileId = pileDragFromDrop(event.dataTransfer);
   if (pileId) performMovePile(pileId, null);
 });
+wireTableZoomControls();
+wireFocusZoom();
 // *nit (2026-08-27), direct user request ("save space"): one
 // consolidated Score panel for every seated player, not one whole panel
 // per player - a single fixed id is enough again, same as before the
@@ -1371,6 +1376,7 @@ function endSessionForGood(message, { retryable = false } = {}) {
     // adjust/set wiring - the session is over.
     const frozenSeated = seatedOrder(latestView.players, myId);
     renderScoreZone(zonesElement, frozenSeated, latestView.scores, {});
+    reapplyFocusZoom();
   }
   renderRosterOnly();
 }
@@ -1379,6 +1385,189 @@ function endSessionForGood(message, { retryable = false } = {}) {
 function currentView() {
   if (role === 'host') return gameState ? viewFor(gameState, myId) : null;
   return latestView;
+}
+
+// US-117 phase 111 (D132, direct user correction - no auto-fit): a
+// per-player manual table zoom, a dial plus S/M/L/XL quick presets
+// (`tableZoom.js`). Local-only view state (D130) - no reducer action,
+// no persistence, wired once at startup rather than per-render since
+// nothing about it depends on `latestView`/`gameState`.
+function wireTableZoomControls() {
+  const zonesElement = document.querySelector('#zones');
+  const dialElement = document.querySelector('#table-zoom-dial');
+  if (!zonesElement || !dialElement) return;
+  dialElement.min = String(TABLE_ZOOM_MIN);
+  dialElement.max = String(TABLE_ZOOM_MAX);
+  dialElement.step = '0.01';
+
+  function applyZoom(value) {
+    const clamped = clampTableZoom(value);
+    dialElement.value = String(clamped);
+    zonesElement.style.setProperty('--table-zoom', String(clamped));
+  }
+
+  applyZoom(TABLE_ZOOM_PRESETS[TABLE_ZOOM_DEFAULT]);
+  dialElement.addEventListener('input', () => applyZoom(Number(dialElement.value)));
+  for (const button of document.querySelectorAll('[data-zoom-preset]')) {
+    button.addEventListener('click', () => applyZoom(TABLE_ZOOM_PRESETS[button.dataset.zoomPreset]));
+  }
+}
+
+// US-117 phase 113 (D131): hover/click a Pile to grow it in place as a
+// `position: fixed` overlay anchored at its own rect - table underneath
+// untouched. Tracked by PILE ID, not a DOM reference: `renderZones`
+// rebuilds `#zones` wholesale on every state-driven render (a comment
+// in `index.html` says so explicitly), which would silently orphan a
+// direct element reference the moment an unrelated player's move
+// triggers a re-render while a pile is focus-zoomed. `reapplyFocusZoom`
+// (called after every `renderZones`, same call sites phase 111 used)
+// discards whatever stale overlay survived from the OLD render and
+// re-grows the pile fresh from the NEW one, so the visible state never
+// drifts from what `focusedPileId` says is true.
+let focusedPileId = null;
+let isDragInProgress = false;
+let hoverIntentTimer = null;
+
+function focusZoomOverlay(pileId) {
+  return document.querySelector(`body > .pile-section.focus-zoomed[data-pile-id="${CSS.escape(pileId)}"]`);
+}
+
+function focusZoomPlaceholder(pileId) {
+  return document.querySelector(`.focus-zoom-placeholder[data-pile-id="${CSS.escape(pileId)}"]`);
+}
+
+// Does the actual DOM work, unconditionally - both a fresh user-
+// triggered grow AND a post-render reapplication go through here.
+function applyFocusZoom(pileElementToGrow) {
+  const pileId = pileElementToGrow.dataset.pileId;
+  const rect = pileElementToGrow.getBoundingClientRect();
+  const placeholder = document.createElement('div');
+  placeholder.className = 'focus-zoom-placeholder';
+  placeholder.dataset.pileId = pileId;
+  placeholder.style.width = `${rect.width}px`;
+  placeholder.style.height = `${rect.height}px`;
+  pileElementToGrow.before(placeholder);
+
+  // Reparent FIRST, pinned at its EXACT original screen position and
+  // scale 1 - a pure DOM move with no visual change yet, not a guess.
+  // This is required, not a two-pass correction: a pile can render at
+  // a genuinely different NATURAL size once it's no longer squeezed by
+  // its old flex siblings in `#zones` (found live, on a small viewport
+  // - a hand's real unconstrained width differs from its flex-item
+  // width), so `rect` above cannot be trusted for the GROWN size, only
+  // for the anchor position. Measuring the true natural size only
+  // AFTER the move, before growing, is what makes the clamp math
+  // correct instead of approximately correct.
+  document.body.append(pileElementToGrow);
+  pileElementToGrow.classList.add('focus-zoomed');
+  pileElementToGrow.style.setProperty('--focus-left', `${rect.left}px`);
+  pileElementToGrow.style.setProperty('--focus-top', `${rect.top}px`);
+  pileElementToGrow.style.setProperty('--focus-scale', '1');
+
+  const naturalRect = pileElementToGrow.getBoundingClientRect();
+  const grownSize = { width: naturalRect.width * FOCUS_ZOOM_SCALE, height: naturalRect.height * FOCUS_ZOOM_SCALE };
+  const { left, top } = clampOverlayPosition(rect, grownSize, { width: window.innerWidth, height: window.innerHeight });
+  pileElementToGrow.style.setProperty('--focus-left', `${left}px`);
+  pileElementToGrow.style.setProperty('--focus-top', `${top}px`);
+  pileElementToGrow.style.setProperty('--focus-scale', String(FOCUS_ZOOM_SCALE));
+
+  // Reparented out of `#zones`, so its pointer events no longer bubble
+  // to that container's delegated listeners below - attached directly
+  // here instead, `{ once: true }` since a fresh one is added every
+  // time this runs (including a post-render reapplication).
+  pileElementToGrow.addEventListener('pointerleave', () => shrinkFocusedPile(), { once: true });
+  focusedPileId = pileId;
+}
+
+// The user-facing entry point (hover-intent/click) - a no-op if this
+// pile is already the focused one, unlike `applyFocusZoom` itself.
+// `isConnected` guards a delayed hover-intent callback whose captured
+// element got detached by an unrelated render finishing during the
+// wait (rare - a state broadcast landing inside the ~180ms window) -
+// without it this would reparent a dead, detached node into `<body>`
+// as an invisible ghost while the real pile renders normally elsewhere.
+function growPileInPlace(pileElementToGrow) {
+  if (isDragInProgress || !pileElementToGrow.isConnected) return;
+  const pileId = pileElementToGrow.dataset.pileId;
+  if (focusedPileId === pileId) return;
+  shrinkFocusedPile();
+  applyFocusZoom(pileElementToGrow);
+}
+
+function shrinkFocusedPile() {
+  if (!focusedPileId) return;
+  const overlay = focusZoomOverlay(focusedPileId);
+  const placeholder = focusZoomPlaceholder(focusedPileId);
+  if (overlay) {
+    overlay.classList.remove('focus-zoomed');
+    overlay.style.removeProperty('--focus-left');
+    overlay.style.removeProperty('--focus-top');
+    overlay.style.removeProperty('--focus-scale');
+    if (placeholder) placeholder.replaceWith(overlay);
+    else overlay.remove(); // its zone is gone too - nowhere to put it back
+  } else {
+    placeholder?.remove();
+  }
+  focusedPileId = null;
+}
+
+// Called after every `renderZones` (same call sites as phase 111's now-
+// removed auto-fit hook): a fresh render just discarded the DOM the
+// current focus-zoom was built on. Drop whatever's stale and re-grow
+// the same pile ID from the new render, or drop focus entirely if that
+// pile no longer exists (e.g. it emptied and was removed).
+function reapplyFocusZoom() {
+  if (!focusedPileId) return;
+  focusZoomOverlay(focusedPileId)?.remove();
+  focusZoomPlaceholder(focusedPileId)?.remove();
+  const fresh = pileElement(focusedPileId);
+  if (fresh) applyFocusZoom(fresh);
+  else focusedPileId = null;
+}
+
+function wireFocusZoom() {
+  const zonesElement = document.querySelector('#zones');
+  if (!zonesElement) return;
+
+  document.addEventListener('dragstart', () => {
+    isDragInProgress = true;
+    clearTimeout(hoverIntentTimer);
+    shrinkFocusedPile();
+  });
+  document.addEventListener('dragend', () => {
+    isDragInProgress = false;
+  });
+
+  zonesElement.addEventListener('pointerover', (event) => {
+    const target = event.target.closest('.pile-section[data-pile-id]');
+    if (!target || isDragInProgress) return;
+    clearTimeout(hoverIntentTimer);
+    hoverIntentTimer = setTimeout(() => growPileInPlace(target), HOVER_INTENT_MS);
+  });
+  // Only cancels a PENDING hover-intent timer for a pile that has not
+  // grown yet - an already-focused pile is reparented out of `#zones`
+  // by the time this could fire for it, so shrinking it is handled by
+  // the `pointerleave` listener `applyFocusZoom` attaches directly to
+  // the overlay, not here. Unconditionally calling `shrinkFocusedPile`
+  // in this handler would be a real bug: it would fire for ANY pile's
+  // pointerout, including one unrelated to whichever pile (if any) is
+  // actually focused right now.
+  zonesElement.addEventListener('pointerout', (event) => {
+    const target = event.target.closest('.pile-section[data-pile-id]');
+    if (!target) return;
+    if (!target.contains(event.relatedTarget)) clearTimeout(hoverIntentTimer);
+  });
+  zonesElement.addEventListener('click', (event) => {
+    const target = event.target.closest('.pile-section[data-pile-id]');
+    if (!target || isDragInProgress) return;
+    clearTimeout(hoverIntentTimer);
+    growPileInPlace(target);
+  });
+  document.addEventListener('click', (event) => {
+    if (!focusedPileId) return;
+    const overlay = focusZoomOverlay(focusedPileId);
+    if (overlay && !overlay.contains(event.target)) shrinkFocusedPile();
+  });
 }
 
 function renderRosterOnly() {
@@ -1658,6 +1847,7 @@ function renderGameFromView(view) {
     onSet: whenLive(setScore),
     ...zoneOptions,
   });
+  reapplyFocusZoom();
   renderRosterOnly();
 }
 

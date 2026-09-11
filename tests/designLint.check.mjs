@@ -217,7 +217,17 @@ try {
         .map((b) => ({
           label: b.id || b.textContent.trim().slice(0, 24) || b.getAttribute('aria-label') || '(unlabeled button)',
           rect: b.getBoundingClientRect(),
+          // US-117 phase 111 (D132): a button inside `#zones` is drawn
+          // at the PLAYER'S OWN chosen table zoom, not its authored
+          // size - `hasMinTouchTarget` below divides this back out so
+          // the check verifies the button was BUILT at >=44px, the
+          // same invariant it always checked, rather than treating the
+          // player's own zoom choice (an explicitly authorized way to
+          // shrink on-screen content, same reasoning as the `.card`
+          // exemption above) as a regression.
+          insideZones: b.closest('#zones') !== null,
         })),
+      tableZoomScale: Number(getComputedStyle(document.querySelector('#zones')).getPropertyValue('--table-zoom')) || 1,
     }));
 
     // Check 1: no forced page scroll (the regression that started this).
@@ -245,10 +255,22 @@ try {
       }
     }
 
-    // Check 4: every visible button clears the 44px touch-target floor.
+    // Check 4: every visible button clears the 44px touch-target floor,
+    // measured at its AUTHORED size - a button inside `#zones` divides
+    // the player's own table-zoom scale back out first (see the
+    // `insideZones` comment above).
     for (const button of g.buttons) {
-      if (!hasMinTouchTarget(button.rect)) {
-        report(vp.name, `button "${button.label}" is ${Math.round(button.rect.width)}x${Math.round(button.rect.height)}px, under the 44px floor`);
+      const scale = button.insideZones ? g.tableZoomScale : 1;
+      // Rounded before comparing: dividing a sub-pixel-rounded rendered
+      // size back out by a non-integer scale (e.g. the 0.85 default)
+      // can land a fraction of a px under an exactly-44px authored
+      // size, which is a measurement artifact, not a real regression.
+      const intrinsicRect = {
+        width: Math.round(button.rect.width / scale),
+        height: Math.round(button.rect.height / scale),
+      };
+      if (!hasMinTouchTarget(intrinsicRect)) {
+        report(vp.name, `button "${button.label}" is ${Math.round(intrinsicRect.width)}x${Math.round(intrinsicRect.height)}px at its authored size, under the 44px floor`);
       }
     }
   }

@@ -3222,24 +3222,36 @@ be recreating per-player zones on one of its two code paths (fresh
 
 Sprint status: COMPLETE.
 
-### US-110: Infinity table — auto-fit view with focus-zoom on hover/click
-**As** a player, **I want** the table to zoom out to show every zone at
-once, with room to grow beyond the screen for big layouts, and to zoom
-smoothly into whatever pile I'm pointing at, **so that** I always see
-the whole game at a glance but can still work a pile at full, legible
-size without ever touching a manual zoom control.
+### US-117: Infinity table — manual table zoom with focus-zoom on hover/click
+**As** a player, **I want** to control the table's own zoom with a dial
+or a quick S/M/L/XL preset, and to zoom smoothly into whatever pile I'm
+pointing at, **so that** I can size the whole table to how I like to
+play while still working any one pile at full, legible size.
 
 **AC:**
-- Default view fits every Zone on screen at once (auto-fit zoom-to-
-  content), recomputed whenever a Zone is added/removed/resized.
-- When the auto-fit layout is too cramped to fit comfortably at a
-  legible minimum size, the player can zoom out further, which enlarges
-  the virtual table canvas itself (not just shrinks content) so zones
-  gain real room to spread out for large layouts.
-- Moving the pointer over a pile, or clicking one, smoothly zooms/pans
-  the view onto that pile's panel at a full, legible working size.
-- Moving the pointer off the pile (or clicking outside it) returns
-  smoothly to the current full-table view.
+- The table's own zoom is fully manual (D132, direct user correction -
+  no auto-fit-to-content): a dial for continuous control, plus S/M/L/XL
+  presets for a quick jump, `M` as the sane default on load.
+- Local-only per player, not replicated - same as every other view-only
+  state (D130).
+- Moving the pointer over a pile, or clicking one, smoothly grows that
+  pile in place to a full, legible working size - the rest of the
+  table stays at its current size and position, untouched (D131:
+  supersedes an earlier camera-zoom design for this one interaction).
+- The grown pile clamps the minimum translation needed to stay fully
+  on-screen for a pile near a table edge/corner - it does not clip off
+  the viewport, and does not fully re-center either (D131/Smith).
+- Moving the pointer off the pile (or clicking outside it) shrinks it
+  back smoothly to its normal size and position.
+- Hover-triggered zoom fires only after a short hover-intent delay
+  (~150-200ms resting on the pile); click-triggered zoom fires
+  immediately. (Smith Gate 1, Heuristic #5)
+- Focus-zoom is suppressed entirely while a card drag is in progress -
+  the existing drop-target hover highlight is unaffected, but the
+  camera does not move mid-drag. Dragging a card back out of an
+  already focus-zoomed pile stays enabled. (Smith Gate 1, Heuristic #3)
+- The zoom/pan transition always animates; an instant snap between
+  scales is not acceptable. (Smith Gate 1, Heuristic #1)
 - This is camera/view state only: purely local per player, not
   replicated - each client's zoom/focus is independent, same as the
   standing model for any other view-only state.
@@ -3271,7 +3283,71 @@ input before implementation:**
    whether this is purely a camera transform or needs to coordinate
    with the existing drag/drop code.
 
-Sprint status: NOT STARTED. Recommend a Morpheus `*lead arch` pass
-given this introduces a new camera/viewport concept with no existing
-precedent in the codebase (no zoom/pan mechanism exists today), before
-Smith's Gate 1 UX read locks in interaction specifics.
+### Smith Gate 1 review (2026-09-10): Approved with amendments
+
+Read against Nielsen's heuristics with D130's arch answers in hand.
+Two amendments are BLOCKING - both go in the AC, not left as
+implementation taste:
+
+**Amendment 1 (Heuristic #3, User Control and Freedom) - hover-zoom
+must be suppressed while a drag is in progress.** As written, moving
+the pointer while dragging a card across the table would fire the
+same hover-triggers-zoom behavior on every pile the cursor crosses en
+route to its actual target - the view would zoom in and out
+repeatedly mid-gesture, which is disorienting exactly when the player
+most needs a stable picture of where their card is going. The
+codebase already tracks an active-drag predicate for the equivalent
+touch-drag suppression (`isDragging()` in `src/ui.js`) - focus-zoom
+gates on the same signal. The existing drop-target hover highlight
+stays exactly as it is today; this only suppresses the NEW camera
+behavior during a drag, not the old cue.
+
+**Amendment 2 (Heuristic #5, Error Prevention) - hover-triggered zoom
+needs a short hover-intent delay; click-triggered zoom does not.** A
+player's cursor passing over a pile on the way to somewhere else (not
+dragging - just moving the mouse) would otherwise trigger the same
+unwanted zoom-and-settle on every pile it crosses. Standard hover-
+intent pattern: hover only zooms after ~150-200ms of the pointer
+resting on the pile (exact figure is Neo/Trin's to tune against feel,
+not specified here); a click zooms immediately, no delay, since a
+click is unambiguous deliberate intent.
+
+**Resolves open question 3 (interaction while zoomed in), from the UX
+side - D130 answered the technical half (no drag/drop code changes
+needed):** dragging a card back out of a focus-zoomed pile stays
+enabled and does not force a zoom-back-out first - forcing an exit
+would fight the player's own gesture. This was the missing UX half of
+the story's open question 3.
+
+**Non-blocking note (Heuristic #1, Visibility of System Status):** the
+zoom/pan transition must animate, not snap - an instant cut between
+two very different scales would disorient far more than a slow
+transition would annoy. Leave exact duration/easing to implementation
+(match the feel of the existing hover-raise transform per D129's
+transform-based motion, not a novel timing scheme), but "instant" is
+not an acceptable choice here.
+
+`*user approve` — proceeds to Mouse for sprint planning.
+
+### D131 revision (2026-09-10): grow the Pile, not a camera
+
+Direct user correction immediately after the Gate 1 above: "a better
+way to do the zoom mechanic is to keep the table at full size and grow
+the piles to make them interactable." Superseded D130's camera-wrapper
+mechanism for the focus interaction specifically - Morpheus's other
+two D130 findings (focus targets the Pile, no drag/drop code changes)
+still stand, and the story's separate auto-fit/zoom-out ACs are
+untouched. New shape: a `position: fixed` overlay anchored at the
+Pile's own on-screen rect, grown to working size - reuses the already-
+shipped `.rtg-inspect` fixed-overlay pattern rather than inventing a
+new one. Smith's 3 Gate-1 amendments above carry over unchanged in
+principle, retargeted from "camera transform" to "the overlay's
+creation/scale/position transition." Smith additionally ruled on the
+one open question D131 left for HCI: clamp-nudge the overlay's
+position for an edge/corner pile rather than letting it clip off the
+viewport or fully re-centering it. Full text: `docs/ARCHITECTURE.md`
+D131.
+
+Sprint status: NOT STARTED. Two rounds of design revision (D130,
+D131) landed before a single line of code - exactly why Cypher flagged
+this as arch-significant going in. Ready for Mouse to plan.

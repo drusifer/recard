@@ -1709,3 +1709,141 @@ after Phase 109's findings are in, matching the sprint's own nature.
 ### Sprint status: US-109 COMPLETE (2026-09-05), D115
 Both phases (109-110) done, no rework. Real severe bug found by
 actually playing RtG, not by reading code - see D115.
+
+---
+
+## Sprint: Infinity Table — US-117 (2026-09-11)
+
+Cypher drafted US-117 -> Morpheus D130 (camera arch) -> Smith Gate 1
+(2 amendments) -> direct user correction -> Morpheus D131 (grow-the-
+Pile-in-place supersedes the camera for the focus interaction only) ->
+Smith confirmed amendments retarget + ruled on edge-clamp. Full design
+history: `docs/ARCHITECTURE.md` D130/D131, `docs/USER_STORIES.md`
+US-117. Two design revisions before any code, so phases stay small and
+each one gets its own live-browser check, not just unit tests - this
+story is pure interaction/visual behavior, exactly the kind of thing
+that reads correct in the reducer and wrong on screen (D129's own
+lesson).
+
+- [x] **Phase 111** — Table zoom: dial + S/M/L/XL presets (US-117 AC1-2, revised D132)
+      - Auto-fit-to-content was implemented, then REPLACED: it shrank
+        the whole table for real, which shrank buttons below the 44px
+        floor at the same viewports `lint:design` already covers - a
+        real conflict, put to the user, who rejected both proposed
+        fixes and replaced the mechanism outright: manual dial + named
+        presets, no content-based computation at all. See D132.
+      - T111.1 `src/tableZoom.js`: `TABLE_ZOOM_PRESETS`
+        (S/M/L/XL = 0.6/0.85/1.1/1.4), `TABLE_ZOOM_MIN/MAX` (0.4/1.6),
+        `clampTableZoom`, `presetScale`. 8 unit tests.
+      - T111.2 `wireTableZoomControls` (`main.js`): dial input + 4
+        preset buttons, wired once at startup (no per-render recompute
+        needed - nothing here depends on `latestView`/`gameState`).
+        Sets `--table-zoom` on `#zones`; `style.css` does the transform.
+      - T111.3 `tests/designLint.check.mjs` Check 4 updated: a button
+        inside `#zones` divides the player's own zoom back out before
+        comparing to 44px, so the check verifies AUTHORED size, not
+        on-screen size at whatever zoom the player picked.
+      - Live browser check (`tests/tableZoom.browser.mjs`, 7 tests,
+        `npm run test:tablezoom`): default M applies before any
+        interaction, each preset sets both the dial and the live scale,
+        dragging the dial directly works, every control itself clears
+        44px. All passing against a real solo table.
+      - 795/795 unit green, lint-js/lint:design at their pre-existing
+        baselines (lint:design actually improved, 10 -> 8 violations,
+        no new categories - unrelated to this phase).
+
+- [x] **Phase 113** — Focus-zoom overlay: core mechanism (US-117 AC3-6)
+      - T113.1 `src/focusZoom.js`: `clampOverlayPosition` (Smith's D131
+        clamp-nudge rule), `FOCUS_ZOOM_SCALE` (1.6x), `HOVER_INTENT_MS`
+        (180ms). 7 unit tests. On hover-intent or click, the target
+        Pile is REPARENTED to `<body>` (required, not stylistic - see
+        the phase-111 `style.css` note: `#zones`'s own transform makes
+        it a containing block for `position: fixed` descendants, so a
+        fixed pile left inside it would be clipped to the table's own
+        box) and grown via `transform: scale()` from `top left`. An
+        invisible placeholder holds its old flex slot so siblings don't
+        reflow - "the rest of the table stays untouched" (D131).
+      - T113.2 Correction: no `isDragging()` existed in `src/ui.js` to
+        reuse (that was a wrong assumption from the Gate 1 review) -
+        drag state is tracked directly via `dragstart`/`dragend` at the
+        document level instead, self-contained in `main.js`. Suppresses
+        both the hover-intent timer and click-triggered grow; shrinks
+        an active focus-zoom on drag start. Shrink-on-pointer-leave is
+        attached directly to the grown overlay (`pointerleave`, once) -
+        NOT delegated through `#zones`, since the reparented pile is no
+        longer a descendant of it once grown.
+      - T113.3 `transition: left/top/transform 0.15s ease` on
+        `.focus-zoomed` - never an instant snap.
+      - **Real constraint found and handled, not just noted:**
+        `renderZones` rebuilds `#zones` wholesale on every state-driven
+        render (an unrelated player's move can trigger one at any
+        time), which would silently orphan a focus-zoomed pile mid-
+        focus. Tracked by PILE ID, not a DOM reference - `reapplyFocusZoom`
+        runs after every `renderZones` call (same 2 call sites phase
+        111 used), discards whatever survived the old render, and
+        re-grows the same pile ID fresh from the new one (or drops
+        focus if that pile no longer exists).
+      - Live browser check (`tests/focusZoom.browser.mjs`, 5 tests,
+        `npm run test:focuszoom`, stress-run 3x clean): hover-before-
+        delay does nothing, hover-past-delay grows into `<body>`,
+        click grows immediately, pointer-out shrinks back into `#zones`
+        (not just deletes it), starting a drag suppresses the whole
+        mechanism.
+      - **Mutation-tested, with an honest finding:** the drag-
+        suppression guard INSIDE `growPileInPlace` turned out to be
+        unreachable via the tested path - `dragstart`'s own
+        `clearTimeout` already cancels any pending hover-intent timer
+        before it could fire, so the test can't tell the two guards
+        apart. Kept as defense-in-depth for a future caller rather than
+        stripped, but disclosed rather than claimed as independently
+        proven.
+      - 802/802 unit green, lint-js baseline, lint:design unchanged (8).
+      - **Trin UAT caught a real gap in Neo's own test suite**: none of
+        the 5 tests actually exercised the "survives a re-render while
+        focused" claim - the phase's own stated hardest problem. Added
+        a 6th test (acting on the focused pile's own "Draw" button,
+        which stays inside the overlay so it isn't also a click-outside
+        dismissal) - it FAILED first try (a duplicate/orphaned pile
+        element after the re-render), a real bug, not a test-writing
+        mistake. Root cause: my first attempt used clicking a score
+        button as the re-render trigger, which the click-outside
+        handler correctly dismisses first - confounded, not a bug,
+        rewritten. Mutation-checked `reapplyFocusZoom` by neutering it:
+        reproduces the exact 2-elements-not-1 failure; restoring fixes
+        it. 6/6 live-browser green after the fix.
+
+- [x] **Phase 114** — Focus-zoom overlay: edge-case polish (US-117 AC7-8)
+      - T114.1 was already wired into phase 113's `applyFocusZoom` from
+        the start (Morpheus's review note), but a live small-viewport
+        test (`tests/focusZoom.browser.mjs`) FOUND A REAL BUG in it:
+        the clamp math was correct against the size it was GIVEN, but
+        that predicted size (the pile's FLEX-CONSTRAINED rect, captured
+        before reparenting) under-counted a pile's true natural size
+        once freed from its old flex siblings - by as much as ~70px on
+        a cramped layout, enough to clip a grown pile off the viewport
+        edge despite the clamp itself never being wrong.
+      - **Real fix, not a patched symptom**: `applyFocusZoom` now
+        reparents the pile to `<body>` FIRST at scale 1 (pinned to its
+        exact original screen position - a pure DOM move, no visual
+        change), measures its TRUE unconstrained natural size THERE,
+        THEN computes the grown size and clamp from that real number.
+        One correct pass instead of guess-then-correct.
+      - T114.2: `tests/focusZoom.browser.mjs` proves D130's claim live
+        - a card dragged out of an already-focus-zoomed (reparented)
+        pile via synthetic dragover/drop lands in its destination pile,
+        with zero changes needed to `dropTarget.js`/`touchDrag.js`.
+      - 2 new live-browser tests (8 total in the file now), stress-run
+        3x clean. 802/802 unit, lint-js/lint:design baselines held.
+
+- [x] **Phase 115** — Reserved bug-fix slot: CONSUMED BY IN-PHASE FIXES
+      - Every real bug found this sprint (auto-fit vs. 44px floor,
+        re-render duplicate-element gap, clamp under-measurement) was
+        fixed inline in the phase that found it - same pattern as
+        prior sprints (Phase 96/102). Nothing outstanding to catch here.
+
+### Sprint status: US-117 COMPLETE (2026-09-11)
+All 5 phases (111/113/114 shipped code, 112 merged into 111, 115
+consumed by in-phase fixes) done, no rework at any gate beyond the two
+mid-flight design revisions (D130 -> D131 -> D132) that happened
+BEFORE any implementation phase started. Full history: `docs/
+ARCHITECTURE.md` D130-D132, `docs/USER_STORIES.md` US-117.

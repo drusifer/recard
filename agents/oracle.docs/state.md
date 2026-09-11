@@ -492,3 +492,22 @@ at `@Neo *swe fix <item>`. `@Smith *user test D129` is still open
 (noted in the ARCHITECTURE.md entry itself) - StackActions/tap-untap
 have unit + one live browser test each but no end-to-end usability
 pass yet.
+
+---
+
+## Groom: US-117 Infinity Table sprint close (2026-09-11)
+
+`check-decisions` clean (131 headings, no duplicates, modern section
+newest-first through D132). Archived `CHAT.md` (1372 lines, covering
+both the prior session's tail - gear reposition, all-players-pile-
+actions, bob-protocol On-Entry additions - and this whole US-117 arc)
+to `agents/chat_archive/CHAT_US117_D132.md`/`.diagram.md`, reset for
+the next sprint. No other doc reorganization needed - US-117/D130-132
+are already written up in `docs/USER_STORIES.md`/`docs/ARCHITECTURE.md`
+as the work happened, not deferred to groom time.
+
+### Next Steps
+@Smith *user test US-117 (end-to-end, sprint close). D129's own open
+`*user test` item (StackActions/tap-untap usability pass) is still
+outstanding from an earlier sprint - unrelated to this one, not
+blocking it.

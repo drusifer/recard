@@ -55,6 +55,49 @@ inheriting the chip value - but that is the user's call.
 
 ---
 
+## US-117 Gate 1 review (2026-09-10): Approved with amendments
+
+Cypher drafted, Morpheus ran an arch pass first (D130 - camera is a
+pure local CSS-transform layer, no drag/drop code changes needed) and
+asked for Gate 1 with that foundation settled. Reviewed against
+Nielsen's heuristics.
+
+**Two amendments, both BLOCKING, folded into the AC (not left as
+implementation taste):**
+1. **Heuristic #3 (User Control and Freedom)**: hover-zoom must be
+   suppressed while a card drag is in progress - otherwise crossing
+   piles en route to a drop target would zoom the camera in and out
+   repeatedly mid-gesture, which is disorienting exactly when the
+   player most needs a stable view. Gates on the same active-drag
+   signal `isDragging()` in `src/ui.js` already provides for
+   touch-drag suppression - no new state needed. The existing
+   drop-target hover highlight is untouched by this.
+2. **Heuristic #5 (Error Prevention)**: hover-triggered zoom needs a
+   ~150-200ms hover-intent delay (exact figure is Neo/Trin's to tune)
+   so passing the cursor over a pile doesn't fire an unwanted zoom;
+   click-triggered zoom fires immediately since a click is
+   unambiguous intent.
+
+Also resolved open question 3's UX half myself (D130 already answered
+the technical half): dragging a card back out of an already
+focus-zoomed pile stays enabled, no forced zoom-out first - forcing
+one would fight the player's own gesture.
+
+Non-blocking: the transition must animate, never snap instantly
+(Heuristic #1) - exact duration/easing left to implementation, match
+the feel of the existing hover-raise transform rather than inventing
+a new timing scheme.
+
+`*user approve` posted. Full amendments in `docs/USER_STORIES.md`
+US-117. Handed to Mouse for sprint planning.
+
+## Next Steps
+None on US-117 - it's Mouse's move now. Watch for the sprint plan to
+confirm these amendments land in whatever phase actually builds the
+hover/click trigger logic, not just get acknowledged and dropped.
+
+---
+
 ## Side-quest: Recard Connectome (2026-09-10)
 
 Direct user request: "make a cool modern viz of the code's connect-ome
@@ -95,3 +138,78 @@ little label crowding near a few adjacent hubs in the force view, and
 the legend panel corner-overlaps one treemap tile at certain window
 sizes. Real polish, not correctness bugs - the user's to ask for if
 it matters to them.
+
+---
+
+## US-117 D131 follow-up (2026-09-10): amendments confirmed + anchor ruling
+
+Morpheus revised the focus-zoom mechanism after direct user feedback:
+a `position: fixed` overlay grown at the Pile's own rect, not a camera
+transform (D131 supersedes that part of D130). Asked me to confirm my
+3 Gate-1 amendments still apply and to rule on one new open question.
+
+**Confirmed: all 3 amendments retarget cleanly, no re-review needed.**
+None of them (drag-suppression, hover-intent delay, animate-don't-
+snap) assumed a camera specifically - they were always about WHEN a
+size-change interaction fires and HOW it transitions, not about what
+kind of transform carries it.
+
+**Ruled on the anchor-vs-nudge question: clamp-nudge, not exact
+anchor.** An overlay that grows exactly at a pile's original position
+and clips off the viewport for every edge/corner pile fails the whole
+feature for exactly the piles most likely to sit at an edge (personal
+zones, hand trays). Heuristic #5 (Error Prevention) rules that out.
+Clamp the MINIMUM translation needed to stay on-screen - not a full
+re-center, which would break the visual continuity of "growing from
+where I pointed" (Heuristic #6). A pile already fully on-screen at
+auto-fit size needs no nudge. Full text: `docs/ARCHITECTURE.md` D131.
+
+## Next Steps
+None on US-117 - handed back to Mouse for sprint planning, now with
+both design rounds (D130 camera, D131 grow-in-place) and all HCI
+amendments settled before a single line of code.
+
+---
+
+## US-117 end-to-end user test (2026-09-11): PASSED, with 2 findings filed
+
+Ran the real app rather than trusting the automated suites alone -
+screenshotted the default view, S/XL presets, and a focus-zoomed pile
+against a live 7-card solo hand.
+
+**Core ACs verified visually, not just by assertion**: the dial and
+S/M/L/XL presets all visibly resize the table; the M default and S
+preset keep everything (table + own hand) comfortably on-screen;
+hover-growing a pile visibly enlarges it in place without moving
+anything else on the table.
+
+**Finding 1 (non-blocking, Heuristic #2/#7)**: at XL, the table grows
+downward from the top (by design, `transform-origin: top center`) far
+enough to push the player's OWN hand below the fold, needing a scroll
+to see it. This runs against a standing project principle from an
+earlier sprint's own design-lint check comment - "see the table and my
+cards at the same time." Not filed as a defect: XL is an explicit,
+deliberate player choice to trade overview-of-everything for a bigger
+table, and scrolling to see a deliberately-oversized view is a
+reasonable, well-understood trade-off - but worth the user's awareness
+since it's the one preset where the standing principle visibly bends.
+
+**Finding 2 (non-blocking, Heuristic #8, Aesthetic and Minimalist
+Design)**: a focus-zoomed pile visually overlaps its own parent Zone's
+own border/label (e.g. hovering the hand pile lets "YOU"'s zone label
+and dashed resize-handle border peek out from behind/around the grown
+"HAND" panel) - reads as slightly cluttered rather than clearly
+"lifted above" the table. A stronger shadow or a dimmed backdrop behind
+the grown overlay (similar to how a modal dims its background) would
+likely read more clearly, but that's a real visual-design call, not
+mine to make unilaterally - filing per the lands-cascade-spread
+precedent (found, described, NOT fixed without asking) rather than
+guessing at a treatment.
+
+Neither finding blocks the sprint - both are genuine "would be nicer"
+polish items on a feature that otherwise works exactly as specified.
+
+## Next Steps
+@all *sprint retro, then @Cypher *pm launch US-117. Both findings above
+go to Cypher's backlog, not a fix-loop - they're real but not blocking,
+same standard as every other disclosed-not-fixed finding this sprint.

@@ -330,7 +330,7 @@ export function clearPileTargets() {
  * another" - a Pile (`renderPile`, above) is what's addressable by pile
  * id, never the Zone it lives in (a Zone can hold several piles, so it
  * has no single pile id of its own to be found by). */
-function pileElement(pileId) {
+export function pileElement(pileId) {
   return document.querySelector(`.pile-section[data-pile-id="${CSS.escape(pileId)}"]`);
 }
 
