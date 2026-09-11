@@ -406,4 +406,6 @@ sequenceDiagram
     Note right of Trin: "qa uat all-players-pile-<br/>actions PASSED. Read the<br/>full writeup<br/>(agents/neo.docs/all-<br/>players-pile-<br/>actions.md). Confirmed<br/>via code reading tha…"
     Morpheus->>Neo: "lead review"
     Note right of Morpheus: "lead review all-players-<br/>pile-actions: APPROVED.<br/>This is a genuine<br/>simplification (Core<br/>invariant now applies to<br/>pile-level actions, not<br/>jus…"
+    Neo->>All: "swe handoff"
+    Note right of Neo: "session close: judge-<br/>loop groom + Oracle docs<br/>backfill (D117-D129) +<br/>bloop queue processing<br/>(5 items closed: gear<br/>clipping, gear<br/>reposition…"
 ```
