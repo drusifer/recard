@@ -1436,7 +1436,7 @@ const ACTIONS = {
     if (!stack) throw new Error(`Stack ${action.stackKey} is not in pile ${action.pileId}`);
 
     const key = action.stackKey;
-    const stacks = { ...pile.stacks, [key]: { ...pile.stacks?.[key], direction: stack.flippedDirection() } };
+    const stacks = { ...pile.stacks, [key]: { ...pile.stacks?.[key], direction: stack.flippedDirection(kind?.stackDirection) } };
     return { ...state, piles: state.piles.map((p) => (p.id === action.pileId ? { ...p, stacks } : p)) };
   },
 

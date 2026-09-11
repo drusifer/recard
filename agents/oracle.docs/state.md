@@ -407,3 +407,88 @@ When it lands it will almost certainly need the Core invariant section
 of ARCHITECTURE.md reworded (it says "cards/table objects" in places
 and "cards" in others), plus a D102. Next session starts at
 `@Cypher *pm plan sprint`.
+
+(The `Pileable` work queued directly above did land — see D107 onward.
+This groom's own log resumes below; the gap between D101 and today
+was tracked live in `docs/ARCHITECTURE.md`/CHAT.md per this file's own
+established pattern, not backfilled here.)
+
+## Groom — docs (2026-09-10)
+
+Triggered directly (`*ora groom docs`), not a sprint close. Found and
+fixed real drift, not just cosmetic staleness:
+
+- **`docs/ARCHITECTURE.md` backfill, D117-D129.** Morpheus's own
+  `state.md` had an explicit standing request: "D129 should be written
+  up in docs/ARCHITECTURE.md (it is currently only in CHAT.md and the
+  state files)." Wrote it up in full (Stack/Stackable domain model,
+  Morpheus's two blocking review conditions, 3 wiring iterations,
+  StackActions, tap/untap StackAction), sourced from CHAT.md's own
+  decision-broadcast messages plus neo.docs/morpheus.docs `state.md` -
+  cross-checked, not reconstructed from memory. Also backfilled D117
+  (New Game) through D125 (LandsPile): 8 same-day drop-target/layout
+  decisions that existed only as well-written `agents/neo.docs/*.md`
+  scratch files and had never reached the canonical doc at all. D126-
+  D128 left as an honest 3-number gap note (a few same-day nits with
+  no individual write-up) rather than fabricated entries.
+- **Found and fixed two REAL pre-existing defects while inserting
+  this**, neither caused by past groom work but both silently wrong
+  until now: (1) New Game had shipped labeled `D116`, colliding with
+  GroupedPile's own (earlier) `D116` - renumbered the New Game entry
+  to `D117` and swapped its position for newest-first order. (2) D111
+  and D112 were swapped (D112 is the newer of the two but sat below
+  D111) - reordered.
+- **Wrote `tools/checkDecisionOrder.mjs` (`make check-decisions`)**
+  specifically because I got the D117/D118 insertion order wrong BY
+  HAND on my own first pass at this exact fix, mid-groom - proof a
+  mechanical check was needed, not just care. It walks every
+  `### D<N>` heading, flags real duplicates (allowing adjacent
+  "(continued)"/"follow-up" same-number headings, a real convention),
+  and reports where the file's legacy forward-chronological section
+  (D1-D81, pre-dating the newest-first convention) begins rather than
+  false-flagging it. Has its own test coverage
+  (`tests/checkDecisionOrder.test.js`), wired into `make`/`.PHONY`.
+- **`docs/USER_STORIES.md`**: backfilled US-116 (New Game) - the user
+  story had a full, well-written scratch doc (`cypher.docs/`) that had
+  NEVER reached the canonical doc, unlike its own architecture
+  decision which had (mislabeled, per above).
+- **Deleted 10 now-redundant scratch docs** once their content was
+  confirmed merged: `morpheus.docs/D116-new-game.md`,
+  `cypher.docs/US-116-new-game.md`, 8 `neo.docs/*.md` write-ups for
+  D118-D125, and `neo.docs/stackable-handoff.md` (an early, ABANDONED
+  StackableElement-as-Web-Component design, superseded by the
+  Stackable-extends-Pileable domain-object direction that actually
+  shipped - kept as history would have been actively misleading, not
+  merely stale).
+- **`agents/oracle.docs/memory.md`**: gap row for D102-D115, full rows
+  for D117-D125 and D129, and fixed a real stale claim (test count
+  said 358, actual is 790) plus a `src/`/`tools/` structure refresh
+  (Stack/Stackable/GroupedPile/LandsPile, `tools/testAudit`/
+  `codeConnectome`/`buildStandalone`/`buildDistribution`/
+  `checkDecisionOrder` were all missing).
+- **`README.md`**: added 3 real shipped features that had never
+  gotten a bullet - the four-way drop-target vocabulary (stack/
+  overlap/column/adjacent) with its live ghost preview, per-stack
+  StackActions (tighten/loosen/flip/tap), and New Game.
+- **Logged 5 items the user queued mid-groom** to CHAT.md for Neo,
+  none started: New Game maybe not recreating per-player zones on one
+  of its two paths; RtG stacks showing no StackActions gear; a hand
+  stack not re-fannable after Flip; the deck/pile split panel reading
+  too wide with many cards; folding pile actions into rows for the
+  same reason.
+
+**Verification:** `bobp make test` (790/790), `bobp make lint-js`
+(10 errors, unchanged `ui.js` baseline - nothing new introduced),
+`bobp make check-decisions` (clean).
+
+**Not done:** `agents/DOCUMENTATION_INDEX.md` (generic bob-protocol
+scaffolding, not project content) and `task.md` (Mouse's file, flagged
+stale since 2026-09-01, still not this persona's to edit) both left
+untouched, same boundary as every prior groom.
+
+### Next Steps
+Nothing blocking. If the 5 queued items above get triaged, that starts
+at `@Neo *swe fix <item>`. `@Smith *user test D129` is still open
+(noted in the ARCHITECTURE.md entry itself) - StackActions/tap-untap
+have unit + one live browser test each but no end-to-end usability
+pass yet.

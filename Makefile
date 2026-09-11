@@ -7,7 +7,7 @@
 #
 # Adding a task: add the npm script first, then a one-line target here.
 
-.PHONY: help test test-ui test-rtg test-hostsetup test-newgame lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome
+.PHONY: help test test-ui test-rtg test-hostsetup test-newgame lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions
 
 help:
 	@echo "Recard targets (all front npm scripts):"
@@ -27,6 +27,9 @@ help:
 	@echo "  art          pack generated art into assets/cards/rtg/*.webp"
 	@echo "  check        cards + test + lint  (full gate)"
 	@echo "  dev          dev server"
+	@echo "  build-standalone  bundle everything into build/recard-standalone.html (runs via file://)"
+	@echo "  dist         gather index.html/style.css/src/assets into dist/ for a static host upload"
+	@echo "  check-decisions  verify docs/ARCHITECTURE.md's modern section is newest-first, no duplicate D-numbers"
 
 test:
 	npm test
@@ -98,6 +101,12 @@ check: cards test lint-decks
 dev:
 	npm run dev
 
+build-standalone:
+	npm run build:standalone
+
+dist:
+	npm run build:dist
+
 coverage-unit:
 	npm run coverage:unit
 
@@ -118,3 +127,10 @@ test-audit:
 connectome:
 	node tools/codeConnectome/buildGraph.mjs
 	node tools/codeConnectome/render.mjs
+
+# Oracle grooming aid: docs/ARCHITECTURE.md's modern section (D82+)
+# must be newest-first with unique decision numbers - see the
+# 2026-09-10 groom that found D116 assigned twice and D111/D112
+# swapped by hand. Run after adding any new decision entry.
+check-decisions:
+	node tools/checkDecisionOrder.mjs

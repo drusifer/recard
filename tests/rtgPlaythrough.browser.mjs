@@ -189,6 +189,26 @@ test('the Decks zone fits every deck panel with no overflow and no overlap with 
   assert.ok(!isOverlapping(info.decksRect, info.tokensRect), 'Decks zone overlaps TOKENS');
 });
 
+// *fix (queued 2026-09-10, direct user reports: "deck/pile split...
+// super wide because of all the actions" / "fold pile actions into
+// rows"): Deck carries the most header actions of any pile kind (6
+// icons + the changePileType control) - `.pile-title`'s old
+// `width: max-content` with no cap meant it always forced the WHOLE
+// panel open to fit that unwrapped row, rather than ever wrapping.
+test('a Deck panel\'s header wraps its many actions instead of forcing the whole panel wide', async () => {
+  const page = fixture.page;
+  const width = await page.locator(`.pile-section[data-pile-id="${DECK_ID}"]`).evaluate((el) => el.getBoundingClientRect().width);
+  // Was 210px before this fix (one unbroken action row); the fixed
+  // 11rem (176px) cap on `.pile-title` brings it back near the panel's
+  // own 11rem `min-width` floor instead of being dictated by the
+  // button row.
+  assert.ok(width <= 200, `Deck panel should be narrow now that its actions wrap (was 210px unwrapped), got ${width}px`);
+
+  const buttonRows = await page.locator(`.pile-section[data-pile-id="${DECK_ID}"] .pile-title .pile-action-btn, .pile-section[data-pile-id="${DECK_ID}"] .pile-title .pile-action-enum`)
+    .evaluateAll((elements) => new Set(elements.map((el) => Math.round(el.getBoundingClientRect().top))).size);
+  assert.ok(buttonRows >= 2, 'Deck\'s 7 header controls must wrap onto at least 2 rows, not force one unbroken row');
+});
+
 test('game 1: draw an opening hand from a real deck pile', async () => {
   const page = fixture.page;
   const before = await deckCount(page, DECK_ID);
@@ -244,6 +264,41 @@ test('game 1: cast a creature to the battlefield and tap it', async () => {
     (id) => document.querySelector(`[data-kind="battlefield"] .middle-card[data-pileable-id="${CSS.escape(id)}"]`)?.dataset.orientation === 'landscape',
     cardId, { timeout: 5000 },
   );
+});
+
+// *fix (queued 2026-09-10, direct user report: "No Gears on RTG
+// stacks?"): a LONE permanent - the single-card state the previous test
+// just built, before any column exists - is the sharpest reproduction:
+// its `.stack-gear` sits right at the bottom of the battlefield's
+// `overflow-y: auto` card-row (Smith Gate-1 condition C2) with no other
+// row content to give it accidental slack, unlike the multi-column
+// board state the "taps and untaps" test further down exercises. Two
+// real bugs compounded: the gear was rendering at the global 44px
+// button touch-target floor instead of its own documented 1.3rem (3.4x
+// its intended footprint), and the row reserved no space below its
+// last card for anything positioned past 100% of it at all.
+test('game 1: a lone battlefield permanent\'s stack gear is not clipped by the row\'s own scroll box', async () => {
+  const page = fixture.page;
+  const gear = page.locator('[data-kind="battlefield"] .stack-gear').first();
+  assert.equal(await gear.count(), 1, 'even a stack of one gets tapStack/untapStack (D129) on Battlefield');
+
+  const [gearBox, rowBox] = await Promise.all([
+    gear.evaluate((element) => element.getBoundingClientRect().toJSON()),
+    page.locator('[data-kind="battlefield"] .card-row').evaluate((element) => element.getBoundingClientRect().toJSON()),
+  ]);
+  assert.ok(gearBox.bottom <= rowBox.bottom + 0.5, `gear (bottom ${gearBox.bottom}) must fit inside its scrollable row (bottom ${rowBox.bottom}), not be clipped past it`);
+
+  // Real containment, not just a geometry check against a stale
+  // clip box: Playwright's own actionability click already fails on a
+  // genuinely non-interactable (clipped) element, so a successful click
+  // confirms a real user could reach it too.
+  await gear.click();
+  await page.waitForSelector('.stack-action-menu', { timeout: 5000 });
+  // Dismissed by its own next-outside-click handler (openStackActionMenu,
+  // ui.js) - there is no Escape binding, so a plain click elsewhere is
+  // the real dismissal path, not a test-only shortcut.
+  await page.mouse.click(10, 10);
+  await page.waitForSelector('.stack-action-menu', { state: 'detached', timeout: 5000 });
 });
 
 // D-nit (direct user request): "vertical drop targets... like how

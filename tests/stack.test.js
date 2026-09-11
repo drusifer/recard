@@ -263,12 +263,32 @@ test('flipping a direction is its own inverse', () => {
   assert.equal(horizontal.flippedDirection(), VERTICAL);
 });
 
-test('flipping a FAN gives a plain horizontal stack, and back again', () => {
-  // A fan is a horizontal layout that arcs, so its opposite is
-  // vertical - flipping it must not silently drop the arc by turning
-  // it into a plain horizontal one.
+test('flipping a FAN gives vertical, not a plain horizontal stack (the arc would silently vanish)', () => {
   const [fan] = stacksOf({ cards: [card('a'), card('b')], direction: FAN });
-  assert.equal(fan.flippedDirection(), VERTICAL);
+  assert.equal(fan.flippedDirection(FAN), VERTICAL);
+});
+
+// *fix (queued 2026-09-10, direct user report: "cant re-fan my hand
+// stack after flip"): the OLD `flippedDirection()` only ever toggled
+// VERTICAL<->HORIZONTAL - once a FAN-default stack (a hand) flipped
+// away to VERTICAL, flipping again pushed it on to HORIZONTAL, and FAN
+// was gone for good. Passing the pile's own default direction lets it
+// tell "away from the pile's natural rest state" (go there) apart from
+// "already away from it" (go BACK), so FAN is always one flip back.
+test('flipping a FAN-default stack twice returns to FAN, not on to horizontal', () => {
+  const [fan] = stacksOf({ cards: [card('a'), card('b')], direction: FAN });
+  const flippedOnce = fan.flippedDirection(FAN);
+  assert.equal(flippedOnce, VERTICAL);
+
+  const [vertical] = stacksOf({ cards: [card('a'), card('b')], direction: flippedOnce });
+  assert.equal(vertical.flippedDirection(FAN), FAN, 'the second flip must restore the fan, not advance to horizontal');
+});
+
+test('a non-FAN-default pile (Battlefield, Lands) still just toggles vertical<->horizontal, unaffected', () => {
+  const [vertical] = stacksOf({ cards: [card('a'), card('b')], direction: VERTICAL });
+  const [horizontal] = stacksOf({ cards: [card('a'), card('b')], direction: HORIZONTAL });
+  assert.equal(vertical.flippedDirection(VERTICAL), HORIZONTAL);
+  assert.equal(horizontal.flippedDirection(VERTICAL), VERTICAL);
 });
 
 // ---------------------------------------------------------------------

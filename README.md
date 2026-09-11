@@ -19,7 +19,7 @@ hole cards) · see other players actually dragging cards live, in real
 time · quick-start presets for common games · simple +/- score tracking ·
 an in-app rules reference · works solo for solitaire-type games too ·
 sort your hand by rank/suit or drag to reorder, both persist ·
-deal and re-deal straight from the deck itself · a self-toggle "Passed" marker · optionally start the game automatically once everyone you're expecting has joined · drag panels around the table and resize them to your own layout, remembered locally per browser · see every player's score, not just your own.
+deal and re-deal straight from the deck itself · a self-toggle "Passed" marker · optionally start the game automatically once everyone you're expecting has joined · drag panels around the table and resize them to your own layout, remembered locally per browser · see every player's score, not just your own · four deliberate drop targets (stack on top, overlap beside, column below, or adjacent with a gap) with a live preview of exactly where a card will land · tighten/loosen/flip/tap any individual stack of cards, or a whole pile's stacks at once · a "New Game" control to switch presets mid-table without a new join code.
 
 See `docs/PRD.md` for the product vision and `docs/ARCHITECTURE.md` for
 the technical design.

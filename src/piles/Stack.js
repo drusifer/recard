@@ -27,7 +27,7 @@
  * hand persists exactly as well as one a rule produced.
  */
 import { pileableFor } from '../pileables/pileableTypes.js';
-import { VERTICAL, HORIZONTAL } from '../pileables/Stackable.js';
+import { VERTICAL, HORIZONTAL, FAN } from '../pileables/Stackable.js';
 
 /**
  * The metadata key for the pile's DEFAULT stack - the one holding
@@ -105,8 +105,22 @@ export class Stack {
    * IS horizontal - it is a horizontal stack that arcs - so flipping it
    * to a plain horizontal one would look like nothing happened while
    * silently discarding the arc.
+   *
+   * `pileDefaultDirection` (the owning Pile kind's own `stackDirection` -
+   * `HandPile.stackDirection = FAN`, `GroupedPile`'s = VERTICAL, the
+   * base `Pile`'s = HORIZONTAL) makes flip a genuine 2-state toggle for
+   * a FAN-default pile: FAN -> VERTICAL -> FAN -> ..., never advancing
+   * on to HORIZONTAL. *fix (queued 2026-09-10, direct user report:
+   * "cant re-fan my hand stack after flip") - the un-parameterized
+   * version below only ever toggled VERTICAL<->HORIZONTAL, so a
+   * FAN-default stack could flip AWAY from its own fan but never flip
+   * back to it, landing on a plain horizontal run with the arc gone for
+   * good instead. Non-FAN-default piles (Battlefield/Lands, VERTICAL;
+   * GroupedPile, VERTICAL) are unaffected - the parameter only changes
+   * anything when it's FAN.
    */
-  flippedDirection() {
+  flippedDirection(pileDefaultDirection = VERTICAL) {
+    if (pileDefaultDirection === FAN) return this.direction === FAN ? VERTICAL : FAN;
     return this.direction === VERTICAL ? HORIZONTAL : VERTICAL;
   }
 
