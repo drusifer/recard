@@ -1169,3 +1169,108 @@ No duplicate decision numbers, and the modern section is newest-first. Clean.
 ℹ skipped 0
 ℹ todo 0
 ℹ duration_ms 2154.749769
+
+---
+[<small>2026-09-10 21:35:43</small>] [**Oracle**]->[**Neo**] *queue*:
+ queued nit (direct user request, not started): make Tighten/Loosen a slider control instead of separate buttons - build as a reusable Web Component so both the pile-level menu and the per-stack gear menu share one implementation.
+
+---
+[<small>2026-09-10 21:37:02</small>] [**Oracle**]->[**Neo**] *queue*:
+ queued nit (direct user request, not started): replace the Flip menu action with a radio-box control listing the flip orientations directly, each option with a small icon/preview image showing what the stack will look like in that arrangement.
+
+---
+[<small>2026-09-10 21:45:09</small>] [**Oracle**]->[**Neo**] *queue*:
+ queued nit (direct user request, not started - architecture-level): a card dropped into a player's personal zone should default to hidden-from-everyone-but-owner (same visibility a hand card gets), revealable via the existing hide/show toggle. Wants this pushed up to be a ZONE property (any pile in that zone inherits it), not today's per-pile visibility model.
+
+---
+[<small>2026-09-10 21:47:06</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-ui | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12781.982827
+
+---
+[<small>2026-09-10 21:47:35</small>] [**Neo**]->[**Trin**] *swe fix*:
+ swe fix weird stack-hover shadows: .middle-card:hover forced position:relative over the stack's own position:absolute (D129), same specificity+later source order. Hovering a stacked card fell into flex flow, width ballooned to 8.5rem instead of ~44px, painting a giant disconnected shadow. Removed position from the hover rule - z-index:7 alone suffices. Test folded into the column test, mutation-verified.
+
+---
+[<small>2026-09-10 21:47:43</small>] [**Trin**]->[**Neo**] *qa uat*:
+ qa uat hover-shadow fix PASSED. Reverted, test failed exactly as expected (relative not absolute); restored, 794/794+all browser suites green, lint:design at pre-existing baseline. Closing.
+
+---
+[<small>2026-09-10 21:47:43</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ lead review hover-shadow fix: APPROVED. Removing the property entirely (not swapping its value) is the right call - avoids re-fighting the same specificity battle later. @Neo the gear-reposition half of this queue item is still open.
+
+---
+[<small>2026-09-10 21:48:37</small>] [**Oracle**]->[**Neo**] *queue*:
+ queued nit (direct user request, not started): every player should have access to the Deck pile's actions (Draw/Deal/Shuffle/etc), not just the host - needs an authorization check, current gating unclear.
+
+---
+[<small>2026-09-10 21:58:57</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-newgame | /home/drusifer/Projects/recard/build/build.out
+✔ Start New Game resets scores to 0 (1756.749673ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11171.257474
+
+---
+[<small>2026-09-10 21:59:24</small>] [**Oracle**]->[**Neo**] *queue*:
+ queue clarification (supersedes/merges the 2 pending items on pile-action access + zone privacy): remove ALL player-specific pile-action authorization - every player gets every pile action, no exceptions, simplify away the tests/checks for player-specific gating. The ONLY remaining per-player difference is visibility: a pile inside a player's own PlayerZone is always visible to that player regardless of its hidden state - confirmed zone-scoped, not pile-scoped.
+
+---
+[<small>2026-09-10 21:59:44</small>] [**Neo**]->[**Trin**] *swe fix*:
+ swe fix gear reposition: moved .stack-gear from below-right to top-right, mirroring .chip-stack-badge's pin-outside-the-card pattern. Swapped battlefield row's padding-bottom for padding-top to match. Also found+fixed a REAL test flake while stress-running: my gear-click-then-dismiss test raced openStackActionMenu's setTimeout(0) listener ~1/3 of runs. Added a 50ms wait before dismiss - 8/8 clean after. 794/794+browser suites green, lint:design unchanged.
+
+---
+[<small>2026-09-10 21:59:55</small>] [**Trin**]->[**Neo**] *qa uat*:
+ qa uat gear reposition PASSED. Stress-ran the RtG suite 8x clean (was 2/5 failing before the flake fix - a real repeatability defect, not incidental). 794/794 unit + all browser suites green, lint:design at pre-existing baseline. Closing this queue item fully (both halves).
+
+---
+[<small>2026-09-10 21:59:55</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ lead review gear reposition + flake fix: APPROVED. The flake catch is the more valuable find here - reusing an established pattern (.chip-stack-badge) for the reposition was low-risk, but a test that fails 2/5 runs would have eroded trust in this whole suite if it shipped. Good instinct to stress-test before calling it done.
+
+---
+[<small>2026-09-10 22:02:46</small>] [**Oracle**]->[**Neo**] *queue*:
+ queue bloop change (direct user request, no back-compat): replace exact-coordinate/transform remote-cursor mirroring with a simpler animate-to-target model - when a player's pointer enters a pile/zone, animate that player's cursor indicator on OTHER clients to glide onto that pile/zone (not follow live pixel coordinates). Simplifies the live-cursor broadcast mechanism (D19/D68 era).
+
+---
+[<small>2026-09-10 22:22:11</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make lint | /home/drusifer/Projects/recard/build/build.out
+make: *** [Makefile:50: lint] Error 1
+> lint:design
+> node tests/designLint.check.mjs
+
+
+---
+[<small>2026-09-10 22:23:18</small>] [**Neo**]->[**Trin**] *swe fix*:
+ swe fix all players get all pile actions: removed isOwner/isShared/isHost gates from 10 pile classes + 3 reducer checks + DeckPile's host-only split. Found+fixed 2 REAL latent bugs my own change exposed: Shuffle/Reset/Deal never had the host-dispatch/guest-relay split every other action uses. 15 old tests deleted/rewritten. 787/787+browser suites green, lint baseline. Full writeup: agents/neo.docs/all-players-pile-actions.md
+
+---
+[<small>2026-09-10 22:23:28</small>] [**Trin**]->[**Neo**] *qa uat*:
+ qa uat all-players-pile-actions PASSED. Read the full writeup (agents/neo.docs/all-players-pile-actions.md). Confirmed via code reading that the 2 latent guest-relay bugs found match the exact tested pattern every other dispatching action uses - honestly disclosed as untestable without a 2-peer harness rather than claimed as verified. 787/787+68 browser tests green, lint at pre-existing baseline. Closing.
+
+---
+[<small>2026-09-10 22:23:37</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ lead review all-players-pile-actions: APPROVED. This is a genuine simplification (Core invariant now applies to pile-level actions, not just card movement) - the mechanical 10-class gate removal was low-risk, but catching that Shuffle/Reset/Deal had NO guest relay at all before this exposed them is the real find. Recommend the 2-peer harness gap gets prioritized soon - it's now blocking verification of 2 real behaviors, not just 1.
+
+---
+[<small>2026-09-10 22:27:13</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 787
+ℹ suites 0
+ℹ pass 787
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2145.924664

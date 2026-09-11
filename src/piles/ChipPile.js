@@ -62,8 +62,7 @@ export class ChipPile extends GroupedPile {
     return ['chip'];
   }
 
-  pileActions({ isOwner, isShared, cards = [] } = {}) {
-    if (!isOwner && !isShared) return [];
+  pileActions({ cards = [] } = {}) {
     // `changePileType` is absent, not disabled: there is exactly one
     // kind to convert to and the pile already is it, so the control
     // could never do anything. Same "no false affordance" rule the rest

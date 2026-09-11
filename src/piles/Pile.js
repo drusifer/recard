@@ -435,9 +435,16 @@ export class Pile {
   }
 
   /**
-   * D55/US-60/61/62: `take`/`hide`/`show` act on the whole pile, open to
-   * any player for a SHARED pile (`isShared`), owner-only for a personal
-   * one (`isOwner`).
+   * *fix (queued 2026-09-10, direct user request: "All players have
+   * access to all pile actions no matter what... simplify remove tests
+   * and requirements for pileaction player specific behavior"):
+   * `take`/`split`/`remove`/etc. used to be owner-only for a personal
+   * pile (`isOwner`), open to anyone only for a SHARED one (`isShared`)
+   * - that gate, and the two context flags it existed for, are gone.
+   * The one remaining per-player difference in this app is VISIBILITY,
+   * and it is a ZONE property (a pile inside a player's own PlayerZone
+   * stays visible to them regardless of hidden state), not a pile-
+   * action authorization concern at all - nothing here.
    *
    * D91: `split` (the old roughly-in-half `'split'`'s real, index-
    * driven replacement) is offered here now that a real picker UI
@@ -448,8 +455,7 @@ export class Pile {
    * it and was a direct user correction: "there is not supposed to be
    * a pickupSplit."
    */
-  pileActions({ isOwner, isShared, cards } = {}) {
-    if (!isOwner && !isShared) return [];
+  pileActions({ cards } = {}) {
     // US-71/72/73 (D62/D63): `remove`/`changePileType` are offered here
     // for every base-Pile-derived kind unconditionally; the reducer is
     // still the real authorization/empty-only gate (D43's standing

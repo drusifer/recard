@@ -8,33 +8,18 @@ import { MIN_SPREAD, MAX_SPREAD } from '../src/piles/Pile.js';
 
 const deck = { id: 'deck', kind: 'deck', ownerId: null };
 
-// UPDATED for D34 (Sprint 12): Draw generalized from a dead per-card
-// action to a pile-level one offered to EVERYONE, not just the host -
-// the deck's host-only set (deal/reshuffleDeal) is now a subset of a
-// larger, open list rather than the whole list. Kept as an update
-// rather than deleted so the widened surface stays visible in the
-// suite, matching how Sprint 11 handled D26->D31.
-test('the deck offers the host dealing actions, plus draw which is open to everyone', () => {
-  const actions = pileLevelActions('deck', { isHost: true });
-  assert.ok(actions.includes('deal') && actions.includes('reshuffleDeal'), 'host keeps dealing actions');
-  assert.ok(actions.includes('draw'), 'draw is now also pile-level, D34');
+// *fix (queued 2026-09-10, "All players have access to all pile
+// actions no matter what"): the deck's dealing actions used to be
+// host-only (`isHost`) - that gate, and the flag itself, are gone.
+// Every deck action is open to every player now, with no ctx at all.
+test('the deck offers draw plus every dealing action, open to everyone - no host gate', () => {
+  const actions = pileLevelActions('deck', {});
+  assert.ok(actions.includes('deal') && actions.includes('reshuffleDeal'), 'dealing actions are open to everyone now');
+  assert.ok(actions.includes('draw'), 'draw is pile-level, D34');
 });
 
-// UPDATED for D34: a guest gets nothing DEAL-related (host-only,
-// unchanged) but DOES now get Draw - drawing your own card was never
-// something that needed host authorization in the first place.
-test('a guest gets draw on the deck, but nothing deal-related - dealing stays host-only', () => {
-  const actions = pileLevelActions('deck', { isHost: false });
-  assert.deepEqual(actions, ['draw']);
-});
-
-test('hands and plain piles have no pile-level actions', () => {
-  // Deliberately narrow: this table exists for dealing, and inventing
-  // pile-level actions for plain piles "while we are here" would put
-  // controls on screen that no story asked for.
-  for (const kind of ['hand', 'plain', 'nonsense']) {
-    assert.deepEqual(pileLevelActions(kind, { isHost: true }), [], `${kind} must offer nothing`);
-  }
+test('an unknown pile kind offers nothing', () => {
+  assert.deepEqual(pileLevelActions('nonsense', {}), []);
 });
 
 // D34's own premise (deck's per-card table is empty, draw is the only
@@ -63,32 +48,14 @@ test('reshuffleDeal is marked destructive and deal is not', () => {
 
 // --- Sprint 12 (US-46, D34/D36) ---------------------------------------
 
-test('D34/D87: the hand offers pile-level actions to its own owner - sort + changePileType (pass removed, direct user request)', () => {
+// *fix (queued 2026-09-10, "All players have access to all pile
+// actions no matter what"): a hand's pile-level actions (sort/
+// changePileType) used to be owner-only (`isOwner`) - gone, along with
+// the flag. Any player can sort or convert any hand now.
+test('D34/D87: the hand offers pile-level actions to any viewer - sort + changePileType', () => {
   // US-104: `cards` now decides whether the sorts appear at all.
-  assert.deepEqual(pileLevelActions('hand', { isHost: false, isOwner: true, cards: [{ pileableType: 'card' }] }),
+  assert.deepEqual(pileLevelActions('hand', { cards: [{ pileableType: 'card' }] }),
     ['sortRank', 'sortSuit', 'changePileType', 'tightenAll', 'loosenAll']);
-});
-
-test('D34: a hand pile offers nothing to a viewer who does not own it', () => {
-  // The hand toolbar being removed doesn't mean sorting someone ELSE's
-  // hand becomes possible - matches actionsForPileable's existing rule that
-  // only a hand's own owner gets anything from it.
-  assert.deepEqual(pileLevelActions('hand', { isHost: false, isOwner: false }), []);
-  assert.deepEqual(pileLevelActions('hand', { isHost: true, isOwner: false }), []);
-});
-
-test('D34: deck still offers its existing host-only actions, plus draw', () => {
-  const actions = pileLevelActions('deck', { isHost: true });
-  for (const id of ['deal', 'reshuffleDeal', 'draw']) {
-    assert.ok(actions.includes(id), `expected "${id}" in ${JSON.stringify(actions)}`);
-  }
-});
-
-test('D34: a guest gets draw from the deck, but not the host-only deal actions', () => {
-  const actions = pileLevelActions('deck', { isHost: false });
-  assert.ok(actions.includes('draw'), 'drawing is not host-only');
-  assert.ok(!actions.includes('deal') && !actions.includes('reshuffleDeal'),
-    'dealing stays host-only');
 });
 
 test('D36: draw is a STATIC single-target action, not computed from live pile counts', () => {
@@ -120,17 +87,11 @@ test('D34: draw is never offered as a per-card action from the deck - it stays p
 // `handlePileAction`), never the interactive picker a pile with real
 // visible cards gets. ---
 
-test('Phase 56/D91: the deck offers shuffle and split to the host, alongside deal/reshuffleDeal/draw', () => {
-  const actions = pileLevelActions('deck', { isHost: true });
+test('Phase 56/D91: the deck offers shuffle and split alongside deal/reshuffleDeal/draw, to everyone', () => {
+  const actions = pileLevelActions('deck', {});
   for (const id of ['draw', 'deal', 'reshuffleDeal', 'shuffle', 'split']) {
     assert.ok(actions.includes(id), `expected "${id}" in ${JSON.stringify(actions)}`);
   }
-});
-
-test('Phase 56: shuffle stays host-only, exactly like deal/reshuffleDeal', () => {
-  const actions = pileLevelActions('deck', { isHost: false });
-  assert.deepEqual(actions, ['draw']);
-  assert.ok(!actions.includes('shuffle'));
 });
 
 test('Phase 56: shuffle is declared with a label and hint, and is not destructive', () => {
@@ -184,7 +145,7 @@ test('Phase 57: move stays unmarked even in that exact one-target shape - no sho
 // OFFER it is a per-class fact, not a kind list kept somewhere central.
 test('tighten/loosen are offered by a hand - the fan the *nit was actually about', () => {
   const actions = new PlayerHandPile({ id: 'hand:me', kind: 'hand', ownerId: 'me' })
-    .pileActions({ isOwner: true, isShared: false, cards: [] });
+    .pileActions({ cards: [] });
   assert.ok(actions.includes('tightenAll'), `got ${JSON.stringify(actions)}`);
   assert.ok(actions.includes('loosenAll'), `got ${JSON.stringify(actions)}`);
 });
@@ -192,7 +153,7 @@ test('tighten/loosen are offered by a hand - the fan the *nit was actually about
 test('tighten/loosen are offered by melds and runs too - any pile that lays its cards out in a row', () => {
   for (const kind of ['run', 'set', 'foundation', 'plain', 'discard']) {
     const actions = new PILE_TYPES[kind]({ id: `p:${kind}`, kind, ownerId: null })
-      .pileActions({ isOwner: true, isShared: true, cards: [] });
+      .pileActions({ cards: [] });
     assert.ok(actions.includes('tightenAll'), `${kind} should offer tighten, got ${JSON.stringify(actions)}`);
     assert.ok(actions.includes('loosenAll'), `${kind} should offer loosen, got ${JSON.stringify(actions)}`);
   }
@@ -203,7 +164,7 @@ test('tighten/loosen are offered by melds and runs too - any pile that lays its 
 // (DeckPile fully overrides pileActions), not a check anywhere else.
 test('a deck offers neither - a stack has no spread to adjust', () => {
   const actions = new PILE_TYPES.deck({ id: 'deck', kind: 'deck', ownerId: null })
-    .pileActions({ isHost: true, isOwner: true, isShared: true, cards: [] });
+    .pileActions({ cards: [] });
   assert.ok(!actions.includes('tightenAll'), `got ${JSON.stringify(actions)}`);
   assert.ok(!actions.includes('loosenAll'), `got ${JSON.stringify(actions)}`);
 });
@@ -267,14 +228,14 @@ test('sortActionsFor: records with no pileableType are treated as cards', () => 
 // contents, with no hardcoded pair left in HandPile.
 test('a hand of cards still offers both sorts - unchanged for every existing game', () => {
   const actions = new PlayerHandPile({ id: 'hand:me', kind: 'hand', ownerId: 'me' })
-    .pileActions({ isOwner: true, cards: [{ pileableType: 'card' }] });
+    .pileActions({ cards: [{ pileableType: 'card' }] });
   assert.ok(actions.includes('sortRank'));
   assert.ok(actions.includes('sortSuit'));
 });
 
 test('a hand holding chips offers NO sort, and no kind check produced that', () => {
   const actions = new PlayerHandPile({ id: 'hand:me', kind: 'hand', ownerId: 'me' })
-    .pileActions({ isOwner: true, cards: [{ pileableType: 'chip' }] });
+    .pileActions({ cards: [{ pileableType: 'chip' }] });
   assert.ok(!actions.includes('sortRank'), `got ${JSON.stringify(actions)}`);
   assert.ok(!actions.includes('sortSuit'), `got ${JSON.stringify(actions)}`);
   assert.ok(actions.includes('changePileType'), 'its other actions are untouched');
@@ -282,7 +243,7 @@ test('a hand holding chips offers NO sort, and no kind check produced that', () 
 
 test('an empty hand offers no sort rather than two dead buttons', () => {
   const actions = new PlayerHandPile({ id: 'hand:me', kind: 'hand', ownerId: 'me' })
-    .pileActions({ isOwner: true, cards: [] });
+    .pileActions({ cards: [] });
   assert.ok(!actions.includes('sortRank'));
   assert.ok(!actions.includes('sortSuit'));
 });

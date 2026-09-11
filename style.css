@@ -690,8 +690,17 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    reintroduced BY it, which is what both earlier placements did. */
 .stack-gear {
   position: absolute;
-  top: calc(100% + 0.15rem);
-  right: 0;
+  /* *fix (queued 2026-09-10, direct user request: "move the gear to
+     the top right of the stack"): was `top: calc(100% + 0.15rem)`
+     (below the stack) - moved to hang off the top-right corner instead,
+     mirroring `.chip-stack-badge`'s own proven "pin outside the card,
+     never on top of it" pattern (top: -0.6rem) rather than inventing a
+     new one. Still never overlaps the card face itself (the whole
+     reason the first two placements - ON the card, then on the pile
+     HEADER - were rejected), so hover-raise/click-through concerns
+     from those two do not apply here. */
+  top: -0.6rem;
+  right: -0.3rem;
   z-index: 4;
   display: flex;
   align-items: center;
@@ -1028,7 +1037,26 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .middle-card:hover,
 .middle-card:focus-within {
-  position: relative;
+  /* *fix (queued 2026-09-10, direct user report: "hover over stack
+     Effect has some weird shadows that look weirdly overlapped"):
+     `position: relative` here used to unconditionally win over
+     `.card-stack > .middle-card`'s `position: absolute` (D129) on
+     hover, for any card that's a member of a multi-card stack (which
+     is every card on the table now, post-D129) - both selectors have
+     equal specificity, so it came down to source order, and this rule
+     comes later. That took the hovered card OUT of the stack's
+     absolute-positioning layout and back into `.card-row`'s normal
+     flex flow, where its width resolved against `.middle-card`'s own
+     `max-width: 8.5rem` instead of its actual ~44px card content - a
+     136px-wide invisible box whose `box-shadow` (below) then painted
+     as a large, disconnected-looking dark smudge, confirmed via
+     getBoundingClientRect (fell right in normal flow, not `absolute`).
+     `position` is dropped from this rule entirely: a stack member
+     keeps its `position: absolute` through hover (which still
+     satisfies the ORIGINAL reason this existed - see the two comments
+     above - `z-index` needs any non-`static` position, and `absolute`
+     already qualifies), and every other `.middle-card` already gets
+     `position: relative` from its own base rule regardless. */
   z-index: 7;
 }
 
@@ -3025,17 +3053,20 @@ body.panel-resize-active {
   max-height: 15rem;
   overflow-y: auto;
   align-content: flex-start;
-  /* *fix (queued 2026-09-10, "No Gears on RTG stacks?"): `.stack-gear`
-     sits BELOW its own stack's box (`top: calc(100% + 0.15rem)`), which
-     is never part of this row's own auto-sized flow-content height -
-     an auto-height `overflow:auto` box only ever sizes to its IN-FLOW
-     children, so anything positioned past 100% of the last row's
-     content is clipped by definition, regardless of the gear's own
-     size (confirmed empirically: fixing the gear's oversized 44px
-     footprint below alone did NOT stop the clipping). Reserving the
-     gear's real footprint (now 1.3rem + the 0.15rem gap) as bottom
-     padding gives the last row real, always-available room for it. */
-  padding-bottom: 1.45rem;
+  /* *fix (queued 2026-09-10, "No Gears on RTG stacks?" then "move the
+     gear to the top right of the stack"): `.stack-gear` sits OUTSIDE
+     its own stack's box (originally below, now above-right), which is
+     never part of this row's own auto-sized flow-content height - an
+     auto-height `overflow:auto` box only ever sizes to its IN-FLOW
+     children, so anything positioned outside a row-edge stack's own
+     box is clipped by definition, regardless of the gear's own size
+     (confirmed empirically both times: fixing the gear's oversized
+     44px footprint alone did NOT stop the clipping either direction).
+     Reserving the gear's real footprint (1.3rem + its 0.15rem gap,
+     rounded up) as TOP padding now that it hangs off the top edge -
+     only the first row's stacks are ever at risk (interior wrapped
+     rows already have real gap space above them from the row before). */
+  padding-top: 1rem;
 }
 
 /* ---- RtG art fallback (US-79) ---------------------------------------

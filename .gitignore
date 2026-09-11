@@ -57,8 +57,6 @@ coverage.xml
 # never committed: a stale audit against changed code is worse than
 # none, since it looks authoritative.
 /coverage/
-/test_audit.md
-/test_audit_graph.html
 
 # tools/codeConnectome - graph.json is pure intermediate data
 # (`buildGraph.mjs` output, fed into `render.mjs`); connectome.html

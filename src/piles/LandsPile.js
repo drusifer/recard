@@ -80,8 +80,7 @@ export class LandsPile extends GroupedPile {
    * one truly frequent action here, and no `take`/`split` - a lands
    * pile is a set of distinct permanents, not a stack of interchangeable
    * cards to scoop or cut. */
-  pileActions({ isOwner, isShared } = {}) {
-    if (!isOwner && !isShared) return [];
+  pileActions() {
     return ['untapAll', 'changePileType', 'remove', 'tightenAll', 'loosenAll'];
   }
 

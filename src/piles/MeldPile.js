@@ -40,10 +40,8 @@ export class MeldPile extends Pile {
    * D71 (US-74): `changePileType` is the first pile-level action ever
    * offered on a meld. Allowed on a non-empty pile too as of a direct
    * user request (2026-08-27) - see `state.js`'s `CHANGE_PILE_TYPE`
-   * doc comment for the risk that carries. Same `isOwner`/`isShared`
-   * gate `Pile.pileActions()` uses, for consistency - a meld is
-   * normally ownerless/shared (Solitaire's foundations), same as any
-   * other shared pile.
+   * doc comment for the risk that carries. No ownership gate (2026-09-10
+   * fix) - every pile action is open to every player now.
    *
    * D91: `split` joins it, per this class's own comment above ("a meld
    * is bulk-splittable too, no separate flag needed any more") -
@@ -52,8 +50,7 @@ export class MeldPile extends Pile {
    * joined it too and was a direct user correction - "there is not
    * supposed to be a pickupSplit" - removed.)
    */
-  pileActions({ isOwner, isShared } = {}) {
-    if (!isOwner && !isShared) return [];
+  pileActions() {
     // *nit (direct user request): "pile actions for tighten/loosen to
     // adjust the overlap on fan and MELD piles or RUNS or whatever."
     // Named in the request, and this method fully overrides the base

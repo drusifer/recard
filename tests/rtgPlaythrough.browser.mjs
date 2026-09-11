@@ -197,7 +197,7 @@ test('the Decks zone fits every deck panel with no overflow and no overlap with 
 // panel open to fit that unwrapped row, rather than ever wrapping.
 test('a Deck panel\'s header wraps its many actions instead of forcing the whole panel wide', async () => {
   const page = fixture.page;
-  const width = await page.locator(`.pile-section[data-pile-id="${DECK_ID}"]`).evaluate((el) => el.getBoundingClientRect().width);
+  const width = await page.locator(`.pile-section[data-pile-id="${DECK_ID}"]`).evaluate((element) => element.getBoundingClientRect().width);
   // Was 210px before this fix (one unbroken action row); the fixed
   // 11rem (176px) cap on `.pile-title` brings it back near the panel's
   // own 11rem `min-width` floor instead of being dictated by the
@@ -205,7 +205,7 @@ test('a Deck panel\'s header wraps its many actions instead of forcing the whole
   assert.ok(width <= 200, `Deck panel should be narrow now that its actions wrap (was 210px unwrapped), got ${width}px`);
 
   const buttonRows = await page.locator(`.pile-section[data-pile-id="${DECK_ID}"] .pile-title .pile-action-btn, .pile-section[data-pile-id="${DECK_ID}"] .pile-title .pile-action-enum`)
-    .evaluateAll((elements) => new Set(elements.map((el) => Math.round(el.getBoundingClientRect().top))).size);
+    .evaluateAll((elements) => new Set(elements.map((element) => Math.round(element.getBoundingClientRect().top))).size);
   assert.ok(buttonRows >= 2, 'Deck\'s 7 header controls must wrap onto at least 2 rows, not force one unbroken row');
 });
 
@@ -267,16 +267,18 @@ test('game 1: cast a creature to the battlefield and tap it', async () => {
 });
 
 // *fix (queued 2026-09-10, direct user report: "No Gears on RTG
-// stacks?"): a LONE permanent - the single-card state the previous test
-// just built, before any column exists - is the sharpest reproduction:
-// its `.stack-gear` sits right at the bottom of the battlefield's
+// stacks?", then "move the gear to the top right of the stack"): a
+// LONE permanent - the single-card state the previous test just built,
+// before any column exists - is the sharpest reproduction: its
+// `.stack-gear` sits right at the edge of the battlefield's
 // `overflow-y: auto` card-row (Smith Gate-1 condition C2) with no other
 // row content to give it accidental slack, unlike the multi-column
 // board state the "taps and untaps" test further down exercises. Two
-// real bugs compounded: the gear was rendering at the global 44px
-// button touch-target floor instead of its own documented 1.3rem (3.4x
-// its intended footprint), and the row reserved no space below its
-// last card for anything positioned past 100% of it at all.
+// real bugs compounded originally: the gear rendered at the global
+// 44px button touch-target floor instead of its own documented 1.3rem,
+// and the row reserved no space for anything positioned outside its
+// stacks' own boxes - first past the bottom (the gear's original
+// position), then past the TOP once the gear moved there.
 test('game 1: a lone battlefield permanent\'s stack gear is not clipped by the row\'s own scroll box', async () => {
   const page = fixture.page;
   const gear = page.locator('[data-kind="battlefield"] .stack-gear').first();
@@ -286,7 +288,7 @@ test('game 1: a lone battlefield permanent\'s stack gear is not clipped by the r
     gear.evaluate((element) => element.getBoundingClientRect().toJSON()),
     page.locator('[data-kind="battlefield"] .card-row').evaluate((element) => element.getBoundingClientRect().toJSON()),
   ]);
-  assert.ok(gearBox.bottom <= rowBox.bottom + 0.5, `gear (bottom ${gearBox.bottom}) must fit inside its scrollable row (bottom ${rowBox.bottom}), not be clipped past it`);
+  assert.ok(gearBox.top >= rowBox.top - 0.5, `gear (top ${gearBox.top}) must fit inside its scrollable row (top ${rowBox.top}), not be clipped past it`);
 
   // Real containment, not just a geometry check against a stale
   // clip box: Playwright's own actionability click already fails on a
@@ -296,7 +298,13 @@ test('game 1: a lone battlefield permanent\'s stack gear is not clipped by the r
   await page.waitForSelector('.stack-action-menu', { timeout: 5000 });
   // Dismissed by its own next-outside-click handler (openStackActionMenu,
   // ui.js) - there is no Escape binding, so a plain click elsewhere is
-  // the real dismissal path, not a test-only shortcut.
+  // the real dismissal path, not a test-only shortcut. That handler
+  // attaches on a `setTimeout(..., 0)` (deliberately, so the click that
+  // OPENED the menu isn't itself read as the closing one) - a dismiss
+  // click fired in the same tick can race ahead of it and get silently
+  // ignored, which is exactly the flake this `waitForTimeout` closes,
+  // found by running this test repeatedly until it reproduced.
+  await page.waitForTimeout(50);
   await page.mouse.click(10, 10);
   await page.waitForSelector('.stack-action-menu', { state: 'detached', timeout: 5000 });
 });
@@ -361,6 +369,27 @@ test('game 1: a column of 3+ cards offsets each one further down, not on top of 
   assert.ok(deltaAB > 5, `card B must sit below card A, got delta ${deltaAB}`);
   assert.ok(deltaBC > 5, `card C must sit below card B, got delta ${deltaBC} - a delta near 0 means it landed on top of B instead of offsetting further`);
   assert.ok(Math.abs(deltaAB - deltaBC) < 2, `each column step should be the same size, got ${deltaAB} then ${deltaBC}`);
+
+  // *fix (queued 2026-09-10, direct user report: "hover over stack
+  // Effect has some weird shadows that look weirdly overlapped"):
+  // hovering a card that's a member of this 3-card column used to
+  // switch it from `position: absolute` (D129's stack layout) to
+  // `position: relative` (a stale `.middle-card:hover` rule, D25-era,
+  // that had equal CSS specificity and came later in source order),
+  // dropping it back into `.card-row`'s normal flex flow. There its
+  // width resolved against `.middle-card`'s own `max-width: 8.5rem`
+  // ceiling instead of its ~44px card content - an invisible 136px-wide
+  // box whose `box-shadow` painted as a large, disconnected smudge.
+  const topCard = page.locator(`[data-kind="battlefield"] .middle-card[data-pileable-id="${idC}"]`);
+  await topCard.hover({ force: true });
+  await page.waitForTimeout(150);
+  const [hoverPosition, hoverWidth, innerCardWidth] = await topCard.evaluate((element) => [
+    getComputedStyle(element).position,
+    element.getBoundingClientRect().width,
+    element.querySelector('.card').getBoundingClientRect().width,
+  ]);
+  assert.equal(hoverPosition, 'absolute', 'a stack member must stay absolutely positioned through hover, not fall back into flex flow');
+  assert.ok(Math.abs(hoverWidth - innerCardWidth) < 1, `hovered wrapper (${hoverWidth}px) should match its real card content (${innerCardWidth}px), not balloon out to the unrelated max-width floor`);
 });
 
 // D129 (direct user request: "add stackaction for tap/untap, keep

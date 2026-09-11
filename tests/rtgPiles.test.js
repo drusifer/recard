@@ -8,8 +8,10 @@ import { StackPile } from '../src/piles/StackPile.js';
 import { LandsPile } from '../src/piles/LandsPile.js';
 import { reduce } from '../src/state.js';
 
-const shared = { isOwner: false, isShared: true, cards: [] };
-const stranger = { isOwner: false, isShared: false, cards: [] };
+// *fix (queued 2026-09-10, "All players have access to all pile
+// actions no matter what"): `pileActions` no longer reads isOwner/
+// isShared at all - only `cards` still matters.
+const context = { cards: [] };
 
 // --- registry ----------------------------------------------------------
 
@@ -38,7 +40,7 @@ test('BattlefieldPile: a permanent can be tapped, moved and picked up', () => {
 });
 
 test('BattlefieldPile: offers untapAll, and never split or take', () => {
-  const actions = new BattlefieldPile({}).pileActions(shared);
+  const actions = new BattlefieldPile({}).pileActions(context);
   assert.ok(actions.includes('untapAll'), 'the untap step is a real, frequent action');
   // You do not scoop up the battlefield the way you scoop a pile of
   // cards - every permanent on it belongs to a distinct game object.
@@ -46,17 +48,13 @@ test('BattlefieldPile: offers untapAll, and never split or take', () => {
   assert.ok(!actions.includes('take'));
 });
 
-test('BattlefieldPile: a non-owner of a personal battlefield gets nothing', () => {
-  assert.deepEqual(new BattlefieldPile({}).pileActions(stranger), []);
-});
-
 // *nit (direct user request): "add tighter/looser actions to the
 // battlefield pile" - offered by the base class for every ROW-laid-out
 // pile kind; this pile just wasn't including them in its own override.
 test('BattlefieldPile: offers tighten and loosen, disabled at the spread ceiling/floor', () => {
   const pile = new BattlefieldPile({});
-  assert.ok(pile.pileActions(shared).includes('tightenAll'));
-  assert.ok(pile.pileActions(shared).includes('loosenAll'));
+  assert.ok(pile.pileActions(context).includes('tightenAll'));
+  assert.ok(pile.pileActions(context).includes('loosenAll'));
   assert.deepEqual(pile.disabledActions(2, { spread: pile.constructor.maxSpread }).includes('tightenAll'), true);
   assert.deepEqual(pile.disabledActions(2, { spread: 0 }).includes('loosenAll'), true);
 });
@@ -74,7 +72,7 @@ test('ExilePile: exiled cards are face-up and get the same card actions as any o
 });
 
 test('ExilePile: never offers take — exile cannot be scooped back', () => {
-  const actions = new ExilePile({}).pileActions(shared);
+  const actions = new ExilePile({}).pileActions(context);
   assert.ok(!actions.includes('take'));
   assert.ok(!actions.includes('split'));
 });
@@ -192,22 +190,21 @@ test('SET_STACK_ORIENTATION: rejects an unknown pile', () => {
   );
 });
 
-test('SET_STACK_ORIENTATION: same owner-or-shared authorization every pile-level action uses', () => {
+// *fix (queued 2026-09-10, "All players have access to all pile
+// actions no matter what"): SET_STACK_ORIENTATION/UNTAP_ALL used to
+// throw for anyone but the pile's owner - that gate is gone.
+test('SET_STACK_ORIENTATION: any player may tap/untap a stack, not just the battlefield\'s owner', () => {
   const state = stateWithBattlefield([{ id: 'a', stackId: 's1' }]);
-  assert.throws(
-    () => reduce(state, {
-      type: 'SET_STACK_ORIENTATION', pileId: 'bf-p1', playerId: 'someone-else', stackKey: 's1', orientation: 'landscape',
-    }),
-    /not authorized/,
-  );
+  const after = reduce(state, {
+    type: 'SET_STACK_ORIENTATION', pileId: 'bf-p1', playerId: 'someone-else', stackKey: 's1', orientation: 'landscape',
+  });
+  assert.equal(after.piles[0].cards[0].orientation, 'landscape');
 });
 
-test('UNTAP_ALL: a non-owner cannot untap someone else\'s battlefield', () => {
+test('UNTAP_ALL: any player may untap someone else\'s battlefield', () => {
   const state = stateWithBattlefield([{ id: 'a', orientation: 'landscape' }]);
-  assert.throws(
-    () => reduce(state, { type: 'UNTAP_ALL', pileId: 'bf-p1', playerId: 'p2' }),
-    /authoriz/i,
-  );
+  const after = reduce(state, { type: 'UNTAP_ALL', pileId: 'bf-p1', playerId: 'p2' });
+  assert.equal(after.piles[0].cards[0].orientation, 'portrait');
 });
 
 // --- LandsPile -----------------------------------------------------------
@@ -231,7 +228,7 @@ test('LandsPile: a land with no derivable colour at all still gets a real (colou
 });
 
 test('LandsPile: offers untapAll and NOT take/split (a set of distinct permanents, not a stack to scoop)', () => {
-  const actions = new LandsPile({}).pileActions(shared);
+  const actions = new LandsPile({}).pileActions(context);
   assert.ok(actions.includes('untapAll'));
   assert.ok(actions.includes('tightenAll'));
   assert.ok(actions.includes('loosenAll'));
@@ -239,9 +236,6 @@ test('LandsPile: offers untapAll and NOT take/split (a set of distinct permanent
   assert.ok(!actions.includes('split'));
 });
 
-test('LandsPile: a non-owner of a personal lands pile gets nothing', () => {
-  assert.deepEqual(new LandsPile({}).pileActions(stranger), []);
-});
 
 test('LandsPile.groupBadge: counts untapped lands in the group, out of the total', () => {
   const cards = [

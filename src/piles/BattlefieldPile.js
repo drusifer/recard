@@ -31,8 +31,7 @@ export class BattlefieldPile extends Pile {
    * battlefield isn't a stack of interchangeable cards); tighten/loosen
    * has nothing to do with that, it adjusts overlap density, which a
    * battlefield's cards have exactly as much as any other pile's. */
-  pileActions({ isOwner, isShared } = {}) {
-    if (!isOwner && !isShared) return [];
+  pileActions() {
     return ['untapAll', 'changePileType', 'remove', 'tightenAll', 'loosenAll'];
   }
 

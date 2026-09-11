@@ -26,8 +26,7 @@ import { Pile } from './Pile.js';
 import { sortActionsFor } from '../pileables/pileableTypes.js';
 
 export class TokenPile extends Pile {
-  pileActions({ isOwner, isShared, cards = [] } = {}) {
-    if (!isOwner && !isShared) return [];
+  pileActions({ cards = [] } = {}) {
     // No `break` (that's a CHIP-specific, denomination concept) and no
     // `changePileType` (same "no false affordance" reasoning `ChipPile`
     // already applies - a token pile converting to a Foundation or a
