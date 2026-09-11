@@ -198,7 +198,37 @@ unit arithmetic, and CSS is the correct place for it.
   revives. Harmless (a Pileable is a cheap view over its record), but
   don't let a third reviver appear.
 
+## D130 — Infinity Table (US-110) arch pass (2026-09-10)
+
+Cypher flagged US-110 as arch-significant (no zoom/pan camera exists
+in this codebase today) and asked for a pass before Smith's Gate 1.
+Answered its 3 open questions:
+1. Zoom-out escape hatch is player-driven on top of an automatic
+   auto-fit default — `min(autoFitZoom, playerZoomOverride)`.
+2. Focus-zoom targets the Pile (matches D129's containment ladder),
+   not its Zone — a Pile already has its own DOM panel to bind to.
+3. No drag/drop coordination needed — `dropTarget.js` takes
+   `getBoundingClientRect()` rects with no DOM dependency, and rects
+   are already post-transform, so a CSS `transform` camera on a
+   wrapper is invisible to existing drag math.
+
+**Binding shape:** one wrapper around `#table-surface` carrying a CSS
+transform, driven by local-only player state (zoom target Pile id,
+auto-fit scale, player override). No data model change, no reducer
+action, no persistence — camera position is as ephemeral as scroll
+position. Full text: `docs/ARCHITECTURE.md` D130.
+
+Handed to Smith for Gate 1 with the foundation settled; Gate 1 owns
+transition timing/easing, hover-vs-click trigger balance, and what
+"too cramped" means as an actual threshold.
+
 ## Next Steps
+
+@Smith owns next move: `*user review US-110` (Gate 1), armed with
+D130's answers. Not yet planned into a sprint — that's Mouse's step
+after Gate 1 passes.
+
+---
 
 Iteration 2 (Neo) is the WIRING ONLY — Conditions 1 and 2 are done.
 D129 should be written up in `docs/ARCHITECTURE.md` (it is currently

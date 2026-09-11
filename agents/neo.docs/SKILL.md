@@ -264,3 +264,6 @@ actually surface.
 
 ### Testing
 - **Bash** — run `bobp make test`, `bobp make test FILE=...`, `bobp make coverage`
+
+## On Entry
+Read `agents/neo.docs/state.md` next — it has the current task, key decisions, and exact resume instructions. Do not start work before loading it.

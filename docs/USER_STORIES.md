@@ -3221,3 +3221,57 @@ be recreating per-player zones on one of its two code paths (fresh
 `NEW_GAME` dispatch vs. host-restore) - see `agents/CHAT.md`.
 
 Sprint status: COMPLETE.
+
+### US-110: Infinity table — auto-fit view with focus-zoom on hover/click
+**As** a player, **I want** the table to zoom out to show every zone at
+once, with room to grow beyond the screen for big layouts, and to zoom
+smoothly into whatever pile I'm pointing at, **so that** I always see
+the whole game at a glance but can still work a pile at full, legible
+size without ever touching a manual zoom control.
+
+**AC:**
+- Default view fits every Zone on screen at once (auto-fit zoom-to-
+  content), recomputed whenever a Zone is added/removed/resized.
+- When the auto-fit layout is too cramped to fit comfortably at a
+  legible minimum size, the player can zoom out further, which enlarges
+  the virtual table canvas itself (not just shrinks content) so zones
+  gain real room to spread out for large layouts.
+- Moving the pointer over a pile, or clicking one, smoothly zooms/pans
+  the view onto that pile's panel at a full, legible working size.
+- Moving the pointer off the pile (or clicking outside it) returns
+  smoothly to the current full-table view.
+- This is camera/view state only: purely local per player, not
+  replicated - each client's zoom/focus is independent, same as the
+  standing model for any other view-only state.
+- Desktop/mouse-only, per the standing UI-pass decision - no touch
+  parity chase.
+- `npm test`/`npm run lint` stay green; the feature ships with
+  regression tests, not one-off manual verification.
+
+**Out of scope:** a persistent user-set zoom level (this story is
+auto-fit + auto-focus only, not a manual zoom slider/control); any
+change to Zone/Pile data model or network protocol; mobile/touch
+layouts.
+
+**Open questions, flagged rather than assumed - need Smith/Morpheus
+input before implementation:**
+1. "Zoom out to make the table bigger" - is this player-driven (a
+   scroll/gesture the player invokes when the auto-fit feels cramped)
+   or fully automatic (the canvas silently grows whenever content
+   would otherwise overlap/clip)? The story is written assuming a
+   player-driven escape hatch on top of an automatic default, since a
+   fully automatic policy has no stated trigger for "when is it enough."
+2. Focus-zoom target granularity - "moves into or clicks onto a pile"
+   is written as Pile-level (matches D129's Pile/Stack model), not
+   Zone-level. Confirm that's right rather than zooming to the whole
+   Zone a pile lives in.
+3. Interaction while zoomed in - can the player still drag a card out
+   to a different pile/zone while focus-zoomed, or does drag-out force
+   an immediate zoom-back-out first? Not specified by the user; affects
+   whether this is purely a camera transform or needs to coordinate
+   with the existing drag/drop code.
+
+Sprint status: NOT STARTED. Recommend a Morpheus `*lead arch` pass
+given this introduces a new camera/viewport concept with no existing
+precedent in the codebase (no zoom/pan mechanism exists today), before
+Smith's Gate 1 UX read locks in interaction specifics.

@@ -5,7 +5,7 @@
 D21-D23) is historical - decisions are numbered continuously now and
 the highest number is always the current binding state, not a
 particular sprint's scope.
-**Last updated:** 2026-09-10 (D92-D129; backfilled D117-D129 this groom
+**Last updated:** 2026-09-10 (D92-D130; backfilled D117-D129 this groom
 - see D117's own "Groom note" and the D126-D128 gap entry)
 
 ## Core invariant (direct user request, stated repeatedly - binding on every Pile type, present and future)
@@ -35,6 +35,53 @@ still: card identity REDACTION (D7) is gone too - a viewer sees every
 card's real identity, always, not just whether it can be moved. As of
 D85, the same removal reaches the three BULK/pile-level actions that
 still had their own separate authorization gate.
+
+### D130. Infinity Table — camera is a pure CSS transform layer, no drag/drop changes
+
+Arch pass on US-110 (Infinity Table: auto-fit table view, player-driven
+zoom-out for big layouts, hover/click zoom-into-pile), requested by
+Cypher ahead of Smith's Gate 1. Answers the three open questions the
+story left unresolved rather than letting Gate 1 lock interaction
+specifics on an unexamined foundation:
+
+1. **Zoom-out escape hatch is player-driven, on top of an automatic
+   default.** Confirmed the story's own assumption: a fully-automatic
+   "grow when it would overlap" policy has no stated stopping
+   condition, so the player needs an explicit control once the
+   auto-fit reads as too cramped for the current layout size. This is
+   a `min(autoFitZoom, playerZoomOverride)` composition, not two
+   independent zoom states.
+2. **Focus-zoom targets the Pile, not its Zone.** Confirmed against
+   D129's containment ladder (`Table -> Zone -> Pile -> Stack ->
+   Stackable`) — a Pile is already its own DOM node
+   (`renderZonePanel`'s per-pile panel), so hover/click detection has a
+   real element to bind to with no new wrapper needed.
+3. **No coordination with drag/drop is required.** Checked
+   `dropTarget.js`: it takes `getBoundingClientRect()` rects from the
+   caller and has no DOM dependency of its own (its own header says
+   so). `getBoundingClientRect()` already returns post-transform
+   screen coordinates, so a CSS `transform: scale() translate()`
+   camera on a wrapper element is invisible to the existing drag math
+   — rects it reads are already correct at whatever zoom is active. A
+   card can be dragged out of a focus-zoomed pile with zero changes to
+   `dropTarget.js`/`touchDrag.js`.
+
+**Decision: this ships as a camera/viewport layer — one wrapper element
+around `#table-surface` carrying a CSS transform, driven by local
+player-only state (current zoom target: none/a Pile id, auto-fit
+scale, player zoom-override).** No Zone/Pile data model change, no
+reducer action, no wire/localStorage change — the same class of
+decision as D129's "plain records at rest" but here it's simpler:
+there is no persisted state at all, because camera position is exactly
+as ephemeral as scroll position. Rejected computing per-card/per-pile
+layout differently at different zoom levels (e.g. a simplified
+"zoomed-out" rendering) — that would duplicate every Pile's rendering
+logic at a second fidelity level for no benefit the CSS transform
+doesn't already provide for free.
+
+Sent to Smith for Gate 1 with these three settled; Gate 1 owns the
+remaining UX specifics (transition timing/easing, exact hover-vs-click
+trigger balance, what "too cramped" looks like as a real threshold).
 
 ### D129. Stack/Stackable — a real domain object replacing four bespoke overlap formulas
 

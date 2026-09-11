@@ -212,3 +212,6 @@ Tank (*devops) wires Trin's quality gates into the CI/CD pipeline. Trin must:
 - **Grep** — find code smells, TODO comments, hardcoded values
 - **Read** — review diffs and implementation before sign-off
 
+## On Entry
+Read `agents/trin.docs/state.md` next — it has the current task, key decisions, and exact resume instructions. Do not start work before loading it.
+

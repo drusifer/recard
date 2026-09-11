@@ -685,3 +685,34 @@ None pending. Standing backlog carries forward: reconnect-after-refresh
 and real QR (now 6 sprints running), 5+-player mobile density, builder
 screen, browser-automation tooling for Smith's OWN gate (distinct from
 Neo's test scripts), jsdom/e2e harness for ui.js, items 6-8 above.
+
+## Sprint: Infinity Table (2026-09-10) — QUEUED, NOT STARTED
+
+Direct user request (`*nreq infinity table`): auto-fit table view
+showing every Zone at once, a player-driven zoom-out to enlarge the
+virtual table canvas for big layouts, and hover/click-driven zoom into
+whatever Pile the pointer is on, returning to full-table view on
+pointer-out. Drafted **US-110** in USER_STORIES.md.
+
+Flagged explicitly as architecturally significant, not a routine
+story: **no zoom/pan/camera mechanism exists anywhere in this codebase
+today** - this introduces a new concept, unlike most stories which
+extend an existing one (Pileable, PileActions, etc.).
+
+Three open questions left for Smith/Morpheus rather than assumed (full
+text in the US-110 AC block):
+1. Is the "zoom out to make the table bigger" step player-driven or
+   fully automatic - the story assumes player-driven, since automatic
+   has no stated stopping condition.
+2. Focus-zoom targets the Pile, not its containing Zone (matches
+   D129's Pile/Stack model) - needs confirming.
+3. Whether drag-and-drop still works while focus-zoomed, or forces a
+   zoom-out first - affects whether this is pure camera work or must
+   coordinate with existing drag code.
+
+## Next Steps
+Start at `@Smith *user review US-110` (Gate 1). Given the "no existing
+precedent" flag, recommend Smith's review happen alongside, not before,
+a `@Morpheus *lead arch` pass - Morpheus should weigh in on the
+open questions above before Gate 1 locks interaction specifics, so the
+two probably want to run close together rather than strictly serial.

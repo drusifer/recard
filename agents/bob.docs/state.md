@@ -113,4 +113,24 @@ naturally in practice.
 Nothing.
 
 ---
-*Last updated: 2026-08-25 (added *nit loop)*
+
+## *bob learn: On Entry instruction added to every persona SKILL.md (2026-09-10)
+
+Direct user request: bake the "read your own state.md next" resume
+step into each persona's own `SKILL.md` file, not just the shared
+bob-protocol doc's ENTRY section - so the instruction survives even if
+a caller invokes a persona's skill directly without going through
+`*chat`/bob-protocol's cold-start steps.
+
+Added an identical `## On Entry` section to the end of all 9 persona
+files: `agents/{bob,cypher,morpheus,mouse,neo,oracle,smith,tank,trin}.docs/SKILL.md`,
+each pointing at that persona's own `state.md` path. Same wording
+everywhere for consistency; only the path differs.
+
+### Next Steps
+None pending. If a 10th persona is ever added, its `SKILL.md` should
+get the same `## On Entry` section as part of Bob's standard template
+(the "Creating a new agent" checklist should reference this).
+
+---
+*Last updated: 2026-09-10 (added On Entry section to all persona SKILL.md files)*

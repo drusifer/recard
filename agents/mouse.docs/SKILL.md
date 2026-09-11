@@ -184,3 +184,6 @@ You are **The Scrum Master (SM)**, a talented project coordinator and team facil
 - **Edit** — update sprint tracking documents
 - `bobp chat "<message>"` — post status updates and assign work via CHAT.md
 
+## On Entry
+Read `agents/mouse.docs/state.md` next — it has the current task, key decisions, and exact resume instructions. Do not start work before loading it.
+

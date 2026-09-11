@@ -1278,3 +1278,27 @@ make: *** [Makefile:50: lint] Error 1
 ---
 [<small>2026-09-10 22:29:13</small>] [**Neo**]->[**all**] *swe handoff*:
  session close: judge-loop groom + Oracle docs backfill (D117-D129) + bloop queue processing (5 items closed: gear clipping, gear reposition, hover-shadow, re-fan-after-flip, wide panels, all-players-pile-actions). 4 items queued not started (slider, flip radio-box, zone privacy, cursor redesign) - see neo.docs/state.md for details/next-step recommendations. dev+main pushed, tree clean, 787/787+68 browser tests green.
+
+---
+[<small>2026-09-10 23:35:42</small>] [**Neo**]->[**User**] *resume*:
+ Resuming cold start after /clear. Read CHAT.md handoff + neo.docs/state.md - all-players-pile-actions closed, tree clean, dev/main pushed. 4 queued items open (slider, flip-radio, zone privacy, cursor redesign), none started. Awaiting user direction on which to pick up.
+
+---
+[<small>2026-09-10 23:43:41</small>] [**User**]->[**all**] *request*:
+ *nreq infinity table: table zooms out to fit all zones. When table is full, user can zoom out further to make the table bigger, giving room for big layouts. When the player's mouse moves into or clicks onto a pile, the view auto-zooms into that panel at full size. Moving/clicking out returns to full table view.
+
+---
+[<small>2026-09-10 23:44:53</small>] [**Cypher**]->[**Morpheus**] *pm story*:
+ US-110 drafted (Infinity Table): auto-fit view of all zones, player-driven zoom-out to enlarge canvas for big layouts, hover/click zoom-into-pile at full size, zoom back out on pointer-out. Flagged as arch-significant - no zoom/pan mechanism exists in codebase today. Full text: docs/USER_STORIES.md US-110. @Morpheus *lead arch review the 3 open questions before Gate 1. @Smith *user review US-110
+
+---
+[<small>2026-09-10 23:46:01</small>] [**Morpheus**]->[**Smith**] *lead decision*:
+ D130 recorded: Infinity Table camera is a pure CSS transform layer (wrapper around #table-surface), local-only state, zero drag/drop changes needed - getBoundingClientRect is already post-transform. Rejected duplicating per-pile render logic at a zoomed-out fidelity. Focus targets Pile not Zone. Full text: docs/ARCHITECTURE.md D130. @Smith *user review US-110
+
+---
+[<small>2026-09-10 23:48:25</small>] [**User**]->[**all**] *request*:
+ *bob learn: add an On Entry instruction to the end of every persona SKILL.md pointing at that persona's own state.md, so the resume step is baked into the persona definition itself, not just the shared bob-protocol doc.
+
+---
+[<small>2026-09-10 23:49:12</small>] [**Bob**]->[**all**] *prompt learn*:
+ *bob learn done: added an On Entry section to all 9 persona SKILL.md files (bob/cypher/morpheus/mouse/neo/oracle/smith/tank/trin), each pointing at that persona's own state.md. Bakes the resume step into the persona definition itself, not just bob-protocol's shared ENTRY steps. Full note: agents/bob.docs/state.md

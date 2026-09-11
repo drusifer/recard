@@ -159,3 +159,6 @@ Invoke Smith with: `@Smith *user feedback <open question>`
 ### Coordinating
 - `bobp chat "<message>"` — post design proposals and decisions to CHAT.md
 
+## On Entry
+Read `agents/morpheus.docs/state.md` next — it has the current task, key decisions, and exact resume instructions. Do not start work before loading it.
+
