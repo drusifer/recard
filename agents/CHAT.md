@@ -112,3 +112,9 @@ Wrote coverage/test_audit_assets/jaccard_heatmap.png, coverage/test_audit_assets
 ---
 [<small>2026-09-11 08:18:18</small>] [**Trin**]->[**all**] *qa report*:
  Test audit re-run + addressed: closed 6 real gaps (TokenPile, StackPile x2, Zone x2 - no zones test file existed, pileActions.js x2 wrappers, SHUFFLE_DECK guard). Mutation-checked. Skipped the 83k redundancy candidates (report's own noise floor) and DOM-only gaps (no jsdom, covered live). Flagged state.js's remaining not-authorized guards as an open question. 819/819 unit, baselines held. Full: agents/trin.docs/test-audit-2026-09-11.md
+
+---
+[<small>2026-09-11 16:48:38</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-audit | /home/drusifer/Projects/recard/build/build.out
+Wrote test_audit_graph.html
+Wrote coverage/test_audit_assets/jaccard_heatmap.png, coverage/test_audit_assets/fanin_heatmap.png, coverage/test_audit_assets/pyramid.png

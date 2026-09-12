@@ -82,3 +82,62 @@ unchanged. Every new test mutation-spot-checked (Zone.viewerRelation
 shown here; the same shape of check - break the line, confirm the test
 fails with the mutated value, restore - was run against each new
 assertion before trusting it).
+
+## Follow-up Q&A pass (same day, later) - answered with real data, not recall
+
+The user asked several sharper questions about the report itself; each
+was answered by actually running something, not by describing the
+tool. Recorded here so the next reader doesn't have to re-derive them:
+
+- **"Can the data tell if a test touches 0 src code (over-mocked)?"**
+  Yes - `coverage/per-case/_manifest.json` already carries a `covered`
+  count per case. Checked directly: 0 of 819 cases have `covered: 0`.
+  The lowest are 16-26 lines, all real narrow assertions on genuinely
+  tiny pure constants/functions, not mocking artifacts.
+- **"Anything else worth addressing?"** Went back and actually READ
+  the three PNG heatmaps (`coverage/test_audit_assets/*.png`), which
+  had only been described from the table text before. The biggest
+  apparent redundancy block in the Jaccard heatmap (~270 cases, far
+  bigger than anything the tables surfaced) is `state.test.js`'s
+  entire reducer suite - every reducer test shares `createInitialState`/
+  `reduce`/`pilesOf` plumbing regardless of which action it exercises,
+  so FLIP/SORT_PILE/JOIN tests all show near-total pairwise overlap
+  despite asserting unrelated things. Confirms the structural
+  explanation rather than overturning it.
+- **"Why don't we use jsdom for ui.js?"** No recorded decision against
+  it - `docs/USER_STORIES.md` names it as a standing, unclaimed
+  backlog item ("browser-automation tooling / jsdom harness for
+  ui.js"), never built, never explicitly rejected.
+- **"Do Playwright tests actually cover ui.js's uncovered lines?"**
+  Checked for real with Playwright's `page.coverage.startJSCoverage()`
+  (real V8 execution ranges from an actual Chromium session) driving a
+  thorough scripted pass (host setup, deal, all 4 zoom presets, focus-
+  zoom hover/click, card context menu, a deck action, a card drag).
+  **Result: 62.0% of `ui.js`'s non-blank/non-comment lines executed
+  (697/1125)** - meaningfully more than unit-only 30.5%, confirming
+  browser tests genuinely pick up real slack, but not "basically
+  everything" as I'd implied earlier that same conversation. The
+  remaining gap is NOT random scatter - it's one coherent block:
+  `touchTargetAt`/`makeDragGhost`/`moveDragGhost`/
+  `wireTouchDragEvents`/`attachTouchDrag` (the touch-drag DOM-wiring
+  path) has zero coverage from anything, unit or browser, because
+  every current browser test drives with mouse events and this
+  project has a standing desktop/mouse-only decision for the current
+  UI pass. Real, named, and consistent with an existing decision -
+  not an oversight.
+- **Dead-code/extraction question**: scanned `ui.js` for exported
+  symbols with zero importers anywhere (none found - the 4 apparent
+  hits were custom-element side-effect imports my grep mis-scored) and
+  for pure logic still sitting inline, untested: `effectiveSpread`,
+  `deckDepth`, `pileDragToken`/the parse half of `pileDragFromDrop`,
+  and the parse/clamp half of `stackStepIn` are the real, small,
+  genuine extraction candidates - not yet pulled out, not yet decided
+  on by the user.
+
+No code changes in this pass - investigation and reporting only, using
+a throwaway Playwright coverage script (written, run, deleted -
+`tests/_check_ui_coverage.mjs` never existed after this session, per
+the project's own "no one-off verification left lying around" norm,
+though the SCRIPT itself was one-off by necessity - the FINDING is
+what's preserved here, not a repeatable check, since it depends on a
+live Chromium session and isn't meant to run in CI).
