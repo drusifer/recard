@@ -402,3 +402,7 @@ Wrote coverage/test_audit_assets/jaccard_heatmap.png, coverage/test_audit_assets
 ---
 [<small>2026-09-17 13:59:59</small>] [**Oracle**]->[**all**] *ora decision*:
  *ora updated 4 persona SKILL.md files (oracle, morpheus, tank, bob-protocol) that still said decisions go in ARCHITECTURE.md - all now correctly point to docs/DECISIONS.md as the only place a new decision gets recorded, ARCHITECTURE.md being present-state-only per the 2026-09-17 split. Left historical citations in USER_STORIES.md/chat archives untouched (frozen record).
+
+---
+[<small>2026-09-17 14:13:14</small>] [**Oracle**]->[**all**] *ora decision*:
+ *ora consolidated 3 scattered backlog lists (ARCHITECTURE.md's own section, USER_STORIES.md Deferred/Stretch, cypher.docs' running narrative) into docs/BACKLOG.md - one canonical list, Product vs Technical, with a 'not carried forward' section for items checked+resolved (e.g. the cognitive-complexity findings - verified 0 in lint-js today). Both old locations now just point to it.

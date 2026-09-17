@@ -188,4 +188,6 @@ sequenceDiagram
     Note right of Oracle: "*ora decision:<br/>ARCHITECTURE.md (6278<br/>lines, almost entirely a<br/>decision-log dump) split<br/>3 ways. Full D1-D132<br/>history moved verbatim<br/>to DECIS…"
     Oracle->>All: "ora decision"
     Note right of Oracle: "*ora updated 4 persona<br/>SKILL.md files (oracle,<br/>morpheus, tank, bob-<br/>protocol) that still<br/>said decisions go in<br/>ARCHITECTURE.md - all<br/>now corr…"
+    Oracle->>All: "ora decision"
+    Note right of Oracle: "*ora consolidated 3<br/>scattered backlog lists<br/>(ARCHITECTURE.md's own<br/>section, USER_STORIES.md<br/>Deferred/Stretch,<br/>cypher.docs' running<br/>narrativ…"
 ```

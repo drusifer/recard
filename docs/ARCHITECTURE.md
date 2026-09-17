@@ -167,19 +167,8 @@ number, respectively.
 
 ## Open, standing backlog items
 
-Carried forward, not blocking anything currently shipped:
-
-- **Reconnect-after-refresh** — if a client's own tab reloads mid-game,
-  it cannot currently resume its session; deferred since v1.
-- **No real two-peer automated test harness** — see Testing Strategy
-  above.
-- **5+-player mobile density** — a crowded table on a narrow viewport is
-  improved but not fully resolved by past passes; real but bounded.
-- **Per-seat anchor geometry** for non-viewer seats can still overlap
-  neighboring panels at some desktop widths/player counts — a real,
-  known, non-blocking gap in the seat-ring layout math.
-- **Reconciling `docs/DECISIONS.md`'s D83/D84 "no per-viewer restriction
-  of any kind"** with any future request for per-player privacy (e.g. a
-  personal zone hidden from other players) needs a direct, explicit
-  decision from the user before implementing — the two are in direct
-  tension and neither should be assumed to silently win.
+See `docs/BACKLOG.md` — the single consolidated list (this section used
+to duplicate it, along with `docs/USER_STORIES.md`'s own "Deferred /
+Stretch" section and the running narrative in
+`agents/cypher.docs/state.md`; consolidated 2026-09-17 for the same
+reason this file was split from a decision dump).

@@ -833,3 +833,13 @@ resizes (224px -> 119px) as its stack thins, violating its own "keeps
 its size while thinning" invariant (`tests/uiActions.browser.mjs`,
 "the deck visibly thins out as it empties, without the panel
 resizing"). Needs its own triage - not yet investigated.
+
+### Backlog consolidated 2026-09-17
+This file's own scattered "standing backlog" mentions (reconnect/QR,
+5+-player density, builder screen, browser-automation tooling for
+Smith's gate, jsdom/e2e harness, the items immediately above, and
+everything else accumulated sprint-to-sprint in this narrative) are now
+tracked in one place: `docs/BACKLOG.md`. Add new backlog items there
+going forward, not as another inline mention here - this file stays the
+sprint-by-sprint narrative log, `docs/BACKLOG.md` is the single current
+list.

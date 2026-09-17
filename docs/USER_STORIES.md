@@ -1976,22 +1976,11 @@ necessary rather than at every phase).
 ---
 
 ## Deferred / Stretch
-- Scannable QR code image for joining (v1 ships join-code + Copy Link
-  instead; descoped 2026-08-15, see CHAT.md Neo→Cypher).
-- In-app text chat or reactions.
-- Custom card backs/themes.
-- Reconnect-to-session after refresh/drop.
-- ~~**Radial action menu, pointer-centered**~~ - **SHIPPED (D52,
-  2026-08-21)**: hovering an actionable card/pile now shows its actions
-  as a radial ring around the pointer; a `target`-bearing action makes
-  the card follow the mouse with valid drop targets highlighted, click
-  to confirm. Built without the icon-language prerequisite this entry
-  originally flagged (text labels, not icons - reads fine in practice
-  at this button count) and without new edge-clamping math (a fixed
-  small radius, not distance/screen-bounds-aware). `tests/e2e.smoke.mjs`
-  coverage for it landed in a follow-up close-out pass; see D52's own
-  groom note in `docs/ARCHITECTURE.md` for the five real bugs that
-  surfaced getting the suite honestly green.
+
+See `docs/BACKLOG.md` — the single consolidated backlog list
+(consolidated 2026-09-17; this section used to duplicate it, along
+with `docs/ARCHITECTURE.md`'s own former "Open, standing backlog
+items" section).
 
 ## Sprint 22 ("Zone/Pile polymorphism, proven by Solitaire + Spit") — US-56..59
 

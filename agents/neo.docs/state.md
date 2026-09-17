@@ -305,6 +305,9 @@ all 4 browser suites green (68 tests), lint-js/lint:design both at
 their pre-existing baselines (unchanged byte-for-byte).
 
 ### Queued, NOT started - real feature/design work, not fixes
+(also tracked in `docs/BACKLOG.md` as of the 2026-09-17 consolidation -
+add new items to both, or just to BACKLOG.md if this section stops
+getting read)
 1. ~~**Tighten/Loosen as a slider**~~ DONE 2026-09-13 (`/sprint sliders`):
    `<spread-slider>` (`src/components/SpreadSlider.js`), shared between
    the pile-level menu and the per-stack gear menu, replaces the old
@@ -637,12 +640,10 @@ slider + table-zoom wheel/pan + focus-zoom fixes bundled together -
 merged forward from `main` first to catch up 7 commits `dev` had
 fallen behind by.
 
-Standing, NOT started: pinch-to-zoom math exists (`zoomFromPinch`,
-tested) but isn't wired to a live touch listener - no touch device to
-verify against. Needs either a live verification session with the
-user on a real touch device, or an explicit "ship it unverified."
-Also still open: the pre-existing focus-zoom/context-menu bug (filed
-2026-09-13, reproduces identically as of 2026-09-16 - see cypher.docs/
-state.md), and the standing queue items 2-4 from before this session
-(flip radio-box, zone privacy vs D83/D84, cursor redesign) - see this
-file's own "Queued, NOT started" section above.
+Standing, NOT started - now tracked in `docs/BACKLOG.md` (consolidated
+2026-09-17, along with every other backlog list that had been
+scattered across this project): pinch-to-zoom wiring, the queued items
+2-4 above (flip radio-box, zone privacy vs D83/D84, cursor redesign).
+The focus-zoom/context-menu bug mentioned in earlier entries here was
+fixed 2026-09-17 (see `docs/BACKLOG.md`'s "Not carried forward" section
+and `agents/oracle.docs/memory.md`'s 2026-09-17 row) - no longer open.
