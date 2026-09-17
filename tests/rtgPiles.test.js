@@ -51,12 +51,12 @@ test('BattlefieldPile: offers untapAll, and never split or take', () => {
 // *nit (direct user request): "add tighter/looser actions to the
 // battlefield pile" - offered by the base class for every ROW-laid-out
 // pile kind; this pile just wasn't including them in its own override.
-test('BattlefieldPile: offers tighten and loosen, disabled at the spread ceiling/floor', () => {
+// Tighten/Loosen slider (2026-09-13): one `spread` action now, bounded
+// by its own slider `min`/`max` rather than a disabled-at-the-limit
+// button pair.
+test('BattlefieldPile: offers spread', () => {
   const pile = new BattlefieldPile({});
-  assert.ok(pile.pileActions(context).includes('tightenAll'));
-  assert.ok(pile.pileActions(context).includes('loosenAll'));
-  assert.deepEqual(pile.disabledActions(2, { spread: pile.constructor.maxSpread }).includes('tightenAll'), true);
-  assert.deepEqual(pile.disabledActions(2, { spread: 0 }).includes('loosenAll'), true);
+  assert.ok(pile.pileActions(context).includes('spread'));
 });
 
 // --- ExilePile ---------------------------------------------------------
@@ -239,8 +239,7 @@ test('LandsPile: a land with no derivable colour at all still gets a real (colou
 test('LandsPile: offers untapAll and NOT take/split (a set of distinct permanents, not a stack to scoop)', () => {
   const actions = new LandsPile({}).pileActions(context);
   assert.ok(actions.includes('untapAll'));
-  assert.ok(actions.includes('tightenAll'));
-  assert.ok(actions.includes('loosenAll'));
+  assert.ok(actions.includes('spread'));
   assert.ok(!actions.includes('take'));
   assert.ok(!actions.includes('split'));
 });

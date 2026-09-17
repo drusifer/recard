@@ -1506,7 +1506,13 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
      `.rtg-inspect` already is, never nested inside `#zones`, or it
      would be clipped to the table's own box instead of escaping to the
      full viewport. */
-  transform: scale(var(--table-zoom, 1));
+  /* Drag-to-pan (direct user request, 2026-09-16): `translate` OUTSIDE
+     `scale` (applied to the already-scaled result, in real on-screen
+     pixels) so a drag of N screen pixels moves the table by N screen
+     pixels regardless of current zoom - `scale` alone inside would make
+     a fixed pan value read as a bigger or smaller move depending on
+     zoom, which is not how dragging something should feel. */
+  transform: translate(var(--table-pan-x, 0), var(--table-pan-y, 0)) scale(var(--table-zoom, 1));
   transform-origin: top center;
 }
 
@@ -1530,9 +1536,36 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   min-height: 44px;
 }
 
-#table-zoom-dial {
-  flex: 1 1 auto;
-  max-width: 12rem;
+/* *fix (direct user request, 2026-09-16): "like the zoom wheel on a
+   mouse" as its own control, vertical, drag-the-tread-up-to-zoom-in.
+   Sized short/wide enough to clear the 44px touch-target floor while
+   still visually reading as a compact wheel, not a full-height slider. */
+.table-zoom-wheel {
+  width: 2.5rem;
+  height: 44px;
+  min-width: 44px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--accent);
+  cursor: ns-resize;
+  overflow: hidden;
+  touch-action: none;
+}
+
+/* The "tread": horizontal ridges reading as a wheel's grippy surface,
+   not a flat track - a `repeating-linear-gradient` needs no image
+   asset and scales with the control's own size. */
+.table-zoom-wheel-tread {
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--accent) 0,
+    var(--accent) 2px,
+    transparent 2px,
+    transparent 8px
+  );
+  opacity: 0.6;
 }
 
 /* US-117 phase 113 (D131): grow a Pile in place on hover/click. Applied
@@ -2622,6 +2655,25 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .pile-action-enum-btn::-webkit-details-marker {
   display: none;
   content: '';
+}
+
+/* Tighten/Loosen slider (direct user request, 2026-09-13): the
+   RangeAction sibling of `.pile-action-enum` above (`ui.js`'s
+   `buildRangeAction`, `<spread-slider>`). A native range input, not a
+   pair of `.pile-action-btn` icons any more - sized to the same
+   compact 1.3rem header-row height, a fixed width since (unlike the
+   enum control) there's no label text to size to and no numeric
+   readout (direct user answer at Smith's gate: handle position only). */
+.pile-action-range {
+  display: inline-flex;
+  align-items: center;
+  height: 1.3rem;
+}
+.spread-slider-input {
+  width: 4rem;
+  height: 1.3rem;
+  margin: 0;
+  cursor: pointer;
 }
 
 /* The open menu - a real touch target per item (unlike the compact

@@ -264,13 +264,14 @@ test('a card menu never opens empty', async () => {
   await fixture.page.keyboard.press('Escape');
 });
 
-// --- Tighten / Loosen (*nit) ----------------------------------------
+// --- Tighten/Loosen slider (*nit, 2026-09-13) ------------------------
 //
-// This layer earned itself again here. The reducer tests for
-// ADJUST_PILE_SPREAD all passed while the feature did nothing on
-// screen: `spread` was written to state correctly but never named in
-// `Pile.getView()`'s explicit field list, so it never crossed into the
-// view. Nothing below the browser could have seen that.
+// This layer earned itself again here, twice over: the reducer tests
+// for the original ADJUST_PILE_SPREAD all passed while the feature did
+// nothing on screen (`spread` was written to state correctly but never
+// named in `Pile.getView()`'s explicit field list); and the slider's
+// own drag-fighting guard (`shouldApplyExternalValue`) is a real
+// browser interaction concern no unit test can see at all.
 const handRow = () => fixture.page.locator('[data-kind="hand"] .card-row').first();
 // D129: spread is the STACK's now, published on the stack element -
 // the row carries the pile-wide fallback, which a per-stack adjustment
@@ -285,10 +286,23 @@ const gapPx = () => handRow().evaluate((row) => {
   const [first, second] = row.querySelectorAll('.middle-card');
   return second.getBoundingClientRect().x - first.getBoundingClientRect().x;
 });
+// The slider's own internal `<input type=range>` (`SpreadSlider.js`) -
+// a HIGHER value means MORE overlap (tighter, smaller gap), a LOWER
+// value means LESS overlap (looser, bigger gap): `ChipPile`'s own
+// `defaultSpread >= 0.9` ("start nearly stacked") is the same direction.
+const handSlider = () => fixture.page.locator('[data-kind="hand"] .spread-slider-input');
 
-test('Loosen really spreads the cards apart on screen, not just in state', async () => {
+// Interacting with the slider hovers the pointer over the hand pile,
+// which is also a focus-zoom trigger (US-117) - `HOVER_INTENT_MS`
+// (180ms) is well within these tests' own wait windows, so without an
+// explicit move-away the pile is left `focus-zoomed` for whichever test
+// runs next in this shared-page suite (found live: three unrelated
+// later tests all timed out on a pointer-events-blocked hand pile).
+// `page.mouse.move(0, 0)` is the same teardown `focusZoom.browser.mjs`
+// itself uses.
+test('dragging the slider down really spreads the cards apart on screen, not just in state', async () => {
   const before = await gapPx();
-  await fixture.page.locator('[data-kind="hand"] button[title="Loosen All"]').click();
+  await handSlider().fill('0');
   await fixture.page.waitForFunction(
     (previous) => {
       const row = document.querySelector('[data-kind="hand"] .card-row');
@@ -298,12 +312,13 @@ test('Loosen really spreads the cards apart on screen, not just in state', async
     before, { timeout: 5000 },
   );
   assert.ok(await gapPx() > before, 'cards overlap less than they did');
-  assert.notEqual(await spreadOf(), '', 'the row really carries the pile\'s own spread');
+  assert.equal(await spreadOf(), '0', 'the row really carries the pile\'s own spread');
+  await fixture.page.mouse.move(0, 0);
 });
 
-test('Tighten is the exact inverse - one of each returns to where it started', async () => {
+test('dragging the slider back up is the exact inverse - returns to where it started', async () => {
   const before = await gapPx();
-  await fixture.page.locator('[data-kind="hand"] button[title="Tighten All"]').click();
+  await handSlider().fill('0.85');
   await fixture.page.waitForFunction(
     (previous) => {
       const row = document.querySelector('[data-kind="hand"] .card-row');
@@ -312,26 +327,21 @@ test('Tighten is the exact inverse - one of each returns to where it started', a
     },
     before, { timeout: 5000 },
   );
-  await fixture.page.locator('[data-kind="hand"] button[title="Loosen All"]').click();
+  await handSlider().fill('0');
   await fixture.page.waitForTimeout(200);
   assert.ok(Math.abs(await gapPx() - before) < 0.5, 'back to the same overlap');
+  await fixture.page.mouse.move(0, 0);
 });
 
-// The disabled-at-the-limit rule, which only exists so a player never
-// clicks a control that cannot do anything.
-test('Loosen disappears at minimum spread, and Tighten still works from there', async () => {
-  for (let index = 0; index < 12; index++) {
-    const loosen = fixture.page.locator('[data-kind="hand"] button[title="Loosen All"]');
-    if (await loosen.count() === 0 || await loosen.isDisabled()) break;
-    await loosen.click();
-    await fixture.page.waitForTimeout(80);
-  }
-  const loosen = fixture.page.locator('[data-kind="hand"] button[title="Loosen All"]');
-  assert.ok(await loosen.count() === 0 || await loosen.isDisabled(), 'no dead Loosen at the floor');
+// The slider is bounded by its own `min`/`max` (`0`/`kind.maxSpread`) -
+// unlike the old button pair, there is no disabled-at-the-limit state
+// to check; the browser's own native range input enforces the range.
+test('the slider is bounded by the pile kind\'s own ceiling', async () => {
+  const max = await handSlider().getAttribute('max');
+  assert.equal(max, '0.85', 'a card pile\'s own MAX_SPREAD ceiling (Pile.js)');
+  await handSlider().fill('0');
   assert.equal(await spreadOf(), '0', 'fully loosened means no overlap at all');
-
-  const tighten = fixture.page.locator('[data-kind="hand"] button[title="Tighten All"]');
-  assert.ok(await tighten.count() > 0 && !(await tighten.isDisabled()), 'the other direction is still open');
+  await fixture.page.mouse.move(0, 0);
 });
 
 // --- Rendering actually reaches the face (sprint pileObjects) --------

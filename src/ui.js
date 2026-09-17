@@ -5,7 +5,7 @@ import {
 } from './pileActions.js';
 import { seatPosition } from './seating.js';
 import { stacksOf, stackKeyFor } from './piles/Stack.js';
-import { MAX_SPREAD } from './piles/Pile.js';
+import { MAX_SPREAD, MIN_SPREAD } from './piles/Pile.js';
 import { PILE_TYPES } from './piles/pileTypes.js';
 import { ZONE_TYPES } from './zones/zoneTypes.js';
 import { pileableFor } from './pileables/pileableTypes.js';
@@ -400,6 +400,26 @@ function applyIconButton(button, spec, labelOverride) {
  *   choice list (`buildEnumActionMenu`) - `onAction`'s second arg is only
  *   ever populated for one of those ids.
  */
+/**
+ * An action id that isn't a plain single-click button: an EnumAction
+ * (`spec.enum`, e.g. `changePileType`, `buildEnumActionMenu`) or a
+ * RangeAction (`spec.range`, e.g. `spread`, `buildRangeAction` -
+ * Tighten/Loosen slider, 2026-09-13). Extracted out of
+ * `renderActionHeader`'s own action loop so that loop stays under its
+ * cognitive-complexity budget as more of these special cases join
+ * plain buttons - each one is a self-contained "does this id need
+ * something other than a button, and if so what" check.
+ *
+ * @returns {HTMLElement|undefined} the control to render instead of a
+ *   button, or `undefined` for a plain action.
+ */
+function buildSpecialActionControl(id, spec, options) {
+  const enumInfo = spec.enum ? options.enumOptions?.[id] : undefined;
+  if (enumInfo) return buildEnumActionMenu(id, spec, enumInfo, options);
+  const rangeInfo = spec.range ? options.rangeOptions?.[id] : undefined;
+  if (rangeInfo) return buildRangeAction(id, spec, rangeInfo, options);
+}
+
 export function renderActionHeader(container, titleText, actionIds, options = {}) {
   container.replaceChildren();
   const extraClass = options.headingClass ? ` ${options.headingClass}` : '';
@@ -475,13 +495,9 @@ export function renderActionHeader(container, titleText, actionIds, options = {}
   for (const id of actionIds) {
     if (options.disabled?.includes(id)) continue;
     const spec = ACTION_SPECS[id];
-    // *nit (direct user request): an EnumAction (`spec.enum`, e.g.
-    // `changePileType`) renders as a menu button showing the CURRENT
-    // value, not a plain single-click icon - see `buildEnumActionMenu`'s
-    // own doc comment.
-    const enumInfo = spec.enum ? options.enumOptions?.[id] : undefined;
-    if (enumInfo) {
-      container.append(buildEnumActionMenu(id, spec, enumInfo, options));
+    const specialControl = buildSpecialActionControl(id, spec, options);
+    if (specialControl) {
+      container.append(specialControl);
       continue;
     }
     const button = document.createElement('button');
@@ -575,6 +591,59 @@ function buildEnumActionMenu(id, spec, { value, choices }, options) {
   }
   details.append(menu);
   return details;
+}
+
+/**
+ * Tighten/Loosen slider (direct user request, 2026-09-13): a
+ * RangeAction (`spec.range`, e.g. `spread`/`spreadStack`) renders as
+ * one `<spread-slider>` (`components/SpreadSlider.js`) instead of a
+ * button - the same "static spec + per-instance value/bounds at the
+ * render call site" split `buildEnumActionMenu` above already uses
+ * (`rangeOptions` here, `enumOptions` there).
+ *
+ * The slider fires live on every drag tick (the user's own answer at
+ * Smith's gate) via its `spread-input` event, forwarded straight to
+ * `options.onAction(id, value)` - the same second-argument shape
+ * `buildEnumActionMenu`'s choice buttons already use.
+ *
+ * @param {string} id the action id (e.g. `'spread'`)
+ * @param {{label: string}} spec
+ * @param {{value: number, min: number, max: number}} rangeInfo
+ * @param {{onAction: (id: string, value: number) => void}} options
+ */
+function buildRangeAction(id, spec, { value, min, max }, options) {
+  const slider = document.createElement('spread-slider');
+  slider.className = 'pile-action-range';
+  slider.setAttribute('min', String(min));
+  slider.setAttribute('max', String(max));
+  // `step="any"`, not `0.1`: `SET_STACK_SPREAD` rounds to 3 decimal
+  // places, not to a 0.1 grid, and a fixed 0.1 step from `min` (0) can
+  // never actually LAND on a kind's own ceiling when it isn't a clean
+  // multiple of 0.1 - a card pile's own 0.85 is exactly this case,
+  // found live: the browser refuses a `step`-misaligned value outright
+  // (a stack could drag to 0.8 but never reach its true maximum).
+  slider.setAttribute('step', 'any');
+  slider.title = spec.label;
+  slider.setAttribute('aria-label', spec.label);
+  // A completed drag on a native range input fires a real `click` that
+  // bubbles - inside `openStackActionMenu`'s popup, that click would
+  // otherwise reach the document-level outside-click listener that
+  // closes the menu (`closeCardContextMenu`), dismissing it the instant
+  // a drag finishes. Every button in these menus already stops this
+  // same propagation in its own click handler for the same reason.
+  slider.addEventListener('click', (event) => event.stopPropagation());
+  slider.addEventListener('spread-input', (event) => {
+    options.onAction(id, event.detail.value);
+  });
+  // Set as a property, not just the initial attribute: `connectedCallback`
+  // reads the attribute once on first connection, but a later external
+  // update (this pile's spread changed - by this viewer's own drag once
+  // it round-trips through replicated state, or by someone else's) has
+  // to go through the property setter's own drag-guard
+  // (`shouldApplyExternalValue`, `SpreadSlider.js`) to avoid fighting an
+  // in-progress drag.
+  slider.value = value;
+  return slider;
 }
 
 /**
@@ -682,8 +751,8 @@ function faceOptionsFor(canReveal, canRotate, isBack, card, options) {
  * `ChipPile` applies to `changePileType`.
  */
 function stackGearFor(stack, pileView, options) {
+  const maxSpread = PILE_TYPES[pileView.kind]?.maxSpread ?? MAX_SPREAD;
   const { ids, disabled } = stack.stackActions({
-    maxSpread: PILE_TYPES[pileView.kind]?.maxSpread ?? MAX_SPREAD,
     canTap: PILE_TYPES[pileView.kind]?.supportsStackTap === true,
   });
   if (ids.length === 0) return null;
@@ -697,7 +766,11 @@ function stackGearFor(stack, pileView, options) {
   gear.addEventListener('click', (event) => {
     event.stopPropagation();
     const at = gear.getBoundingClientRect();
-    openStackActionMenu(at.left, at.bottom, ids, disabled, pileView.id, stackKeyFor(stack.id), options);
+    // Tighten/Loosen slider (2026-09-13): `spreadStack`'s current value
+    // and bounds - the per-stack sibling of the pile-level menu's own
+    // `rangeOptions.spread` (see the `renderPile` call site).
+    const rangeOptions = { spreadStack: { value: stack.spread, min: MIN_SPREAD, max: maxSpread } };
+    openStackActionMenu(at.left, at.bottom, ids, disabled, pileView.id, stackKeyFor(stack.id), rangeOptions, options);
   });
   return gear;
 }
@@ -968,12 +1041,24 @@ function attachCardContextMenu(wrapper, card, pileableActions, piles, fromPileId
  * rule D101 followed. What differs is only WHAT it acts on: a stack,
  * addressed by its key, rather than a card.
  */
-function openStackActionMenu(clientX, clientY, actionIds, disabled, pileId, stackKey, options) {
+function openStackActionMenu(clientX, clientY, actionIds, disabled, pileId, stackKey, rangeOptions, options) {
   closeCardContextMenu();
   const menu = document.createElement('div');
   menu.className = 'pile-action-menu card-context-menu stack-action-menu';
   for (const id of actionIds) {
     const spec = ACTION_SPECS[id];
+    // Tighten/Loosen slider (2026-09-13): `spreadStack` (`spec.range`)
+    // renders as a `<spread-slider>`, same as the pile-level menu's own
+    // `spread` action (`buildRangeAction`) - it does NOT close the menu
+    // on interaction the way a plain button does, since a slider is
+    // meant to be dragged repeatedly, not clicked once and dismissed.
+    const rangeInfo = spec.range ? rangeOptions?.[id] : undefined;
+    if (rangeInfo) {
+      menu.append(buildRangeAction(id, spec, rangeInfo, {
+        onAction: (actionId, value) => options.onStackAction?.(pileId, stackKey, actionId, value),
+      }));
+      continue;
+    }
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'pile-action-menu-item';
@@ -1490,18 +1575,7 @@ export function renderPileShell(container, pile, allPiles, options, buildRow) {
       // at zero cards) is now read polymorphically per pile type
       // (`disabledPileActionsFor`), not a `pile.kind === 'deck'` check
       // hardcoded here.
-      // *nit (Tighten/Loosen): the pile's CURRENT effective spread goes
-      // in too, so Tighten is disabled at maximum and Loosen at minimum
-      // rather than being a dead click there. `?? defaultSpread` is
-      // resolved here because only this layer knows whether this pile
-      // has ever been adjusted; the class only knows its type's default.
-      // D129: `stacks` for the same reason `cards` is here - spread
-      // lives on each stack now, and `pileForKind` builds a BARE
-      // instance whose `this.stacks` is empty. Without it, Tighten
-      // All/Loosen All read the pile's stale fallback spread and never
-      // disable at the limits, which is a dead control at both ends.
-      disabled: disabledPileActionsFor(pile.kind, pile.count ?? pile.cards.length,
-        { spread: effectiveSpread(pile), cards: pile.cards, stacks: pile.stacks }),
+      disabled: disabledPileActionsFor(pile.kind, pile.count ?? pile.cards.length, { cards: pile.cards }),
       // US-61 (Sprint 23), Smith's ruling (Phase 70): `take` confirms
       // unconditionally EXCEPT a 1-card pile, where it's identical in
       // effect to that card's own un-confirmed single-card `pickup`.
@@ -1526,6 +1600,18 @@ export function renderPileShell(container, pile, allPiles, options, buildRow) {
           // the menu" - the choices are the PILE'S own, not every kind
           // that exists (`convertibleKindsFor`, D87 unchanged for cards).
           choices: convertibleKindsFor(pile.kind).map((kind) => ({ value: kind, label: pileKindLabel(kind) })),
+        },
+      },
+      // Tighten/Loosen slider (2026-09-13): `spread`'s current value and
+      // bounds, the RangeAction sibling of `changePileType`'s enumOptions
+      // above - `ACTION_SPECS.spread` only knows this action IS a range
+      // (`range: true`), never which pile or pile KIND it's rendering
+      // for (the ceiling is per-kind, `Pile.js`'s own `maxSpread`).
+      rangeOptions: {
+        spread: {
+          value: effectiveSpread(pile),
+          min: MIN_SPREAD,
+          max: PILE_TYPES[pile.kind]?.maxSpread ?? MAX_SPREAD,
         },
       },
       // *nit (2026-08-26): rename affordance, any player.

@@ -743,9 +743,11 @@ found and closed a real TEST-coverage gap (re-render survival was
 claimed but never actually tested) before approving either phase.
 
 ### Backlog added this sprint (from retro)
-1. **Check story-number uniqueness** (Oracle) - a `check-decisions.mjs`
-   equivalent for `USER_STORIES.md`; this sprint's own US-110/US-117
-   collision would have been caught automatically.
+1. ~~**Check story-number uniqueness**~~ CLOSED 2026-09-12 - shipped as
+   `tools/checkStoryNumbers.mjs`/`make check-story-numbers`, autonomous
+   sprint ("you guys decide"). Full cycle, 833/833 unit green, mutation-
+   checked, Smith DX-parity gate passed. See `agents/oracle.docs/
+   memory.md` (2026-09-12 row).
 2. **XL table zoom pushes the player's own hand below the fold**
    (Smith, non-blocking) - bends the standing "see table + hand
    together" principle; an accepted trade-off for a deliberate
@@ -760,3 +762,68 @@ None pending on US-117. Standing backlog (reconnect/real QR, 5+-player
 mobile density, builder screen, browser-automation tooling for Smith's
 gate, jsdom/e2e harness) carries forward unchanged, plus items 1-3
 above.
+
+---
+
+## Sprint: Tighten/Loosen slider (2026-09-13)
+
+Direct user invocation (`/sprint sliders`), picking up queued item #1
+from Neo's standing queue (see `neo.docs/state.md`): replace the
+separate Tighten/Loosen (and Tighten All/Loosen All) buttons with one
+range control.
+
+**Story**: As a player adjusting how a stack or pile's cards overlap, I
+want one slider instead of clicking +/- repeatedly, so I can dial in a
+spread directly.
+
+**AC**:
+1. One reusable Web Component renders the control; both the per-stack
+   gear menu and the pile-level menu (Tighten All/Loosen All) use the
+   same component, not two implementations.
+2. Dragging it dispatches spread changes through the existing
+   replicated pipeline (`ADJUST_PILE_SPREAD` or an equivalent absolute-
+   set action Morpheus specifies) - value range 0 (MIN_SPREAD) to a
+   pile-kind's own `maxSpread` ceiling (0.85 default, chip stacks
+   tighter), same clamping the buttons already enforce.
+3. Every client at the table sees the same value (presentation state,
+   replicated - matches every existing Tighten/Loosen precedent).
+4. Old +/- buttons are fully replaced, not kept alongside (no back-
+   compat shim per standing project convention) - unless the user's
+   own design answer says otherwise.
+
+**Explicitly NOT assumed - real visual-design calls for the user**:
+- Does the slider fire live on every drag tick, or only commit on
+  release/mouseup?
+- Does it show a numeric readout of the current spread value, or is
+  the handle position itself the only feedback?
+- Layout: does it fully replace the two buttons in the menu row, or
+  do +/- nudge-buttons remain at each end of the slider for fine
+  single-step control?
+
+These go to Smith's gate as an `AskUserQuestion`, not a guess - this is
+exactly the item Neo flagged as needing the user's own visual judgment,
+not busywork a fix-loop can push through.
+
+### Next Steps
+Smith gate 1, surfacing the 3 design questions above to the user before
+approving. Once answered, Morpheus arch (absolute-set vs delta-based
+dispatch from a continuous input) -> Gate 2 -> Mouse phase -> impl.
+
+### DONE 2026-09-13, with one new backlog item found
+User answered all 3 questions directly. Shipped as `<spread-slider>` +
+`SET_STACK_SPREAD`, full 2-phase cycle, both menu sites converted, old
+buttons/`ADJUST_PILE_SPREAD` deleted outright. Full history: `agents/
+oracle.docs/memory.md` (2026-09-13 row), `agents/morpheus.docs/state.md`.
+
+**New backlog item (Trin, found during Phase 2 UAT, NOT fixed this
+sprint - unrelated to the slider):** a hand pile's US-117 focus-zoom can
+get stuck open (`.focus-zoomed` never clears) mid right-click card-menu
+interaction, blocking pointer events for whatever browser test/real
+interaction runs next. Reproduced identically across 3 consecutive full
+`test:ui` runs - fails BEFORE any slider code executes, so it's a real,
+pre-existing gap in the focus-zoom hover-intent/dismissal logic
+(`main.js`'s `applyFocusZoom`/`shrinkFocusedPile`), not new-code flake.
+5 browser tests fail directly on it, 2 more (deck rendering) fail
+downstream. Needs its own triage - likely the hover-intent timer or the
+`pointerleave`-once listener not accounting for a context menu opening
+mid-hover.

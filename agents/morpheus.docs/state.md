@@ -341,3 +341,98 @@ follow ARCHITECTURE.md and do not start a third location. Smith's UX gate is cor
 in iteration 2 — overlap is the most directly user-visible thing on
 the table, and `lint-design`'s 9 red violations are user-facing
 layout failures, not lint noise.
+
+---
+
+## `*lead arch slider` (2026-09-13)
+
+Tighten/Loosen slider (queued item #1). User answered the 3 real
+design questions directly (via Smith's gate): live updates while
+dragging, no numeric readout, slider-only (no +/- nudge buttons kept
+alongside). One nuance in the live-update answer needs a real
+architecture response, not just "wire it up":
+
+> "Live but don't let the slider move while the stack tighten/loosen
+> or it won't work"
+
+Read as: whatever renders the slider's own handle position must not
+get overwritten by the app's normal state-driven re-render while the
+user's pointer is still down on it - a classic controlled-input
+fight-the-user bug (set `.value` from incoming state on every render,
+and the browser's native drag tracking loses against it, or worse, the
+element gets torn down and rebuilt mid-drag and the OS-level pointer
+capture is lost outright).
+
+Checked whether this is already a risk in this codebase: `ui.js`'s
+`openStackActionMenu`/pile-level menu build fresh DOM once per open,
+appended to `document.body`, and `renderGameFromView` (`main.js`)
+never calls `closeCardContextMenu()` - so an open menu already survives
+a full state re-render untouched today. That's good news structurally,
+but NOT a guarantee once a `<spread-slider>` element sits inside that
+menu and Neo wires it to *reflect* the replicated spread value (needed
+so a second tightened-by-someone-else's-slider stack still shows
+correctly if you didn't open the menu yourself, and so a freshly
+opened menu shows the CURRENT value) - that reflection path is exactly
+where the bug would get introduced if built naively.
+
+### Decisions
+1. **New reducer action `SET_STACK_SPREAD`** (absolute value, not
+   delta) alongside the existing `ADJUST_PILE_SPREAD` — same
+   clamp-to-`[MIN_SPREAD, kind.maxSpread]` and same stack-routing
+   rules (pile-level route-to-every-stack vs one `stackKey`), but takes
+   a value because a `<input type=range>`'s native event already IS an
+   absolute value; converting that to a delta and re-adding it every
+   drag tick is unnecessary indirection and reintroduces exactly the
+   float-drift `ADJUST_PILE_SPREAD`'s own comment warns about, at a
+   much higher event rate (every drag tick vs one click). Chose a
+   sibling action over overloading `ADJUST_PILE_SPREAD` with an
+   `absolute` flag — two clear action shapes over one action with a
+   mode switch.
+   `ADJUST_PILE_SPREAD` stays for now (Tighten All/Loosen All step
+   buttons at the pile level are staying step-based since the slider
+   replaces per-stack + pile-level UI, not the underlying step
+   semantics for anything not converted).
+2. **`<spread-slider>` Web Component** (per [[feedback_encapsulate_webcomponents]]
+   convention) owns its own interaction lifecycle:
+   - Exposes a `value` property/attribute (the external, replicated
+     spread) and `min`/`max` (from the pile kind's `maxSpread`).
+   - Internally tracks whether IT is the thing being dragged (its own
+     `pointerdown`→`pointerup`/`pointercancel` on the internal
+     `<input>`), and while that's true, ignores/does not reapply an
+     external `value` re-set — the component is the single source of
+     truth for its own displayed position during an active drag, and
+     only re-syncs from the external prop once the drag ends. This is
+     the direct fix for the user's warning.
+   - Fires a plain `input`-style custom event with the new absolute
+     value on every native `input` event (live, per the user's
+     answer) — Neo wires that to dispatch `SET_STACK_SPREAD`.
+   - No numeric readout in the component's own markup (per the user's
+     second answer) — CSS-only handle, no dependent text node to keep
+     in sync.
+3. Old Tighten/Loosen/Tighten All/Loosen All buttons (`pileActions.js`
+   `tightenAll`/`loosenAll`/`tightenStack`/`loosenStack`) are REMOVED
+   outright, not kept alongside — per the user's third answer and
+   standing no-back-compat-shim convention. `ADJUST_PILE_SPREAD` itself
+   stays (used internally by `SET_STACK_SPREAD`'s sibling clamp logic
+   is duplicated, not reused via delegation, to avoid coupling an
+   absolute-set path through a delta computation just to reuse code —
+   Neo's call at implementation time if a cleaner shared-clamp helper
+   emerges).
+
+### Rejected
+- Reusing `ADJUST_PILE_SPREAD` with a computed delta (`newValue -
+  current`) - works but reintroduces float accumulation error at a
+  much higher event frequency than clicks ever produced, for no
+  benefit over a proper absolute-set action.
+- A readonly reflected value using a MutationObserver or re-render
+  hook. attribute-changed-callback + the pointer-active guard is
+  simpler, is the standard custom-element pattern, and doesn't need to
+  reach outside the component's own DOM.
+
+## Next Steps
+@Smith *user feedback arch (Gate 2) - then @Mouse *sm plan sprint. This
+is small enough to likely be ONE phase like the check-story-numbers
+sprint, but Mouse should confirm sizing since it touches state.js
+(new reducer action), a new tools-adjacent Web Component file, AND
+ui.js wiring across two menu call sites - slightly more surface than a
+single pure-function tool.

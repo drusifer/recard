@@ -67,7 +67,7 @@ export class ChipPile extends GroupedPile {
     // kind to convert to and the pile already is it, so the control
     // could never do anything. Same "no false affordance" rule the rest
     // of this class hierarchy follows.
-    return ['take', 'split', 'remove', 'break', 'tightenAll', 'loosenAll', ...sortActionsFor(cards)];
+    return ['take', 'split', 'remove', 'break', 'spread', ...sortActionsFor(cards)];
   }
 
   disabledActions(count, context = {}) {

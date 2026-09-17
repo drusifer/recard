@@ -4,7 +4,6 @@ import { ACTION_SPECS, pileLevelActions, disabledPileActionsFor, componentFor, a
 import { PILE_TYPES } from '../src/piles/pileTypes.js';
 import { PlayerHandPile } from '../src/piles/PlayerHandPile.js';
 import { sortActionsFor } from '../src/pileables/pileableTypes.js';
-import { MIN_SPREAD, MAX_SPREAD } from '../src/piles/Pile.js';
 
 const deck = { id: 'deck', kind: 'deck', ownerId: null };
 
@@ -80,7 +79,7 @@ test('reshuffleDeal is marked destructive and deal is not', () => {
 test('D34/D87: the hand offers pile-level actions to any viewer - sort + changePileType', () => {
   // US-104: `cards` now decides whether the sorts appear at all.
   assert.deepEqual(pileLevelActions('hand', { cards: [{ pileableType: 'card' }] }),
-    ['sortRank', 'sortSuit', 'changePileType', 'tightenAll', 'loosenAll']);
+    ['sortRank', 'sortSuit', 'changePileType', 'spread']);
 });
 
 test('D36: draw is a STATIC single-target action, not computed from live pile counts', () => {
@@ -168,47 +167,41 @@ test('Phase 57: move stays unmarked even in that exact one-target shape - no sho
 // *nit (direct user request): "pile actions for tighten/loosen to adjust
 // the overlap on fan and meld piles or runs or whatever." Which piles
 // OFFER it is a per-class fact, not a kind list kept somewhere central.
-test('tighten/loosen are offered by a hand - the fan the *nit was actually about', () => {
+//
+// Tighten/Loosen slider (2026-09-13, direct user request): the separate
+// Tighten/Loosen (and Tighten All/Loosen All) buttons became one
+// `spread` action (`range: true`, `ui.js`'s `<spread-slider>`) - same
+// offer rules as before, one id instead of two.
+test('spread is offered by a hand - the fan the *nit was actually about', () => {
   const actions = new PlayerHandPile({ id: 'hand:me', kind: 'hand', ownerId: 'me' })
     .pileActions({ cards: [] });
-  assert.ok(actions.includes('tightenAll'), `got ${JSON.stringify(actions)}`);
-  assert.ok(actions.includes('loosenAll'), `got ${JSON.stringify(actions)}`);
+  assert.ok(actions.includes('spread'), `got ${JSON.stringify(actions)}`);
 });
 
-test('tighten/loosen are offered by melds and runs too - any pile that lays its cards out in a row', () => {
+test('spread is offered by melds and runs too - any pile that lays its cards out in a row', () => {
   for (const kind of ['run', 'set', 'foundation', 'plain', 'discard']) {
     const actions = new PILE_TYPES[kind]({ id: `p:${kind}`, kind, ownerId: null })
       .pileActions({ cards: [] });
-    assert.ok(actions.includes('tightenAll'), `${kind} should offer tighten, got ${JSON.stringify(actions)}`);
-    assert.ok(actions.includes('loosenAll'), `${kind} should offer loosen, got ${JSON.stringify(actions)}`);
+    assert.ok(actions.includes('spread'), `${kind} should offer spread, got ${JSON.stringify(actions)}`);
   }
 });
 
 // A deck is a STACK - its cards sit on top of each other by definition,
 // so there is no overlap to adjust. The exclusion is the class's own
 // (DeckPile fully overrides pileActions), not a check anywhere else.
-test('a deck offers neither - a stack has no spread to adjust', () => {
+test('a deck offers none - a stack has no spread to adjust', () => {
   const actions = new PILE_TYPES.deck({ id: 'deck', kind: 'deck', ownerId: null })
     .pileActions({ cards: [] });
-  assert.ok(!actions.includes('tightenAll'), `got ${JSON.stringify(actions)}`);
-  assert.ok(!actions.includes('loosenAll'), `got ${JSON.stringify(actions)}`);
+  assert.ok(!actions.includes('spread'), `got ${JSON.stringify(actions)}`);
 });
 
-// Clicking an action that cannot move anything is a dead control - the
-// same reason `split` is disabled below 2 cards.
-test('tighten is disabled at maximum spread, loosen at minimum - no dead clicks at the limits', () => {
+// The slider is bounded by its own `min`/`max` (`ui.js`'s
+// `rangeOptions`) - unlike the old buttons, there is no "disabled at
+// the limit" state left for `disabledActions` to compute; the browser
+// enforces the range directly.
+test('spread is never in the disabled list - the slider bounds itself, not disabledActions', () => {
   const pile = new PILE_TYPES.plain({ id: 'p', kind: 'plain', ownerId: null });
-  assert.ok(pile.disabledActions(3, { spread: MAX_SPREAD }).includes('tightenAll'));
-  assert.ok(!pile.disabledActions(3, { spread: MAX_SPREAD }).includes('loosenAll'));
-  assert.ok(pile.disabledActions(3, { spread: MIN_SPREAD }).includes('loosenAll'));
-  assert.ok(!pile.disabledActions(3, { spread: MIN_SPREAD }).includes('tightenAll'));
-});
-
-test('neither is disabled in the middle of the range', () => {
-  const disabled = new PILE_TYPES.plain({ id: 'p', kind: 'plain', ownerId: null })
-    .disabledActions(3, { spread: (MIN_SPREAD + MAX_SPREAD) / 2 });
-  assert.ok(!disabled.includes('tightenAll'));
-  assert.ok(!disabled.includes('loosenAll'));
+  assert.ok(!pile.disabledActions(3).includes('spread'));
 });
 
 

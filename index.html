@@ -176,7 +176,19 @@
         <button type="button" data-zoom-preset="L">L</button>
         <button type="button" data-zoom-preset="XL">XL</button>
       </div>
-      <input type="range" id="table-zoom-dial" aria-labelledby="table-zoom-label" />
+      <!-- *fix (direct user request, 2026-09-16): "like the zoom wheel on
+           a mouse" as its OWN control, not the real scroll wheel (left
+           free for ordinary page scrolling). A vertical drag control -
+           the "tread" spins up to zoom in, down to zoom out
+           (`main.js`'s `wireTableZoomControls`, `tableZoom.js`'s
+           `zoomFromWheelDrag`) - replaces the old `<input type=range>`
+           dial outright, no back-compat shim. `role="slider"` +
+           `aria-value*` (kept in sync on every drag) carry the same
+           accessibility contract the native range input gave for free. -->
+      <div id="table-zoom-wheel" class="table-zoom-wheel" role="slider" tabindex="0"
+        aria-orientation="vertical" aria-labelledby="table-zoom-label">
+        <div class="table-zoom-wheel-tread"></div>
+      </div>
     </div>
     <section class="panel panel-felt table-section">
       <h2 class="sr-only">Table</h2>

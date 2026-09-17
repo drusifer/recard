@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { clampOverlayPosition, FOCUS_ZOOM_SCALE, HOVER_INTENT_MS } from '../src/focusZoom.js';
+import { clampOverlayPosition, clampFocusZoomScale, FOCUS_ZOOM_SCALE, HOVER_INTENT_MS } from '../src/focusZoom.js';
 
 // US-117 phase 113 (D131): growing a Pile in place as a `position:
 // fixed` overlay anchored at its own rect. `clampOverlayPosition`
@@ -54,4 +54,32 @@ test('the scale constant grows the pile, never shrinks it', () => {
 
 test('the hover-intent delay is in the 150-200ms range Smith specified', () => {
   assert.ok(HOVER_INTENT_MS >= 150 && HOVER_INTENT_MS <= 200);
+});
+
+// *fix (found live, 2026-09-16): the Tighten/Loosen slider widened
+// every pile's header just enough that `FOCUS_ZOOM_SCALE` (1.6x) could
+// push a grown overlay's SIZE past a small viewport - `clampOverlayPosition`
+// only ever repositions, it was never asked to cap size (the existing
+// "pins to 0 rather than going negative" test above already documents
+// that as a known, deliberate gap). `clampFocusZoomScale` closes it:
+// the effective scale never grows the pile past the viewport in either
+// dimension, and never shrinks it below its own natural size either.
+test('clampFocusZoomScale: uses the requested scale when there is room for it', () => {
+  const natural = { width: 100, height: 60 };
+  assert.equal(clampFocusZoomScale(natural, viewport), FOCUS_ZOOM_SCALE);
+});
+
+test('clampFocusZoomScale: caps to fit when the requested scale would overflow the WIDTH', () => {
+  const natural = { width: 700, height: 60 }; // *1.6 = 1120, viewport is 800 wide
+  assert.equal(clampFocusZoomScale(natural, viewport), 800 / 700);
+});
+
+test('clampFocusZoomScale: caps to fit when the requested scale would overflow the HEIGHT', () => {
+  const natural = { width: 100, height: 500 }; // *1.6 = 800, viewport is 600 tall
+  assert.equal(clampFocusZoomScale(natural, viewport), 600 / 500);
+});
+
+test('clampFocusZoomScale: never shrinks below 1x (the pile\'s own natural size), even if that still overflows', () => {
+  const natural = { width: 2000, height: 2000 };
+  assert.equal(clampFocusZoomScale(natural, viewport), 1);
 });

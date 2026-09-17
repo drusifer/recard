@@ -32,7 +32,7 @@ export class BattlefieldPile extends Pile {
    * has nothing to do with that, it adjusts overlap density, which a
    * battlefield's cards have exactly as much as any other pile's. */
   pileActions() {
-    return ['untapAll', 'changePileType', 'remove', 'tightenAll', 'loosenAll'];
+    return ['untapAll', 'changePileType', 'remove', 'spread'];
   }
 
   /** `remove`/`changePileType` stay empty-only, `untapAll` is never

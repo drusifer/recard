@@ -231,22 +231,15 @@ test('stacks in one pile can be tightened INDEPENDENTLY', () => {
     'the tightened column occupies less room than the loose one');
 });
 
-test('a stack offers tighten, loosen and flip', () => {
+// Tighten/Loosen slider (2026-09-13): tightenStack/loosenStack merged
+// into one `spreadStack` action (a `<spread-slider>`, `ui.js`) - it is
+// bounded by its own `min`/`max`, so there is no more disabled-at-the-
+// limit state for `stackActions` to compute (the ceiling/floor tests
+// below it are gone with the buttons they described).
+test('a stack offers spread and flip', () => {
   const [stack] = stacksOf({ cards: [card('a'), card('b')], direction: VERTICAL, spread: 0.5 });
-  const actions = stack.stackActions({ maxSpread: 0.85 });
-  assert.deepEqual(actions.ids.toSorted(), ['flipStack', 'loosenStack', 'tightenStack']);
-});
-
-test('a stack at its ceiling cannot be tightened further', () => {
-  const [stack] = stacksOf({ cards: [card('a'), card('b')], direction: VERTICAL, spread: 0.85 });
-  assert.ok(stack.stackActions({ maxSpread: 0.85 }).disabled.includes('tightenStack'));
-  assert.ok(!stack.stackActions({ maxSpread: 0.85 }).disabled.includes('loosenStack'));
-});
-
-test('a stack at zero spread cannot be loosened further', () => {
-  const [stack] = stacksOf({ cards: [card('a'), card('b')], direction: VERTICAL, spread: 0 });
-  assert.ok(stack.stackActions({ maxSpread: 0.85 }).disabled.includes('loosenStack'));
-  assert.ok(!stack.stackActions({ maxSpread: 0.85 }).disabled.includes('tightenStack'));
+  const actions = stack.stackActions();
+  assert.deepEqual(actions.ids.toSorted(), ['flipStack', 'spreadStack']);
 });
 
 test('a stack of ONE offers no overlap actions - there is nothing to overlap', () => {

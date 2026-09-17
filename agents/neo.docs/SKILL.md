@@ -217,6 +217,50 @@ actually surface.
 
 ---
 
+## Type-Conditional Branching → Class/Polymorphism (HARD)
+
+**If you're branching on `if (x.type === Y)` / `x.kind === Y'` and the
+discriminant already has (or could reasonably have) a class hierarchy,
+add a method to that hierarchy instead of another conditional.**
+JS doesn't need a formal class for this — a small factory function that
+returns the right behavior per case is the same polymorphism, just
+written functionally (see below) — but the branch itself should
+disappear from the call site either way.
+
+**Why:** confirmed with a real measurement, not just taste
+(2026-09-12, `src/cardTransforms.js`): `state.js`'s FLIP and ROTATE
+reducer cases had each hand-rolled the identical shape (find the
+card's current pile, check whether it offers this verb, throw the
+same-shaped message, else mutate) - the "type" doing the branching was
+`action.type`. Extracting one `cardTransform({ verb, mutate })` factory
+both cases call through dropped cognitive complexity 3->1 on EACH,
+with zero behavior change (all pre-existing tests stayed green
+byte-for-byte). Two functions that read identically except for one
+verb string and one mutation is the tell - not "this function is a bit
+long."
+
+**How to apply:**
+- Before writing a new `if (kind === X) ... else if (kind === Y) ...`
+  in a reducer/dispatcher, check whether the discriminant is a `Pile`/
+  `Pileable`/`Zone` subclass already, or several near-identical
+  functions differing only in one verb/value. If so, that's a method
+  on the existing hierarchy or a small factory (matching `Stack.js`/
+  `pileActions.js`'s own pattern), not a growing `if` chain.
+- This does NOT mean eliminate every type check - `pileForKind`'s own
+  registry lookup, and genuinely different-shaped operations
+  (`transferCard`'s cross-pile move vs. an in-place mutation) stay as
+  they are. Forcing two genuinely different operations into one shared
+  shape is the opposite mistake (see D129's "not one thing pretending
+  to be two").
+- **This is a code-review-time check, not a `judge`-trace one** -
+  `agents/tools/trace_annotate.py` reads session tool-CALL events
+  (Bash/Skill/Read invocations), not source diffs, so it has no
+  mechanism to detect a type-conditional in a diff the way it detects
+  `bobp make test | tail`. Catch this via `/code-review` and this
+  file's own checklist, not by expecting a judge-trace flag for it.
+
+---
+
 ## Running Tests
 
 | Action | Command |

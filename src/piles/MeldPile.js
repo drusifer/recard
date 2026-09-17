@@ -57,7 +57,7 @@ export class MeldPile extends Pile {
     // one, so they're listed here rather than inherited. A meld lays
     // its cards out in a row like any other spread pile - the rule it
     // enforces is about what may JOIN it, not how it's displayed.
-    return ['split', 'changePileType', 'tightenAll', 'loosenAll'];
+    return ['split', 'changePileType', 'spread'];
   }
 
   /** No before/after halo - a meld has exactly one landing spot

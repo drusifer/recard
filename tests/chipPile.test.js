@@ -286,15 +286,17 @@ test('a chip stack may go tighter than a card fan - the ceiling is the pile type
   assert.ok(ChipPile.defaultSpread <= ChipPile.maxSpread, 'without starting at its own ceiling');
 });
 
-test('ADJUST_PILE_SPREAD clamps a chip tray at ITS ceiling, not the card one', () => {
+// Tighten/Loosen slider (2026-09-13): SET_STACK_SPREAD's own version of
+// this guard - a signed-delta loop no longer applies, but the same
+// per-kind ceiling and "omitted stackKey routes to every stack" (D129)
+// behavior must hold for the absolute-value action too.
+test('SET_STACK_SPREAD clamps a chip tray at ITS ceiling, not the card one', () => {
   let state = createInitialState({}, () => 0.5, {
     piles: [{ kind: 'chip', ownerId: null, count: 1, id: 'tray' }],
   });
-  for (let index = 0; index < 30; index++) {
-    state = reduce(state, { type: 'ADJUST_PILE_SPREAD', pileId: 'tray', delta: 0.1 });
-  }
-  // D129: spread lives on each STACK now; Tighten All routes to every
-  // one, so every stack in the tray must have hit the chip ceiling.
+  state = reduce(state, { type: 'SET_STACK_SPREAD', pileId: 'tray', value: 999 });
+  // D129: spread lives on each STACK now; omitting `stackKey` routes to
+  // every one, so every stack in the tray must have hit the chip ceiling.
   const tray = pilesOf(state).find((p) => p.id === 'tray');
   const spreads = Object.values(tray.stacks).map((stack) => stack.spread);
   assert.ok(spreads.length > 0, 'the tray has stacks to route to');
@@ -305,9 +307,7 @@ test('a card pile still clamps at the card ceiling - chips did not raise it for 
   let state = createInitialState({}, () => 0.5, {
     piles: [{ kind: 'plain', ownerId: null, count: 1, id: 'flat' }],
   });
-  for (let index = 0; index < 30; index++) {
-    state = reduce(state, { type: 'ADJUST_PILE_SPREAD', pileId: 'flat', delta: 0.1 });
-  }
+  state = reduce(state, { type: 'SET_STACK_SPREAD', pileId: 'flat', value: 999 });
   const flat = pilesOf(state).find((p) => p.id === 'flat');
   const spreads = Object.values(flat.stacks).map((stack) => stack.spread);
   for (const spread of spreads) assert.equal(spread, PILE_TYPES.plain.maxSpread);

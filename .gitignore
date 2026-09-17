@@ -239,3 +239,7 @@ __marimo__/
 # Untracked local debris observed recreating itself on this machine,
 # unrelated to any app code (grepped - nothing writes it)
 layout.json
+
+# Playwright's own trace/screenshot output on a failed run - ephemeral,
+# machine-local, never committed (same reasoning as /coverage/ above).
+/test-results/

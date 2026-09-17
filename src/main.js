@@ -1,11 +1,13 @@
 import { Session } from './session.js';
 import { createInitialState, reduce, viewFor, reseatOwner, DECK_PILE_ID } from './state.js';
-import { SPREAD_STEP } from './piles/Pile.js';
 import { breakInto } from './pileables/ChipPileable.js';
 import { homePileKindFor } from './pileables/pileableTypes.js';
 import { makeStateMessage, makeMotionMessage, createMotionThrottler, cardDragPayload } from './protocol.js';
 import { renderShareCode, wireCopyCode } from './qrcode.js';
-import { TABLE_ZOOM_PRESETS, TABLE_ZOOM_DEFAULT, TABLE_ZOOM_MIN, TABLE_ZOOM_MAX, clampTableZoom } from './tableZoom.js';
+import {
+  TABLE_ZOOM_PRESETS, TABLE_ZOOM_DEFAULT, TABLE_ZOOM_MIN, TABLE_ZOOM_MAX, clampTableZoom,
+  zoomFromWheelDrag, clampPan,
+} from './tableZoom.js';
 import {
   renderZones,
   renderRoster,
@@ -23,7 +25,7 @@ import {
   pileDragFromDrop,
   pileElement,
 } from './ui.js';
-import { clampOverlayPosition, FOCUS_ZOOM_SCALE, HOVER_INTENT_MS } from './focusZoom.js';
+import { clampOverlayPosition, clampFocusZoomScale, HOVER_INTENT_MS } from './focusZoom.js';
 import { PRESETS, filterDeckChoicePiles } from './presets.js';
 import { RULES_REFERENCE } from './rulesReference.js';
 import { seatedOrder } from './seating.js';
@@ -48,6 +50,7 @@ import './components/FanPile.js';
 import './components/DeckStack.js';
 import './components/ChipTray.js';
 import './components/HeaderActions.js';
+import './components/SpreadSlider.js';
 
 const MOTION_FLUSH_MS = 50;
 const MOTION_TTL_MS = 2000; // auto-clear a stale "organizing hand" cue if the end-event is dropped
@@ -1388,26 +1391,88 @@ function currentView() {
 }
 
 // US-117 phase 111 (D132, direct user correction - no auto-fit): a
-// per-player manual table zoom, a dial plus S/M/L/XL quick presets
-// (`tableZoom.js`). Local-only view state (D130) - no reducer action,
-// no persistence, wired once at startup rather than per-render since
-// nothing about it depends on `latestView`/`gameState`.
+// per-player manual table zoom, a wheel control plus S/M/L/XL quick
+// presets (`tableZoom.js`). Local-only view state (D130) - no reducer
+// action, no persistence, wired once at startup rather than per-render
+// since nothing about it depends on `latestView`/`gameState`.
+//
+// *fix (direct user request, 2026-09-16): "like the zoom wheel on a
+// mouse" as its own manual control, not the real scroll wheel - a
+// vertical drag replaces the old `<input type=range>` dial outright.
+// Dragging the wheel UP (negative pointer delta) zooms in, DOWN zooms
+// out (`zoomFromWheelDrag`).
 function wireTableZoomControls() {
   const zonesElement = document.querySelector('#zones');
-  const dialElement = document.querySelector('#table-zoom-dial');
-  if (!zonesElement || !dialElement) return;
-  dialElement.min = String(TABLE_ZOOM_MIN);
-  dialElement.max = String(TABLE_ZOOM_MAX);
-  dialElement.step = '0.01';
+  const wheelElement = document.querySelector('#table-zoom-wheel');
+  if (!zonesElement || !wheelElement) return;
+  wheelElement.setAttribute('aria-valuemin', String(TABLE_ZOOM_MIN));
+  wheelElement.setAttribute('aria-valuemax', String(TABLE_ZOOM_MAX));
 
-  function applyZoom(value) {
-    const clamped = clampTableZoom(value);
-    dialElement.value = String(clamped);
-    zonesElement.style.setProperty('--table-zoom', String(clamped));
+  let currentZoom = TABLE_ZOOM_PRESETS[TABLE_ZOOM_DEFAULT];
+  let currentPan = { x: 0, y: 0 };
+
+  // Drag-to-pan (direct user request, 2026-09-16): "we'll also need to
+  // pan with drag on table." Re-clamped against the CURRENT zoom every
+  // time either changes - zooming OUT pulls an out-of-bounds pan back
+  // in rather than leaving it stuck past the new (tighter) limit.
+  function applyPan(pan) {
+    currentPan = clampPan(pan, currentZoom);
+    zonesElement.style.setProperty('--table-pan-x', `${currentPan.x}px`);
+    zonesElement.style.setProperty('--table-pan-y', `${currentPan.y}px`);
   }
 
-  applyZoom(TABLE_ZOOM_PRESETS[TABLE_ZOOM_DEFAULT]);
-  dialElement.addEventListener('input', () => applyZoom(Number(dialElement.value)));
+  function applyZoom(value) {
+    currentZoom = clampTableZoom(value);
+    wheelElement.setAttribute('aria-valuenow', String(currentZoom));
+    zonesElement.style.setProperty('--table-zoom', String(currentZoom));
+    applyPan(currentPan);
+  }
+
+  applyZoom(currentZoom);
+
+  const tableSurface = document.querySelector('.table-surface');
+  let panStart = null;
+  tableSurface?.addEventListener('pointerdown', (event) => {
+    // Only the empty table background starts a pan - a pointerdown on
+    // any pile/zone/card/button inside it (a descendant target) must
+    // reach ITS OWN handler (drag-and-drop, the stack gear, a card
+    // click) untouched. `#table-surface`/`#zones` themselves are the
+    // only two valid targets, since `#zones` is the direct, otherwise-
+    // empty flex container every pile/zone panel lives inside.
+    if (event.target !== tableSurface && event.target !== zonesElement) return;
+    panStart = { x: event.clientX - currentPan.x, y: event.clientY - currentPan.y };
+    tableSurface.setPointerCapture(event.pointerId);
+  });
+  tableSurface?.addEventListener('pointermove', (event) => {
+    if (!panStart) return;
+    applyPan({ x: event.clientX - panStart.x, y: event.clientY - panStart.y });
+  });
+  tableSurface?.addEventListener('pointerup', () => { panStart = null; });
+  tableSurface?.addEventListener('pointercancel', () => { panStart = null; });
+
+  let dragStartY = null;
+  let zoomAtDragStart = currentZoom;
+  wheelElement.addEventListener('pointerdown', (event) => {
+    dragStartY = event.clientY;
+    zoomAtDragStart = currentZoom;
+    wheelElement.setPointerCapture(event.pointerId);
+  });
+  wheelElement.addEventListener('pointermove', (event) => {
+    if (dragStartY === null) return;
+    applyZoom(zoomFromWheelDrag(zoomAtDragStart, event.clientY - dragStartY));
+  });
+  wheelElement.addEventListener('pointerup', () => { dragStartY = null; });
+  wheelElement.addEventListener('pointercancel', () => { dragStartY = null; });
+  // Keyboard equivalent (`role="slider"` implies arrow-key support) -
+  // one `WHEEL_DRAG_RANGE_PX`-scaled "notch" per press, same direction
+  // convention as the drag (up arrow zooms in).
+  wheelElement.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowUp') applyZoom(zoomFromWheelDrag(currentZoom, -20));
+    else if (event.key === 'ArrowDown') applyZoom(zoomFromWheelDrag(currentZoom, 20));
+    else return;
+    event.preventDefault();
+  });
+
   for (const button of document.querySelectorAll('[data-zoom-preset]')) {
     button.addEventListener('click', () => applyZoom(TABLE_ZOOM_PRESETS[button.dataset.zoomPreset]));
   }
@@ -1427,6 +1492,13 @@ function wireTableZoomControls() {
 let focusedPileId = null;
 let isDragInProgress = false;
 let hoverIntentTimer = null;
+// *fix (2026-09-16): the pointer-watcher cleanup for whichever pile is
+// CURRENTLY focused (`applyFocusZoom` sets this, `shrinkFocusedPile`
+// always calls and clears it) - centralized so every path that ends a
+// focus-zoom (natural pointerleave, a click outside, a drag starting
+// elsewhere, a re-render's `reapplyFocusZoom`) tears down the same
+// listeners, instead of only the one path that happened to attach them.
+let clearFocusPointerWatchers = null;
 
 function focusZoomOverlay(pileId) {
   return document.querySelector(`body > .pile-section.focus-zoomed[data-pile-id="${CSS.escape(pileId)}"]`);
@@ -1434,6 +1506,17 @@ function focusZoomOverlay(pileId) {
 
 function focusZoomPlaceholder(pileId) {
   return document.querySelector(`.focus-zoom-placeholder[data-pile-id="${CSS.escape(pileId)}"]`);
+}
+
+// *fix (direct user bug report, 2026-09-16): a plain `pointerleave`
+// shrinks the pile even while the pointer left mid-drag (e.g. dragging
+// the Tighten/Loosen slider) - `event.buttons !== 0` means a button is
+// still held, so wait for release instead (`applyFocusZoom`'s
+// `onPointerUpAnywhere` catches that release). No closure needed, so
+// this lives at module scope rather than being rebuilt on every grow.
+function onPileLeave(event) {
+  if (event.buttons !== 0) return;
+  shrinkFocusedPile();
 }
 
 // Does the actual DOM work, unconditionally - both a fresh user-
@@ -1465,17 +1548,47 @@ function applyFocusZoom(pileElementToGrow) {
   pileElementToGrow.style.setProperty('--focus-scale', '1');
 
   const naturalRect = pileElementToGrow.getBoundingClientRect();
-  const grownSize = { width: naturalRect.width * FOCUS_ZOOM_SCALE, height: naturalRect.height * FOCUS_ZOOM_SCALE };
-  const { left, top } = clampOverlayPosition(rect, grownSize, { width: window.innerWidth, height: window.innerHeight });
+  const viewport = { width: window.innerWidth, height: window.innerHeight };
+  // *fix (found live, 2026-09-16): a wider pile header (the Tighten/
+  // Loosen slider) can push the FIXED `FOCUS_ZOOM_SCALE` past a small
+  // viewport - `clampFocusZoomScale` caps the EFFECTIVE scale so the
+  // grown box always fits, before `clampOverlayPosition` even runs.
+  const scale = clampFocusZoomScale(naturalRect, viewport);
+  const grownSize = { width: naturalRect.width * scale, height: naturalRect.height * scale };
+  const { left, top } = clampOverlayPosition(rect, grownSize, viewport);
   pileElementToGrow.style.setProperty('--focus-left', `${left}px`);
   pileElementToGrow.style.setProperty('--focus-top', `${top}px`);
-  pileElementToGrow.style.setProperty('--focus-scale', String(FOCUS_ZOOM_SCALE));
+  pileElementToGrow.style.setProperty('--focus-scale', String(scale));
 
   // Reparented out of `#zones`, so its pointer events no longer bubble
   // to that container's delegated listeners below - attached directly
-  // here instead, `{ once: true }` since a fresh one is added every
-  // time this runs (including a post-render reapplication).
-  pileElementToGrow.addEventListener('pointerleave', () => shrinkFocusedPile(), { once: true });
+  // here instead, a fresh pair every time this runs (including a
+  // post-render reapplication).
+  //
+  // *fix (direct user bug report, 2026-09-16): "interact with the
+  // [Tighten/Loosen] slider [and it] goes bonkers." Dragging the
+  // slider can carry the pointer briefly outside the pile's own
+  // (enlarged, fixed-position) box - a plain `pointerleave` shrank the
+  // pile mid-drag, reparenting it back into `#zones` while the slider
+  // was still being dragged. `event.buttons !== 0` means a button is
+  // still held (something inside the pile is still being interacted
+  // with) - wait for release instead of shrinking immediately. Once
+  // the pointer HAS left, though, a later `pointerleave` won't fire
+  // again on its own (the pointer isn't re-crossing the boundary), so
+  // a `pointerup` on the document catches "released while already
+  // outside" and shrinks then. `clearFocusPointerWatchers` (module-
+  // level) is how EVERY shrink path - not just these two listeners -
+  // tears them down; see `shrinkFocusedPile`.
+  const onPointerUpAnywhere = (event) => {
+    const overlay = focusZoomOverlay(pileId);
+    if (overlay && !overlay.contains(event.target)) shrinkFocusedPile();
+  };
+  pileElementToGrow.addEventListener('pointerleave', onPileLeave);
+  document.addEventListener('pointerup', onPointerUpAnywhere);
+  clearFocusPointerWatchers = () => {
+    pileElementToGrow.removeEventListener('pointerleave', onPileLeave);
+    document.removeEventListener('pointerup', onPointerUpAnywhere);
+  };
   focusedPileId = pileId;
 }
 
@@ -1496,6 +1609,13 @@ function growPileInPlace(pileElementToGrow) {
 
 function shrinkFocusedPile() {
   if (!focusedPileId) return;
+  // *fix (2026-09-16): tear down `applyFocusZoom`'s pointer watchers
+  // here, unconditionally - this is the ONE function every shrink path
+  // (natural pointerleave, click-outside, a drag starting elsewhere,
+  // `reapplyFocusZoom`) already funnels through, so it is the one place
+  // that can guarantee they never outlive the pile they watched.
+  clearFocusPointerWatchers?.();
+  clearFocusPointerWatchers = null;
   const overlay = focusZoomOverlay(focusedPileId);
   const placeholder = focusZoomPlaceholder(focusedPileId);
   if (overlay) {
@@ -1518,6 +1638,14 @@ function shrinkFocusedPile() {
 // pile no longer exists (e.g. it emptied and was removed).
 function reapplyFocusZoom() {
   if (!focusedPileId) return;
+  // *fix (2026-09-16): same pointer-watcher teardown `shrinkFocusedPile`
+  // does - this path discards the OLD overlay directly rather than
+  // calling that function, so it needs its own copy of the same
+  // cleanup, or the old watchers (particularly the document-level
+  // `pointerup` one) leak forever, one more per re-render while a pile
+  // stays focus-zoomed.
+  clearFocusPointerWatchers?.();
+  clearFocusPointerWatchers = null;
   focusZoomOverlay(focusedPileId)?.remove();
   focusZoomPlaceholder(focusedPileId)?.remove();
   const fresh = pileElement(focusedPileId);
@@ -1529,10 +1657,22 @@ function wireFocusZoom() {
   const zonesElement = document.querySelector('#zones');
   if (!zonesElement) return;
 
-  document.addEventListener('dragstart', () => {
+  document.addEventListener('dragstart', (event) => {
     isDragInProgress = true;
     clearTimeout(hoverIntentTimer);
-    shrinkFocusedPile();
+    // *fix (direct user bug report, 2026-09-16): "drag a card out [of a
+    // zoomed pile] goes bonkers." A drag starting FROM INSIDE the
+    // currently-focused pile must NOT shrink it - `shrinkFocusedPile`
+    // reparents the pile back into `#zones`, which moves the dragged
+    // card's own ancestor chain while native HTML5 DnD has already
+    // captured that exact node as the drag source. Browsers handle a
+    // drag SOURCE being reparented mid-gesture very badly (the drag
+    // silently breaks). Only shrink an UNRELATED already-focused pile -
+    // e.g. starting a drag elsewhere on the board while a different
+    // pile sits zoomed - which is what this existed to do in the first
+    // place.
+    const overlay = focusedPileId ? focusZoomOverlay(focusedPileId) : null;
+    if (!overlay?.contains(event.target)) shrinkFocusedPile();
   });
   document.addEventListener('dragend', () => {
     isDragInProgress = false;
@@ -1682,13 +1822,11 @@ function handlePileAction(pileId, actionId, value) {
   if (actionId === 'show') return performSetPileOrientation(pileId, true);
   if (actionId === 'remove') return performRemovePile(pileId);
   if (actionId === 'untapAll') return performUntapAll(pileId);
-  // *nit (direct user request): "pile actions for tighten/loosen to
-  // adjust the overlap." Two ids, ONE dispatch and one reducer action
-  // taking a signed delta - the direction is the only difference, and
-  // it belongs in the argument, not in a second code path (D75/D103).
-  // D129: no `stackKey` means every stack - see `ADJUST_PILE_SPREAD`.
-  if (actionId === 'tightenAll') return performAdjustSpread(pileId, SPREAD_STEP);
-  if (actionId === 'loosenAll') return performAdjustSpread(pileId, -SPREAD_STEP);
+  // Tighten/Loosen slider (direct user request, 2026-09-13): one
+  // `spread` action, `value` is the slider's absolute position - see
+  // `performSetSpread`/`SET_STACK_SPREAD`. D129: no `stackKey` means
+  // every stack.
+  if (actionId === 'spread') return performSetSpread(pileId, value);
   if (actionId === 'break') return performBreakChip(pileId);
   // One small table, not five `if`s - every `sort*` action id differs
   // ONLY in which `SORT_PILE.by` value it forwards (US-113 added two
@@ -1960,11 +2098,16 @@ function performBreakChip(pileId) {
   else session.send({ type: 'action', action: { type: 'BREAK_CHIP', pileId, pileableId: biggest.id } });
 }
 
-function performAdjustSpread(pileId, delta, stackKey) {
+/**
+ * Tighten/Loosen slider (direct user request, 2026-09-13): dispatches
+ * the slider's own absolute value directly - see `SET_STACK_SPREAD`'s
+ * own doc comment for why this is a value, not the signed-delta shape
+ * `ADJUST_PILE_SPREAD` used for the old +/- buttons.
+ */
+function performSetSpread(pileId, value, stackKey) {
   if (isSessionEnded) return;
-  // D129: `stackKey` omitted means every stack - the pile-level
-  // Tighten All / Loosen All. See `ADJUST_PILE_SPREAD`.
-  const action = { type: 'ADJUST_PILE_SPREAD', pileId, delta, stackKey };
+  // D129: `stackKey` omitted means every stack - the pile-level slider.
+  const action = { type: 'SET_STACK_SPREAD', pileId, value, stackKey };
   if (role === 'host') dispatch({ ...action, playerId: myId });
   else session.send({ type: 'action', action });
 }
@@ -1974,9 +2117,8 @@ function performAdjustSpread(pileId, delta, stackKey) {
  * it offers acts on ONE stack, addressed by its key - the same
  * dispatch shape as the pile-level pair, with the key supplied.
  */
-function handleStackAction(pileId, stackKey, actionId) {
-  if (actionId === 'tightenStack') { performAdjustSpread(pileId, SPREAD_STEP, stackKey); return; }
-  if (actionId === 'loosenStack') { performAdjustSpread(pileId, -SPREAD_STEP, stackKey); return; }
+function handleStackAction(pileId, stackKey, actionId, value) {
+  if (actionId === 'spreadStack') { performSetSpread(pileId, value, stackKey); return; }
   if (actionId === 'flipStack') { performFlipStack(pileId, stackKey); return; }
   if (actionId === 'tapStack') { performSetStackOrientation(pileId, stackKey, 'landscape'); return; }
   if (actionId === 'untapStack') performSetStackOrientation(pileId, stackKey, 'portrait');

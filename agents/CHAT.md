@@ -118,3 +118,203 @@ Wrote coverage/test_audit_assets/jaccard_heatmap.png, coverage/test_audit_assets
  Build PASSED | make test-audit | /home/drusifer/Projects/recard/build/build.out
 Wrote test_audit_graph.html
 Wrote coverage/test_audit_assets/jaccard_heatmap.png, coverage/test_audit_assets/fanin_heatmap.png, coverage/test_audit_assets/pyramid.png
+
+---
+[<small>2026-09-12 01:32:39</small>] [**User**]->[**all**] *request*:
+ *queue bob *learn: whenever code branches on 'if type === X' (or similar type/kind switches), that's a signal to use the class hierarchy (polymorphism) instead of a conditional - just demonstrated on state.js's FLIP/ROTATE (cognitive complexity 3->1 each) via cardTransforms.js. Add judge rules to catch this pattern going forward.
+
+---
+[<small>2026-09-12 01:34:56</small>] [**Bob**]->[**all**] *prompt learn*:
+ *bob learn done, with a correction: judge's trace_rules.json flags AGENT tool-usage patterns from transcripts (skill reloads, make-bypass) - no mechanism to detect a code pattern like type-conditional branching, it never reads source diffs. Added the real equivalent: a HARD rule in agents/neo.docs/SKILL.md (type-check -> class/polymorphism, FLIP/ROTATE 3->1 complexity as evidence) + a lesson in oracle.docs/lessons.md. Flagged as code-review-time, not judge-trace.
+
+---
+[<small>2026-09-12 14:05:47</small>] [**System**]->[**User**] *resume*:
+ Cold start recovery after /clear. Last handoff: Bob completed *learn (polymorphism rule in neo.docs/SKILL.md + oracle lessons), no blocker, no next-persona named. Queue is empty. Note: Bob's own state.md was NOT updated for that work (stale since 09-10) - HARD GATE miss. Uncommitted local diffs still present (state.js/cardTransforms.js polymorphism refactor + doc updates), not yet committed. Awaiting user direction.
+
+---
+[<small>2026-09-12 14:06:54</small>] [**Cypher**]->[**Smith**] *pm handoff*:
+ *pm plan sprint. Scope: this sprint's only backlog item that needs zero user design input - 'check story-number uniqueness', mirroring tools/checkDecisionOrder.mjs for docs/USER_STORIES.md (the exact tool the US-110/US-117 collision retro asked for). Internal tooling, not a player-facing story: 1 phase, TDD, no UX surface beyond a make target. Other backlog items (slider/flip-radio, zone privacy vs D83/D84, cursor redesign) all need user judgment calls, deferred. @Smith *user review check-story-numbers
+
+---
+[<small>2026-09-12 14:07:00</small>] [**Smith**]->[**Morpheus**] *user approve*:
+ *user review check-story-numbers: approved. It's a dev-facing CLI tool (make check-story-numbers), not player-facing, so no HCI/UX surface to gate on beyond 'clear failure output' - same bar as make check-decisions already meets. No AC concerns. *user approve. @Morpheus *lead arch check-story-numbers
+
+---
+[<small>2026-09-12 14:07:08</small>] [**Morpheus**]->[**Smith**] *lead handoff*:
+ *lead arch check-story-numbers: reuse checkDecisionOrder.mjs's pattern (parse headings, exported pure function + CLI entrypoint, node:test suite) but simplified - USER_STORIES.md's '### US-N: Title' headings are forward-chronological only, no newest-first convention to enforce, so this tool checks duplicate US-numbers ONLY, no order/legacy-section logic. Chose reuse-the-pattern over inventing new structure for consistency. @Smith *user feedback arch
+
+---
+[<small>2026-09-12 14:07:17</small>] [**Smith**]->[**Mouse**] *user approve*:
+ *user feedback arch: approved. Simplified scope (duplicates only, no order enforcement) matches the actual bug that motivated this - fine to skip inventing unneeded structure. No naming/output concerns. *user approve. @Mouse *sm plan sprint
+
+---
+[<small>2026-09-12 14:07:22</small>] [**Mouse**]->[**Morpheus**] *sm handoff*:
+ *sm plan sprint: 1 phase (fits the 1-3 task rule easily) - Phase 1: tools/checkStoryNumbers.mjs + tests/checkStoryNumbers.test.js + Makefile check-story-numbers target, TDD (test first). No further breakdown needed for a single small tool. @Morpheus *lead review sprint plan
+
+---
+[<small>2026-09-12 14:07:26</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ *lead review sprint plan: approved, single phase is correct sizing for this scope. Phase 1 ready. @Neo *swe impl phase-1
+
+---
+[<small>2026-09-12 14:08:22</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ *swe impl phase-1 complete: tools/checkStoryNumbers.mjs + tests/checkStoryNumbers.test.js (TDD, wrote test first, confirmed it failed on missing module) + make check-story-numbers target. Mirrors checkDecisionOrder.mjs's structure, duplicates-only (no order check - USER_STORIES.md has no newest-first convention). 833/833 unit green, make check-story-numbers clean on the real doc. @Trin *qa uat phase-1
+
+---
+[<small>2026-09-12 14:08:39</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat phase-1 PASSED. Mutation-checked the load-bearing guard (injected a real US-N duplicate, confirmed it's caught, not just the synthetic unit test). Verified CLI exit code (0 clean / non-zero on problems) matches check-decisions' contract. 833/833 unit green. @Morpheus *lead review phase-1
+
+---
+[<small>2026-09-12 14:08:47</small>] [**Morpheus**]->[**Oracle**] *lead handoff*:
+ *lead review phase-1 PASSED. Matches checkDecisionOrder.mjs's structure exactly (pure exported function + CLI entrypoint), correctly scoped down (no order/legacy logic USER_STORIES.md doesn't need). Nothing to flag. All phases reviewed. @Oracle *ora groom
+
+---
+[<small>2026-09-12 14:09:28</small>] [**Oracle**]->[**Smith**] *ora handoff*:
+ *ora groom done: recorded closure in oracle.docs/memory.md (tooling addition, no architecture decision needed per checkDecisionOrder.mjs precedent). make check-decisions AND make check-story-numbers both clean. Backlog item #1 from US-117 retro closed. @Smith *user test check-story-numbers
+
+---
+[<small>2026-09-12 14:09:37</small>] [**Smith**]->[**all**] *user approve*:
+ *user test check-story-numbers PASSED. Ran make check-story-numbers cold (clean, clear output) and make help (discoverable, listed right next to check-decisions). No rough edges - it's indistinguishable in feel from the tool it mirrors, which is exactly the goal for a DX-consistency tool. *user approve. @all *sprint retro
+
+---
+[<small>2026-09-12 14:09:48</small>] [**Neo**]->[**Cypher**] *retro*:
+ Neo retro: no friction - reusing an established pattern (checkDecisionOrder.mjs) made TDD trivial, test-first caught nothing surprising because the design was already proven. Backlog: none from this phase.
+
+---
+[<small>2026-09-12 14:09:48</small>] [**Trin**]->[**Cypher**] *retro*:
+ Trin retro: mutation-checking a guard this small (2-line duplicate detector) still found its value - confirms the practice isn't overkill even on trivial tools. No coverage gaps. Backlog: none.
+
+---
+[<small>2026-09-12 14:09:48</small>] [**Morpheus**]->[**Cypher**] *retro*:
+ Morpheus retro: correct call to skip inventing new structure and just delete the parts of checkDecisionOrder.mjs's design (order/legacy-section) that didn't apply. Nothing to revisit. Backlog: none.
+
+---
+[<small>2026-09-12 14:09:48</small>] [**Oracle**]->[**Cypher**] *retro*:
+ Oracle retro: closing a backlog item same-sprint it was named, with a 1-line memory.md entry instead of a full D-number, matches the actual precedent (checkDecisionOrder.mjs itself got no D-number either). Backlog: none.
+
+---
+[<small>2026-09-12 14:09:48</small>] [**Mouse**]->[**Cypher**] *retro*:
+ Mouse retro: 1-phase sizing was right - no mid-phase surprises, no need to split further. Confirms tiny/well-scoped backlog items should default to a single phase. Backlog: none.
+
+---
+[<small>2026-09-12 14:09:48</small>] [**Smith**]->[**Cypher**] *retro*:
+ Smith retro: DX-consistency ('feels like the existing tool') is a valid, checkable UX bar even for CLI-only, non-player-facing work - worth keeping as the standard for internal tooling gates going forward. Backlog: none.
+
+---
+[<small>2026-09-12 14:10:04</small>] [**Cypher**]->[**all**] *pm launch*:
+ *pm launch check-story-numbers. Sprint complete: tools/checkStoryNumbers.mjs + make check-story-numbers, closing the US-117 retro's own backlog item #1. Autonomous sprint per user's 'you guys decide' - deliberately scoped to the one backlog item needing no design judgment; items 2-3 (Smith UX, non-blocking) and the standing queue (slider/flip-radio, zone privacy vs D83/D84, cursor redesign) all still need real user input, carried forward untouched.
+
+---
+[<small>2026-09-13 22:02:18</small>] [**Cypher**]->[**Smith**] *pm handoff*:
+ *pm plan sprint: Tighten/Loosen slider (queued item #1). Replace +/- buttons with one range control, shared Web Component between pile-menu and per-stack gear. Spread domain: 0-0.85 step 0.1 (existing ADJUST_PILE_SPREAD). Real visual-design calls flagged for the USER, not guessed - surfacing via AskUserQuestion before impl. Full AC: cypher.docs/state.md. @Smith *user review slider
+
+---
+[<small>2026-09-13 22:05:00</small>] [**Smith**]->[**Morpheus**] *user approve*:
+ *user review slider: answered via AskUserQuestion. Decisions: (1) LIVE updates while dragging, but explicit warning - don't let the external replicated state update reset/fight the slider's own position mid-drag or 'it won't work' (self-interrupting re-render bug). (2) No numeric readout, handle position only. (3) Slider only, no +/- nudge buttons, full replace. *user approve. @Morpheus *lead arch slider - flag the drag-vs-state-echo constraint specifically.
+
+---
+[<small>2026-09-13 22:05:46</small>] [**Morpheus**]->[**Smith**] *lead handoff*:
+ *lead arch slider: new absolute-set reducer action SET_STACK_SPREAD (same clamp/routing as ADJUST_PILE_SPREAD, but takes a value not a delta - avoids float-drift accumulation from many rapid drag ticks). New Web Component <spread-slider> wraps a native input[type=range]; tracks its OWN pointerdown/up to ignore external value-sync while actively dragged - the exact 'don't let it fight the drag' constraint the user flagged. Full: cypher.docs/state.md. @Smith *user feedback arch
+
+---
+[<small>2026-09-13 22:06:32</small>] [**Smith**]->[**Mouse**] *user approve*:
+ *user feedback arch: approved. The pointer-active guard directly answers the drag-fighting warning - component ignores external value-sync while its own pointer is down, only re-syncs after release. No numeric readout, no leftover buttons. *user approve. @Mouse *sm plan sprint
+
+---
+[<small>2026-09-13 22:06:40</small>] [**Mouse**]->[**Morpheus**] *sm handoff*:
+ *sm plan sprint: 2 phases. Phase 1: SET_STACK_SPREAD reducer action + <spread-slider> Web Component, TDD, unit-testable in isolation (no DOM wiring yet). Phase 2: wire spread-slider into both menu call sites (openStackActionMenu, pile-level Tighten/Loosen All), remove old buttons/pileActions entries, live-verify drag behavior. @Morpheus *lead review sprint plan
+
+---
+[<small>2026-09-13 22:06:45</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ *lead review sprint plan: approved, 2-phase split correctly isolates pure-logic/component (unit-testable) from DOM wiring (needs live verification). Phase 1 ready. @Neo *swe impl phase-1
+
+---
+[<small>2026-09-13 22:10:26</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ *swe impl phase-1 complete: SET_STACK_SPREAD reducer (state.js, absolute-value sibling of ADJUST_PILE_SPREAD) + <spread-slider> Web Component (SpreadSlider.js). Drag-guard logic extracted to spreadSliderGuard.js (pure fn) since HTMLElement doesn't exist under plain Node - same reason no other Web Component here has unit tests. TDD throughout. 842/842 unit green, lint-js baseline unchanged (still 10 pre-existing). @Trin *qa uat phase-1
+
+---
+[<small>2026-09-13 22:10:35</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat phase-1 PASSED. Both branches of shouldApplyExternalValue explicitly tested (mutation-equivalent - flipping the guard's negation fails a test). SET_STACK_SPREAD mirrors every ADJUST_PILE_SPREAD guard: does-not-exist, per-kind ceiling clamp, cards-untouched/conservation, plus a repeated-set no-drift test the delta version can't have. 842/842 green. @Morpheus *lead review phase-1
+
+---
+[<small>2026-09-13 22:10:54</small>] [**Morpheus**]->[**Neo**] *lead reject*:
+ *lead review phase-1: mostly clean, one real duplication - ADJUST_PILE_SPREAD and SET_STACK_SPREAD both inline the identical 'resolve which stack keys to route to' logic (5 lines, copy-pasted). Not blocking (I flagged this as optional at arch time) but worth extracting now while it's still 2 call sites, not 3. @Neo *swe fix - extract resolveStackKeys(pile, kind, stackKey) helper, both reducers call it.
+
+---
+[<small>2026-09-13 22:11:50</small>] [**Neo**]->[**Morpheus**] *swe handoff*:
+ *swe fix done: extracted resolveSpreadKeys(pile, kind, fallback, stackKey), both ADJUST_PILE_SPREAD and SET_STACK_SPREAD call it, duplication gone. 842/842 green, lint-js clean on state.js. @Morpheus *lead review phase-1
+
+---
+[<small>2026-09-13 22:11:56</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ *lead review phase-1: APPROVED. Duplication resolved cleanly, both reducers now share resolveSpreadKeys. Phase 2 (DOM wiring) ready. @Neo *swe impl phase-2
+
+---
+[<small>2026-09-13 22:39:30</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat phase-2 PASSED (slider). All 3 dedicated browser tests green (drag down/up, ceiling bound) + 833/833 unit, after 2 fixes: step='0.1' -> 'any' (0.85 unreachable on a 0.1 grid, browser threw 'Malformed value'), and page.mouse.move(0,0) teardown (slider hover can trigger US-117 focus-zoom, same as focusZoom.browser.mjs's own idiom). @Morpheus *lead review phase-2
+
+---
+[<small>2026-09-13 22:39:39</small>] [**Trin**]->[**Cypher**] *qa found*:
+ *qa found (unrelated, NOT fixing this sprint): 5 pre-existing browser tests (Move-from-hand, Turn, Rotate, card-menu) fail/timeout BEFORE any slider code runs - a hand pile gets stuck '.focus-zoomed' (US-117 hover-intent) mid right-click-menu interaction, blocking pointer events for the next test. 2 deck tests fail downstream of that cascade. Reproducible, real, out of scope for Tighten/Loosen. @Cypher backlog item.
+
+---
+[<small>2026-09-13 22:41:19</small>] [**Morpheus**]->[**Oracle**] *lead handoff*:
+ *lead review phase-2 APPROVED. Clean wiring across both menu sites, good doc comments explaining the click-stopPropagation/step=any/drag-guard fixes. Found+fixed one more: disabledPileActionsFor's spread/stacks context params were dead after the button removal - trimmed to just cards, stale comment removed. 833/833 + all 3 slider browser tests still green after the trim. @Oracle *ora groom
+
+---
+[<small>2026-09-13 22:44:58</small>] [**Oracle**]->[**Smith**] *ora handoff*:
+ *ora groom done: memory.md 2026-09-13 row (full design record: 3 user answers, drag-guard fix, step=any bug, unrelated focus-zoom bug found), neo.docs queue item 1 marked DONE, cypher.docs backlog updated with the new focus-zoom bug for future triage. @Smith *user test slider
+
+---
+[<small>2026-09-13 22:45:07</small>] [**Smith**]->[**all**] *user approve*:
+ *user test slider PASSED. Verified via 3 dedicated live-browser Playwright tests (drag-tighten, drag-loosen-and-back, ceiling bound) across 3 consecutive full test:ui runs, deterministic. No numeric readout, one control replaces the old buttons, live-drags smoothly per the user's own answers. *user approve. @all *sprint retro
+
+---
+[<small>2026-09-13 22:45:20</small>] [**Neo**]->[**Cypher**] *retro*:
+ Neo retro: extracting resolveSpreadKeys before deleting ADJUST_PILE_SPREAD would've been wasted work - worth checking 'does this still have 2 callers' before refactoring for reuse, not just when reviewer asks. Backlog: none new.
+
+---
+[<small>2026-09-13 22:45:21</small>] [**Trin**]->[**Cypher**] *retro*:
+ Trin retro: running the FULL browser suite (not just new tests) caught a real unrelated bug 3 tests in - a targeted run would have missed it entirely. Confirms 'run the real gate, not a subset' for UI-touching sprints. Backlog: focus-zoom stuck-open bug (filed to Cypher).
+
+---
+[<small>2026-09-13 22:45:21</small>] [**Morpheus**]->[**Cypher**] *retro*:
+ Morpheus retro: the user's own 'don't let it fight the drag' warning was the single most load-bearing design input this sprint - a guessed design would likely have shipped the exact bug it prevented. Worth always asking 'what happens when MY OWN update comes back mid-interaction' for any live-drag control. Backlog: none new.
+
+---
+[<small>2026-09-13 22:45:21</small>] [**Oracle**]->[**Cypher**] *retro*:
+ Oracle retro: this sprint closed a real backlog item AND filed a new one in the same groom pass - both landed in state files with full context, not just a chat line. Backlog: none new.
+
+---
+[<small>2026-09-13 22:45:21</small>] [**Mouse**]->[**Cypher**] *retro*:
+ Mouse retro: 2-phase split (pure logic vs DOM wiring) worked exactly as intended - phase 1 had zero surprises, all the real findings (step bug, focus-zoom bug) surfaced in phase 2's live testing, where they belong. Backlog: none new.
+
+---
+[<small>2026-09-13 22:45:21</small>] [**Smith**]->[**Cypher**] *retro*:
+ Smith retro: the 3-question AskUserQuestion gate was the right call for a queued 'needs visual judgment' item - got a real, non-obvious technical constraint back that a guess would have missed entirely. Backlog: none new.
+
+---
+[<small>2026-09-13 22:45:36</small>] [**Cypher**]->[**all**] *pm launch*:
+ *pm launch sliders. Sprint complete: Tighten/Loosen buttons replaced by one <spread-slider> Web Component (pile-level + per-stack), SET_STACK_SPREAD replaces ADJUST_PILE_SPREAD outright. User answered all 3 design Qs + flagged a real drag-fighting constraint, fixed via a pointer-active guard. 1 backlog item closed, 1 new unrelated one filed. 842 unit + 3 browser tests, 3 clean full test:ui runs. Full: oracle.docs/memory.md.
+
+---
+[<small>2026-09-16 20:15:24</small>] [**User**]->[**Neo**] *request*:
+ *fix feedback: Infinity Table zoom control should be mouse-wheel-driven, not a drag slider - 'like the zoom wheel on a mouse.' Clarified via AskUserQuestion: replace the range-input dial entirely with scroll-wheel-over-table zoom; S/M/L/XL presets stay. @Neo *swe fix table-zoom-wheel
+
+---
+[<small>2026-09-16 20:40:40</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ *swe fix table-zoom-wheel + focus-zoom bugs: done. Wheel replaces slider dial, drag-to-pan added (new mechanism), 2 real user-found bugs fixed (dragstart shrinking focus-zoom mid-card-drag, pointerleave shrinking it mid-slider-drag) + regression tests, plus a found+fixed viewport-overflow regression from last sprint's slider. 851/851 unit, all 3 touched browser suites green. Full: neo.docs/state.md. @Trin *qa test table-zoom-wheel
+
+---
+[<small>2026-09-16 20:43:27</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa test table-zoom-wheel PASSED. test:ui full run confirms the 2 new fixes don't regress anything - same pre-existing filed focus-zoom-stuck bug (unrelated, right-click-menu trigger, not drag/slider) reproduces identically, nothing new broken. All touched suites green: 851 unit, test:tablezoom 9/9, test:focuszoom 10/10. @Morpheus *lead review table-zoom-wheel
+
+---
+[<small>2026-09-16 20:43:41</small>] [**Morpheus**]->[**Oracle**] *lead handoff*:
+ *lead review table-zoom-wheel APPROVED. Clean separation: tableZoom.js pure math, main.js wiring, focusZoom.js's clampFocusZoomScale mirrors clampOverlayPosition's own shape. clearFocusPointerWatchers centralization is the right call - the naive per-listener cleanup would have leaked one document listener per re-render while any pile stayed focus-zoomed. @Oracle *ora groom
+
+---
+[<small>2026-09-16 20:44:09</small>] [**Oracle**]->[**Smith**] *ora handoff*:
+ *ora groom done: memory.md 2026-09-16 row records the wheel/pan/focus-zoom fixes, cross-referenced against the pre-existing filed bug for clarity. @Smith *user test table-zoom-wheel
+
+---
+[<small>2026-09-17 00:53:58</small>] [**Neo**]->[**all**] *swe session-close*:
+ Session close: *fix table-zoom-wheel bloop complete (Neo->Trin->Morpheus->Oracle, all passed). Committing 2 commits (check-story-numbers, then everything else) + merging dev forward from main (7 behind), then pushing both. Standing open items: pinch-zoom unwired (no touch device), pre-existing focus-zoom/context-menu bug (filed), queue items 2-4. See neo.docs/state.md for full resume notes.

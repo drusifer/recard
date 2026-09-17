@@ -53,7 +53,6 @@
  */
 import { resolveDropTarget as resolveHaloTarget } from '../dropTarget.js';
 import { HORIZONTAL, VERTICAL } from '../pileables/Stackable.js';
-import { stacksOf } from './Stack.js';
 
 /**
  * How far a pile's cards overlap each other, as a fraction of a card's
@@ -470,7 +469,7 @@ export class Pile {
     // are is a dead control, same rule as `disabledActions` elsewhere.
     const restriction = this.constructor.convertibleKinds?.();
     const convertible = restriction === undefined || restriction.length > 1 ? ['changePileType'] : [];
-    return ['take', 'split', ...convertible, 'remove', 'tightenAll', 'loosenAll', ...orientationActions(cards)];
+    return ['take', 'split', ...convertible, 'remove', 'spread', ...orientationActions(cards)];
   }
 
   /**
@@ -484,33 +483,15 @@ export class Pile {
    * D91: `split` disabled below 2 cards - `splitPileAt` (state.js)
    * throws under that minimum, same reasoning as `remove`.
    */
-  disabledActions(count, context = {}) {
-    const { spread } = context;
+  disabledActions(count) {
     const disabled = count > 0 ? ['remove'] : [];
     if (count < 2) disabled.push('split');
-    // *nit: a Tighten at maximum spread (or a Loosen at minimum) can't
-    // move anything, so it's a dead control - disabled for the same
-    // reason `split` is below 2 cards. `spread` is the pile's CURRENT
-    // effective value, resolved by the caller (`disabledPileActionsFor`)
-    // since only it knows whether the pile has been adjusted yet.
-    if (spread !== undefined) {
-      // D129: "All" is disabled only when EVERY stack has hit the
-      // limit - one column already at the ceiling must not stop the
-      // others being tightened, which is the whole point of routing.
-      //
-      // An EMPTY pile counts as one stack at the pile's own spread,
-      // matching where `ADJUST_PILE_SPREAD` routes in that case. Left
-      // to `every()` on an empty list this would be vacuously true and
-      // disable BOTH directions on a pile that adjusts perfectly well.
-      // From the CONTEXT, never `this`: `pileForKind` builds a bare
-      // instance, so `this.cards`/`this.stacks` are empty here. That
-      // is the same trap `ChipPile`'s break rule fell into, documented
-      // on `disabledPileActionsFor`.
-      const stacks = stacksOf({ cards: context.cards ?? [], stacks: context.stacks, spread });
-      const spreads = stacks.length > 0 ? stacks.map((stack) => stack.spread) : [spread];
-      if (spreads.every((value) => value >= this.constructor.maxSpread)) disabled.push('tightenAll');
-      if (spreads.every((value) => value <= MIN_SPREAD)) disabled.push('loosenAll');
-    }
+    // Tighten/Loosen slider (2026-09-13): `spread` used to need a
+    // context-driven disabled-at-the-limit check here (a Tighten at
+    // maximum spread, or a Loosen at minimum, was a dead click). The
+    // slider that replaced the button pair is bounded by its own
+    // `min`/`max` (`ui.js`'s `rangeOptions`) - the browser enforces the
+    // limit, so there is nothing left for this method to disable.
     return disabled;
   }
 

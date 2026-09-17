@@ -246,9 +246,9 @@ test('deck disabledActions: deal disabled at 0 cards, split disabled below 2', (
 test('hand pileActions: sort + changePileType, open to any viewer (pass removed, direct user request, not a requirement)', () => {
   const cards = [{ pileableType: 'card', rank: 'A' }];
   assert.deepEqual(new HandPile(myHand).pileActions({ cards }),
-    ['sortRank', 'sortSuit', 'changePileType', 'tightenAll', 'loosenAll']);
+    ['sortRank', 'sortSuit', 'changePileType', 'spread']);
   assert.deepEqual(new HandPile(myHand).pileActions({ cards: [] }),
-    ['changePileType', 'tightenAll', 'loosenAll'], 'an empty hand has nothing to sort');
+    ['changePileType', 'spread'], 'an empty hand has nothing to sort');
 });
 
 test('cascade/rankAdjacent pileActions: changePileType is the one pile-level action either offers - D71 (US-74)', () => {
@@ -393,7 +393,7 @@ test('discard pileableActions: inherited from Pile, unmodified - same as any oth
 });
 
 test('discard pileActions: take/split/hide/show, inherited from Pile unmodified, open to everyone', () => {
-  assert.deepEqual(new DiscardPile(discard).pileActions({}), ['take', 'split', 'changePileType', 'remove', 'tightenAll', 'loosenAll']);
+  assert.deepEqual(new DiscardPile(discard).pileActions({}), ['take', 'split', 'changePileType', 'remove', 'spread']);
 });
 
 test('discard canRemove: same per-card rule as the base Pile - not unconditionally false any more', () => {
@@ -459,7 +459,7 @@ test('foundation: append-only insert; card actions are the SAME as any other pil
 });
 
 test('foundation: split/changePileType are the pile-level actions offered, inherited from MeldPile (D71/US-74, D91)', () => {
-  assert.deepEqual(new FoundationPile({}).pileActions(), ['split', 'changePileType', 'tightenAll', 'loosenAll']);
+  assert.deepEqual(new FoundationPile({}).pileActions(), ['split', 'changePileType', 'spread']);
 });
 
 test('foundation: tableSide true (inherited from Pile), resolveDropTarget always empty (no halo geometry, from MeldPile)', () => {
@@ -494,7 +494,7 @@ test('set: inherits MeldPile\'s append-only insert, single-slot drop target, and
   const inserted = new SetPile(pile).insertPileable({ id: 'b', rank: 'K', suit: 'hearts' });
   assert.deepEqual(inserted.cards.map((c) => c.id), ['a', 'b']);
   assert.deepEqual(new SetPile(pile).resolveDropTarget([{ pileableId: 'a' }], { x: 0, y: 0 }), {});
-  assert.deepEqual(new SetPile(pile).pileActions(), ['split', 'changePileType', 'tightenAll', 'loosenAll']);
+  assert.deepEqual(new SetPile(pile).pileActions(), ['split', 'changePileType', 'spread']);
   assert.equal(SetPile.reparentable, false);
 });
 
@@ -788,9 +788,9 @@ test('D129: a lands pile lays its colour columns out VERTICALLY', () => {
 // happened to declare. Confirms both halves of its own doc comment:
 // no `break`/`changePileType` (token-specific "no false affordance"
 // reasoning), but the universal pile actions are still offered.
-test('TokenPile: offers take/split/remove/tighten/loosen but no break or changePileType', () => {
+test('TokenPile: offers take/split/remove/spread but no break or changePileType', () => {
   const actions = new TokenPile({ id: 'tokens', kind: 'token', cards: [] }).pileActions({ cards: [] });
-  for (const id of ['take', 'split', 'remove', 'tightenAll', 'loosenAll']) {
+  for (const id of ['take', 'split', 'remove', 'spread']) {
     assert.ok(actions.includes(id), `missing ${id}`);
   }
   assert.ok(!actions.includes('break'), 'break is a CHIP denomination concept, not a token one');

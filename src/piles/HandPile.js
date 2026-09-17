@@ -91,6 +91,6 @@ export class HandPile extends Pile {
     //
     // *nit (Tighten/Loosen): those two are listed explicitly because
     // this method fully overrides the base one rather than inheriting.
-    return [...sortActionsFor(cards), 'changePileType', 'tightenAll', 'loosenAll'];
+    return [...sortActionsFor(cards), 'changePileType', 'spread'];
   }
 }

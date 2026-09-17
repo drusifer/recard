@@ -523,3 +523,17 @@ This file contains critical lessons and rules derived from past errors, technica
   intervening commit) before the correction landed, but the right move
   was to ask or leave it alone, not pattern-match "unexplained file +
   plausible-sounding debris theory" into deletion.
+- **"If type === X" branching on a discriminant that already has a
+  class hierarchy is a signal to add a method there, not another
+  conditional** (2026-09-12, `cardTransforms.js`). `state.js`'s FLIP
+  and ROTATE reducer cases each hand-rolled the identical shape (find
+  the card's current pile, check whether it currently offers this
+  verb, throw the same-shaped message, else mutate) - the "type" doing
+  the branching was `action.type`, and the fix was a small
+  `cardTransform({ verb, mutate })` factory (functional, matching this
+  file's own style - no class needed in JS to get the polymorphism
+  benefit) that both cases call through. Real, measured result:
+  cognitive complexity 3->1 on both. The tell was two functions that
+  read identically except for one verb string and one mutation -
+  worth pattern-matching on `git diff`/code-review, not just "this
+  function is a bit long."

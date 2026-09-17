@@ -268,7 +268,12 @@ test('a grown pile never extends past the viewport, even on a small screen', asy
     const piles = await page.locator('.pile-section[data-pile-id]').all();
     for (const pile of piles) {
       await pile.hover({ force: true });
-      await page.waitForTimeout(HOVER_INTENT_MS + 50);
+      // *fix (found live, 2026-09-16): `.focus-zoomed`'s own 0.15s CSS
+      // transition (`style.css`) starts only AFTER the hover-intent
+      // timer fires, so a wait of just `HOVER_INTENT_MS + 50` measured
+      // the overlay mid-animation, not at rest - +200 clears the full
+      // 150ms transition with room to spare.
+      await page.waitForTimeout(HOVER_INTENT_MS + 200);
       const overlay = page.locator('body > .pile-section.focus-zoomed');
       if (await overlay.count() === 0) continue; // hover missed - not this test's concern
       const box = await overlay.boundingBox();
@@ -282,6 +287,80 @@ test('a grown pile never extends past the viewport, even on a small screen', asy
       await page.mouse.move(0, 0);
       await page.waitForFunction(() => document.querySelector('.focus-zoomed') === null, undefined, { timeout: 2000 });
     }
+  } finally {
+    await context.close();
+  }
+});
+
+// *fix (direct user bug report, 2026-09-16): "drag a card out [of a
+// zoomed pile] goes bonkers." The EXISTING drag-out test above
+// dispatches synthetic `dragover`/`drop` directly, skipping `dragstart`
+// entirely (Playwright cannot synthesise a full native HTML5 drag) -
+// which is exactly why it never caught this: the real bug was in
+// `wireFocusZoom`'s own `dragstart` listener unconditionally shrinking
+// (reparenting) the CURRENTLY FOCUSED pile, including when the drag
+// started from a card INSIDE that same pile - moving the drag's own
+// source element mid-gesture. This test dispatches a real `dragstart`
+// on a card inside the zoomed pile and checks it stays put.
+test('starting a drag FROM a card inside the focus-zoomed pile does not shrink it', async () => {
+  const context = await fixture.browser.newContext();
+  try {
+    const page = await freshLiveTable(context);
+    const pile = myHandPile(page);
+    const pileId = await pile.getAttribute('data-pile-id');
+    await pile.hover();
+    await page.waitForSelector(`body > .pile-section.focus-zoomed[data-pile-id="${pileId}"]`, { timeout: 2000 });
+
+    await page.dispatchEvent(`body > .focus-zoomed[data-pile-id="${pileId}"] .middle-card >> nth=0`, 'dragstart', {
+      dataTransfer: await page.evaluateHandle(() => new DataTransfer()),
+    });
+
+    const stillFocused = await page.evaluate(
+      (id) => document.querySelector(`body > .pile-section.focus-zoomed[data-pile-id="${CSS.escape(id)}"]`) !== null,
+      pileId,
+    );
+    assert.ok(stillFocused, 'the pile must stay put while its own card is mid-drag, not snap back into #zones');
+
+    await page.dispatchEvent(`body > .focus-zoomed[data-pile-id="${pileId}"] .middle-card >> nth=0`, 'dragend');
+  } finally {
+    await context.close();
+  }
+});
+
+// *fix (direct user bug report, 2026-09-16): "interact with the
+// [Tighten/Loosen] slider [and it] goes bonkers." Dragging the slider
+// can carry the pointer briefly outside the pile's own enlarged box -
+// a plain `pointerleave` used to shrink (reparent) the pile mid-drag.
+test('dragging the pile\'s own spread slider outside its bounds does not shrink the pile mid-drag', async () => {
+  const context = await fixture.browser.newContext();
+  try {
+    const page = await freshLiveTable(context);
+    const pile = myHandPile(page);
+    const pileId = await pile.getAttribute('data-pile-id');
+    await pile.hover();
+    await page.waitForSelector(`body > .pile-section.focus-zoomed[data-pile-id="${pileId}"]`, { timeout: 2000 });
+
+    const slider = page.locator(`body > .focus-zoomed[data-pile-id="${pileId}"] .spread-slider-input`);
+    const box = await slider.boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    // Move well outside the (enlarged) pile's own box while the button
+    // is still held - the exact gesture that used to trigger a
+    // mid-drag `pointerleave` shrink.
+    await page.mouse.move(box.x + box.width / 2, box.y - 400);
+    const stillFocusedMidDrag = await page.evaluate(
+      (id) => document.querySelector(`body > .pile-section.focus-zoomed[data-pile-id="${CSS.escape(id)}"]`) !== null,
+      pileId,
+    );
+    assert.ok(stillFocusedMidDrag, 'must not shrink while the slider drag is still in progress (button held)');
+
+    // Releasing OUTSIDE the pile is a real "the pointer left" - it
+    // should shrink NOW, not stay stuck open forever.
+    await page.mouse.up();
+    await page.waitForFunction(
+      (id) => document.querySelector(`body > .pile-section.focus-zoomed[data-pile-id="${CSS.escape(id)}"]`) === null,
+      pileId, { timeout: 2000 },
+    );
   } finally {
     await context.close();
   }

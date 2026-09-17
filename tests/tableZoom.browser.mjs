@@ -81,11 +81,11 @@ async function freshLiveTable(context) {
   return page;
 }
 
-test('the dial applies the sane default (M) once a table exists', async () => {
+test('the wheel applies the sane default (M) once a table exists', async () => {
   const context = await fixture.browser.newContext();
   try {
     const page = await freshLiveTable(context);
-    assert.equal(await page.locator('#table-zoom-dial').inputValue(), String(TABLE_ZOOM_PRESETS[TABLE_ZOOM_DEFAULT]));
+    assert.equal(await page.locator('#table-zoom-wheel').getAttribute('aria-valuenow'), String(TABLE_ZOOM_PRESETS[TABLE_ZOOM_DEFAULT]));
     assert.equal(await currentTableZoomScale(page), String(TABLE_ZOOM_PRESETS[TABLE_ZOOM_DEFAULT]));
   } finally {
     await context.close();
@@ -93,12 +93,12 @@ test('the dial applies the sane default (M) once a table exists', async () => {
 });
 
 for (const size of ['S', 'M', 'L', 'XL']) {
-  test(`clicking the "${size}" preset sets both the dial and #zones' scale`, async () => {
+  test(`clicking the "${size}" preset sets both the wheel and #zones' scale`, async () => {
     const context = await fixture.browser.newContext();
     try {
       const page = await freshLiveTable(context);
       await page.click(`[data-zoom-preset="${size}"]`);
-      assert.equal(await page.locator('#table-zoom-dial').inputValue(), String(TABLE_ZOOM_PRESETS[size]));
+      assert.equal(await page.locator('#table-zoom-wheel').getAttribute('aria-valuenow'), String(TABLE_ZOOM_PRESETS[size]));
       assert.equal(await currentTableZoomScale(page), String(TABLE_ZOOM_PRESETS[size]));
     } finally {
       await context.close();
@@ -106,19 +106,33 @@ for (const size of ['S', 'M', 'L', 'XL']) {
   });
 }
 
-test('dragging the dial directly (not a preset) also updates the applied scale', async () => {
+// *fix (direct user request, 2026-09-16): "like the zoom wheel on a
+// mouse" as its own manual control - a vertical drag, tread up zooms
+// in, down zooms out. Replaces the old `<input type=range>` dial test.
+test('dragging the wheel UP zooms in, DOWN zooms out', async () => {
   const context = await fixture.browser.newContext();
   try {
     const page = await freshLiveTable(context);
-    await page.locator('#table-zoom-dial').fill('1.2');
-    await page.locator('#table-zoom-dial').dispatchEvent('input');
-    assert.equal(await currentTableZoomScale(page), '1.2');
+    const wheel = page.locator('#table-zoom-wheel');
+    const box = await wheel.boundingBox();
+    const startScale = Number(await currentTableZoomScale(page));
+
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 60); // UP
+    const afterUp = Number(await currentTableZoomScale(page));
+    assert.ok(afterUp > startScale, `spinning up must zoom in (${startScale} -> ${afterUp})`);
+
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 + 120); // back down, past start
+    const afterDown = Number(await currentTableZoomScale(page));
+    assert.ok(afterDown < afterUp, `spinning down must zoom back out (${afterUp} -> ${afterDown})`);
+    await page.mouse.up();
   } finally {
     await context.close();
   }
 });
 
-test('every preset button and the dial itself clear the 44px touch-target floor', async () => {
+test('every preset button and the wheel itself clear the 44px touch-target floor', async () => {
   const context = await fixture.browser.newContext();
   try {
     const page = await freshLiveTable(context);
@@ -126,6 +140,53 @@ test('every preset button and the dial itself clear the 44px touch-target floor'
       const box = await page.locator(`[data-zoom-preset="${size}"]`).boundingBox();
       assert.ok(box.width >= 44 && box.height >= 44, `${size} preset button must clear the 44px floor`);
     }
+    const wheelBox = await page.locator('#table-zoom-wheel').boundingBox();
+    assert.ok(wheelBox.width >= 44 && wheelBox.height >= 44, 'the wheel must clear the 44px floor too');
+  } finally {
+    await context.close();
+  }
+});
+
+// *fix (direct user request, 2026-09-16): "we'll also need to pan with
+// drag on table." Dragging the empty table background (not a pile/
+// card/button) pans the view.
+test('dragging the empty table background pans #zones', async () => {
+  const context = await fixture.browser.newContext();
+  try {
+    const page = await freshLiveTable(context);
+    // Pan only has room to move once zoomed in past 1x (`maxPan`).
+    await page.click('[data-zoom-preset="XL"]');
+    const surface = page.locator('.table-surface');
+    const box = await surface.boundingBox();
+    await page.mouse.move(box.x + 5, box.y + 5);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 55, box.y + 45);
+    await page.mouse.up();
+    const pan = await page.evaluate(() => {
+      const style = getComputedStyle(document.querySelector('#zones'));
+      return { x: style.getPropertyValue('--table-pan-x').trim(), y: style.getPropertyValue('--table-pan-y').trim() };
+    });
+    assert.notEqual(pan.x, '', 'a pan-x must actually be set');
+    assert.ok(Number.parseFloat(pan.x) > 0, `dragging right must pan positively on x, got ${pan.x}`);
+    assert.ok(Number.parseFloat(pan.y) > 0, `dragging down must pan positively on y, got ${pan.y}`);
+  } finally {
+    await context.close();
+  }
+});
+
+test('dragging a card does not pan the table - only the empty background does', async () => {
+  const context = await fixture.browser.newContext();
+  try {
+    const page = await freshLiveTable(context);
+    await page.click('[data-zoom-preset="XL"]');
+    const card = page.locator('[data-kind="hand"] .middle-card').first();
+    const box = await card.boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 80, box.y + 80);
+    await page.mouse.up();
+    const panX = await page.evaluate(() => getComputedStyle(document.querySelector('#zones')).getPropertyValue('--table-pan-x').trim());
+    assert.ok(panX === '' || Number.parseFloat(panX) === 0, `a card drag must never pan the table, got --table-pan-x: ${panX}`);
   } finally {
     await context.close();
   }

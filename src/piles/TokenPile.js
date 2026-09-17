@@ -32,6 +32,6 @@ export class TokenPile extends Pile {
     // already applies - a token pile converting to a Foundation or a
     // Discard is a meaningless operation, not a real choice a host
     // would make).
-    return ['take', 'split', 'remove', 'tightenAll', 'loosenAll', ...sortActionsFor(cards)];
+    return ['take', 'split', 'remove', 'spread', ...sortActionsFor(cards)];
   }
 }

@@ -163,29 +163,23 @@ export const ACTION_SPECS = {
   // *nit (direct user request): "pile actions for tighten/loosen to
   // adjust the overlap on fan and meld piles or runs or whatever."
   // Pile-level and in place, same shape as `shuffle`/`hide`/`show` - no
-  // `target`, so never draggable. Two SPEC entries for one reducer
-  // action (`ADJUST_PILE_SPREAD`, a signed delta), the same split D103
-  // used for reveal/conceal: the direction belongs in the label, not in
-  // a second code path.
-  // *nit (direct user request, restated unambiguously): "if i press a
-  // button that looks like this '<-' it should tighten and '->' should
-  // loosen". So the mapping is by DIRECTION, not by which glyph sits
-  // where: an arrow pointing left pulls the pile together, one pointing
-  // right pushes it apart.
-  //
-  // Plain arrows rather than the previous ⇤/⇥ (arrow-to-BAR): those read
-  // as tab stops as much as directions, which is most of why this took
-  // three passes to get right. There is nothing to misread about ← and →.
+  // `target`, so never draggable. Originally a signed-delta pair of
+  // buttons (Tighten/Loosen); see the slider comment below for why
+  // that's gone.
   // D129 (direct user request): spread belongs to a STACK now, so the
-  // pile-level pair became "all" - they ROUTE to every stack's own
-  // tighten/loosen rather than writing one pile-wide number, which is
-  // what lets columns that have been adjusted apart keep their
-  // relative differences. The per-stack pair below is what the gear
-  // emblem on each stack opens.
-  tightenAll: { label: 'Tighten All', destructive: false, hint: 'Overlap every stack in this pile more tightly.', icon: '←' },
-  loosenAll: { label: 'Loosen All', destructive: false, hint: 'Spread every stack in this pile further apart.', icon: '→' },
-  tightenStack: { label: 'Tighten', destructive: false, hint: 'Overlap this stack\'s cards more tightly.', icon: '←' },
-  loosenStack: { label: 'Loosen', destructive: false, hint: 'Spread this stack\'s cards further apart.', icon: '→' },
+  // pile-level control became "all" - it ROUTES to every stack's own
+  // spread rather than writing one pile-wide number, which is what
+  // lets columns that have been adjusted apart keep their relative
+  // differences. `spreadStack` below is what the gear emblem on each
+  // stack opens.
+  //
+  // Tighten/Loosen slider (direct user request, 2026-09-13): one range
+  // control replacing the old separate Tighten/Loosen button pair -
+  // `range: true` is the slider's own equivalent of `enum: true` above,
+  // same "static spec + per-instance value/bounds at the render call
+  // site" split (`rangeOptions`, `ui.js`, mirroring `enumOptions`).
+  spread: { label: 'Spread', destructive: false, hint: 'Adjust how much every stack in this pile overlaps.', icon: '↔', range: true },
+  spreadStack: { label: 'Spread', destructive: false, hint: 'Adjust how much this stack\'s cards overlap.', icon: '↔', range: true },
   flipStack: { label: 'Flip', destructive: false, hint: 'Run this stack the other way - a row becomes a column.', icon: '↕' },
   // D129 (direct user request: "add stackaction for tap/untap, keep
   // pile level for all stacks") - `untapAll` above stays pile-wide and
@@ -428,14 +422,14 @@ export function pileLevelActions(kind, context = {}) {
  * @param {number} count
  * @returns {string[]} action ids currently disabled
  */
-export function disabledPileActionsFor(kind, count, { spread, cards, stacks } = {}) {
+export function disabledPileActionsFor(kind, count, { cards } = {}) {
   // `cards` matters as much as `count`: `pileForKind` builds a BARE
   // instance of the kind, so anything reading `this.cards` sees an empty
   // pile. `ChipPile`'s break-is-disabled rule did exactly that and
   // disabled the button on every tray, however many breakable chips it
   // held - found by clicking it in a real browser, where the control
   // simply wasn't there.
-  return pileForKind(kind)?.disabledActions(count, { spread, cards, stacks }) ?? [];
+  return pileForKind(kind)?.disabledActions(count, { cards }) ?? [];
 }
 
 /**

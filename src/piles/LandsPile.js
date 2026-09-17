@@ -81,7 +81,7 @@ export class LandsPile extends GroupedPile {
    * pile is a set of distinct permanents, not a stack of interchangeable
    * cards to scoop or cut. */
   pileActions() {
-    return ['untapAll', 'changePileType', 'remove', 'tightenAll', 'loosenAll'];
+    return ['untapAll', 'changePileType', 'remove', 'spread'];
   }
 
   /**

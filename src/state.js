@@ -5,6 +5,7 @@ import { MIN_SPREAD, MAX_SPREAD } from './piles/Pile.js';
 import { survivorsOfReset } from './pileables/pileableTypes.js';
 import { breakInto, COLOUR_FOR_VALUE } from './pileables/ChipPileable.js';
 import { batchToken } from './decks/batchToken.js';
+import { requireCanRemove, rotateCard, flipCard } from './cardTransforms.js';
 
 // US-113 (direct user request: "rtg hand sorting should be by color and
 // card type not suite and rank") - SORT_PILE's two RtG-specific keys.
@@ -143,6 +144,31 @@ function makePile(kind, { id, name, ownerId = null, cards = [], zoneId = null })
   // lookup table lives in this shared primitive.
   const resolvedZoneId = zoneId ?? (ownerId ? playerZoneId(ownerId) : id);
   return { id, kind, name, ownerId, cards, zoneId: resolvedZoneId };
+}
+
+/**
+ * `SET_STACK_SPREAD`'s own helper: which stack keys a spread change
+ * routes to. D129 (direct user request): spread
+ * is a STACK's, not a pile's - a gear emblem on each stack adjusts
+ * that one. A pile-level Tighten All / Loosen All (or the pile-level
+ * slider) omits `stackKey` and ROUTES to every stack instead of
+ * writing one pile-wide number, so columns that have been adjusted
+ * apart keep their relative differences.
+ *
+ * Omitting the key means ALL - it cannot mean "the default stack",
+ * because that stack has a real key (`DEFAULT_STACK_KEY`) precisely so
+ * the two are never confused.
+ */
+function resolveSpreadKeys(pile, kind, fallbackSpread, stackKey) {
+  const routed = stacksOf({ cards: pile.cards, stacks: pile.stacks, spread: fallbackSpread })
+    .map((stack) => stackKeyFor(stack.id));
+  // An EMPTY pile has no stacks to route to, but adjusting one is
+  // still meaningful - it sets what the cards will arrive into.
+  // Without this the adjustment is a silent no-op that the pile then
+  // forgets, which is what the old pile-wide `spread` did correctly
+  // and this routing would otherwise have lost.
+  const everyStack = routed.length > 0 ? routed : [DEFAULT_STACK_KEY];
+  return stackKey === undefined ? everyStack : [stackKey];
 }
 
 /** Shared by every caller that needs a fresh, collision-free pile id
@@ -733,9 +759,7 @@ function transferCard(state, { fromPileId, toPileId, pileableId, viewerId, actio
   const card = fromPile.cards.find((c) => c.id === pileableId);
   if (!card) throw new Error(`Card ${pileableId} is not in pile ${fromPileId}`);
 
-  if (!pileInstanceFor(fromPile, viewerId).canRemove(card, viewerId, action)) {
-    throw new Error(`Player ${viewerId} is not authorized to ${action} ${pileableId}`);
-  }
+  requireCanRemove(pileInstanceFor(fromPile, viewerId), card, viewerId, action);
 
   const toPile = state.piles.find((p) => p.id === toPileId);
   if (!toPile) throw new Error(`Pile ${toPileId} does not exist`);
@@ -1355,11 +1379,6 @@ const ACTIONS = {
    * *nit (direct user request): "pile actions for tighten/loosen to
    * adjust the overlap on fan and meld piles or runs or whatever."
    *
-   * ONE action taking a signed `delta`, not a `TIGHTEN` and a `LOOSEN`
-   * - the same "there can be only 1" correction D75 made and D103
-   * followed, and the same shape `ADJUST_SCORE` already uses for its
-   * +/- steps. The two are one operation in opposite directions.
-   *
    * Replicated state, not a local view preference: everyone at the
    * table is looking at the same cards, so they must see the same
    * spread. It is presentation, though - the cards themselves are
@@ -1371,43 +1390,27 @@ const ACTIONS = {
    * first adjustment moves from what the player is actually looking at.
    * Clamped here rather than in the UI: the reducer is the authority,
    * and a directly-dispatched action from a guest gets the same limits.
+   *
+   * Tighten/Loosen slider (direct user request, 2026-09-13): takes an
+   * absolute `value`, not a signed delta - the old separate Tighten/
+   * Loosen button pair (and its own `ADJUST_PILE_SPREAD` action, one
+   * click = one step) is gone outright, replaced by a `<spread-slider>`
+   * whose native range-input event already carries an absolute value.
+   * Converting that to a delta and re-adding it on every drag tick
+   * would reintroduce float-drift at a much higher event rate than a
+   * button click ever produced, for no benefit over an absolute set.
    */
-  ADJUST_PILE_SPREAD(state, action) {
+  SET_STACK_SPREAD(state, action) {
     const pile = state.piles.find((p) => p.id === action.pileId);
     if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
     const kind = PILE_TYPES[pile.kind];
-    // The ceiling is the pile TYPE's (*nit: chip stacks go tighter than
-    // a card fan may, because a stack reads by its top chip).
     const ceiling = kind?.maxSpread ?? MAX_SPREAD;
     const fallback = pile.spread ?? kind?.defaultSpread ?? MIN_SPREAD;
+    const keys = resolveSpreadKeys(pile, kind, fallback, action.stackKey);
 
-    // D129 (direct user request): spread is a STACK's, not a pile's -
-    // a gear emblem on each stack adjusts that one. A pile-level
-    // Tighten All / Loosen All omits `stackKey` and ROUTES to every
-    // stack instead of writing one pile-wide number, so columns that
-    // have been adjusted apart keep their relative differences.
-    //
-    // Omitting the key means ALL - it cannot mean "the default stack",
-    // because that stack has a real key (`DEFAULT_STACK_KEY`) precisely
-    // so the two are never confused.
-    const routed = stacksOf({ cards: pile.cards, stacks: pile.stacks, spread: fallback })
-      .map((stack) => stackKeyFor(stack.id));
-    // An EMPTY pile has no stacks to route to, but adjusting one is
-    // still meaningful - it sets what the cards will arrive into.
-    // Without this the adjustment is a silent no-op that the pile then
-    // forgets, which is what the old pile-wide `spread` did correctly
-    // and this routing would otherwise have lost.
-    const everyStack = routed.length > 0 ? routed : [DEFAULT_STACK_KEY];
-    const keys = action.stackKey === undefined ? everyStack : [action.stackKey];
-
+    const next = Math.round(Math.min(ceiling, Math.max(MIN_SPREAD, action.value)) * 1000) / 1000;
     const stacks = { ...pile.stacks };
     for (const key of keys) {
-      const current = stacks[key]?.spread ?? fallback;
-      // Rounded to the step: floating-point addition of 0.1 otherwise
-      // drifts (0.65 + 0.1 + 0.1 = 0.8500000000000001), which would
-      // never compare equal to MAX_SPREAD and so never disable the
-      // button.
-      const next = Math.round(Math.min(ceiling, Math.max(MIN_SPREAD, current + action.delta)) * 1000) / 1000;
       stacks[key] = { ...stacks[key], spread: next };
     }
     return { ...state, piles: state.piles.map((p) => (p.id === action.pileId ? { ...p, stacks } : p)) };
@@ -1420,7 +1423,7 @@ const ACTIONS = {
    * emblem is worth its pixels.
    *
    * Replicated like every other presentation change (see
-   * `ADJUST_PILE_SPREAD`): everyone at the table is looking at the same
+   * `SET_STACK_SPREAD`): everyone at the table is looking at the same
    * cards, so they must see the same arrangement.
    */
   FLIP_STACK(state, action) {
@@ -1546,14 +1549,10 @@ const ACTIONS = {
       throw new Error(`Card ${action.pileableId} is not in any pile`);
     }
     const { pileId, card } = found;
-    const isFaceUp = card.faceUp === true;
-    const verb = isFaceUp ? 'conceal' : 'reveal';
-    const pile = state.piles.find((p) => p.id === pileId);
-    if (!revivePile(pile).canRemove(card, action.playerId, verb)) {
-      throw new Error(`Player ${action.playerId} is not authorized to ${verb} ${action.pileableId}`);
-    }
+    const pile = revivePile(state.piles.find((p) => p.id === pileId));
+    const flipped = flipCard(pile, card, action.playerId);
     return replacePile(state, pileId, (p) =>
-      withCards(p, p.cards.map((c) => (c.id === action.pileableId ? { ...c, faceUp: !isFaceUp } : c))),
+      withCards(p, p.cards.map((c) => (c.id === action.pileableId ? flipped : c))),
     );
   },
 
@@ -1572,13 +1571,10 @@ const ACTIONS = {
       throw new Error(`Card ${action.pileableId} is not in any pile`);
     }
     const { pileId, card } = found;
-    const pile = state.piles.find((p) => p.id === pileId);
-    if (!revivePile(pile).canRemove(card, action.playerId, 'rotate')) {
-      throw new Error(`Player ${action.playerId} is not authorized to rotate ${action.pileableId}`);
-    }
-    const orientation = card.orientation === 'landscape' ? 'portrait' : 'landscape';
+    const pile = revivePile(state.piles.find((p) => p.id === pileId));
+    const rotated = rotateCard(pile, card, action.playerId);
     return replacePile(state, pileId, (p) =>
-      withCards(p, p.cards.map((c) => (c.id === action.pileableId ? { ...c, orientation } : c))),
+      withCards(p, p.cards.map((c) => (c.id === action.pileableId ? rotated : c))),
     );
   },
 
@@ -1614,7 +1610,7 @@ const ACTIONS = {
    *
    * ONE action taking `orientation` rather than a `TAP_STACK`/
    * `UNTAP_STACK` pair - the same D75/D103 "there can be only 1"
-   * correction `ADJUST_PILE_SPREAD` already follows.
+   * correction `SET_STACK_SPREAD` already follows.
    */
   SET_STACK_ORIENTATION(state, action) {
     if (state.piles.every((p) => p.id !== action.pileId)) throw new Error(`Pile ${action.pileId} does not exist`);

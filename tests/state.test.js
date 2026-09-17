@@ -2519,8 +2519,8 @@ test('TAKE_PILE: fully permissive - deck/hand are eligible too now, no kind allo
 // actions no matter what"): take/split/etc. used to be owner-or-shared
 // only - gone, along with the isOwner/isShared flags.
 test('zonePile/discardPile pileActions: take/split/etc. are open to any player', () => {
-  assert.deepEqual(new PILE_TYPES.plain({}).pileActions({}), ['take', 'split', 'changePileType', 'remove', 'tightenAll', 'loosenAll']);
-  assert.deepEqual(new PILE_TYPES.discard({}).pileActions({}), ['take', 'split', 'changePileType', 'remove', 'tightenAll', 'loosenAll']);
+  assert.deepEqual(new PILE_TYPES.plain({}).pileActions({}), ['take', 'split', 'changePileType', 'remove', 'spread']);
+  assert.deepEqual(new PILE_TYPES.discard({}).pileActions({}), ['take', 'split', 'changePileType', 'remove', 'spread']);
 });
 
 // --- Sprint 23, Phase 69: SET_PILE_ORIENTATION (US-62, hide/show) ---
@@ -3183,7 +3183,7 @@ test('SORT_PILE by cardType: Creature/Instant/Sorcery/Enchantment/Land order, co
 });
 
 
-// --- Pile spread: Tighten / Loosen (*nit) ---------------------------
+// --- Pile spread: the Tighten/Loosen slider (*nit, 2026-09-13) ------
 //
 // *nit (direct user request): "pile actions for tighten/loosen to adjust
 // the overlap on fan and meld piles or runs or whatever." How far a
@@ -3192,30 +3192,18 @@ test('SORT_PILE by cardType: Creature/Instant/Sorcery/Enchantment/Land order, co
 // unadjustable. It's replicated state now, so everyone at the table
 // sees the same spread.
 //
-// ONE reducer action taking a signed delta, not a TIGHTEN plus a
-// LOOSEN - the same "there can be only 1" rule D75/D103 applied, and
-// the same shape `ADJUST_SCORE` already uses for +/- steps.
+// Originally a signed-delta button pair (`ADJUST_PILE_SPREAD`, one
+// click = one step); replaced outright by one `SET_STACK_SPREAD` action
+// (an absolute value) when the buttons became a `<spread-slider>` -
+// see its own reducer doc comment for why absolute over delta.
 
-test('ADJUST_PILE_SPREAD: loosening lowers the overlap factor from the pile type\'s own default', () => {
-  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
-  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
-  state = reduce(state, { type: 'ADJUST_PILE_SPREAD', pileId: 'hand:p1', delta: -SPREAD_STEP });
-  const hand = state.piles.find((p) => p.id === 'hand:p1');
-  assert.equal(stackSpreadOf(hand), spreadAfter(-1));
-});
-
-test('ADJUST_PILE_SPREAD: tightening raises it, and repeated steps accumulate', () => {
-  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
-  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
-  state = reduce(state, { type: 'ADJUST_PILE_SPREAD', pileId: 'hand:p1', delta: SPREAD_STEP });
-  assert.equal(stackSpreadOf(state.piles.find((p) => p.id === 'hand:p1')), spreadAfter(1));
-
-  // Accumulation checked downward: a hand starts near the tight end of
-  // the range, so two steps UP would hit MAX_SPREAD and prove clamping
-  // rather than accumulation (which the clamp tests below cover).
-  state = reduce(state, { type: 'ADJUST_PILE_SPREAD', pileId: 'hand:p1', delta: -SPREAD_STEP });
-  state = reduce(state, { type: 'ADJUST_PILE_SPREAD', pileId: 'hand:p1', delta: -SPREAD_STEP });
-  assert.equal(stackSpreadOf(state.piles.find((p) => p.id === 'hand:p1')), spreadAfter(-1));
+// Test-audit gap (2026-09-11): every other pile-targeting action has a
+// does-not-exist guard test (MOVE_PILE, CREATE_PILE, REORDER_PILE,
+// SET_STACK_SPREAD elsewhere, several more) - SHUFFLE_DECK's own copy of
+// the same guard had none.
+test('SHUFFLE_DECK: throws for a pile that does not exist', () => {
+  const state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  assert.throws(() => reduce(state, { type: 'SHUFFLE_DECK', pileId: 'nope' }), /does not exist/);
 });
 
 // Each pile TYPE brings its own starting spread - a hand fans by
@@ -3223,57 +3211,12 @@ test('ADJUST_PILE_SPREAD: tightening raises it, and repeated steps accumulate', 
 // has to move from that type's own default, not from a single global
 // number. `static defaultSpread` on the class, same shape as
 // `visibility`/`tableSide`/`component`.
-test('ADJUST_PILE_SPREAD: a flat pile starts from ITS default (no overlap), not the hand\'s', () => {
+test('SET_STACK_SPREAD: a flat pile starts from ITS default (no overlap), not the hand\'s', () => {
   let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
   state = reduce(state, { type: 'CREATE_ZONE', name: 'Meld', kind: 'run' });
   const meld = pilesOf(state).find((z) => z.name === 'Meld');
-  state = reduce(state, { type: 'ADJUST_PILE_SPREAD', pileId: meld.id, delta: SPREAD_STEP });
+  state = reduce(state, { type: 'SET_STACK_SPREAD', pileId: meld.id, value: SPREAD_STEP });
   assert.equal(stackSpreadOf(pilesOf(state).find((z) => z.id === meld.id)), SPREAD_STEP);
-});
-
-test('ADJUST_PILE_SPREAD: clamps at fully tightened - further tightening is a no-op, never past the max', () => {
-  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
-  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
-  for (let index = 0; index < 50; index++) {
-    state = reduce(state, { type: 'ADJUST_PILE_SPREAD', pileId: 'hand:p1', delta: SPREAD_STEP });
-  }
-  assert.equal(stackSpreadOf(state.piles.find((p) => p.id === 'hand:p1')), MAX_SPREAD);
-});
-
-test('ADJUST_PILE_SPREAD: clamps at fully loosened - never negative, which would push cards apart', () => {
-  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
-  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
-  for (let index = 0; index < 50; index++) {
-    state = reduce(state, { type: 'ADJUST_PILE_SPREAD', pileId: 'hand:p1', delta: -SPREAD_STEP });
-  }
-  assert.equal(stackSpreadOf(state.piles.find((p) => p.id === 'hand:p1')), MIN_SPREAD);
-});
-
-test('ADJUST_PILE_SPREAD: throws for a pile that does not exist', () => {
-  const state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
-  assert.throws(() => reduce(state, { type: 'ADJUST_PILE_SPREAD', pileId: 'nope', delta: SPREAD_STEP }), /does not exist/);
-});
-
-// Test-audit gap (2026-09-11): every other pile-targeting action has a
-// does-not-exist guard test (MOVE_PILE, CREATE_PILE, REORDER_PILE,
-// ADJUST_PILE_SPREAD above, several more) - SHUFFLE_DECK's own copy of
-// the same guard had none.
-test('SHUFFLE_DECK: throws for a pile that does not exist', () => {
-  const state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
-  assert.throws(() => reduce(state, { type: 'SHUFFLE_DECK', pileId: 'nope' }), /does not exist/);
-});
-
-// Spread is presentation, not content: adjusting it must never disturb
-// the cards themselves. Worth an explicit assertion because the reducer
-// rebuilds the pile record to write the field.
-test('ADJUST_PILE_SPREAD: leaves the pile\'s cards completely untouched', () => {
-  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
-  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
-  const before = handOf(state, 'p1');
-  const beforeState = state;
-  state = reduce(state, { type: 'ADJUST_PILE_SPREAD', pileId: 'hand:p1', delta: -SPREAD_STEP });
-  assert.deepEqual(handOf(state, 'p1'), before);
-  assertCardsConserved(beforeState, state, 'ADJUST_PILE_SPREAD');
 });
 
 // The three explicit field lists a pile's data passes through
@@ -3282,10 +3225,10 @@ test('ADJUST_PILE_SPREAD: leaves the pile\'s cards completely untouched', () => 
 // `insertPileable`/`removePileable` rebuild the pile from `toJSON()`, and
 // `viewFor` sends `getView()`. The reducer tests above all passed while
 // the feature did nothing on screen because only `getView` was missing.
-test('ADJUST_PILE_SPREAD: the spread survives cards moving in and out of the pile', () => {
+test('SET_STACK_SPREAD: the spread survives cards moving in and out of the pile', () => {
   let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
   state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
-  state = reduce(state, { type: 'ADJUST_PILE_SPREAD', pileId: 'hand:p1', delta: -SPREAD_STEP });
+  state = reduce(state, { type: 'SET_STACK_SPREAD', pileId: 'hand:p1', value: spreadAfter(-1) });
   const adjusted = stackSpreadOf(state.piles.find((p) => p.id === 'hand:p1'));
 
   const pileableId = handOf(state, 'p1')[0].id;
@@ -3296,13 +3239,73 @@ test('ADJUST_PILE_SPREAD: the spread survives cards moving in and out of the pil
   assert.equal(stackSpreadOf(state.piles.find((p) => p.id === 'hand:p1')), adjusted, 'and a card arriving');
 });
 
-test('ADJUST_PILE_SPREAD: the spread reaches the VIEW, not just the state - the wiring the reducer tests cannot see', () => {
+test('SET_STACK_SPREAD: the spread reaches the VIEW, not just the state - the wiring the reducer tests cannot see', () => {
   let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
   state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
-  state = reduce(state, { type: 'ADJUST_PILE_SPREAD', pileId: 'hand:p1', delta: -SPREAD_STEP });
+  state = reduce(state, { type: 'SET_STACK_SPREAD', pileId: 'hand:p1', value: spreadAfter(-1) });
 
   const pileView = viewFor(state, 'p1').piles.find((p) => p.id === 'hand:p1');
   assert.equal(pileView.stacks?.[DEFAULT_STACK_KEY]?.spread, spreadAfter(-1));
+});
+
+// SET_STACK_SPREAD (2026-09-13, Tighten/Loosen slider): a slider's
+// native input event already IS an absolute value - converting that to
+// a delta and re-adding it every drag tick would reintroduce the same
+// float-drift ADJUST_PILE_SPREAD's own rounding guards against, at a
+// much higher event rate. Same clamp/routing rules, absolute value
+// instead of a signed step.
+test('SET_STACK_SPREAD: writes the given value directly onto the default stack', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
+  state = reduce(state, { type: 'SET_STACK_SPREAD', pileId: 'hand:p1', stackKey: DEFAULT_STACK_KEY, value: 0.4 });
+  assert.equal(stackSpreadOf(state.piles.find((p) => p.id === 'hand:p1')), 0.4);
+});
+
+test('SET_STACK_SPREAD: clamps above the pile kind\'s own ceiling', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
+  state = reduce(state, { type: 'SET_STACK_SPREAD', pileId: 'hand:p1', stackKey: DEFAULT_STACK_KEY, value: 999 });
+  assert.equal(stackSpreadOf(state.piles.find((p) => p.id === 'hand:p1')), MAX_SPREAD);
+});
+
+test('SET_STACK_SPREAD: clamps below MIN_SPREAD - never negative', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
+  state = reduce(state, { type: 'SET_STACK_SPREAD', pileId: 'hand:p1', stackKey: DEFAULT_STACK_KEY, value: -5 });
+  assert.equal(stackSpreadOf(state.piles.find((p) => p.id === 'hand:p1')), MIN_SPREAD);
+});
+
+test('SET_STACK_SPREAD: repeated sets to the same value do not drift (no accumulation, unlike a delta)', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
+  for (let index = 0; index < 20; index++) {
+    state = reduce(state, { type: 'SET_STACK_SPREAD', pileId: 'hand:p1', stackKey: DEFAULT_STACK_KEY, value: 0.4 });
+  }
+  assert.equal(stackSpreadOf(state.piles.find((p) => p.id === 'hand:p1')), 0.4);
+});
+
+test('SET_STACK_SPREAD: chip tray clamps at ITS ceiling, not the card one', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'CREATE_ZONE', name: 'Tray', kind: 'chip' });
+  const tray = pilesOf(state).find((z) => z.name === 'Tray');
+  const ceiling = PILE_TYPES.chip.maxSpread;
+  state = reduce(state, { type: 'SET_STACK_SPREAD', pileId: tray.id, stackKey: DEFAULT_STACK_KEY, value: ceiling + 1 });
+  assert.equal(stackSpreadOf(pilesOf(state).find((z) => z.id === tray.id)), ceiling);
+});
+
+test('SET_STACK_SPREAD: throws for a pile that does not exist', () => {
+  const state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  assert.throws(() => reduce(state, { type: 'SET_STACK_SPREAD', pileId: 'nope', stackKey: DEFAULT_STACK_KEY, value: 0.4 }), /does not exist/);
+});
+
+test('SET_STACK_SPREAD: leaves the pile\'s cards completely untouched', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
+  const before = handOf(state, 'p1');
+  const beforeState = state;
+  state = reduce(state, { type: 'SET_STACK_SPREAD', pileId: 'hand:p1', stackKey: DEFAULT_STACK_KEY, value: 0.2 });
+  assert.deepEqual(handOf(state, 'p1'), before);
+  assertCardsConserved(beforeState, state, 'SET_STACK_SPREAD');
 });
 
 test('an unadjusted pile carries spread: undefined in its view, so the type default applies', () => {

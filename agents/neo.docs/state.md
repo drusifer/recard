@@ -305,8 +305,15 @@ all 4 browser suites green (68 tests), lint-js/lint:design both at
 their pre-existing baselines (unchanged byte-for-byte).
 
 ### Queued, NOT started - real feature/design work, not fixes
-1. **Tighten/Loosen as a slider** — reusable Web Component, shared
-   between the pile-level menu and the per-stack gear menu.
+1. ~~**Tighten/Loosen as a slider**~~ DONE 2026-09-13 (`/sprint sliders`):
+   `<spread-slider>` (`src/components/SpreadSlider.js`), shared between
+   the pile-level menu and the per-stack gear menu, replaces the old
+   button pair outright. `SET_STACK_SPREAD` (absolute value) replaces
+   `ADJUST_PILE_SPREAD` (signed delta), which is deleted - nothing else
+   called it once both menu sites converted. See `agents/cypher.docs/
+   state.md` and `agents/morpheus.docs/state.md` for the full design
+   record (user answered 3 real visual-design questions at Smith's gate:
+   live updates, no numeric readout, slider-only no nudge buttons).
 2. **Flip as a radio box with preview icons** — replace the single
    Flip action with a radio control listing orientations directly,
    each with a small icon/image showing the resulting arrangement.
@@ -515,4 +522,127 @@ still stand, or does zone-privacy supersede it for PlayerZones
 specifically); items 1/2 need a look at what "the slider"/"the radio
 box" should actually look like; item 4 needs either a live 2-person
 test session with the user watching, or an explicit "I accept the risk,
-build it anyway."
+build it alone."
+
+---
+
+## `*fix table-zoom-wheel` + focus-zoom bugs (2026-09-16)
+
+Direct user feedback, iterated live across several messages rather than
+planned upfront - each correction narrowed the actual ask:
+
+1. "the infinitable slider should be a wheel not a slider. like the
+   zoom wheel on a mouse" - clarified via AskUserQuestion: replace the
+   `<input type=range>` table-zoom dial entirely with scroll-driven
+   zoom; S/M/L/XL presets stay.
+2. "can it be a manual control 'like' a mouse wheel. I don't want to
+   overload mouse scrolling but maybe pinch zoom on touch screens?" -
+   reversed the real scroll-wheel idea: a dedicated widget instead, so
+   it never fights ordinary page/panel scrolling. Pinch-to-zoom for
+   touch confirmed as the touch equivalent (built the pure math,
+   `zoomFromPinch` - NOT wired to a live touch listener this pass, no
+   real touch device to verify against; flagged below).
+3. "make it a verticle control where the 'tred' of the wheel can be
+   spun up to zoom in or down to zoom out" - the final, built design.
+4. "we'll also need to pan with drag on table" - a second, genuinely
+   new mechanism (no pan/camera code existed anywhere in this codebase
+   before this).
+5. "*fix bug zooming in on the pile looks great but it goes bonkers
+   when trying to interact with the fit slider or drag a card out" -
+   two real, reproducible bugs in the EXISTING US-117 focus-zoom
+   feature, found by the user in actual use, not by any test.
+
+### What shipped
+- **`tableZoom.js`**: `zoomFromWheelDrag` (vertical drag delta ->
+  absolute zoom, `WHEEL_DRAG_RANGE_PX` spans MIN..MAX), `zoomFromPinch`
+  (ratio-based, built+tested, not yet wired), `maxPan`/`clampPan` (pan
+  bound grows linearly past 1x zoom, zero at/below 1x - a deliberate
+  heuristic, not measured from real content, same spirit as the zoom
+  range itself being player-driven).
+- **`index.html`**/**`style.css`**: `#table-zoom-dial` deleted outright
+  (no back-compat shim); `#table-zoom-wheel` (`role="slider"`,
+  vertical) with a `repeating-linear-gradient` "tread" for the wheel
+  look. `#zones`' transform is now `translate(pan) scale(zoom)` -
+  translate OUTSIDE scale so a screen-pixel drag reads as the same pan
+  distance regardless of current zoom.
+- **`main.js`**'s `wireTableZoomControls`: pointer-drag wheel (+
+  ArrowUp/ArrowDown keyboard equivalent, `role="slider"` implies it),
+  and table-pan (pointerdown on `#table-surface`/`#zones` THEMSELVES
+  only, never a descendant pile/card/button, so it can never compete
+  with existing drag-and-drop).
+- **Bug 1 fixed**: `wireFocusZoom`'s `dragstart` listener unconditionally
+  called `shrinkFocusedPile()`, reparenting the pile back into `#zones`
+  - including when the drag's OWN source card lived inside that exact
+  pile, moving the native drag's source node mid-gesture (browsers
+  handle that very badly). Now skips the shrink when the drag started
+  from inside the currently-focused overlay.
+- **Bug 2 fixed**: a plain `pointerleave` on the grown pile shrank it
+  the instant the pointer crossed its (enlarged, fixed-position)
+  boundary - including mid-drag on the pile's own Tighten/Loosen
+  slider. Now checks `event.buttons !== 0` (a button still held) and
+  waits for a `pointerup` (anywhere on `document`) instead of shrinking
+  immediately. Centralized the cleanup for both watchers into
+  `shrinkFocusedPile`/`reapplyFocusZoom` (module-level
+  `clearFocusPointerWatchers`) - the original one-off version leaked a
+  `document`-level listener on every re-render path that didn't happen
+  to be the one that attached it.
+- **Bug 3, found not reported**: while live-testing bug 1/2's fix, the
+  existing "grown pile never extends past viewport" browser test
+  failed - a REAL regression from last sprint's Tighten/Loosen slider
+  (a wider pile header pushed `FOCUS_ZOOM_SCALE` (1.6x) past a small
+  viewport for at least one pile kind). `clampOverlayPosition`
+  (`focusZoom.js`) only ever repositions, never resizes - added
+  `clampFocusZoomScale` (caps the EFFECTIVE scale to fit, never below
+  1x) alongside it, wired into `applyFocusZoom` before the position
+  clamp runs.
+- **Test-timing bug found alongside it**: that same viewport test
+  measured the overlay's `boundingBox()` only 50ms into `.focus-zoomed`'s
+  own 150ms CSS transition - mid-animation, not at rest. Extended the
+  wait; unmasked by bug 3's fix producing different geometry, not
+  itself something bug 3 caused.
+
+### Verification
+851/851 unit (`tableZoom.test.js` + `focusZoom.test.js` additions),
+`test:tablezoom` (9/9, wheel drag direction, pan, card-drag-does-NOT-pan),
+`test:focuszoom` (10/10, both new regression tests + the pre-existing
+viewport one), `test:ui` full run in progress at handoff. `lint-js`/
+`lint-style` at their unchanged pre-existing baselines; `lint-design`'s
+8 violations confirmed pre-existing via a scoped `git stash` comparison
+against the last commit, not a regression from this work.
+
+### Explicitly NOT done this pass
+- **Pinch-to-zoom is NOT wired** to a real touch listener - `zoomFromPinch`
+  exists and is unit-tested, but there is no touch device to verify
+  against live, and this project's own standing convention is not to
+  ship an unverified live-interaction change unsupervised. Flagged for
+  the user rather than guessed into place.
+- No `overflow: hidden` added to `.table-surface` for panned/zoomed
+  content - matches the EXISTING (pre-this-session) zoom behavior,
+  which already doesn't clip either (Smith's own backlog item #2 from
+  the US-117 retro: "XL zoom pushes the hand below the fold" - a known,
+  accepted trade-off, not something this pass changed either way).
+
+## Next Steps
+*fix bloop closed (Neo->Trin->Morpheus->Oracle all passed, see CHAT.md)
+- this was a `*fix`, not a `/sprint`, so no Smith/retro/launch ceremony
+ran. 851/851 unit, test:tablezoom 9/9, test:focuszoom 10/10, full
+test:ui confirmed no new regressions (the one remaining failure set is
+the pre-existing, already-filed, unrelated focus-zoom/context-menu bug -
+see cypher.docs/state.md backlog).
+
+Committed and pushed as of 2026-09-17 (2 commits: check-story-numbers
+tool, then the cardTransforms polymorphism refactor + Tighten/Loosen
+slider + table-zoom wheel/pan + focus-zoom fixes bundled together -
+`state.js`'s own diff wasn't cleanly separable by feature). `dev`
+merged forward from `main` first to catch up 7 commits `dev` had
+fallen behind by.
+
+Standing, NOT started: pinch-to-zoom math exists (`zoomFromPinch`,
+tested) but isn't wired to a live touch listener - no touch device to
+verify against. Needs either a live verification session with the
+user on a real touch device, or an explicit "ship it unverified."
+Also still open: the pre-existing focus-zoom/context-menu bug (filed
+2026-09-13, reproduces identically as of 2026-09-16 - see cypher.docs/
+state.md), and the standing queue items 2-4 from before this session
+(flip radio-box, zone privacy vs D83/D84, cursor redesign) - see this
+file's own "Queued, NOT started" section above.

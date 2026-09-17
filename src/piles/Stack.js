@@ -128,11 +128,16 @@ export class Stack {
    * What this stack offers in its own action menu, and which of those
    * are currently unavailable.
    *
-   * Tighten/loosen/flip are absent on a stack of ONE - three controls
-   * that visibly do nothing, the same "no false affordance" rule
-   * `ChipPile` applies to `changePileType`. The ceiling comes from the
-   * caller because it is the PILE KIND's (a chip stack goes tighter
-   * than a card fan may), and a stack does not know its own kind.
+   * `spreadStack`/`flipStack` are absent on a stack of ONE - controls
+   * that would visibly do nothing, the same "no false affordance" rule
+   * `ChipPile` applies to `changePileType`. Tighten/Loosen slider
+   * (2026-09-13): `spreadStack` needs no disabled-at-the-limit logic
+   * any more - it's a `<spread-slider>` (`ui.js`) bounded by its own
+   * `min`/`max`, not a button that can be a dead click at the ceiling.
+   * The pile kind's own ceiling (a chip stack goes tighter than a card
+   * fan may) is resolved by the render call site (`stackGearFor`),
+   * which is what builds the slider's actual `min`/`max` - a stack
+   * does not know its own kind.
    *
    * Tap/untap (direct user request: "add stackaction for tap/untap,
    * keep pile level for all stacks" - pile-level `UNTAP_ALL` is
@@ -143,20 +148,12 @@ export class Stack {
    * `Pile.supportsStackTap`, the same opt-in-static shape
    * `stacksDownward`/`groupBadge` already use, since tapping a chip or
    * a hand card is not a real concept.
-   *
-   * Disabled the same way tighten/loosen are - when the action would
-   * be a no-op on every card in the stack - rather than `orientation
-   * Actions`' strict hide/show XOR: a MIXED stack has real work for
-   * BOTH directions, so nothing is disabled until the whole stack
-   * agrees.
    */
-  stackActions({ maxSpread, canTap = false } = {}) {
+  stackActions({ canTap = false } = {}) {
     const ids = [];
     const disabled = [];
     if (this.pileables.length >= 2) {
-      ids.push('tightenStack', 'loosenStack', 'flipStack');
-      if (this.spread >= maxSpread) disabled.push('tightenStack');
-      if (this.spread <= 0) disabled.push('loosenStack');
+      ids.push('spreadStack', 'flipStack');
     }
     if (canTap && this.pileables.length > 0) {
       ids.push('tapStack', 'untapStack');
