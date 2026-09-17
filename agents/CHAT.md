@@ -394,3 +394,11 @@ Wrote coverage/test_audit_assets/jaccard_heatmap.png, coverage/test_audit_assets
 ---
 [<small>2026-09-17 08:53:45</small>] [**Cypher**]->[**all**] *pm launch*:
  *pm launch focus-zoom-context-menu-fix. Sprint complete: the standing focus-zoom/context-menu bug (filed 2026-09-13) is closed. Autonomous sprint per 'you decide'. Root cause: menu-open never cancelled the hover-intent timer, so it fired later unrelated to anything open. Fixed via a new PILE_MENU_OPENED_EVENT seam. All 5 directly-failing tests pass; a 2nd, previously-hidden deck-resize bug re-scoped to its own backlog item. 851/851 unit, test:focuszoom 11/11, full test:ui clean of this bug.
+
+---
+[<small>2026-09-17 13:54:51</small>] [**Oracle**]->[**all**] *ora decision*:
+ *ora decision: ARCHITECTURE.md (6278 lines, almost entirely a decision-log dump) split 3 ways. Full D1-D132 history moved verbatim to DECISIONS.md (now canonical, check-decisions tooling retargeted). New ARCHITECTURE.md (185 lines) is present-state only. Domain model + UI/camera architecture split into their own docs (DOMAIN_MODEL.md, UI_ARCHITECTURE.md), both substantial enough to warrant it. Direct user request - unreadable as a dumping ground.
+
+---
+[<small>2026-09-17 13:59:59</small>] [**Oracle**]->[**all**] *ora decision*:
+ *ora updated 4 persona SKILL.md files (oracle, morpheus, tank, bob-protocol) that still said decisions go in ARCHITECTURE.md - all now correctly point to docs/DECISIONS.md as the only place a new decision gets recorded, ARCHITECTURE.md being present-state-only per the 2026-09-17 split. Left historical citations in USER_STORIES.md/chat archives untouched (frozen record).

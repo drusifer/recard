@@ -511,3 +511,72 @@ as the work happened, not deferred to groom time.
 `*user test` item (StackActions/tap-untap usability pass) is still
 outstanding from an earlier sprint - unrelated to this one, not
 blocking it.
+
+---
+
+## `*ora refactor` — ARCHITECTURE.md split into present-state + full decision log (2026-09-17)
+
+Direct user request: "Architecture.md has become a dumping ground of
+what looks like decisions. It's very hard to tell what the actual
+architecture is... turn whatever is happening right now in the
+architecture file into what the present state looks like. Maybe move
+those decisions into the decision file." Confirmed the diagnosis first:
+`docs/ARCHITECTURE.md` was 6278 lines, almost entirely a chronological
+`### D<n>.` decision log (D1-D132) with one real present-state section
+(Core invariant) and a small, stale "Module Layout"/"Testing Strategy"/
+"UI Conventions"/"Open Items" block near the end. `docs/DECISIONS.md`
+(266 lines) was already explicitly self-declared stale/superseded,
+stopping at D20 with a note saying ARCHITECTURE.md was canonical for
+D21+ — so this was a one-way move, not a reconciliation of two
+diverging histories.
+
+**What changed:**
+- **`docs/DECISIONS.md`** (266 -> 6147 lines): now holds the COMPLETE
+  decision log, D1 through D132, moved verbatim (not summarized/
+  reformatted) from ARCHITECTURE.md - same per-decision shape it
+  already had there. New header explains the newest-first-then-legacy
+  structure and points to the present-state docs for "how it works
+  today."
+- **`docs/ARCHITECTURE.md`** (6278 -> 185 lines): rewritten from
+  scratch as present-state only - Overview, Core invariant (kept,
+  D-refs updated), Networking/replication model (including local-only
+  view state as its own category), Module Layout (refreshed against
+  the actual current source tree, the old one was self-flagged stale),
+  Testing Strategy (refreshed - the old one didn't know about
+  test:tablezoom/test:focuszoom), Open backlog items.
+- **NEW `docs/DOMAIN_MODEL.md`** (136 lines) and **`docs/UI_ARCHITECTURE.md`**
+  (102 lines) - split out per the user's own follow-up guidance mid-task
+  ("consider decomposing... if warranted"): the Pileable/Stackable/Pile/
+  Stack/Zone hierarchy and the Web-Components/camera/focus-zoom/
+  table-zoom subsystems were each substantial enough that burying them
+  in one file would recreate the same problem. UI Conventions (44px
+  floor, zone-overlap) folded into UI_ARCHITECTURE.md rather than its
+  own file - too small to warrant a 4th doc.
+- **Retargeted tooling**: `tools/checkDecisionOrder.mjs` (`make
+  check-decisions`) now reads `docs/DECISIONS.md`, not ARCHITECTURE.md;
+  `tests/checkDecisionOrder.test.js`'s real-file assertion updated to
+  match; `Makefile`'s help text/comment for the target updated;
+  `tests/designLint.check.mjs`'s own violation-report pointer message
+  updated (UI Conventions -> UI_ARCHITECTURE.md, D24 -> DECISIONS.md).
+- **Deliberately NOT touched**: historical cross-references in
+  `agents/oracle.docs/memory.md`, `agents/chat_archive/*`, other state
+  files, or source-code comments citing "docs/ARCHITECTURE.md D<n>" -
+  those are frozen records of what was true when written, consistent
+  with this project's "memory is frozen in time" convention. Only the
+  two live docs plus the 3 pieces of tooling that actively point readers
+  somewhere were updated.
+
+**Verified:** `make check-decisions` clean (131 headings, no
+duplicates, modern section newest-first) against the new DECISIONS.md.
+851/851 unit tests unchanged. `lint-js`/`lint-style`/`lint-design`
+baselines unchanged (8 pre-existing design-lint violations, confirmed
+unrelated in an earlier session via `git stash` comparison - not
+re-verified here since this is a docs-only change that cannot affect
+layout).
+
+### Next Steps
+Nothing blocking. Not yet committed - this was a fork's own work,
+running under the parent session; the parent session owns committing
+it. If a future decision gets recorded, it goes in `docs/DECISIONS.md`
+now, not `docs/ARCHITECTURE.md` - update `*ora record`'s own routing
+instructions/muscle memory accordingly the next time this comes up.

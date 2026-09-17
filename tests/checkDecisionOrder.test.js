@@ -4,8 +4,8 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { checkDecisionOrder } from '../tools/checkDecisionOrder.mjs';
 
-test('the real docs/ARCHITECTURE.md has no duplicate decision numbers', async () => {
-  const text = await readFile(path.join(import.meta.dirname, '..', 'docs', 'ARCHITECTURE.md'), 'utf8');
+test('the real docs/DECISIONS.md has no duplicate decision numbers', async () => {
+  const text = await readFile(path.join(import.meta.dirname, '..', 'docs', 'DECISIONS.md'), 'utf8');
   const { problems } = await checkDecisionOrder(text);
   const duplicates = problems.filter((p) => p.startsWith('Duplicate'));
   assert.deepEqual(duplicates, []);

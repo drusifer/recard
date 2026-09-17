@@ -282,7 +282,7 @@ try {
 if (violations.length > 0) {
   console.error(`design-lint: ${violations.length} violation(s) found\n`);
   for (const v of violations) console.error(`  ✖ ${v}`);
-  console.error('\nSee ARCHITECTURE.md UI Conventions (44px floor) and D24 (zone overlap) for the invariants being checked.');
+  console.error('\nSee docs/UI_ARCHITECTURE.md UI Conventions (44px floor) and docs/DECISIONS.md D24 (zone overlap) for the invariants being checked.');
   process.exit(1);
 }
 console.log(`design-lint: clean across ${VIEWPORTS.length} viewports (no forced scroll, no zone overlap, no undersized touch targets)`);

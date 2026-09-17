@@ -184,4 +184,8 @@ sequenceDiagram
     Note right of Smith: "Smith retro: this bug<br/>was a real, live UX<br/>problem (a menu you're<br/>still reading could yank<br/>the pile out from under<br/>you), not just a test-<br/>sui…"
     Cypher->>All: "pm launch"
     Note right of Cypher: "*pm launch focus-zoom-<br/>context-menu-fix. Sprint<br/>complete: the standing<br/>focus-zoom/context-menu<br/>bug (filed 2026-09-13)<br/>is closed. Autonomous…"
+    Oracle->>All: "ora decision"
+    Note right of Oracle: "*ora decision:<br/>ARCHITECTURE.md (6278<br/>lines, almost entirely a<br/>decision-log dump) split<br/>3 ways. Full D1-D132<br/>history moved verbatim<br/>to DECIS…"
+    Oracle->>All: "ora decision"
+    Note right of Oracle: "*ora updated 4 persona<br/>SKILL.md files (oracle,<br/>morpheus, tank, bob-<br/>protocol) that still<br/>said decisions go in<br/>ARCHITECTURE.md - all<br/>now corr…"
 ```

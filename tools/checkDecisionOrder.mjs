@@ -1,5 +1,5 @@
 /**
- * `docs/ARCHITECTURE.md` is newest-first for its modern section (its
+ * `docs/DECISIONS.md` is newest-first for its modern section (its
  * own header: "the highest number is always the current binding
  * state") - but only from D82 down to the top; below that it's a
  * legacy block written forward-chronologically (D1...D81, pre-dating
@@ -24,7 +24,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const DOC = path.join(ROOT, 'docs', 'ARCHITECTURE.md');
+const DOC = path.join(ROOT, 'docs', 'DECISIONS.md');
 
 const HEADING = /^### D(\d+)(?:-D(\d+))?\b/;
 

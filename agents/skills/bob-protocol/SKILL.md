@@ -180,8 +180,8 @@ this is "summarized" and not "pasted". Three things, in this order:
 2. **What was rejected, and why** — the alternative is the half that
    makes the decision legible later. A decision with no visible
    alternative reads as an accident.
-3. **Where the full text lives** — `docs/ARCHITECTURE.md` D-number,
-   `DECISIONS.md`, a story's AC, a state file.
+3. **Where the full text lives** — `docs/DECISIONS.md` D-number, a
+   story's AC, a state file.
 
 If it will not fit in 512 characters, the decision goes in a document and
 the *summary* goes in chat — never skip the post because the reasoning is
@@ -194,13 +194,18 @@ work that nobody could question at the time.
 **Why chat specifically.** `*ora report` archives CHAT.md per sprint to
 `agents/chat_archive/`, so chat is the one durable, time-ordered record of
 *why* — documents get rewritten in place and quietly lose their reasoning.
-The failure mode is real and present in this repo: `docs/DECISIONS.md`
-stops at D20 while D21-D28 exist only in `ARCHITECTURE.md`. Every one of
-those was posted to chat, which is the only reason the reasoning survived
-the drift.
+The failure mode was real and present in this repo for a long stretch:
+`docs/DECISIONS.md` stopped at D20 for over a month while D21+ were
+recorded directly in `docs/ARCHITECTURE.md` instead and never backfilled
+- fixed 2026-09-17 (`docs/ARCHITECTURE.md` split into a present-state doc;
+the full D1-D132 log now lives in `docs/DECISIONS.md`, which is the
+ONLY place a new decision gets recorded - never `ARCHITECTURE.md` again).
+Every decision made during that gap was still posted to chat, which is
+the only reason the reasoning survived the drift - the same discipline
+this rule asks for now, so a repeat needs the same recovery.
 
 ```bash
-bobp chat "D<n> recorded: <what was decided>. Chose <X> over <Y> because <reason>. Full text: docs/ARCHITECTURE.md. @Next *command" \
+bobp chat "D<n> recorded: <what was decided>. Chose <X> over <Y> because <reason>. Full text: docs/DECISIONS.md. @Next *command" \
   --persona <Name> --cmd "<prefix> decision" --to <Next>
 ```
 
