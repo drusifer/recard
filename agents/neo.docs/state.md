@@ -320,12 +320,19 @@ getting read)
 2. **Flip as a radio box with preview icons** — replace the single
    Flip action with a radio control listing orientations directly,
    each with a small icon/image showing the resulting arrangement.
-3. **Zone-level privacy** (architecture change) — a pile inside a
-   player's own PlayerZone should default to hidden-from-everyone-but-
-   owner (like a hand card), revealable via the existing hide/show
-   toggle. Explicitly a ZONE property, not a pile property - today's
-   model is pile-level. NOT touched by the pile-ACTIONS work above
-   (that was authorization; this is visibility/data-model).
+3. **Zone-level privacy** (architecture change; corrected 2026-09-17,
+   see below) — a pile inside a player's own PlayerZone should default
+   to hidden-from-everyone-but-owner (like a hand card), revealable via
+   the existing hide/show toggle. **Not actually a D83/D84 conflict**:
+   D84 only governs the DATA (every viewer's own `view` always carries
+   the real card, full stop) - RENDERING is a separate, per-viewer
+   question that's always been allowed to differ, which is exactly what
+   `HandPile`'s own `showsFace()` split already does (`PlayerHandPile`
+   always renders the owner's real face; `OpponentHandPile` always
+   renders a back, regardless of the card's own `faceUp`). The actual
+   work is generalizing that same owner/opponent rendering split to
+   piles inside a `PerPlayerZone` generally, not just the built-in
+   Hand kind - a rendering-class change, not a data-model one.
 4. **Remote-cursor redesign** (no back-compat) — replace exact-
    coordinate/transform mirroring with an animate-to-target model: on
    pointer-enters-pile/zone, glide the OTHER clients' cursor indicator
@@ -502,6 +509,13 @@ not busywork to push through:
    standing, deliberate architectural decision, not extend it. Posted
    to CHAT.md rather than picking a side - this needs the user to say
    which one is still true, not an autonomous judgment call.
+   **Correction (2026-09-17, direct user clarification):** this
+   analysis conflated the DATA question (D84's, settled) with the
+   RENDERING question (never actually settled either way) - the user
+   pointed out `HandPile`'s own owner/opponent `showsFace()` split
+   already renders differently per viewer without touching the data
+   D84 protects. No real conflict; see the queue entry above for the
+   corrected scope.
 4. **Remote-cursor redesign** - "no back-compat" means the existing
    D19/D68 coordinate-mirroring code gets deleted outright, and this
    project has a standing, repeatedly-flagged gap: no 2-peer browser

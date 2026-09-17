@@ -62,8 +62,10 @@ on `#zones` via CSS custom properties:
 
 - **Table zoom** — a vertical drag "wheel" control (`#table-zoom-wheel`,
   deliberately not the real scroll wheel, which stays free for ordinary
-  page scrolling) plus S/M/L/XL quick presets. Sets `--table-zoom`,
-  applied as `scale()` on `#zones`.
+  page scrolling), pinned to the right edge of the table. Tall and
+  thin by design; the old S/M/L/XL quick-preset buttons are gone
+  entirely (removed 2026-09-17, no back-compat shim). Sets
+  `--table-zoom`, applied as `scale()` on `#zones`.
 - **Drag-to-pan** — dragging the empty table background (never a pile,
   card, or button — those keep their own interactions untouched) moves
   the view. Sets `--table-pan-x`/`--table-pan-y`, applied as

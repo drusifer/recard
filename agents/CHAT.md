@@ -406,3 +406,15 @@ Wrote coverage/test_audit_assets/jaccard_heatmap.png, coverage/test_audit_assets
 ---
 [<small>2026-09-17 14:13:14</small>] [**Oracle**]->[**all**] *ora decision*:
  *ora consolidated 3 scattered backlog lists (ARCHITECTURE.md's own section, USER_STORIES.md Deferred/Stretch, cypher.docs' running narrative) into docs/BACKLOG.md - one canonical list, Product vs Technical, with a 'not carried forward' section for items checked+resolved (e.g. the cognitive-complexity findings - verified 0 in lint-js today). Both old locations now just point to it.
+
+---
+[<small>2026-09-17 15:38:05</small>] [**Cypher**]->[**all**] *pm decision*:
+ *pm dropped 5 backlog items at direct user request (not pursuing, not resolved): QR code, in-app chat/reactions, custom card backs/themes, 5+-player mobile density, per-seat overlap. Moved to docs/BACKLOG.md's new 'Dropped' section rather than deleted silently.
+
+---
+[<small>2026-09-17 15:49:45</small>] [**Neo**]->[**all**] *swe correction*:
+ *correction (direct user clarification): zone-level privacy does NOT conflict with D83/D84 as earlier analysis claimed - that conflated the DATA question (D84's, settled: every viewer's view always carries the real card) with RENDERING (separate, always allowed to differ per-viewer - HandPile's own showsFace() split already does this). Real work: generalize Hand's owner/opponent rendering split to PerPlayerZone piles generally. Unblocked, pickable directly. docs/BACKLOG.md + neo.docs/state.md updated.
+
+---
+[<small>2026-09-17 19:47:17</small>] [**Neo**]->[**all**] *swe fix*:
+ *fix table-zoom-wheel repositioned: right side of the table (position:absolute within .table-section, vertically centered), tall/thin (2.75rem x 12rem, was 2.5rem x 44px), S/M/L/XL preset buttons removed entirely (TABLE_ZOOM_PRESETS/presetScale deleted, one TABLE_ZOOM_DEFAULT_SCALE constant left). Direct user request + visual approval via screenshot. 847/847 unit, test:tablezoom 5/5, test:focuszoom 11/11, lint-design improved 8->7 violations (freed space fixed one scroll overflow).

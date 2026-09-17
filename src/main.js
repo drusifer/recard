@@ -5,7 +5,7 @@ import { homePileKindFor } from './pileables/pileableTypes.js';
 import { makeStateMessage, makeMotionMessage, createMotionThrottler, cardDragPayload } from './protocol.js';
 import { renderShareCode, wireCopyCode } from './qrcode.js';
 import {
-  TABLE_ZOOM_PRESETS, TABLE_ZOOM_DEFAULT, TABLE_ZOOM_MIN, TABLE_ZOOM_MAX, clampTableZoom,
+  TABLE_ZOOM_DEFAULT_SCALE, TABLE_ZOOM_MIN, TABLE_ZOOM_MAX, clampTableZoom,
   zoomFromWheelDrag, clampPan,
 } from './tableZoom.js';
 import {
@@ -1392,14 +1392,17 @@ function currentView() {
 }
 
 // US-117 phase 111 (D132, direct user correction - no auto-fit): a
-// per-player manual table zoom, a wheel control plus S/M/L/XL quick
-// presets (`tableZoom.js`). Local-only view state (D130) - no reducer
-// action, no persistence, wired once at startup rather than per-render
-// since nothing about it depends on `latestView`/`gameState`.
+// per-player manual table zoom, a wheel control (`tableZoom.js`).
+// Local-only view state (D130) - no reducer action, no persistence,
+// wired once at startup rather than per-render since nothing about it
+// depends on `latestView`/`gameState`.
 //
 // *fix (direct user request, 2026-09-16): "like the zoom wheel on a
 // mouse" as its own manual control, not the real scroll wheel - a
 // vertical drag replaces the old `<input type=range>` dial outright.
+// *fix (direct user request, 2026-09-17): the S/M/L/XL preset buttons
+// this control originally shipped alongside are gone too, no back-
+// compat shim - the wheel is the only control now.
 // Dragging the wheel UP (negative pointer delta) zooms in, DOWN zooms
 // out (`zoomFromWheelDrag`).
 function wireTableZoomControls() {
@@ -1409,7 +1412,7 @@ function wireTableZoomControls() {
   wheelElement.setAttribute('aria-valuemin', String(TABLE_ZOOM_MIN));
   wheelElement.setAttribute('aria-valuemax', String(TABLE_ZOOM_MAX));
 
-  let currentZoom = TABLE_ZOOM_PRESETS[TABLE_ZOOM_DEFAULT];
+  let currentZoom = TABLE_ZOOM_DEFAULT_SCALE;
   let currentPan = { x: 0, y: 0 };
 
   // Drag-to-pan (direct user request, 2026-09-16): "we'll also need to
@@ -1473,10 +1476,6 @@ function wireTableZoomControls() {
     else return;
     event.preventDefault();
   });
-
-  for (const button of document.querySelectorAll('[data-zoom-preset]')) {
-    button.addEventListener('click', () => applyZoom(TABLE_ZOOM_PRESETS[button.dataset.zoomPreset]));
-  }
 }
 
 // US-117 phase 113 (D131): hover/click a Pile to grow it in place as a

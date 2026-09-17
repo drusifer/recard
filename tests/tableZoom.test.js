@@ -1,36 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  TABLE_ZOOM_PRESETS, TABLE_ZOOM_DEFAULT, TABLE_ZOOM_MIN, TABLE_ZOOM_MAX, clampTableZoom, presetScale,
+  TABLE_ZOOM_DEFAULT_SCALE, TABLE_ZOOM_MIN, TABLE_ZOOM_MAX, clampTableZoom,
   WHEEL_DRAG_RANGE_PX, zoomFromWheelDrag, zoomFromPinch, maxPan, clampPan,
 } from '../src/tableZoom.js';
 
 // US-117 phase 111 (revised, D132, direct user correction): no
-// auto-fit-to-content - the table zoom is fully player-driven, a dial
-// (continuous) plus S/M/L/XL quick presets, with a sane default. Pure
-// math only; the dial's own DOM wiring lives in main.js.
+// auto-fit-to-content - the table zoom is fully player-driven, a wheel
+// (continuous). *fix (2026-09-17, direct user request): the old S/M/L/
+// XL quick presets are gone entirely, no back-compat shim. Pure math
+// only; the wheel's own DOM wiring lives in main.js.
 
-test('the default preset is a real preset value', () => {
-  assert.ok(Object.hasOwn(TABLE_ZOOM_PRESETS, TABLE_ZOOM_DEFAULT));
-});
-
-test('presets are ordered S < M < L < XL', () => {
-  const { S, M, L, XL } = TABLE_ZOOM_PRESETS;
-  assert.ok(S < M && M < L && L < XL);
-});
-
-test('every preset is within the dial range', () => {
-  for (const value of Object.values(TABLE_ZOOM_PRESETS)) {
-    assert.ok(value >= TABLE_ZOOM_MIN && value <= TABLE_ZOOM_MAX);
-  }
-});
-
-test('presetScale looks up a known preset', () => {
-  assert.equal(presetScale('M'), TABLE_ZOOM_PRESETS.M);
-});
-
-test('presetScale rejects an unknown preset rather than returning undefined', () => {
-  assert.throws(() => presetScale('XXL'));
+test('the default scale is within the wheel range', () => {
+  assert.ok(TABLE_ZOOM_DEFAULT_SCALE >= TABLE_ZOOM_MIN && TABLE_ZOOM_DEFAULT_SCALE <= TABLE_ZOOM_MAX);
 });
 
 test('clampTableZoom passes through an in-range value unchanged', () => {
@@ -79,15 +61,15 @@ test('zoomFromWheelDrag: no movement is a no-op', () => {
 // --- Pinch-to-zoom (touch screens) -----------------------------------
 
 test('zoomFromPinch: fingers spreading apart (ratio > 1) zooms in', () => {
-  assert.ok(zoomFromPinch(TABLE_ZOOM_DEFAULT_VALUE(), 1.5) > TABLE_ZOOM_DEFAULT_VALUE());
+  assert.ok(zoomFromPinch(TABLE_ZOOM_DEFAULT_SCALE, 1.5) > TABLE_ZOOM_DEFAULT_SCALE);
 });
 
 test('zoomFromPinch: fingers pinching together (ratio < 1) zooms out', () => {
-  assert.ok(zoomFromPinch(TABLE_ZOOM_DEFAULT_VALUE(), 0.5) < TABLE_ZOOM_DEFAULT_VALUE());
+  assert.ok(zoomFromPinch(TABLE_ZOOM_DEFAULT_SCALE, 0.5) < TABLE_ZOOM_DEFAULT_SCALE);
 });
 
 test('zoomFromPinch: ratio of exactly 1 (no change in finger distance) is a no-op', () => {
-  const start = TABLE_ZOOM_DEFAULT_VALUE();
+  const start = TABLE_ZOOM_DEFAULT_SCALE;
   assert.equal(zoomFromPinch(start, 1), start);
 });
 
@@ -95,10 +77,6 @@ test('zoomFromPinch: clamps at the ceiling/floor same as any other zoom input', 
   assert.equal(zoomFromPinch(TABLE_ZOOM_MAX, 10), TABLE_ZOOM_MAX);
   assert.equal(zoomFromPinch(TABLE_ZOOM_MIN, 0.01), TABLE_ZOOM_MIN);
 });
-
-function TABLE_ZOOM_DEFAULT_VALUE() {
-  return TABLE_ZOOM_PRESETS[TABLE_ZOOM_DEFAULT];
-}
 
 // --- Drag-to-pan (direct user request, 2026-09-16): "we'll also need
 // to pan with drag on table". No pan mechanism existed anywhere in this

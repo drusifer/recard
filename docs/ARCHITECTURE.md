@@ -153,7 +153,7 @@ Several single-client, real-Playwright-browser suites fill the gap for
 everything that doesn't need a second peer, each its own `npm run test:*`
 script (see Module Layout above for the file list): card-action wiring
 through the context menu, a full RtG playthrough, the pre-game host-setup
-picker, New Game, the table-zoom wheel/pan/presets, and the focus-zoom
+picker, New Game, the table-zoom wheel/pan, and the focus-zoom
 grow-in-place interaction. `npm run lint:design` is a further real-browser
 check specifically for layout/overlap/touch-target invariants (see UI
 Conventions in `docs/UI_ARCHITECTURE.md`) across several real viewport

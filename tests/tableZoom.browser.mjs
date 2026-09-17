@@ -1,8 +1,11 @@
-// US-117 phase 111 (D132): the manual table-zoom dial + S/M/L/XL
-// presets, verified against the real running app - a pure function
-// verified by `tableZoom.test.js` says nothing about whether the DOM
-// wiring actually applies it, which is exactly the kind of gap this
-// project's own history (D129) says unit tests alone will miss.
+// US-117 phase 111 (D132): the manual table-zoom wheel, verified
+// against the real running app - a pure function verified by
+// `tableZoom.test.js` says nothing about whether the DOM wiring
+// actually applies it, which is exactly the kind of gap this project's
+// own history (D129) says unit tests alone will miss.
+// *fix (2026-09-17, direct user request): the S/M/L/XL preset buttons
+// this suite used to also cover are gone entirely, no back-compat
+// shim - the wheel is the only control now.
 //
 // NOT part of `npm test` - needs a browser. `npm run test:tablezoom`.
 import { test, before, after } from 'node:test';
@@ -12,7 +15,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { TABLE_ZOOM_PRESETS, TABLE_ZOOM_DEFAULT } from '../src/tableZoom.js';
+import { TABLE_ZOOM_DEFAULT_SCALE, WHEEL_DRAG_RANGE_PX } from '../src/tableZoom.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const PORT = 8217; // not 8211-8216 (designLint/uiActions/rtgPlaythrough/hostSetup/newGame)
@@ -62,7 +65,7 @@ async function currentTableZoomScale(page) {
   return page.evaluate(() => getComputedStyle(document.querySelector('#zones')).getPropertyValue('--table-zoom').trim());
 }
 
-// The zoom dial lives inside `#screen-game`, hidden until a real table
+// The zoom wheel lives inside `#screen-game`, hidden until a real table
 // exists (`index.html`) - every test needs a live solo table, not just
 // a page load, same startup sequence `uiActions.browser.mjs` uses.
 async function freshLiveTable(context) {
@@ -81,29 +84,28 @@ async function freshLiveTable(context) {
   return page;
 }
 
-test('the wheel applies the sane default (M) once a table exists', async () => {
+test('the wheel applies the sane default once a table exists', async () => {
   const context = await fixture.browser.newContext();
   try {
     const page = await freshLiveTable(context);
-    assert.equal(await page.locator('#table-zoom-wheel').getAttribute('aria-valuenow'), String(TABLE_ZOOM_PRESETS[TABLE_ZOOM_DEFAULT]));
-    assert.equal(await currentTableZoomScale(page), String(TABLE_ZOOM_PRESETS[TABLE_ZOOM_DEFAULT]));
+    assert.equal(await page.locator('#table-zoom-wheel').getAttribute('aria-valuenow'), String(TABLE_ZOOM_DEFAULT_SCALE));
+    assert.equal(await currentTableZoomScale(page), String(TABLE_ZOOM_DEFAULT_SCALE));
   } finally {
     await context.close();
   }
 });
 
-for (const size of ['S', 'M', 'L', 'XL']) {
-  test(`clicking the "${size}" preset sets both the wheel and #zones' scale`, async () => {
-    const context = await fixture.browser.newContext();
-    try {
-      const page = await freshLiveTable(context);
-      await page.click(`[data-zoom-preset="${size}"]`);
-      assert.equal(await page.locator('#table-zoom-wheel').getAttribute('aria-valuenow'), String(TABLE_ZOOM_PRESETS[size]));
-      assert.equal(await currentTableZoomScale(page), String(TABLE_ZOOM_PRESETS[size]));
-    } finally {
-      await context.close();
-    }
-  });
+/** Drags the wheel up by more than a full range - always lands at
+ * TABLE_ZOOM_MAX regardless of the starting scale (`zoomFromWheelDrag`
+ * clamps). Used by the pan tests below, which need real room to pan in
+ * (`maxPan` is 0 at/below 1x) now that the XL preset button is gone. */
+async function zoomToMax(page) {
+  const wheel = page.locator('#table-zoom-wheel');
+  const box = await wheel.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - (WHEEL_DRAG_RANGE_PX + 50));
+  await page.mouse.up();
 }
 
 // *fix (direct user request, 2026-09-16): "like the zoom wheel on a
@@ -132,16 +134,12 @@ test('dragging the wheel UP zooms in, DOWN zooms out', async () => {
   }
 });
 
-test('every preset button and the wheel itself clear the 44px touch-target floor', async () => {
+test('the wheel clears the 44px touch-target floor', async () => {
   const context = await fixture.browser.newContext();
   try {
     const page = await freshLiveTable(context);
-    for (const size of ['S', 'M', 'L', 'XL']) {
-      const box = await page.locator(`[data-zoom-preset="${size}"]`).boundingBox();
-      assert.ok(box.width >= 44 && box.height >= 44, `${size} preset button must clear the 44px floor`);
-    }
     const wheelBox = await page.locator('#table-zoom-wheel').boundingBox();
-    assert.ok(wheelBox.width >= 44 && wheelBox.height >= 44, 'the wheel must clear the 44px floor too');
+    assert.ok(wheelBox.width >= 44 && wheelBox.height >= 44, 'the wheel must clear the 44px floor');
   } finally {
     await context.close();
   }
@@ -155,7 +153,7 @@ test('dragging the empty table background pans #zones', async () => {
   try {
     const page = await freshLiveTable(context);
     // Pan only has room to move once zoomed in past 1x (`maxPan`).
-    await page.click('[data-zoom-preset="XL"]');
+    await zoomToMax(page);
     const surface = page.locator('.table-surface');
     const box = await surface.boundingBox();
     await page.mouse.move(box.x + 5, box.y + 5);
@@ -178,7 +176,7 @@ test('dragging a card does not pan the table - only the empty background does', 
   const context = await fixture.browser.newContext();
   try {
     const page = await freshLiveTable(context);
-    await page.click('[data-zoom-preset="XL"]');
+    await zoomToMax(page);
     const card = page.locator('[data-kind="hand"] .middle-card').first();
     const box = await card.boundingBox();
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);

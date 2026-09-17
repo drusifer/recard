@@ -190,4 +190,10 @@ sequenceDiagram
     Note right of Oracle: "*ora updated 4 persona<br/>SKILL.md files (oracle,<br/>morpheus, tank, bob-<br/>protocol) that still<br/>said decisions go in<br/>ARCHITECTURE.md - all<br/>now corr…"
     Oracle->>All: "ora decision"
     Note right of Oracle: "*ora consolidated 3<br/>scattered backlog lists<br/>(ARCHITECTURE.md's own<br/>section, USER_STORIES.md<br/>Deferred/Stretch,<br/>cypher.docs' running<br/>narrativ…"
+    Cypher->>All: "pm decision"
+    Note right of Cypher: "*pm dropped 5 backlog<br/>items at direct user<br/>request (not pursuing,<br/>not resolved): QR code,<br/>in-app chat/reactions,<br/>custom card<br/>backs/themes,…"
+    Neo->>All: "swe correction"
+    Note right of Neo: "*correction (direct user<br/>clarification): zone-<br/>level privacy does NOT<br/>conflict with D83/D84 as<br/>earlier analysis claimed<br/>- that conflated the…"
+    Neo->>All: "swe fix"
+    Note right of Neo: "*fix table-zoom-wheel<br/>repositioned: right side<br/>of the table<br/>(position:absolute<br/>within .table-section,<br/>vertically centered),<br/>tall/thin (2.75…"
 ```

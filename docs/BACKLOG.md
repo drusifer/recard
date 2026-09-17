@@ -21,27 +21,26 @@ or a live-verification session) versus being pickable directly.
   reloads (or the host's does), there is no way to resume the session;
   a known v1 limitation, standing since the original architecture
   (`docs/DECISIONS.md` D6).
-- **Scannable QR code for joining** — v1 ships a join-code + Copy Link
-  instead (descoped 2026-08-15, no verified-working QR encoder without
-  a build step or a real device to confirm scannability).
-- **In-app text chat or reactions** — never scoped past a stretch idea.
-- **Custom card backs/themes** — never scoped past a stretch idea.
-- **5+-player mobile density** — a crowded table on a narrow viewport
-  is improved by past passes but not fully resolved; real but bounded.
 - **Builder screen** — standing idea, not yet scoped into stories.
 - **Flip as a radio box with preview icons** (Neo, queued) — replace
   the single Flip action with a radio control listing orientations
   directly, each with a small icon/image showing the resulting
   arrangement. Needs the user's own visual-design input (icon
   rendering, layout) before implementation - not a fix-loop's to guess.
-- **Zone-level privacy** (Neo, queued; architecturally significant) —
-  a pile inside a player's own PlayerZone defaulting to hidden-from-
-  everyone-but-owner, like a hand card. Explicitly a ZONE property, not
-  a pile property - today's model is pile-level. **Blocked on a direct
-  user decision**: this conflicts with the standing `docs/DECISIONS.md`
-  D83/D84 invariant ("no per-viewer restriction of any kind... a viewer
-  sees every card's real identity, always") - the two are in direct
-  tension and neither should be assumed to silently win.
+- **Zone-level privacy** (Neo, queued) — a pile inside a player's own
+  PlayerZone defaulting to hidden-from-everyone-but-owner, like a hand
+  card. **Not blocked** (corrected 2026-09-17, direct user
+  clarification - an earlier pass here had wrongly read this as
+  conflicting with `docs/DECISIONS.md` D83/D84): D84 governs the DATA
+  only (every viewer's own `view` always carries the real card) -
+  RENDERING is a separate, per-viewer question that's always been
+  allowed to differ, which is exactly what `HandPile`'s own
+  `showsFace()` split already does today (`PlayerHandPile` always
+  renders the owner's real face; `OpponentHandPile` always renders a
+  back, regardless of the card's own `faceUp`). The real work is
+  generalizing that same owner/opponent rendering split to piles inside
+  a `PerPlayerZone` generally, not just the built-in Hand kind - a
+  rendering-class change, not a data-model one, and pickable directly.
 - **Remote-cursor redesign** (Neo, queued; no back-compat) — replace
   exact-coordinate/transform cursor mirroring with an animate-to-target
   model (glide onto whatever pile/zone the other client's pointer just
@@ -86,14 +85,22 @@ or a live-verification session) versus being pickable directly.
   empties, without the panel resizing" — panel height 224px -> 119px
   observed live). Confirmed as its own independent bug, not downstream
   of the now-fixed focus-zoom/context-menu issue. Not yet triaged.
-- **Per-seat anchor geometry** for non-viewer seats can still overlap
-  neighboring panels at some desktop widths/player counts — a real,
-  known, non-blocking gap in the seat-ring layout math.
 - **Morpheus's process note** (2026-08-27): check a record's id
   survives a round-trip before designing any future save-for-reuse
   feature on top of it - came out of a real live bug (Table pile's
   Remove button always failing) in the Save Layout work. Not a
   standing bug itself, a reminder for whoever next builds on that area.
+
+## Dropped (direct user decision, 2026-09-17)
+
+Not pursuing - removed at the user's explicit request, not resolved or
+superseded:
+
+- Scannable QR code for joining.
+- In-app text chat or reactions.
+- Custom card backs/themes.
+- 5+-player mobile density.
+- Per-seat anchor geometry overlap at some desktop widths/player counts.
 
 ## Not carried forward (checked, resolved)
 

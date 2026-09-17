@@ -211,6 +211,11 @@ body {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  /* *fix (direct user request, 2026-09-17): the table-zoom wheel moved
+     onto the right edge of the table itself - `position: relative`
+     here is what makes `.table-zoom-controls`' own `position: absolute`
+     anchor to THIS box, not the page. */
+  position: relative;
 }
 
 #screen-game > .table-section .table-surface {
@@ -1516,33 +1521,41 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   transform-origin: top center;
 }
 
-/* US-117 phase 111 (D132): the manual table-zoom control bar. Every
-   player has their own (not host-gated, unlike `.layout-controls`
-   above it) - local view state, D130. */
+/* US-117 phase 111 (D132): the manual table-zoom control. Every player
+   has their own (not host-gated, unlike `.layout-controls` above it) -
+   local view state, D130.
+   *fix (direct user request, 2026-09-17): "put it on the right side of
+   the table" - pinned to the table-section's own right edge (that
+   section is `position: relative` specifically for this), vertically
+   centered, rather than a control bar living above the table. z-index
+   above `#zones`' own content (piles/zones never carry a z-index of
+   their own) so it's never occluded by a panel dragged near the edge. */
 .table-zoom-controls {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  margin: 0 0 0.5rem;
+  gap: 0.4rem;
 }
 
-.table-zoom-presets {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.table-zoom-presets button {
-  min-width: 44px;
-  min-height: 44px;
+.table-zoom-label {
+  font-size: 0.7rem;
+  color: var(--muted);
+  letter-spacing: 0.02em;
 }
 
 /* *fix (direct user request, 2026-09-16): "like the zoom wheel on a
-   mouse" as its own control, vertical, drag-the-tread-up-to-zoom-in.
-   Sized short/wide enough to clear the 44px touch-target floor while
-   still visually reading as a compact wheel, not a full-height slider. */
+   mouse" as its own control, drag-the-tread-up-to-zoom-in.
+   *fix (direct user request, 2026-09-17): "tall and thin" - was a
+   short/wide bar (2.5rem x 44px); now a real vertical wheel. Width
+   still clears the 44px touch-target floor. */
 .table-zoom-wheel {
-  width: 2.5rem;
-  height: 44px;
+  width: 2.75rem;
+  height: 12rem;
   min-width: 44px;
   border-radius: var(--radius-sm);
   background: var(--surface-2);
