@@ -7,7 +7,7 @@
 #
 # Adding a task: add the npm script first, then a one-line target here.
 
-.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-tablezoom test-focuszoom lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions
+.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-tablezoom test-focuszoom lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers
 
 help:
 	@echo "Recard targets (all front npm scripts):"
@@ -32,6 +32,7 @@ help:
 	@echo "  build-standalone  bundle everything into build/recard-standalone.html (runs via file://)"
 	@echo "  dist         gather index.html/style.css/src/assets into dist/ for a static host upload"
 	@echo "  check-decisions  verify docs/ARCHITECTURE.md's modern section is newest-first, no duplicate D-numbers"
+	@echo "  check-story-numbers  verify docs/USER_STORIES.md has no duplicate US-numbers"
 
 test:
 	npm test
@@ -142,3 +143,11 @@ connectome:
 # swapped by hand. Run after adding any new decision entry.
 check-decisions:
 	node tools/checkDecisionOrder.mjs
+
+# Same purpose as check-decisions but for docs/USER_STORIES.md - see
+# the 2026-09-10/11 groom that caught US-117 first drafted as US-110,
+# a number already in use. No newest-first ordering to check here
+# (stories are forward-chronological with expected gaps), just
+# duplicates.
+check-story-numbers:
+	node tools/checkStoryNumbers.mjs
