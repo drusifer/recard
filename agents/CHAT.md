@@ -318,3 +318,79 @@ Wrote coverage/test_audit_assets/jaccard_heatmap.png, coverage/test_audit_assets
 ---
 [<small>2026-09-17 00:53:58</small>] [**Neo**]->[**all**] *swe session-close*:
  Session close: *fix table-zoom-wheel bloop complete (Neo->Trin->Morpheus->Oracle, all passed). Committing 2 commits (check-story-numbers, then everything else) + merging dev forward from main (7 behind), then pushing both. Standing open items: pinch-zoom unwired (no touch device), pre-existing focus-zoom/context-menu bug (filed), queue items 2-4. See neo.docs/state.md for full resume notes.
+
+---
+[<small>2026-09-17 08:44:59</small>] [**Cypher**]->[**Smith**] *pm handoff*:
+ *pm plan sprint: fix the standing focus-zoom/context-menu bug (filed 2026-09-13 by Trin, reproduces identically across every run since). No design judgment needed - a real, well-specified regression in existing hover-intent/dismissal logic, good fit for an autonomous sprint. @Smith *user review focus-zoom-context-menu-fix
+
+---
+[<small>2026-09-17 08:45:04</small>] [**Smith**]->[**Morpheus**] *user approve*:
+ *user review: approved. Fixing a stuck-open zoom overlay is squarely a bug fix, not a design call - no HCI judgment needed beyond 'it should behave like every other dismissal already does.' *user approve. @Morpheus *lead arch focus-zoom-context-menu-fix
+
+---
+[<small>2026-09-17 08:46:02</small>] [**Morpheus**]->[**Smith**] *lead handoff*:
+ *lead arch: root cause found. Right-clicking a card also satisfies focus-zoom's hover-intent (180ms) - growPileInPlace only guards isDragInProgress, nothing checks for an open menu. A user slow to pick a menu action gets the pile zoomed out from under them. Fix: suppress hover-intent while a card/stack menu is open, same category as isDragInProgress. @Smith *user feedback arch
+
+---
+[<small>2026-09-17 08:46:07</small>] [**Smith**]->[**Mouse**] *user approve*:
+ *user feedback arch: approved. Suppressing hover-intent while a menu is open is exactly right - a pile growing out from under an open menu would be jarring and could visually break the menu's own positioning. *user approve. @Mouse *sm plan sprint
+
+---
+[<small>2026-09-17 08:46:11</small>] [**Mouse**]->[**Morpheus**] *sm handoff*:
+ *sm plan sprint: 1 phase - single well-scoped guard addition + regression tests, no reason to split. @Morpheus *lead review sprint plan
+
+---
+[<small>2026-09-17 08:46:15</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ *lead review sprint plan: approved, 1 phase is right for this scope. @Neo *swe impl phase-1
+
+---
+[<small>2026-09-17 08:50:04</small>] [**Morpheus**]->[**Neo**] *lead note*:
+ *lead arch refinement (found via direct diagnostic, not just the test): the real gap isn't 'hover-intent fires while a menu is open' - it's that opening/closing a menu never CANCELS the pending hover timer armed by that same hover. Menu opens+closes fast (well under 180ms), timer outlives it, fires LATER unrelated to anything open, growing an orphaned pile mid a later interaction. Fix: menu-open cancels the pending timer, not a fire-time open-menu check. @Neo continuing impl
+
+---
+[<small>2026-09-17 08:52:43</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat phase-1 PASSED. All 5 previously-failing tests now pass (Move from hand, card lands face-up, Turn/Rotate, card menu never opens empty) - confirmed via the exact repro sequence AND a full test:ui run. New regression test added + passes. 851/851 unit, test:focuszoom 11/11. @Morpheus *lead review phase-1
+
+---
+[<small>2026-09-17 08:52:48</small>] [**Trin**]->[**Cypher**] *qa found*:
+ *qa found (unrelated, NOT fixing this sprint): with the focus-zoom cascade gone, 2 deck-rendering test failures are now revealed as their OWN independent bug, not downstream damage as originally filed - fails identically in isolation AND on the pre-fix baseline (confirmed via stash). Deck panel resizes (224px->119px) as it empties, violating its own 'keeps its size while thinning' invariant. @Cypher backlog item, re-scoped from the old filing.
+
+---
+[<small>2026-09-17 08:52:56</small>] [**Morpheus**]->[**Oracle**] *lead handoff*:
+ *lead review phase-1 APPROVED. Clean seam - a custom event rather than coupling main.js to ui.js's menu internals, minimal 2-line dispatch at both real open sites. Diagnostic-driven root cause (not guessed) gives high confidence this is the real fix, not a band-aid. @Oracle *ora groom
+
+---
+[<small>2026-09-17 08:53:24</small>] [**Oracle**]->[**Smith**] *ora handoff*:
+ *ora groom done: memory.md 2026-09-17 row (full root-cause + fix record), cypher.docs backlog item closed + re-scoped deck-resize bug filed separately. @Smith *user test focus-zoom-context-menu-fix
+
+---
+[<small>2026-09-17 08:53:29</small>] [**Smith**]->[**all**] *user approve*:
+ *user test focus-zoom-context-menu-fix PASSED. Right-click a card, browse the menu at a normal human pace, pick an action - the pile no longer zooms out from under the decision mid-menu. Same for stack gears. Verified via the exact live-browser repro + full suite, all previously-broken interactions now clean. *user approve. @all *sprint retro
+
+---
+[<small>2026-09-17 08:53:39</small>] [**Neo**]->[**Cypher**] *retro*:
+ Neo retro: my first hypothesis (suppress-while-open) was wrong but plausible-sounding - writing the test FIRST and watching it pass unexpectedly (not fail) caught that before I built the wrong fix. Worth trusting 'the test didn't fail like I expected' as a real signal, not a fluke to wave away. Backlog: none new.
+
+---
+[<small>2026-09-17 08:53:39</small>] [**Trin**]->[**Cypher**] *retro*:
+ Trin retro: a diagnostic script outside the test framework was the right call once the first regression test didn't reproduce the bug - faster iteration than adding more browser-test assertions to a slow suite just to narrow down timing. Backlog: none new.
+
+---
+[<small>2026-09-17 08:53:39</small>] [**Morpheus**]->[**Cypher**] *retro*:
+ Morpheus retro: posting the ROOT-CAUSE REVISION to chat (not just the final answer) preserved why the fix looks the way it does - a future reader would otherwise wonder why it's an event on menu-open rather than a check on menu-open. Backlog: none new.
+
+---
+[<small>2026-09-17 08:53:39</small>] [**Oracle**]->[**Cypher**] *retro*:
+ Oracle retro: closing an old filed bug AND immediately re-scoping what it had lumped in with a new one, same groom pass, kept the backlog honest instead of leaving a vague 'downstream' note to rot. Backlog: none new.
+
+---
+[<small>2026-09-17 08:53:39</small>] [**Mouse**]->[**Cypher**] *retro*:
+ Mouse retro: 1 phase was right even though the root cause needed revision mid-flight - that's normal investigation depth, not a sign the phase was mis-sized. Backlog: none new.
+
+---
+[<small>2026-09-17 08:53:39</small>] [**Smith**]->[**Cypher**] *retro*:
+ Smith retro: this bug was a real, live UX problem (a menu you're still reading could yank the pile out from under you), not just a test-suite artifact - worth remembering standing 'downstream test failures' can hide a second real bug, as they did here. Backlog: none new.
+
+---
+[<small>2026-09-17 08:53:45</small>] [**Cypher**]->[**all**] *pm launch*:
+ *pm launch focus-zoom-context-menu-fix. Sprint complete: the standing focus-zoom/context-menu bug (filed 2026-09-13) is closed. Autonomous sprint per 'you decide'. Root cause: menu-open never cancelled the hover-intent timer, so it fired later unrelated to anything open. Fixed via a new PILE_MENU_OPENED_EVENT seam. All 5 directly-failing tests pass; a 2nd, previously-hidden deck-resize bug re-scoped to its own backlog item. 851/851 unit, test:focuszoom 11/11, full test:ui clean of this bug.

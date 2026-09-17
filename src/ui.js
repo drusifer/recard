@@ -1032,6 +1032,18 @@ function attachCardContextMenu(wrapper, card, pileableActions, piles, fromPileId
  * the card's own wrapper so it's never clipped by a pile's overflow, same
  * reasoning `pileElement` lookups already rely on for cross-cutting UI.
  */
+// *fix (standing backlog bug, filed 2026-09-13, root-caused 2026-09-17):
+// right-clicking a card/stack ALSO satisfies US-117 focus-zoom's own
+// hover-intent trigger (the click hovers first) - a menu opens and
+// closes well within the 180ms delay, but nothing ever cancelled the
+// timer THAT hover armed, so it fires later, unrelated to anything
+// still open, growing an orphaned pile mid a later interaction. main.js
+// owns the timer and has no reference to ui.js's menu functions (nor
+// should it), so this event is the seam: every menu-open call site
+// dispatches it once the popup is actually in the DOM, and `main.js`'s
+// `wireFocusZoom` cancels the pending timer on it.
+export const PILE_MENU_OPENED_EVENT = 'pilemenu:opened';
+
 /**
  * One stack's own action menu, opened by its gear emblem.
  *
@@ -1075,6 +1087,7 @@ function openStackActionMenu(clientX, clientY, actionIds, disabled, pileId, stac
     menu.append(button);
   }
   document.body.append(menu);
+  document.dispatchEvent(new Event(PILE_MENU_OPENED_EVENT));
   const rect = menu.getBoundingClientRect();
   const pos = clampMenuPosition(clientX, clientY, { width: rect.width, height: rect.height },
     { width: globalThis.innerWidth, height: globalThis.innerHeight });
@@ -1154,6 +1167,7 @@ function openCardContextMenu(clientX, clientY, actionIds, card, piles, fromPileI
     menu.append(button);
   }
   document.body.append(menu);
+  document.dispatchEvent(new Event(PILE_MENU_OPENED_EVENT));
 
   const rect = menu.getBoundingClientRect();
   const pos = clampMenuPosition(clientX, clientY, { width: rect.width, height: rect.height },

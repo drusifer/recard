@@ -815,15 +815,21 @@ User answered all 3 questions directly. Shipped as `<spread-slider>` +
 buttons/`ADJUST_PILE_SPREAD` deleted outright. Full history: `agents/
 oracle.docs/memory.md` (2026-09-13 row), `agents/morpheus.docs/state.md`.
 
-**New backlog item (Trin, found during Phase 2 UAT, NOT fixed this
-sprint - unrelated to the slider):** a hand pile's US-117 focus-zoom can
-get stuck open (`.focus-zoomed` never clears) mid right-click card-menu
-interaction, blocking pointer events for whatever browser test/real
-interaction runs next. Reproduced identically across 3 consecutive full
-`test:ui` runs - fails BEFORE any slider code executes, so it's a real,
-pre-existing gap in the focus-zoom hover-intent/dismissal logic
-(`main.js`'s `applyFocusZoom`/`shrinkFocusedPile`), not new-code flake.
-5 browser tests fail directly on it, 2 more (deck rendering) fail
-downstream. Needs its own triage - likely the hover-intent timer or the
-`pointerleave`-once listener not accounting for a context menu opening
-mid-hover.
+~~**Focus-zoom/context-menu stuck-open bug**~~ CLOSED 2026-09-17
+(`*fix focus-zoom-context-menu-fix`, autonomous sprint). Root cause:
+opening a card/stack menu never cancelled the hover-intent timer armed
+by the same right-click's hover, so it fired later - after the menu
+already closed - growing an orphaned pile mid an unrelated interaction.
+Fixed via a new `PILE_MENU_OPENED_EVENT` custom event (`ui.js`) that
+`main.js` listens for to cancel the timer. All 5 directly-failing
+browser tests now pass. Full history: `agents/oracle.docs/memory.md`
+(2026-09-17 row).
+
+**New backlog item (Trin, found closing the item above):** re-scoped
+from "2 deck-rendering tests fail downstream of the focus-zoom bug" -
+with that bug fixed, both still fail, confirmed as their OWN
+independent, pre-existing bug (not cascade damage): the deck's panel
+resizes (224px -> 119px) as its stack thins, violating its own "keeps
+its size while thinning" invariant (`tests/uiActions.browser.mjs`,
+"the deck visibly thins out as it empties, without the panel
+resizing"). Needs its own triage - not yet investigated.

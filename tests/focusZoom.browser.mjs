@@ -365,3 +365,41 @@ test('dragging the pile\'s own spread slider outside its bounds does not shrink 
     await context.close();
   }
 });
+
+// *fix (standing backlog bug, filed 2026-09-13 by Trin - found while
+// UAT'ing the Tighten/Loosen slider, actually unrelated to it):
+// right-clicking a card to open its context menu ALSO satisfies
+// focus-zoom's own hover-intent trigger (the click hovers the card
+// first) - `growPileInPlace` only ever guarded `isDragInProgress`,
+// nothing checked for an open menu. A player slow to pick a menu
+// action got the pile zoomed out from under them mid-decision; in the
+// live browser suite, the SAME leftover hover (nothing moves the mouse
+// away after `openMenu`) fired the timer mid-NEXT-test, leaving a
+// `.focus-zoomed` pile stuck open and blocking that test's own clicks.
+test('a card context menu staying open suppresses hover-intent for the rest of that wait', async () => {
+  const context = await fixture.browser.newContext();
+  try {
+    const page = await freshLiveTable(context);
+    const card = page.locator('[data-kind="hand"] .middle-card').last();
+    await card.click({ button: 'right' });
+    await page.waitForSelector('.card-context-menu', { timeout: 2000 });
+
+    // Longer than HOVER_INTENT_MS, with the menu still open and the
+    // mouse still sitting where the right-click left it (over the
+    // card) - exactly the gesture that used to grow the pile.
+    await page.waitForTimeout(HOVER_INTENT_MS + 200);
+    const focusedWhileMenuOpen = await page.evaluate(() => document.querySelector('.focus-zoomed') !== null);
+    assert.equal(focusedWhileMenuOpen, false, 'a pile must not grow while its own card menu is open');
+
+    // Closing the menu and hovering normally afterward must still work
+    // - this is a suppression while a menu is open, not a permanent
+    // break of the feature.
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('.card-context-menu', { state: 'detached', timeout: 2000 });
+    const pile = myHandPile(page);
+    await pile.hover();
+    await page.waitForSelector('body > .pile-section.focus-zoomed', { timeout: 2000 });
+  } finally {
+    await context.close();
+  }
+});
