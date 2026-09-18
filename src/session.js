@@ -3,8 +3,8 @@
  * WebRTC/PeerJS and is not covered by node:test — mocking a DataConnection
  * would only prove the code matches our own assumptions about PeerJS's
  * behavior, not reality (see Trin's "mocks vs reality" lesson). It's
- * verified manually: two browser tabs against a local static server, per
- * ARCHITECTURE.md's Testing Strategy.
+ * verified against the real broker by the multi-player harness
+ * (`tests/multiplayer.browser.mjs`, D135).
  *
  * Star topology: the host is the hub. Joining clients only ever connect to
  * the host, never to each other.

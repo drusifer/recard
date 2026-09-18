@@ -1847,3 +1847,22 @@ consumed by in-phase fixes) done, no rework at any gate beyond the two
 mid-flight design revisions (D130 -> D131 -> D132) that happened
 BEFORE any implementation phase started. Full history: `docs/
 ARCHITECTURE.md` D130-D132, `docs/USER_STORIES.md` US-117.
+
+---
+
+## Sprint: Multi-player Test Harness — US-118 (2026-09-18) — SHIPPED
+
+Tier 2. Arch: `agents/morpheus.docs/multiplayer_harness_arch.md`.
+User gate decisions: submitAction() extraction approved; hook named
+`window.__recardHarness`; migrating existing browser tests IN scope.
+
+## Phase 1 — One action funnel ✅ DONE
+- [x] T1.1 `src/main.js`: extract `submitAction(action)` (host -> dispatch w/ playerId: myId, guest -> session.send action msg); migrate every duplicated call site; unit + lint green
+
+## Phase 2 — Harness + scenario ✅ DONE
+- [x] T2.1 `window.__recardHarness` (act/view/myId) in main.js
+- [x] T2.2 `tests/harness/multiplayer.mjs`: startStaticServer, launchChromium, createTable -> peers (act/view/waitForView/query)
+- [x] T2.3 `tests/multiplayer.browser.mjs` 3-player scenario (TDD, written first) + `test:multiplayer` npm script + `test-multiplayer` make target
+
+## Phase 3 — Migrate existing browser tests ✅ DONE
+- [x] T3.1 uiActions/rtgPlaythrough/hostSetup/newGame/tableZoom/focusZoom `.browser.mjs` + `designLint.check.mjs` import the shared server/launchChromium; delete duplicate copies

@@ -20,48 +20,14 @@
 // scroll, a self-inflicted `min-height: 0` bug) were each found by
 // writing a one-off Node script with an inline geometry check, run once,
 // then thrown away. This is that script, kept.
-import http from 'node:http';
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { chromium } from 'playwright';
+import { launchChromium, startStaticServer } from './harness/multiplayer.mjs';
 import { isOverlapping, isWithinViewport, hasMinTouchTarget, pageOverflow } from './designLint.mjs';
 import { PRESETS } from '../src/presets.js';
 
-const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const PORT = 8211;
 const BASE = `http://localhost:${PORT}`;
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
 
-const server = http.createServer(async (request, response) => {
-  const pathname = request.url.split('?', 1)[0];
-  const filePath = path.join(ROOT, pathname === '/' ? 'index.html' : pathname);
-  try {
-    const body = await readFile(filePath);
-    response.writeHead(200, { 'Content-Type': MIME[path.extname(filePath)] ?? 'application/octet-stream' });
-    response.end(body);
-  } catch {
-    response.writeHead(404);
-    response.end('not found');
-  }
-});
-await new Promise((resolve) => server.listen(PORT, resolve));
-
-// Playwright's bundled Chromium isn't always installed, so a system
-// browser is an acceptable substitute.
-const SYSTEM_CHROMIUM_PATHS = ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'];
-async function launchChromium() {
-  try {
-    return await chromium.launch({ args: ['--no-sandbox'] });
-  } catch (error) {
-    for (const executablePath of SYSTEM_CHROMIUM_PATHS) {
-      try {
-        return await chromium.launch({ executablePath, args: ['--no-sandbox'] });
-      } catch { /* try the next candidate */ }
-    }
-    throw error;
-  }
-}
+const server = await startStaticServer(PORT);
 
 // The real viewports this project already treats as meaningful
 // (D20/D24/US-31's own breakpoints, plus the common short-desktop-window
@@ -346,7 +312,7 @@ try {
   }
 } finally {
   await browser.close();
-  server.close();
+  await server.close();
 }
 
 if (violations.length > 0) {

@@ -7,7 +7,7 @@
 #
 # Adding a task: add the npm script first, then a one-line target here.
 
-.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-tablezoom test-focuszoom lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers
+.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-tablezoom test-focuszoom test-multiplayer lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers
 
 help:
 	@echo "Recard targets (all front npm scripts):"
@@ -18,6 +18,7 @@ help:
 	@echo "  test-newgame  New Game: host swaps preset mid-table, same code"
 	@echo "  test-tablezoom  Infinity Table: manual zoom dial + S/M/L/XL presets"
 	@echo "  test-focuszoom  Infinity Table: focus-zoom grow-pile-in-place mechanism"
+	@echo "  test-multiplayer  host + 2 guests driven over the real protocol (US-118 harness)"
 	@echo "  lint         style + design + js"
 	@echo "  lint-js      eslint"
 	@echo "  lint-style   stylelint"
@@ -54,6 +55,9 @@ test-tablezoom:
 
 test-focuszoom:
 	npm run test:focuszoom
+
+test-multiplayer:
+	npm run test:multiplayer
 
 lint:
 	npm run lint

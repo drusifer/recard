@@ -3340,3 +3340,43 @@ D131.
 Sprint status: NOT STARTED. Two rounds of design revision (D130,
 D131) landed before a single line of code - exactly why Cypher flagged
 this as arch-significant going in. Ready for Mouse to plan.
+
+### US-118: Multi-player test harness — drive real peers over the real protocol
+**As** the team shipping cross-client features, **I want** an automated
+harness that stands up a real host plus N real guests and drives them
+by protocol actions (not clicks), **so that** anything needing a second
+peer (privacy, sync, reconnect, cursor work) is verified by a
+repeatable test instead of manual two-tab sessions (closes the
+`docs/BACKLOG.md` Technical item left open since D60).
+
+**AC:**
+- One call stands up a table: a host page plus N guest pages, each a
+  real headless Chromium page joined over the real PeerJS broker via
+  the real table code - no mocked transport.
+- A test can make any peer perform any reducer action by name
+  (`{type:'DRAW', pileId}` etc.). Host actions go through the same
+  local `dispatch` funnel a UI button uses; guest actions go over the
+  real data channel as a real `action` message - exactly the path a
+  UI button takes, not a shortcut around it.
+- A test can read any peer's current structured view (the same object
+  that peer renders from) and wait until it satisfies a predicate -
+  convergence is awaited, never slept for.
+- A test can inspect any peer's DOM through one shared helper
+  (selectors -> rect/text/attributes), not a bespoke inline
+  `page.evaluate()`.
+- A scripted 3-player scenario (host + 2 guests) proves the harness:
+  deal, a guest acts, every peer converges, and another player's hand
+  RENDERS face-down in a guest's DOM (privacy is a rendering split since
+  D84 - the view data itself carries every card, so this is asserted via
+  the DOM helper, not the view).
+- Runs headless via `bobp make test-multiplayer`; deterministic - zero
+  tolerance for flakes (all waits are condition-based, bounded).
+
+- The existing browser test files drop their duplicated static server /
+  `launchChromium()` copies and import the harness's shared helpers
+  instead (user decision at Smith gate).
+
+**Out of scope:** any new wire message in
+`protocol.js`; logic-only/non-browser robot peers; UI changes.
+
+Sprint status: COMPLETE (D135).

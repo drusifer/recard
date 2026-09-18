@@ -1119,19 +1119,15 @@ document.querySelector('#start-new-game-btn').addEventListener('click', () => {
 
 function adjustScore(targetPlayerId, delta) {
   if (isSessionEnded) return;
-  if (role === 'host') dispatch({ type: 'ADJUST_SCORE', targetPlayerId, delta });
-  else session.send({ type: 'action', action: { type: 'ADJUST_SCORE', targetPlayerId, delta } });
+  submitAction({ type: 'ADJUST_SCORE', targetPlayerId, delta });
 }
 
 // *nit (2026-08-27), direct user request: "update the score by typing it
-// in" - same host-authoritative/guest-relays shape as every other
 // dispatch here (`adjustScore` above, `performCreatePileWithCard`, ...).
 function setScore(targetPlayerId, value) {
   if (isSessionEnded) return;
-  if (role === 'host') {
-    try { dispatch({ type: 'SET_SCORE', targetPlayerId, value }); }
-    catch (error) { globalThis.alert(error.message); }
-  } else session.send({ type: 'action', action: { type: 'SET_SCORE', targetPlayerId, value } });
+  try { submitAction({ type: 'SET_SCORE', targetPlayerId, value }); }
+  catch (error) { globalThis.alert(error.message); }
 }
 
 /**
@@ -1161,6 +1157,33 @@ function rosterWithCounts(view) {
     handCount: p.id === myId ? view.myHand.length : view.otherHandCounts[p.id] ?? 0,
   }));
 }
+
+/**
+ * US-118: the one funnel every player action goes through. The host
+ * reduces it locally; a guest relays it over the data channel and the
+ * host reduces it there, stamping `playerId` from the sending
+ * connection's identity (D27) - the same stamp the host gives its own
+ * `myId` here. A host-side reducer throw propagates to the caller; a
+ * guest never runs the reducer, so it has nothing local to throw.
+ */
+function submitAction(action) {
+  if (role === 'host') dispatch({ ...action, playerId: myId });
+  else session.send({ type: 'action', action });
+}
+
+/**
+ * US-118: the multi-player test harness's page-side hook
+ * (`tests/harness/multiplayer.mjs`). Exposed unconditionally (D1, no
+ * build step) - not a new trust surface: any player can already call
+ * `session.send` from devtools, and the host authorizes by the sending
+ * connection's identity, never by UI origin (D27).
+ */
+// eslint-disable-next-line unicorn/no-global-object-property-assignment -- publishing this hook on the page's global IS the point
+globalThis.__recardHarness = {
+  act: submitAction,
+  view: currentView,
+  myId: () => myId,
+};
 
 function dispatch(action) {
   gameState = reduce(gameState, action);
@@ -2087,14 +2110,12 @@ function renderGameFromView(view) {
 // or the menu's `reveal`/`hide` entry) never has to say which way.
 function revealCard(pileableId) {
   if (isSessionEnded) return;
-  if (role === 'host') dispatch({ type: 'FLIP', playerId: myId, pileableId });
-  else session.send({ type: 'action', action: { type: 'FLIP', pileableId } });
+  submitAction({ type: 'FLIP', pileableId });
 }
 
 function rotateCard(pileableId) {
   if (isSessionEnded) return;
-  if (role === 'host') dispatch({ type: 'ROTATE', playerId: myId, pileableId });
-  else session.send({ type: 'action', action: { type: 'ROTATE', pileableId } });
+  submitAction({ type: 'ROTATE', pileableId });
 }
 
 // UX follow-up (direct user request): panel positions/sizes are LOCAL,
@@ -2121,15 +2142,13 @@ function resizePanel(id, w, h) {
 
 function pickupCard(pileableId) {
   if (isSessionEnded) return;
-  if (role === 'host') dispatch({ type: 'PICKUP', playerId: myId, pileableId });
-  else session.send({ type: 'action', action: { type: 'PICKUP', pileableId } });
+  submitAction({ type: 'PICKUP', pileableId });
 }
 
 function moveCard(pileableId, toPileId, placement = {}) {
   if (isSessionEnded) return;
   const { targetCardId, side, layout } = placement;
-  if (role === 'host') dispatch({ type: 'MOVE', playerId: myId, pileableId, toPileId, targetCardId, side, layout });
-  else session.send({ type: 'action', action: { type: 'MOVE', pileableId, toPileId, targetCardId, side, layout } });
+  submitAction({ type: 'MOVE', pileableId, toPileId, targetCardId, side, layout });
 }
 
 // US-28: dropping a dragged card on a pile moves it there - the drop
@@ -2187,8 +2206,7 @@ function performBreakChip(pileId) {
     .filter((chip) => chip.pileableType === 'chip' && breakInto(chip.denom) !== undefined)
     .toSorted((a, b) => b.denom - a.denom)[0];
   if (!biggest) return;
-  if (role === 'host') dispatch({ type: 'BREAK_CHIP', playerId: myId, pileId, pileableId: biggest.id });
-  else session.send({ type: 'action', action: { type: 'BREAK_CHIP', pileId, pileableId: biggest.id } });
+  submitAction({ type: 'BREAK_CHIP', pileId, pileableId: biggest.id });
 }
 
 /**
@@ -2201,8 +2219,7 @@ function performSetSpread(pileId, value, stackKey) {
   if (isSessionEnded) return;
   // D129: `stackKey` omitted means every stack - the pile-level slider.
   const action = { type: 'SET_STACK_SPREAD', pileId, value, stackKey };
-  if (role === 'host') dispatch({ ...action, playerId: myId });
-  else session.send({ type: 'action', action });
+  submitAction(action);
 }
 
 /**
@@ -2224,29 +2241,18 @@ function handleStackAction(pileId, stackKey, actionId, value) {
 function performSetStackOrientation(pileId, stackKey, orientation) {
   if (isSessionEnded) return;
   const action = { type: 'SET_STACK_ORIENTATION', pileId, stackKey, orientation };
-  if (role === 'host') dispatch({ ...action, playerId: myId });
-  else session.send({ type: 'action', action });
+  submitAction(action);
 }
 
 function performFlipStack(pileId, stackKey) {
   if (isSessionEnded) return;
   const action = { type: 'FLIP_STACK', pileId, stackKey };
-  if (role === 'host') dispatch({ ...action, playerId: myId });
-  else session.send({ type: 'action', action });
+  submitAction(action);
 }
 
 function performShuffle(pileId) {
   if (isSessionEnded) return;
-  // *fix (queued 2026-09-10, "All players have access to all pile
-  // actions no matter what" - front-end constraints too): Shuffle used
-  // to be host-only at the pile-actions offer level (`DeckPile`), so a
-  // guest could never reach this function at all - it never needed the
-  // host-dispatch/guest-relay split every OTHER deck action here
-  // already has. Now that Shuffle is open to everyone, it needs the
-  // same split or a guest's click would call `dispatch` directly with
-  // no local `gameState` to reduce against.
-  if (role === 'host') dispatch({ type: 'SHUFFLE_DECK', pileId });
-  else session.send({ type: 'action', action: { type: 'SHUFFLE_DECK', pileId } });
+  submitAction({ type: 'SHUFFLE_DECK', pileId });
 }
 
 // Sprint 12 (D34/D35/D36, T54.1): named so the deck's pile anchor - both
@@ -2255,24 +2261,19 @@ function performShuffle(pileId) {
 // `pileId` is the real target now, no hardcoded deck constant.
 function performDraw(pileId) {
   if (isSessionEnded) return;
-  if (role === 'host') dispatch({ type: 'DRAW', playerId: myId, pileId });
-  else session.send({ type: 'action', action: { type: 'DRAW', pileId } });
+  submitAction({ type: 'DRAW', pileId });
 }
 
 function performTakePile(pileId) {
   if (isSessionEnded) return;
-  if (role === 'host') {
-    try { dispatch({ type: 'TAKE_PILE', playerId: myId, pileId }); }
-    catch (error) { globalThis.alert(error.message); }
-  } else session.send({ type: 'action', action: { type: 'TAKE_PILE', pileId } });
+  try { submitAction({ type: 'TAKE_PILE', pileId }); }
+  catch (error) { globalThis.alert(error.message); }
 }
 
 function performSetPileOrientation(pileId, faceUp) {
   if (isSessionEnded) return;
-  if (role === 'host') {
-    try { dispatch({ type: 'SET_PILE_ORIENTATION', playerId: myId, pileId, faceUp }); }
-    catch (error) { globalThis.alert(error.message); }
-  } else session.send({ type: 'action', action: { type: 'SET_PILE_ORIENTATION', pileId, faceUp } });
+  try { submitAction({ type: 'SET_PILE_ORIENTATION', pileId, faceUp }); }
+  catch (error) { globalThis.alert(error.message); }
 }
 
 // *nit (2026-08-26): rename, any player - same dispatch shape as every
@@ -2282,18 +2283,14 @@ function performSetPileOrientation(pileId, faceUp) {
 // between the dblclick and the commit).
 function performRenamePile(pileId, name) {
   if (isSessionEnded) return;
-  if (role === 'host') {
-    try { dispatch({ type: 'RENAME_PILE', playerId: myId, pileId, name }); }
-    catch (error) { globalThis.alert(error.message); }
-  } else session.send({ type: 'action', action: { type: 'RENAME_PILE', pileId, name } });
+  try { submitAction({ type: 'RENAME_PILE', pileId, name }); }
+  catch (error) { globalThis.alert(error.message); }
 }
 
 function performRenameZone(zoneId, name) {
   if (isSessionEnded) return;
-  if (role === 'host') {
-    try { dispatch({ type: 'RENAME_ZONE', playerId: myId, zoneId, name }); }
-    catch (error) { globalThis.alert(error.message); }
-  } else session.send({ type: 'action', action: { type: 'RENAME_ZONE', zoneId, name } });
+  try { submitAction({ type: 'RENAME_ZONE', zoneId, name }); }
+  catch (error) { globalThis.alert(error.message); }
 }
 
 // US-71/72/73 (D62/D63): same host-local/guest-relay + try/catch +
@@ -2302,28 +2299,22 @@ function performRenameZone(zoneId, name) {
 // just how they reach the user (Gate 1 Nielsen #9).
 function performRemovePile(pileId) {
   if (isSessionEnded) return;
-  if (role === 'host') {
-    try { dispatch({ type: 'REMOVE_PILE', playerId: myId, pileId }); }
-    catch (error) { globalThis.alert(error.message); }
-  } else session.send({ type: 'action', action: { type: 'REMOVE_PILE', pileId } });
+  try { submitAction({ type: 'REMOVE_PILE', pileId }); }
+  catch (error) { globalThis.alert(error.message); }
 }
 
 function performRemoveZone(zoneId) {
   if (isSessionEnded) return;
-  if (role === 'host') {
-    try { dispatch({ type: 'REMOVE_ZONE', playerId: myId, zoneId }); }
-    catch (error) { globalThis.alert(error.message); }
-  } else session.send({ type: 'action', action: { type: 'REMOVE_ZONE', zoneId } });
+  try { submitAction({ type: 'REMOVE_ZONE', zoneId }); }
+  catch (error) { globalThis.alert(error.message); }
 }
 
 // D79 (US-82): the untap step. Same host-authoritative / guest-relay
 // dispatch shape as every other pile action here.
 function performUntapAll(pileId) {
   if (isSessionEnded) return;
-  if (role === 'host') {
-    try { dispatch({ type: 'UNTAP_ALL', playerId: myId, pileId }); }
-    catch (error) { globalThis.alert(error.message); }
-  } else session.send({ type: 'action', action: { type: 'UNTAP_ALL', pileId } });
+  try { submitAction({ type: 'UNTAP_ALL', pileId }); }
+  catch (error) { globalThis.alert(error.message); }
 }
 
 // D91: same dispatch shape as every other pile action here - `by` is
@@ -2331,10 +2322,8 @@ function performUntapAll(pileId) {
 // actual rank/suit ordering.
 function performSortPile(pileId, by) {
   if (isSessionEnded) return;
-  if (role === 'host') {
-    try { dispatch({ type: 'SORT_PILE', playerId: myId, pileId, by }); }
-    catch (error) { globalThis.alert(error.message); }
-  } else session.send({ type: 'action', action: { type: 'SORT_PILE', pileId, by } });
+  try { submitAction({ type: 'SORT_PILE', pileId, by }); }
+  catch (error) { globalThis.alert(error.message); }
 }
 
 // D91: commits the Split picker (`splitPicker`, above) at the gap the
@@ -2346,18 +2335,14 @@ function performSplitCommit(index) {
   if (isSessionEnded || !splitPicker) return;
   const { pileId } = splitPicker;
   splitPicker = null;
-  if (role === 'host') {
-    try { dispatch({ type: 'SPLIT_PILE', playerId: myId, pileId, index }); }
-    catch (error) { globalThis.alert(error.message); rerender(); }
-  } else session.send({ type: 'action', action: { type: 'SPLIT_PILE', pileId, index } });
+  try { submitAction({ type: 'SPLIT_PILE', pileId, index }); }
+  catch (error) { globalThis.alert(error.message); rerender(); }
 }
 
 function performChangePileType(pileId, kind) {
   if (isSessionEnded) return;
-  if (role === 'host') {
-    try { dispatch({ type: 'CHANGE_PILE_TYPE', playerId: myId, pileId, kind }); }
-    catch (error) { globalThis.alert(error.message); }
-  } else session.send({ type: 'action', action: { type: 'CHANGE_PILE_TYPE', pileId, kind } });
+  try { submitAction({ type: 'CHANGE_PILE_TYPE', pileId, kind }); }
+  catch (error) { globalThis.alert(error.message); }
 }
 
 // (bloop: piles/zones/cards are all Movable) - reparent a pile
@@ -2366,10 +2351,8 @@ function performChangePileType(pileId, kind) {
 // action above.
 function performMovePile(pileId, targetZoneId) {
   if (isSessionEnded) return;
-  if (role === 'host') {
-    try { dispatch({ type: 'MOVE_PILE', playerId: myId, pileId, targetZoneId }); }
-    catch (error) { globalThis.alert(error.message); }
-  } else session.send({ type: 'action', action: { type: 'MOVE_PILE', pileId, targetZoneId } });
+  try { submitAction({ type: 'MOVE_PILE', pileId, targetZoneId }); }
+  catch (error) { globalThis.alert(error.message); }
 }
 
 // (direct user request) - "all piles can be dropped into any other
@@ -2377,10 +2360,8 @@ function performMovePile(pileId, targetZoneId) {
 // Same dispatch shape as every other pile-affecting action above.
 function performMergePile(pileId, targetPileId) {
   if (isSessionEnded) return;
-  if (role === 'host') {
-    try { dispatch({ type: 'MERGE_PILE', playerId: myId, pileId, targetPileId }); }
-    catch (error) { globalThis.alert(error.message); }
-  } else session.send({ type: 'action', action: { type: 'MERGE_PILE', pileId, targetPileId } });
+  try { submitAction({ type: 'MERGE_PILE', pileId, targetPileId }); }
+  catch (error) { globalThis.alert(error.message); }
 }
 
 
@@ -2421,10 +2402,8 @@ function performCreatePileWithCard(pileableId, zoneId) {
     moveCard(pileableId, existing.id);
     return;
   }
-  if (role === 'host') {
-    try { dispatch({ type: 'CREATE_PILE', playerId: myId, zoneId, fromPileId, pileableId }); }
-    catch (error) { globalThis.alert(error.message); }
-  } else session.send({ type: 'action', action: { type: 'CREATE_PILE', zoneId, fromPileId, pileableId } });
+  try { submitAction({ type: 'CREATE_PILE', zoneId, fromPileId, pileableId }); }
+  catch (error) { globalThis.alert(error.message); }
 }
 
 // D51/D67: a dragged table card (or, since D67, the deck's own exposed
@@ -2526,26 +2505,13 @@ function dealFromDeck(pileId, action, count) {
   if (isSessionEnded) return;
   if (action === 'draw') return performDraw(pileId);
   if (action === 'shuffle') return performShuffle(pileId);
-  // *fix (queued 2026-09-10, "All players have access to all pile
-  // actions no matter what" - front-end constraints too): reset/
-  // reshuffleDeal/deal used to be host-only at the pile-actions offer
-  // level (`DeckPile`), so a guest could never reach this far - these
-  // two branches called `dispatch` directly with no host-dispatch/
-  // guest-relay split, unlike every other action in this file. Now that
-  // they're open to everyone, a guest's click needs the same split or
-  // it would call `dispatch` with no local `gameState` to reduce
-  // against. The try/catch only applies on the host side - a guest
-  // never runs the reducer itself, so it has no local exception to
-  // catch; it just waits for the host's broadcast like any other relay.
+  // The try/catch only ever catches on the host side - a guest never
+  // runs the reducer itself (see `submitAction`).
   if (action === 'reset') {
-    if (role === 'host') {
-      try {
-        dispatch({ type: 'RESET' });
-      } catch (error) {
-        showDeckError(error.message);
-      }
-    } else {
-      session.send({ type: 'action', action: { type: 'RESET' } });
+    try {
+      submitAction({ type: 'RESET' });
+    } catch (error) {
+      showDeckError(error.message);
     }
     return;
   }
@@ -2553,19 +2519,15 @@ function dealFromDeck(pileId, action, count) {
   const dealAction = action === 'reshuffleDeal'
     ? { type: 'RESHUFFLE_DEAL', cardsPerPlayer: count, pileId }
     : { type: 'DEAL_MORE', cardsPerPlayer: count, pileId };
-  if (role === 'host') {
-    try {
-      dispatch(dealAction);
-    } catch (error) {
-      // US-41 AC: "fail the way it already does - a clear message, no
-      // partial deal". It did NOT already do that: the reducer's throw ran
-      // straight out of the click handler as an uncaught error, so the host
-      // saw nothing at all. Only visible now because moving the control
-      // somewhere reachable made it easy to hit.
-      showDeckError(error.message);
-    }
-  } else {
-    session.send({ type: 'action', action: dealAction });
+  try {
+    submitAction(dealAction);
+  } catch (error) {
+    // US-41 AC: "fail the way it already does - a clear message, no
+    // partial deal". It did NOT already do that: the reducer's throw ran
+    // straight out of the click handler as an uncaught error, so the host
+    // saw nothing at all. Only visible now because moving the control
+    // somewhere reachable made it easy to hit.
+    showDeckError(error.message);
   }
 }
 

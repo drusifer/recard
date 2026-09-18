@@ -46,9 +46,10 @@ or a live-verification session) versus being pickable directly.
   model (glide onto whatever pile/zone the other client's pointer just
   entered, rather than following live pixel coordinates). Needs either
   a live 2-person test session with the user watching, or an explicit
-  "ship it unverified, I accept the risk" - there is no automated
-  two-peer harness (see Technical, below) to verify live cross-client
-  behavior any other way.
+  "ship it unverified, I accept the risk". The multi-player harness
+  (US-118/D135, `tests/harness/multiplayer.mjs`) now covers
+  cross-client STATE; motion/cursor assertions would need it extended
+  to `motion` messages.
 - **Pinch-to-zoom for the table-zoom wheel** (Neo) — the math exists
   and is unit-tested (`zoomFromPinch`, `src/tableZoom.js`) but is not
   wired to a live touch listener; no touch device available to verify
@@ -74,14 +75,23 @@ or a live-verification session) versus being pickable directly.
 
 ## Technical / testing
 
-- **No real, automated two-peer end-to-end test harness** — the
-  earlier one (`tests/e2e.smoke.mjs`) was removed (`docs/DECISIONS.md`
-  D60) after drifting out of date with a DOM redesign; nothing has
-  replaced it since. Anything that needs a real second peer (cross-
-  client motion sync, reconnect behavior, live cursor redesign above)
-  is currently unverified by automation and needs manual two-tab
-  testing. Blocks the remote-cursor redesign item above from being
-  shippable with real confidence.
+- **`test:rtg` has 4 failing tests on HEAD 540ce88** (found 2026-09-18
+  during US-118, verified identical on a clean HEAD worktree - not
+  caused by it): stack-gear tap/untap and token-supply both time out
+  on a `locator.click` (30s); "Reshuffle & deal recalls only its own
+  cards" and "Restart game rebuilds every deck" fail their battlefield
+  assertions. Likely drift from the D133/D134 layout changes - not yet
+  triaged.
+- **`lint:js` reports 10 errors in untouched `src/ui.js` on HEAD**
+  (found 2026-09-18 during US-118) - `no-undef getComputedStyle`,
+  `no-unused-vars row`, several unicorn rules. Not yet triaged.
+- **Multi-player harness follow-ups** (US-118 retro, 2026-09-18):
+  extend `tests/harness/multiplayer.mjs` to assert `motion` messages
+  (unblocks the remote-cursor redesign); `waitForView` predicates run
+  in-page and silently can't capture closures - a trap for test
+  authors; `createTable` without `cardsPerPlayer` times out instead of
+  failing fast; concurrent `bobp make` runs clobber each other's
+  `build/build.out`.
 - **Browser-automation tooling for Smith's own UX gate** — distinct
   from Neo's existing Playwright test scripts; Smith's end-to-end
   sprint-close testing is currently manual.

@@ -28,53 +28,15 @@
 // `make check`.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import http from 'node:http';
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { chromium } from 'playwright';
+import { launchChromium, startStaticServer } from './harness/multiplayer.mjs';
 
-const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const PORT = 8212; // not 8211 - designLint.check.mjs owns that one
 const BASE = `http://localhost:${PORT}`;
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
-
-// Same static server + system-chromium fallback as `designLint.check.mjs`.
-const server = http.createServer(async (request, response) => {
-  const pathname = request.url.split('?', 1)[0];
-  // Resolve to the real file BEFORE reading its extension: `extname('/')`
-  // is empty, so typing the root as octet-stream makes the browser
-  // download index.html instead of rendering it ("fixture.page.goto: Download is
-  // starting"), which is exactly what happened the first time this ran.
-  const filePath = path.join(ROOT, pathname === '/' ? 'index.html' : pathname);
-  try {
-    const body = await readFile(filePath);
-    response.writeHead(200, { 'Content-Type': MIME[path.extname(filePath)] ?? 'application/octet-stream' });
-    response.end(body);
-  } catch {
-    response.writeHead(404);
-    response.end('not found');
-  }
-});
-
-const SYSTEM_CHROMIUM_PATHS = ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'];
-async function launchChromium() {
-  try {
-    return await chromium.launch({ args: ['--no-sandbox'] });
-  } catch (error) {
-    for (const executablePath of SYSTEM_CHROMIUM_PATHS) {
-      try {
-        return await chromium.launch({ executablePath, args: ['--no-sandbox'] });
-      } catch { /* try the next candidate */ }
-    }
-    throw error;
-  }
-}
 
 // One holder object, not two `let`s: `unicorn/no-top-level-assignment-in-function`
 // forbids a `before` hook writing top-level bindings, and a shared
 // fixture is exactly what a `before` hook is for.
-const fixture = { browser: undefined, page: undefined };
+const fixture = { server: undefined, browser: undefined, page: undefined };
 
 /**
  * The card the tests act on: the last card in the host's own hand fan.
@@ -125,7 +87,7 @@ async function chooseAction(locator, actionId) {
 }
 
 before(async () => {
-  await new Promise((resolve) => server.listen(PORT, resolve));
+  fixture.server = await startStaticServer(PORT);
   fixture.browser = await launchChromium();
   fixture.page = await (await fixture.browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
 
@@ -156,7 +118,7 @@ before(async () => {
 
 after(async () => {
   await fixture.browser?.close();
-  await new Promise((resolve) => server.close(resolve));
+  await fixture.server?.close();
 });
 
 // The *nit that prompted this file: rows were icon-only, with the name

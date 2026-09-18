@@ -66,7 +66,48 @@ D129: `Stack`/`Stackable` (also domain model — see above) · D130: camera is a
 D20: desktop table width, pure CSS breakpoints · D24: Zone room grows at desktop breakpoints · D51: bigger cards (also drag-and-drop — see above) · D61: saved layout overrides, separate localStorage store · D133: fixed local canvas + computed fit-zoom fixes zone-overlap drift (also camera/view — see above) · D134: per-preset canvas size + every preset's own layout tuned/verified (also camera/view, testing — see above/below)
 
 **Testing & tooling**
-D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rules disabled post-autofix · D60: `tests/e2e.smoke.mjs` removed · D96: universal DnD guarantee, structural test (also drag-and-drop — see above) · D134: `lint:design` sweeps every preset, not just the default (also camera/view — see above)
+D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rules disabled post-autofix · D60: `tests/e2e.smoke.mjs` removed · D96: universal DnD guarantee, structural test (also drag-and-drop — see above) · D134: `lint:design` sweeps every preset, not just the default (also camera/view — see above) · D135: multi-player test harness — real peers driven over the real protocol, one `submitAction` funnel
+
+---
+
+### D135. Multi-player test harness — real peers driven over the real protocol; one `submitAction` funnel
+
+US-118 (Tier 2 sprint, direct user request). Closes the two-peer gap
+D60 left open when it removed `tests/e2e.smoke.mjs`.
+
+**What:** `tests/harness/multiplayer.mjs` stands up a table of real
+headless Chromium pages (host + N guests, one browser context each so
+identities don't collide) joined over the real PeerJS broker, then
+drives them by PROTOCOL actions through a page-side hook,
+`window.__recardHarness` (`act`/`view`/`myId`, `main.js`).
+`waitForView(predicate, argument)` awaits convergence on a peer's own
+structured view (bounded, never slept); `query(selectors)` is the one
+DOM-inspection helper. First scenario: `tests/multiplayer.browser.mjs`
+(`bobp make test-multiplayer`), mutation-proved against a no-op guest
+relay.
+
+**`submitAction` (the load-bearing refactor):** `main.js` repeated the
+same `host → dispatch({...action, playerId: myId}) / guest →
+session.send({type:'action', action})` branch at 27 call sites. It is
+now one function every UI action and the harness go through, so the
+harness exercises the exact path a button does, not a parallel copy.
+No aliases left (no-back-compat rule); callers keep their own
+try/catch, so host-side error handling is unchanged.
+
+**Rejected:** a wire-level DOM query/reply message in `protocol.js` -
+the test controller already holds every peer's `Page`, so the query
+stays local; logic-only Node robot peers - one execution model beats
+the scaling win; two role-specific entry points (`dispatchLocal`/
+`sendAction`) - redundant once `submitAction` existed.
+
+**Also:** every browser test file (+ `designLint.check.mjs`) now
+imports `startStaticServer`/`launchChromium` from the harness; seven
+copies of that boilerplate are deleted (user decision at the Smith
+gate).
+
+**Privacy note:** since D84 a peer's VIEW carries every card, so
+"another player's hand is private" is asserted in the DOM (card
+backs), not the view.
 
 ---
 

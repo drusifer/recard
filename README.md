@@ -120,10 +120,9 @@ either run `npx playwright install chromium` once, or have a system
 Chromium/Chrome installed (it falls back to `/usr/bin/chromium`,
 `/usr/bin/chromium-browser`, or `/usr/bin/google-chrome`).
 
-There is no automated end-to-end/integration test suite today (see
-"Known limitations" below) — `npm run lint:design` and manual two-tab
-testing are the two remaining automated/semi-automated checks beyond
-unit tests.
+Multi-peer behaviour is tested headless by `npm run test:multiplayer`:
+a real host and two real guests driven over the real protocol (see
+`docs/ARCHITECTURE.md`'s Testing Strategy).
 
 ## Known limitations
 
@@ -160,12 +159,6 @@ unit tests.
 - **Multi-touch gestures (pinch, rotate) and long-press menus do
   nothing.** Touch support covers dragging cards; it isn't a full mobile
   gesture vocabulary.
-- **No automated end-to-end/integration test suite exists.** The
-  previous one (`tests/e2e.smoke.mjs`) had drifted into asserting
-  against DOM containers retired by the table-unification redesign
-  (D51/D52) and was removed 2026-08-27 rather than kept as false
-  assurance — see `docs/ARCHITECTURE.md`'s Testing Strategy. Rebuilding
-  one against the current `#zones`-based DOM is open backlog.
 
 ## How it works, briefly
 

@@ -139,15 +139,17 @@ Pure logic (`deck.js`, `state.js`, the domain-model classes, `protocol.js`,
 and friends) is unit-tested with Node's built-in `node:test` — `npm test`,
 no framework dependency needed.
 
-There is no standing, automated, full two-peer end-to-end suite today.
-An earlier one (`tests/e2e.smoke.mjs`) drove two real Playwright browser
-contexts against the actual PeerJS broker/WebRTC; it was removed (D60)
-after drifting into asserting against DOM containers retired by a later
-redesign and going unexercised for an unknown stretch. Rebuilding a real
-two-peer harness against the current DOM is open backlog, not attempted
-since — anything that needs a real second peer (cross-client motion
-sync, reconnect behavior) is currently unverified by automation and
-needs manual two-tab testing.
+Multi-peer behaviour is covered by the multi-player harness (US-118,
+D135): `tests/harness/multiplayer.mjs` stands up a real host plus N real
+guests (one headless Chromium page each, over the real PeerJS broker)
+and drives them by protocol actions through `window.__recardHarness`
+-> `submitAction`, the same funnel every UI button uses. Tests await
+convergence on each peer's structured view and inspect the DOM through
+one `query()` helper. First scenario: `tests/multiplayer.browser.mjs`
+(`npm run test:multiplayer`). It covers cross-client STATE; `motion`
+messages (live drag/cursor sync) aren't asserted yet. The harness also
+supplies the static server and Chromium launcher every browser test
+file uses.
 
 Several single-client, real-Playwright-browser suites fill the gap for
 everything that doesn't need a second peer, each its own `npm run test:*`

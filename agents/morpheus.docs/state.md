@@ -2,6 +2,143 @@
 
 ## Context
 
+`*design multi-player test harness` (2026-09-18, direct user request).
+Neo's D133/D134 session (table-zone overlap fix + per-preset layouts,
+committed as 540ce88) surfaced the same pain repeatedly: every browser
+test file hand-rolls its own Playwright click-through + a bespoke
+inline `page.evaluate()` DOM query. Backlog already names the gap this
+closes: "No real, automated two-peer end-to-end test harness" (D60
+removed `tests/e2e.smoke.mjs`, nothing replaced it since - see
+`docs/BACKLOG.md`'s Technical section).
+
+Design happened as three sequential decisions with the user, each
+narrowing the previous one - resume order matters, they build on each
+other:
+1. **Drive peers by protocol, not clicks** - `session.js`/`protocol.js`
+   already define the wire format (`action`/`state`/`motion`/
+   `identity`). A test should inject an `action` message directly
+   instead of clicking through the UI to produce the same effect.
+2. **Option B, confirmed**: the DOM-query request/reply endpoint stays
+   LOCAL to the test process (`page.evaluate()`), not a new wire
+   message added to `protocol.js`. Rejected extending the real WebRTC
+   protocol with `{type:'query'}`/`{type:'query-reply'}` - the test
+   controller already holds every peer's own Playwright `Page` object
+   directly, so routing a DOM query over the game's own data channel
+   would solve a problem that doesn't exist here (it would only earn
+   its keep for a peer the controller does NOT directly control - a
+   real remote/health-check use this ask never asked for).
+3. **Every peer is a real headless Playwright page, confirmed** -
+   rejected "layered" (logic-only Node robots for most peers, real
+   pages only where DOM assertions are needed) even though it's
+   cheaper for large player counts, and rejected "robots only, no
+   DOM at all". One execution model, no new Node-side PeerJS/transport
+   code to build or maintain - simplicity over the scaling benefit.
+4. **Confirmed**: yes, wrap it as a `make` target following this
+   project's own convention (`Makefile`'s own comment: "add the npm
+   script first, then a one-line target here" - see `test-tablezoom`/
+   `test-focuszoom` for the exact shape to copy).
+
+## Current Task
+
+**SHIPPED 2026-09-18 as US-118 / D135** (Tier 2 sprint). Implemented
+per the design below with one refinement: the two role-specific entry
+points became ONE `submitAction(action)` in main.js (the branch it
+replaces was duplicated at 27 call sites, all migrated, no aliases).
+Hook is `window.__recardHarness` {act, view, myId}. User put migrating
+the existing browser tests onto the harness's server/launcher IN scope
+- done. Arch record: `morpheus.docs/multiplayer_harness_arch.md`.
+
+Revisit: the harness asserts cross-client STATE only; extending it to
+`motion` messages is what unblocks the remote-cursor redesign backlog
+item.
+
+### Full design, for a cold implementer with zero other context
+
+**Component 1 - `window.__harness`, exposed unconditionally by
+`main.js` (no build-flag gating - this project has no build step,
+D1).** Not a new security surface: a real player could already call
+`session.send(...)` from devtools today, since the host authorizes
+every action by the SENDING CONNECTION's bound identity
+(`peerToKey.get(fromId)`, `main.js`'s host-side `session.on('data',
+...)`), never by UI origin - see `state.js`'/D27's own reasoning.
+Surface (names are proposals, not binding - pick something that
+won't collide with a real global; `__harness` might already be too
+generic, check first):
+  - `dispatchLocal(action)` - HOST side only. Applies an action through
+    the SAME local path a UI button already uses (main.js's `dispatch`
+    wrapper, whatever it's actually called - confirm the exact name/
+    call site before wiring this, don't guess) - so a host-authored
+    test action exercises real code, not a shortcut around it.
+  - `sendAction(action)` - GUEST side only. Calls the real
+    `session.send({type:'action', action})` - literally what "remote
+    control over the protocol" means. Goes over the real data channel,
+    to the real host, through the real reducer, back down as a real
+    `state` broadcast.
+  - `getView()` - returns this peer's current `latestView` (guest) or
+    the host's own `gameState`/derived view (host) - confirm exact
+    variable names in `main.js` before wiring; the point is a
+    STRUCTURED assertion surface ("does player 2's hand show 7 cards")
+    that never touches the DOM.
+  - `query(selectors)` - ONE canonical DOM-inspection helper (bounding
+    rects, text content, attributes) for the selector list given.
+    Replaces the ad hoc inline `page.evaluate(() => {...})` blocks
+    duplicated across `tests/designLint.check.mjs`,
+    `tests/uiActions.browser.mjs`, etc. - migrate incrementally, not a
+    single big-bang rewrite of every existing browser test.
+
+**Component 2 - `tests/harness/multiplayerHarness.mjs`** (new file,
+Node-side, wraps Playwright). `createTable({ preset, players })`:
+launches one headless Chromium page per player (host first, using the
+SAME `launchChromium()`/system-Chromium-fallback pattern
+`tests/designLint.check.mjs` already has - don't reimplement that),
+has the host create the table, joins each guest via the real share
+code (same flow every existing browser test already does by hand),
+and returns `{ host, guests: [...] }` - each a thin wrapper object
+exposing `.act(action)`, `.getView()`, `.query(selectors)` via
+`page.evaluate()` calls into that page's own `window.__harness`. This
+is the ONE place that knows how to stand up a table; every test built
+on it stops reimplementing that boilerplate.
+
+**Component 3 - rebuild `tests/e2e.smoke.mjs`'s role on top of this**
+(D60 removed it; nothing has replaced it since). A scripted multi-
+player play-through expressed as a sequence of `.act(...)` calls and
+`.getView()`/`.query()` assertions, not clicks - genuinely closes the
+standing backlog gap, not just a testing-convenience nicety.
+
+**Component 4 - the `make` target**, following the Makefile's own
+documented convention EXACTLY (see its header comment): add the npm
+script first (`package.json`, e.g. `"test:multiplayer": "node --test
+tests/multiplayerHarness.*.mjs"` or wherever the new scenario file(s)
+land), THEN a one-line Makefile target (`test-multiplayer:\n\tnpm run
+test:multiplayer`), THEN add it to `.PHONY` and the `help:` echo list
+- copy `test-tablezoom`/`test-focuszoom`'s exact shape, don't
+improvise a different pattern.
+
+### Explicitly NOT decided yet (ask before guessing)
+- Exact naming for `window.__harness` and its methods - proposals
+  above, not binding.
+- Exact `npm run` script name / new test file name(s).
+- Whether existing browser test files (`designLint.check.mjs` etc.)
+  migrate their own inline DOM queries onto Component 1's `query()`
+  helper as part of this work, or that's separate/later cleanup - the
+  user asked for the harness, not necessarily a refactor of every
+  existing test file in the same pass. Ask before expanding scope.
+
+## Next Steps (historical - done)
+@Neo *swe impl multiplayer-test-harness - implement Components 1-4
+above, in order (1 and 2 are the load-bearing pieces; 3 and 4 are
+what make it real/discoverable). Confirm the "explicitly not decided"
+naming questions with the user rather than guessing, same standing
+project convention as everything else this session. Once implemented
+and verified (real multi-peer scenario passing headless via `make
+test-multiplayer`), record it as the next D-number in
+`docs/DECISIONS.md` - same pattern D133/D134 followed today (write it
+up AFTER it's real and verified, not before).
+
+---
+
+## Archived (2026-09-13, superseded by the above): Tighten/Loosen slider architecture review
+
 `*lead review stackable` iteration 1 (D129 domain model). Reviewed the
 code, not the summary. The hierarchy move and the offset formula are
 right and I approve them; two seams the iteration did NOT touch will
@@ -9,7 +146,7 @@ break the wiring if they aren't settled first, and one of them changes
 `offsetIn`'s interface — so this is APPROVED WITH CONDITIONS, and the
 conditions are for iteration 2 before it writes a line of wiring.
 
-## Current Task
+### Old Current Task
 
 **`*lead review stackactions` (iteration 4): APPROVED.**
 
