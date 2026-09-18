@@ -4,10 +4,7 @@ import { breakInto } from './pileables/ChipPileable.js';
 import { homePileKindFor } from './pileables/pileableTypes.js';
 import { makeStateMessage, makeMotionMessage, createMotionThrottler, cardDragPayload } from './protocol.js';
 import { renderShareCode, wireCopyCode } from './qrcode.js';
-import {
-  TABLE_ZOOM_DEFAULT_SCALE, TABLE_ZOOM_MIN, TABLE_ZOOM_MAX, clampTableZoom,
-  zoomFromWheelDrag, clampPan,
-} from './tableZoom.js';
+import { TABLE_ZOOM_MIN, TABLE_ZOOM_MAX, zoomFromWheelDrag, TableCamera } from './tableZoom.js';
 import {
   renderZones,
   renderRoster,
@@ -85,6 +82,14 @@ zonesElement.addEventListener('drop', (event) => {
   const pileId = pileDragFromDrop(event.dataTransfer);
   if (pileId) performMovePile(pileId, null);
 });
+// *fix (direct user request, 2026-09-17): "we need a unifying domain
+// object" for converting between screen and local pixel space under
+// the table's own zoom/pan - one shared instance, not scattered
+// closure state, so `wireTableZoomControls` (below) and every render's
+// own `options` bag (`buildZoneOptions`) reference the SAME camera.
+// Declared before `wireTableZoomControls()` runs (right below), which
+// reads it immediately.
+const tableCamera = new TableCamera();
 wireTableZoomControls();
 wireFocusZoom();
 // *nit (2026-08-27), direct user request ("save space"): one
@@ -1366,6 +1371,7 @@ function endSessionForGood(message, { retryable = false } = {}) {
     const nameById = new Map(latestView.players.map((p) => [p.id, p.id === myId ? 'You' : p.name]));
     const frozenOptions = {
       resolveOwnerName: (ownerId) => nameById.get(ownerId) ?? ownerId,
+      camera: tableCamera,
     };
     // UX follow-up (direct user request): "a Deck is a specific kind of
     // Pile" - the deck is a real pile in `latestView.piles` now, so this
@@ -1379,7 +1385,7 @@ function endSessionForGood(message, { retryable = false } = {}) {
     // player with a score, one consolidated panel), just no
     // adjust/set wiring - the session is over.
     const frozenSeated = seatedOrder(latestView.players, myId);
-    renderScoreZone(zonesElement, frozenSeated, latestView.scores, {});
+    renderScoreZone(zonesElement, frozenSeated, latestView.scores, { camera: tableCamera });
     reapplyFocusZoom();
   }
   renderRosterOnly();
@@ -1412,27 +1418,25 @@ function wireTableZoomControls() {
   wheelElement.setAttribute('aria-valuemin', String(TABLE_ZOOM_MIN));
   wheelElement.setAttribute('aria-valuemax', String(TABLE_ZOOM_MAX));
 
-  let currentZoom = TABLE_ZOOM_DEFAULT_SCALE;
-  let currentPan = { x: 0, y: 0 };
-
-  // Drag-to-pan (direct user request, 2026-09-16): "we'll also need to
-  // pan with drag on table." Re-clamped against the CURRENT zoom every
-  // time either changes - zooming OUT pulls an out-of-bounds pan back
-  // in rather than leaving it stuck past the new (tighter) limit.
+  // *fix (2026-09-17): reads/writes the shared `tableCamera` (module
+  // scope) instead of owning its own closure state, so the SAME
+  // zoom/pan this function applies visually is also what `ui.js`'s
+  // panel drag/resize convert screen deltas against (`buildZoneOptions`
+  // passes the same instance through as `options.camera`).
   function applyPan(pan) {
-    currentPan = clampPan(pan, currentZoom);
-    zonesElement.style.setProperty('--table-pan-x', `${currentPan.x}px`);
-    zonesElement.style.setProperty('--table-pan-y', `${currentPan.y}px`);
+    tableCamera.setPan(pan);
+    zonesElement.style.setProperty('--table-pan-x', `${tableCamera.pan.x}px`);
+    zonesElement.style.setProperty('--table-pan-y', `${tableCamera.pan.y}px`);
   }
 
   function applyZoom(value) {
-    currentZoom = clampTableZoom(value);
-    wheelElement.setAttribute('aria-valuenow', String(currentZoom));
-    zonesElement.style.setProperty('--table-zoom', String(currentZoom));
-    applyPan(currentPan);
+    tableCamera.setZoom(value);
+    wheelElement.setAttribute('aria-valuenow', String(tableCamera.zoom));
+    zonesElement.style.setProperty('--table-zoom', String(tableCamera.zoom));
+    applyPan(tableCamera.pan);
   }
 
-  applyZoom(currentZoom);
+  applyZoom(tableCamera.zoom);
 
   const tableSurface = document.querySelector('.table-surface');
   let panStart = null;
@@ -1444,7 +1448,7 @@ function wireTableZoomControls() {
     // only two valid targets, since `#zones` is the direct, otherwise-
     // empty flex container every pile/zone panel lives inside.
     if (event.target !== tableSurface && event.target !== zonesElement) return;
-    panStart = { x: event.clientX - currentPan.x, y: event.clientY - currentPan.y };
+    panStart = { x: event.clientX - tableCamera.pan.x, y: event.clientY - tableCamera.pan.y };
     tableSurface.setPointerCapture(event.pointerId);
   });
   tableSurface?.addEventListener('pointermove', (event) => {
@@ -1455,10 +1459,10 @@ function wireTableZoomControls() {
   tableSurface?.addEventListener('pointercancel', () => { panStart = null; });
 
   let dragStartY = null;
-  let zoomAtDragStart = currentZoom;
+  let zoomAtDragStart = tableCamera.zoom;
   wheelElement.addEventListener('pointerdown', (event) => {
     dragStartY = event.clientY;
-    zoomAtDragStart = currentZoom;
+    zoomAtDragStart = tableCamera.zoom;
     wheelElement.setPointerCapture(event.pointerId);
   });
   wheelElement.addEventListener('pointermove', (event) => {
@@ -1471,8 +1475,8 @@ function wireTableZoomControls() {
   // one `WHEEL_DRAG_RANGE_PX`-scaled "notch" per press, same direction
   // convention as the drag (up arrow zooms in).
   wheelElement.addEventListener('keydown', (event) => {
-    if (event.key === 'ArrowUp') applyZoom(zoomFromWheelDrag(currentZoom, -20));
-    else if (event.key === 'ArrowDown') applyZoom(zoomFromWheelDrag(currentZoom, 20));
+    if (event.key === 'ArrowUp') applyZoom(zoomFromWheelDrag(tableCamera.zoom, -20));
+    else if (event.key === 'ArrowDown') applyZoom(zoomFromWheelDrag(tableCamera.zoom, 20));
     else return;
     event.preventDefault();
   });
@@ -1895,6 +1899,12 @@ function whenLive(handler) {
 function buildZoneOptions(nameById) {
   return {
     viewerId: myId,
+    // *fix (2026-09-17): threaded through to `wirePanelLayout` ->
+    // `attachPanelDrag`/`attachPanelResize` (ui.js), which need it to
+    // convert a screen-space pointer delta into the local-space delta
+    // a panel's own `left`/`top` actually use - see `tableCamera`'s
+    // own doc comment (module scope, above) for the full reasoning.
+    camera: tableCamera,
     resolveOwnerName: (ownerId) => nameById.get(ownerId) ?? ownerId,
     onReveal: (pileableId) => revealCard(pileableId),
     onRotate: (pileableId) => rotateCard(pileableId),

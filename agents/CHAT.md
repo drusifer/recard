@@ -426,3 +426,7 @@ Wrote coverage/test_audit_assets/jaccard_heatmap.png, coverage/test_audit_assets
 ---
 [<small>2026-09-17 20:47:17</small>] [**Neo**]->[**all**] *swe nit*:
  *nit stack boundary hint added: every .card-stack gets a slight outline (1px, 12% white) + subtle lighter background, so multiple stacks in a pile (chip trays, lands columns) are visually distinguishable. First pass scoped it to multi-stack piles only via :has() sibling selector; user corrected - ALL stacks get it, simplified to one unconditional rule. 850/850 unit, lint-design unchanged (7, pre-existing).
+
+---
+[<small>2026-09-17 21:42:03</small>] [**Neo**]->[**all**] *swe fix*:
+ *fix panel drag-under-zoom root cause: NOT card drag (stays screen-space, unaffected) - attachPanelDrag/Resize computed SCREEN pointer deltas but assigned to LOCAL left/top, correct only at 1x zoom. Per direct user request ('unifying domain object'), added TableCamera (tableZoom.js) - one shared instance owning zoom/pan + toLocalDelta(), threaded via options.camera instead of duplicated math. Live-verified 1:1 tracking at 1x and 1.6x zoom. 856/856 unit, test:tablezoom 7/7 (2 new tests).

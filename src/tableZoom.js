@@ -76,3 +76,67 @@ export function clampPan({ x, y }, zoom) {
     y: Math.min(bound, Math.max(-bound, y)) + 0,
   };
 }
+
+/**
+ * *fix (direct user request, 2026-09-17): "drag alignment is still off
+ * it needs to readjust when the table zoom changes" - then, once the
+ * real culprit (panel move/resize, not card drag) was found: "we
+ * already have working drag-math code - don't fix - reuse... we need a
+ * unifying domain object."
+ *
+ * `#zones` renders with `transform: translate(pan) scale(zoom)` -
+ * `scale` means one LOCAL pixel (the coordinate space a panel's own
+ * `left`/`top` are set in, since `position: absolute` inside a
+ * transformed ancestor is measured pre-transform) renders as `zoom`
+ * SCREEN pixels. A pointer event's `clientX`/`clientY` are always
+ * SCREEN pixels. Any drag that reads a screen-space pointer delta and
+ * assigns it directly to a LOCAL `left`/`top` is correct only at
+ * exactly 1x zoom - found live in `ui.js`'s `attachPanelDrag` and
+ * `attachPanelResize`, both of which did exactly that.
+ *
+ * `TableCamera` is the ONE object that owns the current zoom/pan state
+ * (`main.js` creates a single instance, threaded through the render
+ * `options` bag the same way every other shared piece of view state
+ * already is) and knows how to convert a screen-space delta into the
+ * equivalent local-space delta - so that conversion is written and
+ * tested exactly once, not re-derived per drag call site. Card drag/
+ * drop-target code never needed this: it stays in screen space
+ * throughout, comparing `getBoundingClientRect()` results on both
+ * sides of every check, which is why it was never affected by zoom in
+ * the first place.
+ */
+export class TableCamera {
+  constructor() {
+    this.zoom = TABLE_ZOOM_DEFAULT_SCALE;
+    this.pan = { x: 0, y: 0 };
+  }
+
+  /** Sets zoom, clamped to the wheel's own range - and re-clamps the
+   * CURRENT pan against the new zoom, so zooming back out pulls an
+   * out-of-bounds pan back in rather than leaving it stuck past the
+   * new (tighter) limit (same behavior `main.js`'s own `applyZoom`
+   * already had before this class existed). */
+  setZoom(value) {
+    this.zoom = clampTableZoom(value);
+    this.pan = clampPan(this.pan, this.zoom);
+    return this.zoom;
+  }
+
+  /**
+   * Sets pan, clamped against the CURRENT zoom.
+   */
+  setPan(pan) {
+    this.pan = clampPan(pan, this.zoom);
+    return this.pan;
+  }
+
+  /**
+   * A SCREEN-space delta (e.g. how far the real mouse cursor moved)
+   * converted to the equivalent LOCAL delta for positioning something
+   * whose `left`/`top` live inside this camera's own transformed
+   * container - `local * zoom = screen`, so `screen / zoom = local`.
+   */
+  toLocalDelta(screenDx, screenDy) {
+    return { x: screenDx / this.zoom, y: screenDy / this.zoom };
+  }
+}

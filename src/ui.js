@@ -317,25 +317,36 @@ export function clampMenuPosition(x, y, size, viewport) {
 }
 
 /**
- * *fix (direct user bug report, 2026-09-17): "drag is weird, not scaled
- * right so the dragged items fall behind the mouse pointer."
- * `DataTransfer.setDragImage(image, x, y)` anchors the drag ghost at
- * `(x, y)` into the image the browser ACTUALLY RENDERS - which reflects
- * every ancestor CSS transform, including `--table-zoom`'s `scale()`
- * on `#zones`. `offsetWidth`/`offsetHeight` are the element's UNSCALED
- * layout size, so anchoring at exactly half of those only centers the
- * ghost when the table happens to be at 1x zoom - at any other zoom the
- * anchor drifts away from center by the zoom deviation. Scaling the
- * offset by the table's own current zoom is what keeps the anchor at
- * the true center regardless.
+ * *fix (direct user bug report, 2026-09-17, corrected same day): "drag
+ * is weird, not scaled right so the dragged items fall behind the
+ * mouse pointer" - then, after a first attempt: "still off, it needs
+ * to readjust when the table zoom changes."
  *
- * @param {number} offsetWidth the dragged element's own unscaled `offsetWidth`
- * @param {number} offsetHeight its unscaled `offsetHeight`
- * @param {number} tableZoomScale the CURRENT `--table-zoom` value
+ * `DataTransfer.setDragImage(image, x, y)` anchors the drag ghost at
+ * `(x, y)` into the image the browser ACTUALLY RENDERS, which reflects
+ * every ancestor CSS transform - `--table-zoom`'s `scale()` on
+ * `#zones`, but also anything else that ever scales/rotates a card
+ * (hover-raise's own `--raise-base`, a future effect, etc.).
+ *
+ * The FIRST fix multiplied the element's unscaled `offsetWidth`/
+ * `offsetHeight` by the table's own `--table-zoom` value read back off
+ * `#zones` - correct for a plain table-zoom-only case, but it silently
+ * assumed that was the ONLY transform in play, and re-deriving a scale
+ * factor from a specific CSS variable is exactly the kind of thing
+ * that drifts out of sync (a rotation nudge alone changes the
+ * axis-aligned rendered box even at zero scale). This version instead
+ * measures the card's own ACTUAL on-screen size directly
+ * (`getBoundingClientRect()`, called fresh at every dragstart) -
+ * correct under any combination of transforms, current or future,
+ * with nothing to keep in sync.
+ *
+ * @param {number} renderedWidth the dragged element's actual on-screen
+ *   width (`getBoundingClientRect().width`), not its unscaled layout size
+ * @param {number} renderedHeight its actual on-screen height
  * @returns {{x: number, y: number}}
  */
-export function scaledDragImageAnchor(offsetWidth, offsetHeight, tableZoomScale) {
-  return { x: (offsetWidth * tableZoomScale) / 2, y: (offsetHeight * tableZoomScale) / 2 };
+export function dragImageAnchor(renderedWidth, renderedHeight) {
+  return { x: renderedWidth / 2, y: renderedHeight / 2 };
 }
 
 /**
@@ -716,19 +727,6 @@ function wireCardLiftCue(wrapper, card, onCardLift) {
 /** Native-drag wiring (US-28/US-29/D19, US-107 extraction) - unchanged;
  * see `renderPileCards`' own call site comment for the authorization
  * reasoning behind when a card is draggable at all. */
-/** The live `--table-zoom` value `main.js`'s `wireTableZoomControls`
- * sets on `#zones` - read back here rather than threaded through as a
- * parameter, same as every other place this file reads a CSS custom
- * property back off the DOM rather than duplicating the source of
- * truth. Falls back to 1 (no scaling assumed) if `#zones` doesn't
- * exist yet or the property is unset/unparseable. */
-function currentTableZoomScale() {
-  const zonesElement = document.querySelector('#zones');
-  const raw = zonesElement ? globalThis.getComputedStyle(zonesElement).getPropertyValue('--table-zoom') : '';
-  const scale = Number(raw.trim());
-  return Number.isFinite(scale) && scale > 0 ? scale : 1;
-}
-
 function wireCardDrag(wrapper, card, pileableActions, piles, pileView, options) {
   const { onMoveCard, onCardLift, onCardDrag } = options;
   if (!onMoveCard || pileableActions.length === 0) return;
@@ -746,7 +744,8 @@ function wireCardDrag(wrapper, card, pileableActions, piles, pileView, options) 
     // shape, not just rectangular ones.
     const face = wrapper.querySelector('.card');
     if (face) {
-      const anchor = scaledDragImageAnchor(face.offsetWidth, face.offsetHeight, currentTableZoomScale());
+      const rect = face.getBoundingClientRect();
+      const anchor = dragImageAnchor(rect.width, rect.height);
       event.dataTransfer.setDragImage(face, anchor.x, anchor.y);
     }
     highlightDragTargets(
@@ -1511,7 +1510,7 @@ export function wirePanelLayout(panelElement, id, headingElement, options) {
       // already in it are never simply hidden.
       panelElement.style.overflowY = 'auto';
     }
-    attachPanelResize(panelElement, id, options.onResizePanel);
+    attachPanelResize(panelElement, id, options.onResizePanel, options.camera);
   }
   if (options.onMovePanel) {
     const stored = options.layout?.[id];
@@ -1520,8 +1519,17 @@ export function wirePanelLayout(panelElement, id, headingElement, options) {
       panelElement.style.left = `${stored.x}px`;
       panelElement.style.top = `${stored.y}px`;
     }
-    attachPanelDrag(headingElement, panelElement, id, options.onMovePanel);
+    attachPanelDrag(headingElement, panelElement, id, options.onMovePanel, options.camera);
   }
+}
+
+/** `options.camera` (a `TableCamera`, `tableZoom.js`) is optional here -
+ * every real caller supplies one (`main.js`'s `buildZoneOptions`), but
+ * a missing one degrades to "1x zoom, no conversion" rather than
+ * throwing, so a future caller that genuinely has no camera concept
+ * (a test harness, a future non-table panel) isn't forced to fake one. */
+function localDelta(camera, screenDx, screenDy) {
+  return camera ? camera.toLocalDelta(screenDx, screenDy) : { x: screenDx, y: screenDy };
 }
 
 /**
@@ -2138,7 +2146,7 @@ const MIN_PANEL_HEIGHT_PX = 90;
  * native drag for its own different, discrete-target capability
  * instead - see `wirePanelLayout`'s own comment for the full reasoning.
  */
-function attachPanelDrag(headingElement, panelElement, id, onMove) {
+function attachPanelDrag(headingElement, panelElement, id, onMove, camera) {
   if (!headingElement) return;
   headingElement.classList.add('panel-drag-handle');
   headingElement.addEventListener('pointerdown', (event) => {
@@ -2156,6 +2164,15 @@ function attachPanelDrag(headingElement, panelElement, id, onMove) {
     // drag starts - it moves exactly as far as the pointer does.
     const grabDx = event.clientX - startRect.left;
     const grabDy = event.clientY - startRect.top;
+    // *fix (direct user bug report, 2026-09-17): "drag alignment is
+    // still off, it needs to readjust when the table zoom changes...
+    // you need to scale the movement." `parentRect`/`startRect` are
+    // SCREEN-space (`getBoundingClientRect`), but `panelElement.style.
+    // left/top` are LOCAL-space (the panel's own containing block,
+    // `#zones`, is transformed by `--table-zoom`'s `scale()`) - every
+    // screen-space delta below goes through `localDelta`/`camera` to
+    // convert, or it's only correct at exactly 1x zoom.
+    //
     // UX follow-up (real bug, found live): a panel that has never been
     // moved is still positioned by its OWN default mechanism (a personal
     // zone's seatPosition ring math + centering transform, a shared
@@ -2166,15 +2183,15 @@ function attachPanelDrag(headingElement, panelElement, id, onMove) {
     // (a second drag, or a personal zone whose position was already
     // stored) - this produces the same left/top it already had.
     panelElement.classList.add('panel-moved');
-    panelElement.style.left = `${startRect.left - parentRect.left}px`;
-    panelElement.style.top = `${startRect.top - parentRect.top}px`;
+    const anchor = localDelta(camera, startRect.left - parentRect.left, startRect.top - parentRect.top);
+    panelElement.style.left = `${anchor.x}px`;
+    panelElement.style.top = `${anchor.y}px`;
 
     panelElement.classList.add('panel-dragging');
     document.body.classList.add('panel-drag-active');
 
     const onPointerMove = (event) => {
-      const x = event.clientX - grabDx - parentRect.left;
-      const y = event.clientY - grabDy - parentRect.top;
+      const { x, y } = localDelta(camera, event.clientX - grabDx - parentRect.left, event.clientY - grabDy - parentRect.top);
       panelElement.style.left = `${x}px`;
       panelElement.style.top = `${y}px`;
       panelElement.dataset.dragX = x;
@@ -2213,7 +2230,7 @@ function attachPanelDrag(headingElement, panelElement, id, onMove) {
  * zone while width (and personal zones, already `position: absolute`
  * either way) looked fine. Plain pixels sidestep the whole question.
  */
-function attachPanelResize(panelElement, id, onResize) {
+function attachPanelResize(panelElement, id, onResize, camera) {
   const handle = document.createElement('div');
   handle.className = 'panel-resize-handle';
   handle.title = 'Drag to resize';
@@ -2230,7 +2247,18 @@ function attachPanelResize(panelElement, id, onResize) {
     // stable outer bound to avoid an unbounded resize, not that specific
     // element.
     const bound = (panelElement.offsetParent || document.querySelector('#table-surface')).getBoundingClientRect();
-    const startRect = panelElement.getBoundingClientRect();
+    // *fix (direct user bug report, 2026-09-17): "you need to scale the
+    // movement" - `panelElement.style.width/height` are LOCAL-space,
+    // same as `left`/`top` in `attachPanelDrag` above (see its own
+    // comment). `offsetWidth`/`offsetHeight` give the panel's CURRENT
+    // size already in that same local space, so the starting size
+    // needs no conversion - only the ongoing SCREEN-space pointer
+    // delta does (`localDelta`), and the outer `bound` (screen-space,
+    // from `getBoundingClientRect`) needs converting the other way to
+    // compare against a local `w`/`h`.
+    const startWidth = panelElement.offsetWidth;
+    const startHeight = panelElement.offsetHeight;
+    const boundLocal = localDelta(camera, bound.width, bound.height);
     const startX = event.clientX;
     const startY = event.clientY;
     // *nit (2026-08-26): `flex-grow: 1` would otherwise grow the panel
@@ -2242,14 +2270,9 @@ function attachPanelResize(panelElement, id, onResize) {
     document.body.classList.add('panel-resize-active');
 
     const onPointerMove = (event) => {
-      const w = Math.min(
-        Math.max(startRect.width + (event.clientX - startX), MIN_PANEL_WIDTH_PX),
-        bound.width * 0.9,
-      );
-      const h = Math.min(
-        Math.max(startRect.height + (event.clientY - startY), MIN_PANEL_HEIGHT_PX),
-        bound.height * 0.9,
-      );
+      const { x: dx, y: dy } = localDelta(camera, event.clientX - startX, event.clientY - startY);
+      const w = Math.min(Math.max(startWidth + dx, MIN_PANEL_WIDTH_PX), boundLocal.x * 0.9);
+      const h = Math.min(Math.max(startHeight + dy, MIN_PANEL_HEIGHT_PX), boundLocal.y * 0.9);
       panelElement.style.width = `${w}px`;
       panelElement.style.height = `${h}px`;
       panelElement.style.overflowY = 'auto';

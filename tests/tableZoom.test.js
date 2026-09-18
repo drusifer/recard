@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   TABLE_ZOOM_DEFAULT_SCALE, TABLE_ZOOM_MIN, TABLE_ZOOM_MAX, clampTableZoom,
-  WHEEL_DRAG_RANGE_PX, zoomFromWheelDrag, zoomFromPinch, maxPan, clampPan,
+  WHEEL_DRAG_RANGE_PX, zoomFromWheelDrag, zoomFromPinch, maxPan, clampPan, TableCamera,
 } from '../src/tableZoom.js';
 
 // US-117 phase 111 (revised, D132, direct user correction): no
@@ -107,4 +107,62 @@ test('clampPan: clamps past the bound in either direction, on either axis', () =
 
 test('clampPan: at 1x zoom, any pan collapses to the origin', () => {
   assert.deepEqual(clampPan({ x: 200, y: -200 }, 1), { x: 0, y: 0 });
+});
+
+// --- TableCamera (direct user request, 2026-09-17): "we need a
+// unifying domain object." Found live: attachPanelDrag/attachPanelResize
+// (ui.js) each computed a panel's new position from a raw SCREEN-space
+// pointer delta, assigned directly to the panel's own LOCAL `left`/
+// `top` - correct only at 1x zoom, since #zones' scale(zoom) transform
+// means 1 local pixel renders as `zoom` screen pixels. Rather than
+// have every drag call site re-derive its own "divide by the current
+// zoom" math (exactly the kind of duplicated, driftable logic that
+// caused this bug in the first place), TableCamera is the ONE object
+// that owns the current zoom/pan state and knows how to convert
+// between the two coordinate spaces - card drag/drop-target code
+// never needed this (it stays in screen space throughout, via
+// getBoundingClientRect on both sides of every comparison), but
+// anything that positions something via LOCAL pixels does. ---
+
+test('TableCamera: starts at the default zoom, no pan', () => {
+  const camera = new TableCamera();
+  assert.equal(camera.zoom, TABLE_ZOOM_DEFAULT_SCALE);
+  assert.deepEqual(camera.pan, { x: 0, y: 0 });
+});
+
+test('TableCamera.setZoom: clamps the same way clampTableZoom does', () => {
+  const camera = new TableCamera();
+  camera.setZoom(TABLE_ZOOM_MAX + 1);
+  assert.equal(camera.zoom, TABLE_ZOOM_MAX);
+});
+
+test('TableCamera.setZoom: re-clamps the CURRENT pan against the new zoom', () => {
+  const camera = new TableCamera();
+  camera.setZoom(TABLE_ZOOM_MAX);
+  camera.setPan({ x: 1000, y: 1000 }); // pinned to maxPan(TABLE_ZOOM_MAX)
+  const zoomedInPan = camera.pan;
+  camera.setZoom(TABLE_ZOOM_MIN); // no room to pan at all down here
+  assert.deepEqual(camera.pan, { x: 0, y: 0 });
+  assert.notDeepEqual(zoomedInPan, { x: 0, y: 0 }); // sanity: it really had room before
+});
+
+test('TableCamera.toLocalDelta: at 1x zoom, a screen delta IS the local delta', () => {
+  const camera = new TableCamera();
+  camera.setZoom(1);
+  assert.deepEqual(camera.toLocalDelta(100, 60), { x: 100, y: 60 });
+});
+
+test('TableCamera.toLocalDelta: zoomed in, the same screen delta is a SMALLER local delta', () => {
+  const camera = new TableCamera();
+  camera.setZoom(TABLE_ZOOM_MAX); // 1.6x - the wheel's own ceiling
+  // 1 local px renders as 1.6 screen px at this zoom, so 100 screen px
+  // of real on-screen movement is only 62.5 local px - this is exactly
+  // what keeps a dragged panel from moving faster than the cursor.
+  assert.deepEqual(camera.toLocalDelta(100, 60), { x: 100 / TABLE_ZOOM_MAX, y: 60 / TABLE_ZOOM_MAX });
+});
+
+test('TableCamera.toLocalDelta: zoomed out, the same screen delta is a BIGGER local delta', () => {
+  const camera = new TableCamera();
+  camera.setZoom(0.5);
+  assert.deepEqual(camera.toLocalDelta(100, 60), { x: 200, y: 120 });
 });

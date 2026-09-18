@@ -189,3 +189,70 @@ test('dragging a card does not pan the table - only the empty background does', 
     await context.close();
   }
 });
+
+// *fix (direct user bug report, 2026-09-17): "drag alignment is still
+// off it needs to readjust when the table zoom changes" - then, once
+// pinned to the real culprit: "you need to scale the movement." A
+// zone/pile's title bar drag (`attachPanelDrag`, ui.js) computed a
+// SCREEN-space pointer delta and assigned it directly to the panel's
+// own LOCAL `left`/`top` (the coordinate space `position: absolute`
+// uses inside a `scale()`-transformed ancestor) - correct only at
+// exactly 1x zoom. `TableCamera.toLocalDelta` (tableZoom.js) is the
+// fix; this is the live proof it actually tracks the cursor 1:1 no
+// matter the current zoom, not just at the unzoomed default.
+async function dragTitleAndMeasureDelta(page) {
+  const title = page.locator('.pile-title, .zone-name').first();
+  const titleBox = await title.boundingBox();
+  const panel = page.locator('[data-pile-id], .zone').first();
+  const before = await panel.boundingBox();
+
+  const startX = titleBox.x + titleBox.width / 2;
+  const startY = titleBox.y + titleBox.height / 2;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  const moveX = 150;
+  const moveY = 80;
+  await page.mouse.move(startX + moveX, startY + moveY, { steps: 8 });
+  await page.waitForTimeout(50);
+  const after = await panel.boundingBox();
+  await page.mouse.up();
+  await page.waitForTimeout(50);
+  return { moveX, moveY, actualDx: after.x - before.x, actualDy: after.y - before.y };
+}
+
+// At the default (unzoomed) scale - this direction already worked
+// before the fix, kept as a regression guard against re-breaking it.
+test('dragging a panel\'s title bar tracks the cursor 1:1, at the default table zoom', async () => {
+  const context = await fixture.browser.newContext();
+  try {
+    const page = await freshLiveTable(context);
+    const { moveX, moveY, actualDx, actualDy } = await dragTitleAndMeasureDelta(page);
+    assert.ok(Math.abs(actualDx - moveX) < 2, `expected dx~=${moveX}, got ${actualDx}`);
+    assert.ok(Math.abs(actualDy - moveY) < 2, `expected dy~=${moveY}, got ${actualDy}`);
+  } finally {
+    await context.close();
+  }
+});
+
+// *fix (direct user bug report, 2026-09-17): "drag alignment is still
+// off it needs to readjust when the table zoom changes" - then, once
+// pinned to the real culprit: "you need to scale the movement." A
+// zone/pile's title bar drag (`attachPanelDrag`, ui.js) computed a
+// SCREEN-space pointer delta and assigned it directly to the panel's
+// own LOCAL `left`/`top` (the coordinate space `position: absolute`
+// uses inside a `scale()`-transformed ancestor) - correct only at
+// exactly 1x zoom. `TableCamera.toLocalDelta` (tableZoom.js) is the
+// fix; this is the live proof it actually tracks the cursor 1:1 while
+// zoomed in, which is the direction that was actually broken.
+test('dragging a panel\'s title bar tracks the cursor 1:1, zoomed in', async () => {
+  const context = await fixture.browser.newContext();
+  try {
+    const page = await freshLiveTable(context);
+    await zoomToMax(page);
+    const { moveX, moveY, actualDx, actualDy } = await dragTitleAndMeasureDelta(page);
+    assert.ok(Math.abs(actualDx - moveX) < 2, `expected dx~=${moveX}, got ${actualDx}`);
+    assert.ok(Math.abs(actualDy - moveY) < 2, `expected dy~=${moveY}, got ${actualDy}`);
+  } finally {
+    await context.close();
+  }
+});

@@ -200,4 +200,6 @@ sequenceDiagram
     Note right of Neo: "*fix drag-ghost<br/>misalignment when<br/>zoomed: setDragImage<br/>anchored at half the<br/>card's UNSCALED offsetWi<br/>dth/offsetHeight, but<br/>the browser rende…"
     Neo->>All: "swe nit"
     Note right of Neo: "*nit stack boundary hint<br/>added: every .card-stack<br/>gets a slight outline<br/>(1px, 12% white) +<br/>subtle lighter<br/>background, so multiple<br/>stacks in…"
+    Neo->>All: "swe fix"
+    Note right of Neo: "*fix panel drag-under-<br/>zoom root cause: NOT<br/>card drag (stays screen-<br/>space, unaffected) -<br/>attachPanelDrag/Resize<br/>computed SCREEN pointer<br/>delt…"
 ```
