@@ -154,14 +154,17 @@
       <button id="save-layout-btn" type="button">Save Layout</button>
       <button id="save-layout-as-btn" type="button">Save As…</button>
       <button id="reset-layout-btn" type="button">Reset Layout</button>
+      <!-- US-116: deliberately away from the deck panel's "Restart game"
+           action (Smith Gate 1) - that's a same-game round restart, this
+           discards the whole table for a DIFFERENT preset. BEFORE the
+           caption, not after: the caption is `flex-basis: 100%`, so a
+           button after it wrapped onto a third row of its own - 44px of
+           chrome that pushed the game screen past the viewport. -->
+      <button id="new-game-btn" type="button">New Game…</button>
       <p class="layout-controls-caption">
         Saves positions of built-in panels only — custom zones aren't included.
         Applies to new games with this preset, not this table.
       </p>
-      <!-- US-116: deliberately away from the deck panel's "Restart game"
-           action (Smith Gate 1) - that's a same-game round restart, this
-           discards the whole table for a DIFFERENT preset. -->
-      <button id="new-game-btn" type="button">New Game…</button>
     </div>
     <section class="panel panel-felt table-section">
       <h2 class="sr-only">Table</h2>

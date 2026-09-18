@@ -191,7 +191,7 @@ function attachTouchDrag(sourceElement, card, context) {
   let hinted = null; // the pile currently showing drop feedback
 
   const clearHint = () => {
-    if (hinted) clearPileDragOver(hinted.el, hinted.row);
+    if (hinted) clearPileDragOver(hinted.el);
     hinted = null;
   };
 
@@ -1255,34 +1255,35 @@ function onContextMenuKeydown(event) {
  * placement a drop there would have produced - one real target
  * vocabulary for both gestures, not a second, cruder one for clicks.
  */
+function rowUnder(event) {
+  const target = event.target.closest?.('.pile-section.pile-target[data-pile-id]');
+  return target ? { pileElement: target, row: target.querySelector('.card-row') } : {};
+}
+
+function placementAt(pileElement, row, event) {
+  if (!row) return {};
+  return resolveDropTargetFor(pileElement.dataset.kind, cardBoxesIn(row), { x: event.clientX, y: event.clientY });
+}
+
+function previewTargetUnderPointer(event) {
+  const { pileElement, row } = rowUnder(event);
+  if (row) showDropPreview(row, placementAt(pileElement, row, event));
+  else clearDropPreview();
+}
+
 function beginCardTargetPick(actionId, card, piles, fromPileId, options) {
   highlightDragTargets([actionId], piles, { viewerId: options.viewerId, fromPileId });
-
-  function rowUnder(event) {
-    const target = event.target.closest?.('.pile-section.pile-target[data-pile-id]');
-    return target ? { pileElement: target, row: target.querySelector('.card-row') } : {};
-  }
-  function placementAt(pileElement, row, event) {
-    if (!row) return {};
-    return resolveDropTargetFor(pileElement.dataset.kind, cardBoxesIn(row), { x: event.clientX, y: event.clientY });
-  }
-
-  const onMouseMove = (event) => {
-    const { pileElement, row } = rowUnder(event);
-    if (row) showDropPreview(row, placementAt(pileElement, row, event));
-    else clearDropPreview();
-  };
 
   const cancelOnEscape = (event) => {
     if (event.key !== 'Escape') return;
     document.removeEventListener('click', commit, true);
-    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mousemove', previewTargetUnderPointer);
     clearDropPreview();
     clearPileTargets();
   };
   const commit = (event) => {
     document.removeEventListener('keydown', cancelOnEscape);
-    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mousemove', previewTargetUnderPointer);
     const { pileElement, row } = rowUnder(event);
     if (pileElement) {
       event.stopPropagation();
@@ -1299,7 +1300,7 @@ function beginCardTargetPick(actionId, card, piles, fromPileId, options) {
   setTimeout(() => {
     document.addEventListener('click', commit, { once: true, capture: true });
     document.addEventListener('keydown', cancelOnEscape, { once: true });
-    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mousemove', previewTargetUnderPointer);
   }, 0);
 }
 
@@ -1357,29 +1358,33 @@ function cardBoxesIn(rowElement) {
  * afterwards. Membership does not depend on which side a card landed,
  * so there is nothing to toggle and nothing to restore.
  */
-let dropGhost = null;
+// A holder, not a reassigned top-level `let` - built lazily on first
+// use, since this module also loads under Node (unit tests) with no DOM.
+const dropPreview = { ghost: null };
 
 /** One step along a stack, in the same unitless stride multipliers
  * `Stackable.offsetIn` returns - `1 - spread`, read from the row's own
  * `--pile-spread` so the preview matches whatever Tighten/Loosen has
  * been set to. */
 function stackStepIn(element) {
-  const raw = Number.parseFloat(getComputedStyle(element).getPropertyValue('--pile-spread'));
+  // Unitless custom property, so `Number` is exact (`''` -> 0, same as before).
+  const raw = Number(globalThis.getComputedStyle(element).getPropertyValue('--pile-spread'));
   return 1 - Math.min(1, Math.max(0, Number.isNaN(raw) ? 0 : raw));
 }
 
 function ghostElement() {
-  if (dropGhost) return dropGhost;
-  dropGhost = document.createElement('div');
-  dropGhost.className = 'middle-card drop-ghost';
+  if (dropPreview.ghost) return dropPreview.ghost;
+  const ghost = document.createElement('div');
+  ghost.className = 'middle-card drop-ghost';
   const face = document.createElement('div');
   face.className = 'card card-ghost';
-  dropGhost.append(face);
-  return dropGhost;
+  ghost.append(face);
+  dropPreview.ghost = ghost;
+  return ghost;
 }
 
 function clearDropPreview() {
-  dropGhost?.remove();
+  dropPreview.ghost?.remove();
 }
 
 function showDropPreview(rowElement, placement) {
@@ -1403,10 +1408,10 @@ function showDropPreview(rowElement, placement) {
   // preview measured against the row would be a step of the wrong size
   // in any pile whose stacks have been adjusted apart.
   const step = stackStepIn(target.parentElement) * (placement.side === 'before' ? -1 : 1);
-  const at = (axis) => Number.parseFloat(target.style.getPropertyValue(axis)) || 0;
-  const vertical = placement.layout === 'column';
-  ghost.style.setProperty('--stack-x', String(at('--stack-x') + (vertical ? 0 : step)));
-  ghost.style.setProperty('--stack-y', String(at('--stack-y') + (vertical ? step : 0)));
+  const at = (axis) => Number(target.style.getPropertyValue(axis)) || 0; // unitless, set by `String(n)`
+  const isVertical = placement.layout === 'column';
+  ghost.style.setProperty('--stack-x', String(at('--stack-x') + (isVertical ? 0 : step)));
+  ghost.style.setProperty('--stack-y', String(at('--stack-y') + (isVertical ? step : 0)));
   target.parentElement.append(ghost);
 }
 
@@ -1431,13 +1436,13 @@ function showPileDragOver(pileElement, row, point, kind) {
   showDropPreview(row, resolveDropTargetFor(kind, cardBoxesIn(row), point));
 }
 
-function clearPileDragOver(pileElement, row) {
+function clearPileDragOver(pileElement) {
   pileElement.classList.remove('drag-over');
   clearDropPreview();
 }
 
 function performPileDrop(pileElement, row, pileId, pileableId, point, onDropCard, kind) {
-  clearPileDragOver(pileElement, row);
+  clearPileDragOver(pileElement);
   if (!pileableId) return;
   // US-32/33: the drop point decides stack vs. overlap vs. plain
   // append. Aiming at the card being dragged itself is meaningless
@@ -1697,7 +1702,7 @@ export function renderPileShell(container, pile, allPiles, options, buildRow) {
       event.preventDefault();
       showPileDragOver(container, row, { x: event.clientX, y: event.clientY }, pile.kind);
     });
-    container.addEventListener('dragleave', () => clearPileDragOver(container, row));
+    container.addEventListener('dragleave', () => clearPileDragOver(container));
     container.addEventListener('drop', (event) => {
       event.preventDefault();
       // (direct user request) - "all piles can be dropped into any other
@@ -2721,6 +2726,7 @@ export function applyCardSize(size) {
     // number ratio, not lengths - `aspect-ratio` can't consume
     // `--card-w`/`--card-h` directly, so this derives the same ratio
     // numerically alongside them rather than leaving it to drift.
+    // eslint-disable-next-line unicorn/prefer-number-coercion -- sizes carry units ('4.4rem'); Number() would be NaN
     root.setProperty('--card-aspect', `${Number.parseFloat(size.w)} / ${Number.parseFloat(size.h)}`);
   } else {
     root.removeProperty('--card-w');

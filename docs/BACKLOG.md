@@ -75,16 +75,6 @@ or a live-verification session) versus being pickable directly.
 
 ## Technical / testing
 
-- **`test:rtg` has 4 failing tests on HEAD 540ce88** (found 2026-09-18
-  during US-118, verified identical on a clean HEAD worktree - not
-  caused by it): stack-gear tap/untap and token-supply both time out
-  on a `locator.click` (30s); "Reshuffle & deal recalls only its own
-  cards" and "Restart game rebuilds every deck" fail their battlefield
-  assertions. Likely drift from the D133/D134 layout changes - not yet
-  triaged.
-- **`lint:js` reports 10 errors in untouched `src/ui.js` on HEAD**
-  (found 2026-09-18 during US-118) - `no-undef getComputedStyle`,
-  `no-unused-vars row`, several unicorn rules. Not yet triaged.
 - **Multi-player harness follow-ups** (US-118 retro, 2026-09-18):
   extend `tests/harness/multiplayer.mjs` to assert `motion` messages
   (unblocks the remote-cursor redesign); `waitForView` predicates run
@@ -98,22 +88,12 @@ or a live-verification session) versus being pickable directly.
 - **Dropping a card on a hand stack splits the stack instead of merging
   it in** (nit, queued 2026-09-17, direct user report) — not yet
   triaged.
-- **Deck panel resizes as its stack thins** (Trin, found 2026-09-17) —
-  violates its own "keeps its size while thinning" invariant
-  (`tests/uiActions.browser.mjs`, "the deck visibly thins out as it
-  empties, without the panel resizing" — panel height 224px -> 119px
-  observed live). Confirmed as its own independent bug, not downstream
-  of the now-fixed focus-zoom/context-menu issue. Not yet triaged.
-- **Flaky test: "dragging the pile's own spread slider outside its
-  bounds does not shrink the pile mid-drag"** (Trin, found 2026-09-17,
-  `tests/focusZoom.browser.mjs`) — the post-mouseup `waitForFunction`
-  (expects the focus-zoomed overlay to shrink) intermittently times out
-  at 2000ms. Confirmed PRE-EXISTING via an 8-run baseline against
-  unmodified `dev` (1 failure in 8) - not a regression from the
-  Table-Zone/D132 zoom work done the same session, just newly noticed
-  while re-running suites for that fix. Root cause not yet
-  investigated; violates this project's own zero-flake standard, so
-  worth a dedicated pass rather than a bumped timeout.
+- **`onPileLeave`'s held-button guard is unproven in Chromium**
+  (Trin, 2026-09-18) — `focusZoom.browser.mjs`'s slider test passes
+  with the `event.buttons !== 0` guard REMOVED: a range input captures
+  the mouse while held, so the pile gets no `pointerleave` mid-drag at
+  all. Kept as defensive code (other browsers / other drag sources may
+  need it); nothing currently proves it load-bearing.
 - **Morpheus's process note** (2026-08-27): check a record's id
   survives a round-trip before designing any future save-for-reuse
   feature on top of it - came out of a real live bug (Table pile's

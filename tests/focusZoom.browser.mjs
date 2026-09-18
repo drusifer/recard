@@ -307,14 +307,39 @@ test('dragging the pile\'s own spread slider outside its bounds does not shrink 
     await pile.hover();
     await page.waitForSelector(`body > .pile-section.focus-zoomed[data-pile-id="${pileId}"]`, { timeout: 2000 });
 
-    const slider = page.locator(`body > .focus-zoomed[data-pile-id="${pileId}"] .spread-slider-input`);
+    const overlay = page.locator(`body > .focus-zoomed[data-pile-id="${pileId}"]`);
+    // Let the grow transition (left/top/transform, 0.15s) FINISH before
+    // measuring anything: a box read mid-transition is stale by the time
+    // the button goes down, and the press lands on the pile instead of
+    // the slider - which is what made this test flaky.
+    await overlay.evaluate((element) => Promise.all(element.getAnimations().map((animation) => animation.finished)));
+    const slider = overlay.locator('.spread-slider-input');
     const box = await slider.boundingBox();
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    const press = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    assert.ok(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.matches('.spread-slider-input'), press),
+      'the press point must actually be ON the slider');
+    // The release point must be OUTSIDE the grown pile but INSIDE the
+    // viewport. The old fixed `box.y - 400` landed above the window
+    // whenever the overlay sat high - and a button released outside the
+    // window delivers `pointerup` to the element that was pressed (the
+    // slider, inside the pile), so the shrink never fired: an
+    // intermittent failure that tracked the overlay's clamped size.
+    const grown = await overlay.boundingBox();
+    const viewport = page.viewportSize();
+    const outside = [
+      { x: grown.x + grown.width / 2, y: grown.y - 20 },
+      { x: grown.x + grown.width / 2, y: grown.y + grown.height + 20 },
+      { x: grown.x - 20, y: grown.y + grown.height / 2 },
+      { x: grown.x + grown.width + 20, y: grown.y + grown.height / 2 },
+    ].find(({ x, y }) => x >= 0 && y >= 0 && x < viewport.width && y < viewport.height);
+    assert.ok(outside, 'need an on-screen point outside the grown pile to release at');
+
+    await page.mouse.move(press.x, press.y);
     await page.mouse.down();
-    // Move well outside the (enlarged) pile's own box while the button
-    // is still held - the exact gesture that used to trigger a
-    // mid-drag `pointerleave` shrink.
-    await page.mouse.move(box.x + box.width / 2, box.y - 400);
+    // Move outside the (enlarged) pile's own box while the button is
+    // still held - the exact gesture that used to trigger a mid-drag
+    // `pointerleave` shrink.
+    await page.mouse.move(outside.x, outside.y);
     const stillFocusedMidDrag = await page.evaluate(
       (id) => document.querySelector(`body > .pile-section.focus-zoomed[data-pile-id="${CSS.escape(id)}"]`) !== null,
       pileId,

@@ -31,4 +31,6 @@ sequenceDiagram
     Note right of Cypher: "Cypher retro: AC mostly<br/>held, the privacy AC was<br/>wrong vs D84 and got<br/>corrected. Backlog<br/>added: waitForView<br/>closure trap,<br/>createTable fail-…"
     Cypher->>All: "pm launch"
     Note right of Cypher: "*pm launch multiplayer-<br/>harness. US-118 shipped:<br/>bobp make test-<br/>multiplayer runs a real<br/>host + 2 guests over the<br/>real protocol. D135.<br/>Retro…"
+    Neo->>All: "swe fix"
+    Note right of Neo: "*fix old failing tests,<br/>all green: make check<br/>(860 unit + lint incl.<br/>lint:design) + ui 20/20,<br/>rtg 16/16, hostsetup<br/>7/7, newgame 5/5,<br/>tablez…"
 ```

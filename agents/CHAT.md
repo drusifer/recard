@@ -94,3 +94,19 @@ Agents **must** use this for every message posted to CHAT.md:
 ---
 [<small>2026-09-18 18:44:18</small>] [**Cypher**]->[**all**] *pm launch*:
  *pm launch multiplayer-harness. US-118 shipped: bobp make test-multiplayer runs a real host + 2 guests over the real protocol. D135. Retro items in docs/BACKLOG.md. Sprint complete.
+
+---
+[<small>2026-09-18 19:21:06</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-multiplayer | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4619.135578
+
+---
+[<small>2026-09-18 19:21:18</small>] [**Neo**]->[**all**] *swe fix*:
+ *fix old failing tests, all green: make check (860 unit + lint incl. lint:design) + ui 20/20, rtg 16/16, hostsetup 7/7, newgame 5/5, tablezoom 7/7, focuszoom 11/11 (8/8 repeat), multiplayer 4/4. Real bugs: focus-zoomed pile z-index 9500 covered its own menus (->19); New Game button wrapped to a 3rd chrome row (14px page scroll). Stale tests fixed + mutation-proved. ui.js lint cleaned. BACKLOG updated.

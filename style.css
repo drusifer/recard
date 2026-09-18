@@ -1642,7 +1642,12 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   transform: scale(var(--focus-scale, 1));
   transform-origin: top left;
   transition: left 0.15s ease, top 0.15s ease, transform 0.15s ease;
-  z-index: 9500;
+  /* Above every table layer (all <= 15), BELOW every body-level overlay
+     (`.overlay`/`.card-context-menu` 20, `.touch-drag-ghost` 30,
+     `.rtg-inspect` 9000). It used to be 9500, which put a zoomed pile on
+     top of its OWN right-click and stack-gear menus - they opened under
+     the pile and could not be clicked. */
+  z-index: 19;
 }
 
 /* An invisible spacer left behind in the pile's normal flex position

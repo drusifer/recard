@@ -646,26 +646,35 @@ test('the deck renders as a stack with depth, but only one card is draggable', a
   assert.ok(inert, 'depth layers never intercept a pointer');
 });
 
-test('the deck visibly thins out as it empties, without the panel resizing', async () => {
+test('the deck visibly thins out as it empties, without its stack box resizing', async () => {
   const deck = fixture.page.locator('.pile-section[data-pile-id="deck"]');
   const before = await deck.locator('.deck-stack-layer').count();
-  const panelBefore = Math.round((await deck.boundingBox()).height);
+  // The `.deck-stack` box is what reserves room for the deepest stack -
+  // the PANEL is sized by the preset's layout and could never resize
+  // anyway. LAYOUT height (`offsetHeight`), not `boundingBox()`: the
+  // latter includes transforms, and clicking Draw focus-zooms the pile
+  // (D131), so a screen-space box would measure the zoom, not a resize.
+  const layoutHeight = () => deck.locator('.deck-stack').evaluate((element) => element.offsetHeight);
+  const stackBefore = await layoutHeight();
 
   // Draw the deck down a long way and watch the stack lose depth.
   for (let index = 0; index < 25; index++) {
     await deck.locator('button[title="Draw"]').first().click();
   }
-  await fixture.page.waitForTimeout(400);
+  // Release the focus-zoom so the pile is back in its own slot in the
+  // table's flow before it is measured again.
+  await fixture.page.mouse.move(0, 0);
+  await fixture.page.waitForFunction(() => !document.querySelector('.pile-section.focus-zoomed'), undefined, { timeout: 5000 });
 
   const after = await deck.locator('.deck-stack-layer').count();
   assert.ok(after < before, `a thinner deck shows fewer layers: ${before} -> ${after}`);
 
   // *nit ("give the deck panel more room for when the deck gets big"):
-  // the panel RESERVES room for the deepest stack, so it never crowds a
-  // full deck - and, just as importantly, never resizes as cards come
-  // off. A panel that shrank on every draw made the whole row twitch.
-  assert.equal(Math.round((await deck.boundingBox()).height), panelBefore,
-    'the deck panel keeps its size while the stack inside it thins');
+  // the stack box RESERVES room for the deepest stack, so it never crowds
+  // a full deck - and, just as importantly, never resizes as cards come
+  // off. A box that shrank on every draw made the whole row twitch.
+  assert.equal(await layoutHeight(), stackBefore,
+    'the deck\'s stack box keeps its size while the stack inside it thins');
 });
 
 // *nit (direct user request): "make the stacking angles consistent wrt

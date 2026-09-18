@@ -374,6 +374,32 @@ test('game 1: a stack gear taps and untaps one battlefield column without touchi
   assert.notEqual(deepIndex, -1, 'need the 3-card column the previous test built');
   const column = battlefield.locator('.card-stack').nth(deepIndex);
 
+  // The only permanent outside this column is the one "cast a creature
+  // and tap it" left TAPPED - and a tapped card cannot show a leaking
+  // Tap. Untap it first, so the card outside is one a leak WOULD change.
+  const tappedOutside = await battlefield.locator('.card-stack').evaluateAll(
+    (stacks, index) => stacks.filter((element, index_) => index_ !== index)
+      .flatMap((element) => [...element.querySelectorAll(':scope > .middle-card[data-orientation="landscape"]')])
+      .map((card) => card.dataset.pileableId),
+    deepIndex,
+  );
+  for (const id of tappedOutside) {
+    await rotate(page, battlefield.locator(`.middle-card[data-pileable-id="${id}"]`));
+    await page.waitForFunction(
+      (cardId) => document.querySelector(`[data-kind="battlefield"] .middle-card[data-pileable-id="${CSS.escape(cardId)}"]`)?.dataset.orientation !== 'landscape',
+      id, { timeout: 5000 },
+    );
+  }
+
+  // Snapshot BEFORE tapping - "no other card CHANGED" is the invariant.
+  const outsideBefore = await battlefield.locator('.card-stack').evaluateAll(
+    (stacks, index) => stacks.filter((element, index_) => index_ !== index)
+      .flatMap((element) => [...element.querySelectorAll(':scope > .middle-card')].map((card) => card.dataset.orientation ?? null)),
+    deepIndex,
+  );
+  assert.ok(outsideBefore.some((orientation) => orientation !== 'landscape'),
+    'need an UNTAPPED card outside the column, or a leaking Tap would be invisible');
+
   const gear = column.locator('.stack-gear');
   assert.equal(await gear.count(), 1, 'a multi-card battlefield column carries a gear');
   await gear.click();
@@ -388,11 +414,12 @@ test('game 1: a stack gear taps and untaps one battlefield column without touchi
   }, deepIndex, { timeout: 5000 });
 
   // A card OUTSIDE this stack must be untouched by a stack-scoped action.
-  const otherOrientation = await battlefield.locator('.card-stack').evaluateAll((stacks, index) => {
-    const other = stacks.find((element, index_) => index_ !== index && element.querySelector(':scope > .middle-card'));
-    return other?.querySelector(':scope > .middle-card')?.dataset.orientation ?? null;
-  }, deepIndex);
-  assert.notEqual(otherOrientation, 'landscape', 'a card outside the tapped stack must not be tapped too');
+  const outsideAfter = await battlefield.locator('.card-stack').evaluateAll(
+    (stacks, index) => stacks.filter((element, index_) => index_ !== index)
+      .flatMap((element) => [...element.querySelectorAll(':scope > .middle-card')].map((card) => card.dataset.orientation ?? null)),
+    deepIndex,
+  );
+  assert.deepEqual(outsideAfter, outsideBefore, 'a card outside the tapped stack must not change orientation');
 
   // Untap reverses it - and put the table back the way the next tests expect.
   await gear.click();

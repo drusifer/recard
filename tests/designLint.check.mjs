@@ -104,6 +104,21 @@ try {
 
     const g = await host.evaluate(() => ({
       docScrollHeight: document.documentElement.scrollHeight,
+      // Names WHAT forces the scroll, not just that something does: the
+      // in-flow element reaching furthest past the viewport's bottom.
+      tallest: [...document.body.querySelectorAll('*')]
+        .filter((element) => getComputedStyle(element).position !== 'fixed')
+        .map((element) => ({ element, bottom: element.getBoundingClientRect().bottom + globalThis.scrollY }))
+        // Only elements that actually DEFINE the scroll height - one
+        // clipped inside an overflow container can reach far lower
+        // without contributing anything.
+        .filter(({ bottom }) => bottom > globalThis.innerHeight && bottom <= document.documentElement.scrollHeight + 1)
+        .toSorted((a, b) => b.bottom - a.bottom)
+        .slice(0, 1)
+        .map(({ element, bottom }) => {
+          const selector = [element.tagName.toLowerCase(), element.id && '#' + element.id, ...[...element.classList].map((name) => '.' + name)].join('');
+          return `${selector} (bottom ${Math.round(bottom)}px)`;
+        })[0],
       // UX follow-up (direct user request): no more single `#hand-area` -
       // every seated player's hand is its own bare `[data-kind="hand"]`
       // pile now, grouped into that player's own Zone (`<zone-panel
@@ -200,7 +215,7 @@ try {
     // Check 1: no forced page scroll (the regression that started this).
     const overflow = pageOverflow(g.docScrollHeight, vp.height);
     if (overflow > 0) {
-      report(vp.name, `page forces ${overflow}px of scroll (document ${g.docScrollHeight}px vs viewport ${vp.height}px)`);
+      report(vp.name, `page forces ${overflow}px of scroll (document ${g.docScrollHeight}px vs viewport ${vp.height}px) - furthest: ${g.tallest ?? 'unknown'}`);
     }
 
     // Check 2: every hand stays visible without scrolling - the user's
