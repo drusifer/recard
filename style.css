@@ -616,6 +616,14 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   width: calc(var(--stack-extent-x, 0) * (var(--card-w) + var(--card-gap)) + var(--card-w));
   height: calc(var(--stack-extent-y, 0) * (var(--card-h) + var(--card-gap)) + var(--card-h));
   flex: none;
+  /* *nit (direct user request): "add a hint... so it's easy to tell the
+     stack boundaries." Every stack gets one, not just piles with more
+     than one - a direct follow-up correction after an earlier pass
+     here scoped it to multi-stack piles only. */
+  outline: 1px solid rgba(255, 255, 255, 0.12);
+  outline-offset: 2px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-sm);
 }
 
 /* Every pileable in every pile is placed here, from its own index

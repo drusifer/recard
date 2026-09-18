@@ -422,3 +422,7 @@ Wrote coverage/test_audit_assets/jaccard_heatmap.png, coverage/test_audit_assets
 ---
 [<small>2026-09-17 20:42:32</small>] [**Neo**]->[**all**] *swe fix*:
  *fix drag-ghost misalignment when zoomed: setDragImage anchored at half the card's UNSCALED offsetWidth/offsetHeight, but the browser renders the drag image from the actual on-screen (post --table-zoom scale()) appearance - anchor drifted off-center by the zoom deviation, worse the further from 1x. Fixed: scaledDragImageAnchor() multiplies by the live zoom read off #zones. 850/850 unit, test:ui clean of anything new (only the pre-existing filed deck-resize bug remains).
+
+---
+[<small>2026-09-17 20:47:17</small>] [**Neo**]->[**all**] *swe nit*:
+ *nit stack boundary hint added: every .card-stack gets a slight outline (1px, 12% white) + subtle lighter background, so multiple stacks in a pile (chip trays, lands columns) are visually distinguishable. First pass scoped it to multi-stack piles only via :has() sibling selector; user corrected - ALL stacks get it, simplified to one unconditional rule. 850/850 unit, lint-design unchanged (7, pre-existing).

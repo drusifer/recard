@@ -198,4 +198,6 @@ sequenceDiagram
     Note right of Neo: "*fix table-zoom-wheel<br/>repositioned: right side<br/>of the table<br/>(position:absolute<br/>within .table-section,<br/>vertically centered),<br/>tall/thin (2.75…"
     Neo->>All: "swe fix"
     Note right of Neo: "*fix drag-ghost<br/>misalignment when<br/>zoomed: setDragImage<br/>anchored at half the<br/>card's UNSCALED offsetWi<br/>dth/offsetHeight, but<br/>the browser rende…"
+    Neo->>All: "swe nit"
+    Note right of Neo: "*nit stack boundary hint<br/>added: every .card-stack<br/>gets a slight outline<br/>(1px, 12% white) +<br/>subtle lighter<br/>background, so multiple<br/>stacks in…"
 ```
