@@ -26,6 +26,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { isOverlapping, isWithinViewport, hasMinTouchTarget, pageOverflow } from './designLint.mjs';
+import { PRESETS } from '../src/presets.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const PORT = 8211;
@@ -272,6 +273,75 @@ try {
       if (!hasMinTouchTarget(intrinsicRect)) {
         report(vp.name, `button "${button.label}" is ${Math.round(intrinsicRect.width)}x${Math.round(intrinsicRect.height)}px at its authored size, under the 44px floor`);
       }
+    }
+  }
+
+  // *fix (direct user request, 2026-09-18: "update all the presets to
+  // have ... neatly organized table zones"): the sweep above only ever
+  // exercises whichever preset the host form defaults to - every OTHER
+  // preset's own `layout` (`presets.js`) went unchecked by this gate
+  // entirely, which is exactly how Gin Rummy's dead DevTools capture
+  // and Chips & Tokens' complete absence of a `layout` went unnoticed
+  // for as long as they did. One fresh host+guest table per preset, one
+  // representative viewport (1280x800 - the size most of these layouts
+  // were actually calibrated against), Check 3 (zone overlap) only -
+  // the scroll/44px checks stay scoped to the default preset's own
+  // sweep above, since neither varies meaningfully by WHICH preset's
+  // panels are on the table, only by viewport.
+  //
+  // RtG is a known, accepted exception (see its own `tableCanvasSize`
+  // comment, `presets.js`) - Smith's Gate-1 C3 flagged this exact table
+  // as the app's most crowded before this check existed, and squeezing
+  // it fully overlap-free would mean either a cramped deck grid again
+  // or a canvas past what `TABLE_ZOOM_MIN` can still fit in a real
+  // viewport. Solitaire is a narrower known exception (see its own
+  // preset comment) - it's genuinely solo-designed (`cardsPerPlayer:
+  // 0`), but this sweep's own host+guest flow can and does seat a
+  // second player on it, whose empty hand still claims a ring position
+  // the solo grid never accounted for; a real fix needs a "disallow
+  // extra players" GameConfig capability this project doesn't have yet,
+  // not more coordinate tuning. Not silently skipped: violations are
+  // still LOGGED, just not counted toward this script's exit code, so a
+  // regression beyond today's already-known findings is still visible
+  // in the output.
+  const KNOWN_EXCEPTIONS = new Set(['Recard the Gathering', 'Solitaire']);
+  for (const preset of PRESETS) {
+    const host2 = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+    const guest2 = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+    try {
+      await host2.goto(BASE);
+      await host2.click('#show-host');
+      await host2.fill('#host-name', 'Alice');
+      await host2.selectOption('#host-preset', { label: preset.name });
+      await host2.click('#create-table');
+      await host2.waitForSelector('#host-share:not([hidden])', { timeout: 20_000 });
+      const code2 = (await host2.locator('.share-code').textContent()).trim();
+
+      await guest2.goto(`${BASE}/?join=${encodeURIComponent(code2)}`);
+      await guest2.fill('#join-name', 'Bob');
+      await guest2.click('#join-btn');
+      await guest2.waitForFunction(
+        () => document.querySelector('#join-status').textContent.includes('Connected'),
+        undefined, { timeout: 20_000 },
+      );
+      await host2.click('#deal-btn');
+      await host2.waitForTimeout(400); // no per-preset "hand has N cards" signal that works for cardsPerPlayer:0 presets too
+
+      const zones = await host2.evaluate(() => [...document.querySelectorAll('#zones .zone')].map((element) => ({
+        label: element.querySelector('.zone-name')?.textContent?.trim() || element.className,
+        rect: element.getBoundingClientRect(),
+      })));
+      for (let index = 0; index < zones.length; index++) {
+        for (let index_ = index + 1; index_ < zones.length; index_++) {
+          if (!isOverlapping(zones[index].rect, zones[index_].rect)) continue;
+          const message = `[${preset.name}] zone "${zones[index].label}" overlaps zone "${zones[index_].label}"`;
+          if (KNOWN_EXCEPTIONS.has(preset.name)) console.error(`  (known, accepted) ${message}`);
+          else report('preset-sweep@1280x800', message);
+        }
+      }
+    } finally {
+      await host2.close();
+      await guest2.close();
     }
   }
 } finally {

@@ -15,7 +15,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { TABLE_ZOOM_DEFAULT_SCALE, WHEEL_DRAG_RANGE_PX } from '../src/tableZoom.js';
+import { WHEEL_DRAG_RANGE_PX, computeFitZoom } from '../src/tableZoom.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const PORT = 8217; // not 8211-8216 (designLint/uiActions/rtgPlaythrough/hostSetup/newGame)
@@ -84,12 +84,32 @@ async function freshLiveTable(context) {
   return page;
 }
 
-test('the wheel applies the sane default once a table exists', async () => {
+// D132 revised (2026-09-17): the default is no longer a flat constant
+// (`TABLE_ZOOM_DEFAULT_SCALE` is still exported, but only as
+// `TableCamera`'s pre-layout starting value - see its own doc comment)
+// - it's `computeFitZoom(<the active preset's own canvas size>, <the
+// real .table-surface box>)`, so this asserts against that same math
+// rather than a hardcoded number that would silently drift from
+// `computeFitZoom`'s own behavior. Reads the canvas size back off the
+// live `--table-canvas-w`/`-h` vars (D134: a preset MAY declare its own
+// `tableCanvasSize`, so the DEFAULT preset's real canvas is not
+// guaranteed to be the shared `TABLE_CANVAS_SIZE` constant).
+test('the wheel applies the computed fit-zoom default once a table exists', async () => {
   const context = await fixture.browser.newContext();
   try {
     const page = await freshLiveTable(context);
-    assert.equal(await page.locator('#table-zoom-wheel').getAttribute('aria-valuenow'), String(TABLE_ZOOM_DEFAULT_SCALE));
-    assert.equal(await currentTableZoomScale(page), String(TABLE_ZOOM_DEFAULT_SCALE));
+    const { surface, canvas } = await page.evaluate(() => {
+      const zones = document.querySelector('#zones');
+      const cs = getComputedStyle(zones);
+      const { width, height } = document.querySelector('.table-surface').getBoundingClientRect();
+      return {
+        surface: { width, height },
+        canvas: { width: Number.parseFloat(cs.getPropertyValue('--table-canvas-w')), height: Number.parseFloat(cs.getPropertyValue('--table-canvas-h')) },
+      };
+    });
+    const expected = String(computeFitZoom(canvas, surface));
+    assert.equal(await page.locator('#table-zoom-wheel').getAttribute('aria-valuenow'), expected);
+    assert.equal(await currentTableZoomScale(page), expected);
   } finally {
     await context.close();
   }
@@ -245,7 +265,17 @@ test('dragging a panel\'s title bar tracks the cursor 1:1, at the default table 
 // fix; this is the live proof it actually tracks the cursor 1:1 while
 // zoomed in, which is the direction that was actually broken.
 test('dragging a panel\'s title bar tracks the cursor 1:1, zoomed in', async () => {
-  const context = await fixture.browser.newContext();
+  // *fix (2026-09-17, D132-revision follow-up): an explicit viewport,
+  // not Playwright's 1280x720 default - the Table Zone panel this test
+  // drags moved down (`presets.js`' `SIMPLE_LAYOUT`, `y: 290 -> 480`,
+  // clearing the top seat's own zone) to fix `lint:design`'s "Table
+  // Zone overlaps Bob" finding. At MAX zoom (1.6x) that panel now
+  // renders at screen-y ~768px, below a 720px-tall viewport entirely -
+  // the drag missed empty space, not a regression in the delta math
+  // this test actually exists to prove. 1440x900 is one of this
+  // project's own real breakpoints (`designLint.check.mjs`'s
+  // `VIEWPORTS`), not an arbitrary number picked to dodge the failure.
+  const context = await fixture.browser.newContext({ viewport: { width: 1440, height: 900 } });
   try {
     const page = await freshLiveTable(context);
     await zoomToMax(page);

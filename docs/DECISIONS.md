@@ -60,15 +60,161 @@ reset/reshuffle, card ids, RtG content pipeline
 D9: score is a flat map · D10: presets/rules reference are static data · D11: solo play needs no architecture change · D22: deck operations reuse existing helpers · D40: `Card.orientation` field · D47: `DeckDefinition` registry · D48: `Card.orientation` ships, real `rotate` action · D49: preset schema extends to `DeckDefinition` (Pinochle) · D76: card faces are a registry · D77: card content is an offline pipeline · D78: deck balance is a lint check · D79: Battlefield/Exile/Stack real pile types, `UNTAP_ALL` · D80: `deckList` additive parameter · D81: a declared pile may be pre-stocked · D88: card conservation enforced invariant · D91: card-back rendering polymorphic · D105: cards get a visible border · D108: physical card id unique per BUILD · D109: chips have denominations, their own pile kind · D110: a chip tray is stacks, not a row · D111: reset redeals cards, does not confiscate chips · D113: the deck looks like a deck again · D114: Reshuffle & re-deal is its own action · D115: RESET rebuilds every declared deck · D117: New Game — host swaps preset, same table code · D125: `LandsPile` — colour columns · D126-D128: several small same-day nits
 
 **Camera / view** — Infinity Table: zoom, pan, focus-zoom
-D129: `Stack`/`Stackable` (also domain model — see above) · D130: camera is a pure CSS transform layer · D131: focus interaction — grow the Pile in place · D132: Infinity Table overview — manual dial + presets
+D129: `Stack`/`Stackable` (also domain model — see above) · D130: camera is a pure CSS transform layer · D131: focus interaction — grow the Pile in place · D132: Infinity Table overview — manual dial + presets · D133: default zoom computed to fit a fixed canvas (D132 partially reversed) · D134: per-preset canvas size, lint:design preset sweep, transform-origin fix
 
 **Layout & responsive design**
-D20: desktop table width, pure CSS breakpoints · D24: Zone room grows at desktop breakpoints · D51: bigger cards (also drag-and-drop — see above) · D61: saved layout overrides, separate localStorage store
+D20: desktop table width, pure CSS breakpoints · D24: Zone room grows at desktop breakpoints · D51: bigger cards (also drag-and-drop — see above) · D61: saved layout overrides, separate localStorage store · D133: fixed local canvas + computed fit-zoom fixes zone-overlap drift (also camera/view — see above) · D134: per-preset canvas size + every preset's own layout tuned/verified (also camera/view, testing — see above/below)
 
 **Testing & tooling**
-D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rules disabled post-autofix · D60: `tests/e2e.smoke.mjs` removed · D96: universal DnD guarantee, structural test (also drag-and-drop — see above)
+D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rules disabled post-autofix · D60: `tests/e2e.smoke.mjs` removed · D96: universal DnD guarantee, structural test (also drag-and-drop — see above) · D134: `lint:design` sweeps every preset, not just the default (also camera/view — see above)
 
 ---
+
+### D134. Per-preset table canvas size; `lint:design` sweeps every preset; a real `transform-origin` bug found and fixed
+
+Direct user request, immediately following D133 in the same session:
+"update all the presets to have a reasonable zoom level and neatly
+organized table zones." When a preset's own personal-zone geometry
+(RtG's 5-pile-per-player table, War's 26-card hand) turned out too hard
+to reconcile with the SHARED `TABLE_CANVAS_SIZE` without either
+cramping it back down or growing the canvas for every OTHER preset
+too, the user pre-authorized the fallback: "if hard to get the layout
+right change the preset to use a grid for the initial layout and the
+players can organize and save their presets" - `panelLayout.js`'s
+existing Save Layout feature (D61) is the intended per-table escape
+hatch, not a promise every preset's default is pixel-perfect forever.
+
+**`gameConfig.tableCanvasSize`** (optional, `undefined` falls back to
+`TABLE_CANVAS_SIZE`) - same "additive, no invented default" shape as
+`cardSize` (D133's own precedent). Threaded through `configsForPreset`
+(main.js) same as `cardSize`; `main.js`'s `applyFitZoom` reads the
+ACTIVE preset's own size (`currentTableCanvasSize`, refreshed every
+`renderGameFromView`) instead of the constant directly.
+
+**Found live, not guessed, while wiring this through**: `state.js`
+reconstructs `gameConfig` in TWO places via an explicit per-field
+allowlist (`createInitialState`, and separately `viewFor` - the one a
+GUEST's own render actually reads) - `tableCanvasSize` had to be added
+to BOTH, the same trap `cardSize` would have hit if D133 hadn't already
+paid that cost. A preset's own `tableCanvasSize` silently fell back to
+the shared default the first time this was tried, exactly because of
+this gap.
+
+**A real, independent bug found via this session's own testing, not
+part of the original ask**: `#zones`' CSS centering (`top/left: 50%` +
+a negative margin, D133) and its `scale()` transform used DIFFERENT
+pivot points (`transform-origin: top center`, a leftover from the OLD
+`inset: 0` approach where scaling from the top edge read as "the table
+pulling back from the player"). Harmless at the shared canvas' modest
+height, it badly misaligned `#zones` for War's taller (1300 vs 1050)
+dedicated canvas - confirmed live, `#zones` rendered 177px ABOVE the
+visible table surface entirely. Fixed: `transform-origin: center`,
+matching the margin-based centering it now has to agree with.
+
+**`tests/designLint.check.mjs`'s preset sweep** (new): the standing
+viewport sweep only ever exercised whichever preset the host form
+defaults to (War) - every other preset's own `layout` went completely
+unchecked by any automated gate. Running one fresh host+guest table
+per preset (1280x800, Check 3/zone-overlap only) surfaced real,
+previously-invisible bugs on its first run: Gin Rummy's `layout` was a
+raw, years-stale DevTools capture full of dead per-connection-id
+entries (replaced with the shared, verified `SIMPLE_LAYOUT` - the game
+needs nothing beyond table-zone/score); Chips & Tokens had NO `layout`
+at all; Solitaire's and Spit's declared column widths (140/150/160)
+were silently widened to 176px by `.pile-section`'s own `min-width:
+11rem` floor at render time, eating the gaps meant to keep adjacent
+columns apart and causing real, live overlaps between them.
+
+**Two known, accepted exceptions, not silently exempted** - both still
+LOGGED by the sweep (`console.error`, "(known, accepted)"), just not
+counted toward its exit code, so a NEW regression on top of them stays
+visible: Recard the Gathering (Smith's own Gate-1 C3 finding, its own
+15-deck table - `tableCanvasSize` widened for breathing room, but full
+overlap-freedom would need a canvas past what `TABLE_ZOOM_MIN` can
+still fit in a real viewport) and Solitaire (genuinely solo-designed,
+`cardsPerPlayer: 0`, but nothing stops a second player from joining
+its table today, and their empty hand still claims a seat-ring
+position the solo grid never accounted for - a real fix needs a
+"disallow extra players" `GameConfig` capability this project doesn't
+have).
+
+**Verified:** 860/860 unit (2 pre-existing exact-shape assertions in
+`state.test.js` updated for the new `gameConfig` field), 7/7
+`test:tablezoom` (the default-zoom test now reads the ACTIVE preset's
+canvas size off `--table-canvas-w`/`-h` live rather than assuming the
+shared constant), `test:focuszoom` 10/11 and `test:ui` 19/20 (both
+single failures pre-existing and already backlogged, confirmed not
+regressions - see `docs/BACKLOG.md`), `make check` PASSED. `lint:design`
+clean of every zone-overlap finding outside the two documented
+exceptions; the 2 "forced page scroll" findings are pre-existing and
+unrelated.
+
+### D133. Infinity Table default zoom — computed fit-to-canvas, layered under the still-manual dial (D132 partially reversed)
+
+Direct user request, same session as `lint:design`'s "Table Zone
+overlaps Bob/You" findings (grown from a documented baseline of 3 to 5
+before this fix): "we can actually fix it by updating the presets with
+a table zoom that can fit all the zones." Confirmed explicitly (asked
+first, since it revises D132) before implementing.
+
+**Root cause, not what D132's own auto-fit rejection was about:**
+`#zones` used to be `inset: 0` (fills whatever `.table-surface` the
+viewport happens to leave). The seat ring (`seating.js`'s
+`seatPosition`, percentage-of-container) and every preset's fixed-
+pixel shared-panel coordinates (`presets.js`) only ever agreed with
+each other at the exact container size the layout was originally
+calibrated/eyeballed against - at any other size they drifted apart,
+independent of zoom. **Uniform scale cannot fix this on its own**: for
+any positive scale from one origin, whether two rects intersect is
+scale-invariant - shrinking only shrinks the overlap amount, never
+removes it. So the fix isn't "shrink more"; it's giving `#zones` ONE
+fixed local canvas (`TABLE_CANVAS_SIZE`, `tableZoom.js`, 1280x950) so
+every percentage AND every fixed-pixel coordinate always resolves the
+same way regardless of the real viewport, repositioning
+`presets.js`'s `SIMPLE_LAYOUT` table-zone/score panels (`y: 290 ->
+480`) so they clear the top seat's own zone WITHIN that canvas (a
+one-time geometry fix, verified by rendering the real app, not
+derived), and only THEN computing a default zoom
+(`computeFitZoom`) that scales the whole (now genuinely non-
+overlapping) canvas down to fit whatever surface is actually
+available - preserving the calibrated geometry at every real viewport
+instead of recomputing it differently each time.
+
+**What D132 actually rejected, and why this doesn't reopen it:** D132's
+auto-fit was rejected because shrinking to fit CONTENT pushed buttons
+below the 44px touch-target floor, with no clean resolution while the
+scale was computed FOR the player. That tension is unchanged and still
+solved the same way D132 already established - `designLint.check.mjs`
+Check 4 divides a button's rendered size back out by `--table-zoom`
+before comparing to 44px, so an AUTHORED size is what's actually
+checked, regardless of whether the current zoom came from the dial or
+from this new computed default. `lint:design` stays clean of 44px
+findings after this change (verified). What's different from D132's
+rejected design: this is NOT "compute a scale FROM the game's content"
+(cards, hand size, deck count) - it's "fit ONE FIXED, developer-
+calibrated reference frame to the screen," closer in spirit to a
+responsive `viewport meta` scale than to content-driven auto-fit. The
+player's own manual wheel/keyboard zoom (D132) is UNCHANGED and layered
+on top of this computed starting point (`hasUserSetZoom` in
+`main.js`'s `wireTableZoomControls` - once the player drags/keys the
+wheel, a later resize no longer overrides their choice).
+
+**Verified:** 860/860 unit (new `computeFitZoom` tests in
+`tableZoom.test.js`), 7/7 `test:tablezoom` (one test's assertion
+updated to compare against the computed value instead of a flat
+constant; the "zoomed in" drag test's viewport pinned to 1440x900, a
+real project breakpoint, since the repositioned Table Zone panel no
+longer fits Playwright's 720px-tall default viewport at max zoom -
+not a regression in what that test actually verifies).
+`lint:design`: the "Table Zone overlaps Bob/You" findings are gone at
+all three tracked breakpoints; the 2 pre-existing "forced page scroll"
+findings (unrelated, predate this session) remain, tracked in
+`docs/BACKLOG.md`.
+
+**Also reverses a same-day "Dropped" call**: this exact issue ("per-
+seat anchor geometry overlap at some desktop widths/player counts")
+had been marked "not pursuing" earlier in this same 2026-09-17 session
+- see `docs/BACKLOG.md`'s Dropped section for the reversal note.
 
 ### D132. Infinity Table overview — manual dial + S/M/L/XL presets, no auto-fit
 

@@ -19,6 +19,34 @@ export function clampTableZoom(value) {
 }
 
 /**
+ * D132 revised (direct user request, 2026-09-17): the fixed LOCAL
+ * reference size `#zones` is now given (`style.css`), matching the
+ * size the seat ring (`seating.js`, percentage-based) and every
+ * preset's fixed-pixel shared-panel coordinates (`presets.js`) were
+ * actually calibrated/verified overlap-free against. Never resize this
+ * without re-running `npm run lint:design` at all three viewports -
+ * it's the one number both coordinate systems agree on.
+ */
+export const TABLE_CANVAS_SIZE = { width: 1280, height: 1050 };
+
+/**
+ * The DEFAULT zoom (main.js applies it once at table-creation and
+ * again on every resize, unless the player has since dragged the wheel
+ * themselves): scales `TABLE_CANVAS_SIZE` down to fit whatever
+ * `.table-surface` box is actually available, never up past 1x
+ * uninvited (a bigger-than-calibrated screen should show the table at
+ * its real size, not artificially enlarged). Uniform scale from one
+ * origin can never change whether two rects intersect - only shrink
+ * the intersection - so this only works because the CANVAS itself is
+ * collision-free at `TABLE_CANVAS_SIZE`; it is not a substitute for
+ * that.
+ */
+export function computeFitZoom(canvasSize, availableSize) {
+  const fit = Math.min(1, availableSize.width / canvasSize.width, availableSize.height / canvasSize.height);
+  return clampTableZoom(fit);
+}
+
+/**
  * The zoom wheel (direct user request, 2026-09-16): "like the zoom
  * wheel on a mouse" but as its own manual control - explicitly NOT the
  * real scroll wheel, which the user wants left alone for ordinary page

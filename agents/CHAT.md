@@ -430,3 +430,31 @@ Wrote coverage/test_audit_assets/jaccard_heatmap.png, coverage/test_audit_assets
 ---
 [<small>2026-09-17 21:42:03</small>] [**Neo**]->[**all**] *swe fix*:
  *fix panel drag-under-zoom root cause: NOT card drag (stays screen-space, unaffected) - attachPanelDrag/Resize computed SCREEN pointer deltas but assigned to LOCAL left/top, correct only at 1x zoom. Per direct user request ('unifying domain object'), added TableCamera (tableZoom.js) - one shared instance owning zoom/pan + toLocalDelta(), threaded via options.camera instead of duplicated math. Live-verified 1:1 tracking at 1x and 1.6x zoom. 856/856 unit, test:tablezoom 7/7 (2 new tests).
+
+---
+[<small>2026-09-17 23:09:25</small>] [**Neo**]->[**all**] *resume*:
+ Resuming after context clear. Repo at b1c656a (panel drag/resize TableCamera fix), working tree clean, no pending handoff found in CHAT.md - last thread closed cleanly. Awaiting next task.
+
+---
+[<small>2026-09-17 23:15:59</small>] [**Neo**]->[**all**] *swe nit-queued*:
+ *queue nit filed: dropping a card on a hand stack splits the stack instead of merging it in. Not yet triaged, added to docs/BACKLOG.md. Continuing on the Table-Zone/opponent-zone overlap fix.
+
+---
+[<small>2026-09-17 23:19:13</small>] [**Neo**]->[**all**] *swe nit-queued*:
+ *queue nit filed: pin a focus-zoomed pile open with a top-right X button (stay zoomed for spacing/interaction until re-zoom or explicit close), instead of shrinking on pointerleave. Not yet triaged, added to docs/BACKLOG.md. Continuing on the Table-Zone/opponent-zone overlap fix.
+
+---
+[<small>2026-09-17 23:45:29</small>] [**Neo**]->[**all**] *swe decision*:
+ D133 recorded: default table zoom is now computed (fit a fixed #zones canvas to the real viewport), layered under D132's still-manual dial. Chose fixed-canvas+auto-fit over just zooming out more (scale can't fix a real local overlap - proven live) or hand-tuning per-viewport. Fixes lint:design's 'Table Zone overlaps Bob/You' (grown 3->5) at all 3 breakpoints. Full: docs/DECISIONS.md D133.
+
+---
+[<small>2026-09-17 23:45:43</small>] [**Neo**]->[**Trin**] *handoff*:
+ *fix Table-Zone-overlap done, full writeup in neo.docs/state.md: root-caused + fixed via fixed #zones canvas + computed fit-zoom + a SIMPLE_LAYOUT reposition (D133). 860/860 unit, 7/7 test:tablezoom, lint:design clean of overlaps, make check PASSED. Found+backlogged a pre-existing flaky focusZoom test (not fixed, scope). @Trin *qa test - please gate before commit (D132 partial reversal).
+
+---
+[<small>2026-09-18 09:09:11</small>] [**Neo**]->[**all**] *swe decision*:
+ D134 recorded: presets may declare their own tableCanvasSize (War/RtG/Solitaire now do). Chose per-preset canvas over forcing one universal size (RtG's 5-pile player zones + 15 decks can't share War's needs). Also fixed 2 real bugs found live: gameConfig field-allowlist drop, #zones transform-origin mismatch. Full: docs/DECISIONS.md D134.
+
+---
+[<small>2026-09-18 09:09:16</small>] [**Neo**]->[**Trin**] *handoff*:
+ *fix all-presets-layout done, folded into the same pending D133 handoff below (nothing committed yet). lint:design now sweeps EVERY preset (new), found+fixed Gin Rummy's dead layout, Chips&Tokens missing one, a min-width floor bug, and a real #zones transform-origin misalignment. 860/860 unit, 7/7 test:tablezoom, make check PASSED. @Trin *qa test - one combined gate for D133+D134 please.

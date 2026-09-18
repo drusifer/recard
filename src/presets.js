@@ -1,4 +1,5 @@
 import { deckLists } from './decks/rtgDeck.js';
+import { TABLE_CANVAS_SIZE } from './tableZoom.js';
 /**
  * Static, client-side game presets (US-15, ARCHITECTURE.md D10). Purely
  * a convenience lookup that prefills the existing deck-config (US-3) and
@@ -109,8 +110,32 @@ const SIMPLE_LAYOUT = {
   // panel only ~12px clear of the bottom - fine at 50 cards, crowded the
   // moment a preset deals fewer or a deck grows. The extra height is
   // headroom for the panel, not for more piles.
-  'table-zone': { x: 110, y: 290, w: 650, h: 190 },
-  score: { x: 780, y: 290, w: 180, h: 190 },
+  //
+  // *fix (direct user request, 2026-09-17): `y` moved 290 -> 480 -
+  // `lint:design`'s "Table Zone overlaps zone Bob" finding, calibrated
+  // against a 7-card test hand.
+  //
+  // *fix (direct user request, 2026-09-18): 480 -> 550, and
+  // `TABLE_CANVAS_SIZE.height` 950 -> 1050 (`tableZoom.js`) - the
+  // preset-sweep addition to `lint:design` (`tests/designLint.check.
+  // mjs`) exercises each preset's OWN real `cardsPerPlayer`, not a
+  // fixed 7, and Hearts' real 13-card hand measured 240.6 local units
+  // tall (vs 7 cards' ~206) - tall enough to leave 480 only ~11px of
+  // real clearance, not the margin it looked like at 7 cards. This is
+  // the shared layout every SIMPLE_LAYOUT preset EXCEPT War uses (War's
+  // own 26-card hand is a real outlier - see its own dedicated
+  // `layout`/`tableCanvasSize` below, not squeezed in here). The
+  // top-seat's own zone (`seating.js`'s `seatPosition`, personal-zone
+  // radius 26) anchors at 24% of canvas height and grows DOWNWARD only
+  // (`.seat-zone`'s `translate(-50%, 0%)`, never centered vertically) -
+  // at 13 cards it spans roughly local y [252, 493]. `y: 550` clears
+  // that with ~57px to spare, while still finishing (550+190=740) ~58px
+  // before the bottom seat's own span starts (0.76*1050=798). Re-verify
+  // with `npm run lint:design` before ever changing `TABLE_CANVAS_SIZE`,
+  // this position, or the personal-zone radius independently of the
+  // other two - they're one piece of geometry, not three.
+  'table-zone': { x: 110, y: 550, w: 650, h: 190 },
+  score: { x: 780, y: 550, w: 180, h: 190 },
 };
 
 
@@ -170,7 +195,21 @@ export const PRESETS = [
     jokers: 0,
     cardsPerPlayer: 26,
     tableZone: true,
-    layout: SIMPLE_LAYOUT,
+    // *fix (direct user request, 2026-09-18): a real outlier among the
+    // SIMPLE_LAYOUT presets - War deals HALF a deck to each player (26
+    // cards), measured at 393.4 local units tall vs Hearts' worst-case
+    // 240.6 at 13. Squeezing that into `SIMPLE_LAYOUT`'s shared 1050-
+    // tall canvas would have meant either a cramped shared row or
+    // widening the canvas for every OTHER preset that doesn't need it.
+    // Its own canvas (1280x1300) and a lower table-zone/score row
+    // (`y: 750`, clear of the top seat's ~705-unit-tall zone by ~45px
+    // and the bottom seat's own span - starting at 0.76*1300=988 - by
+    // ~48px) are calibrated for THIS preset's own real hand size.
+    tableCanvasSize: { width: 1280, height: 1300 },
+    layout: {
+      'table-zone': { x: 110, y: 750, w: 650, h: 190 },
+      score: { x: 780, y: 750, w: 180, h: 190 },
+    },
   },
   {
     name: 'Gin Rummy',
@@ -181,43 +220,18 @@ export const PRESETS = [
     // *nit (direct user request): no discard pile - this game doesn't
     // use one. The generic shared Table zone covers whatever ad hoc
     // table-side play this preset needs, same as War/Hearts below.
-    // Direct user request: captured from an actual arranged table
-    // (devtools -> `recard:panel-layout:v1`) rather than calibrated
-    // like the other presets' below - kept verbatim, including several
-    // entries (random `zone-*` ids, `hand:*`/`player-*` keyed to that
-    // session's own connection ids) that can never match a fresh game's
-    // ids and are simply inert here, same as they'd be in any browser's
-    // own accumulated local storage.
-    layout: {
-      'zone-1787670038402-0.9010174863170234': { w: 30.483140821752396, h: 17.99974719913367, x: 980.12158203125, y: 156.0330047607422 },
-      table: { w: 940.9288024902344, h: 350.4601287841797, x: 120.3515625, y: 454.2404556274414 },
-      'zone-1787663760489-0.09149022111065175': { w: 36.33726852858775, h: 17.545108227736648, x: 51.28277651473354, y: 11.72023012693309 },
-      'zone-1787670038402-0.2629345589587625': { w: 487.968796, h: 127.671886, x: 61.080688, y: 167.617218 },
-      'zone-1787614397561-0.5513049884546531': { x: 47.42170000318735, y: 25.587802773915048 },
-      'zone-1787614371244-0.5730961717906486': { w: 17.320217382901074, h: 7.673292614934287 },
-      'zone-1787614371244-0.5141461779167045': { w: 52.263806179055486, h: 38.220969491322386, x: 40.305122386871695, y: 63.50230059805833 },
-      'zone-1787672543726-0.8023572234786502': { w: 619.175354, h: 399.166687, x: 314.335968, y: 843.402809 },
-      deck: { w: 263.9757385253906, h: 201.55816650390625, x: 45.4296875, y: 482.03125762939453 },
-      'zone-1787672554751-0.3855307837355365': { x: 402.0573425292969, y: 178.07294464111328 },
-      'zone-1787672543726-0.8160163792174508': { w: 272.5347137451172, h: 182.4349365234375, x: 41.332427978515625, y: 279.5529556274414 },
-      score: { w: 160, h: 119.6832275390625, x: 194.6953125, y: 427.171875 },
-      'hand:pk-1787672554750-dz30ba1hyo': { x: 647.8255615234375, y: 53.32465362548828 },
-      'hand:RLBX7D': { w: 268.1466979980469, h: 217.96876525878906, x: 335.5295104980469, y: 1008.6545791625977 },
-      'table-zone': { w: 929.875, h: 164.89453125, x: 88.19921875, y: 186.6796875 },
-      'player-RLBX7D': { w: 583.6762084960938, h: 383.2855529785156, x: 136.7664794921875, y: 853.9930801391602 },
-      'player-pk-1787672554750-dz30ba1hyo': { w: 696.558228, h: 286.896683, x: 243.007843, y: 51.918404 },
-      'player-pk-1787691970079-p54pp88bbve': { x: 470.2691345214844, y: 61.076393127441406 },
-      'player-ESGSR3': { x: 407.5911560058594, y: 932.0920791625977 },
-      'player-pk-1787769037434-ya2k37s60i': { x: 336.6796875, y: -17.44140625 },
-      'player-WUX6BS': { x: 322.94921875, y: 353.49609375 },
-      'score-pk-1787769037434-ya2k37s60i': { x: 708.546875, y: 7.921875 },
-      'player-pk-1787792998068-ba0xc1cksnn': { x: 222.1171875, y: 19.390625 },
-      'player-VKWECT': { x: 367.60546875, y: 317.05859375 },
-      'score-pk-1787792998068-ba0xc1cksnn': { w: 160, h: 90.98828125 },
-      'player-N7D39S': { x: 380.1015625, y: 360.1015625 },
-      'score-pk-1787797411912-a9cuh3ytdcu': { x: 585.62109375, y: 8.54296875 },
-      'player-pk-1787797411912-a9cuh3ytdcu': { x: 350.16796875, y: 9.4921875 },
-    },
+    //
+    // *fix (direct user request, 2026-09-18: "neatly organized table
+    // zones" for every preset): this used to be a raw DevTools capture
+    // (`recard:panel-layout:v1`) from one real arranged table - kept
+    // "verbatim" including a dozen entries keyed to that session's own
+    // now-meaningless connection ids (`hand:pk-...`, `player-VKWECT`,
+    // etc.) and even a stray `y: 1008`/`y: 932` well outside any
+    // reasonable table height. None of that was ever organized, just
+    // frozen - replaced with `SIMPLE_LAYOUT`, the same clean, verified-
+    // overlap-free table-zone/score placement War/Hearts/Poker/Pinochle
+    // already use (this game needs nothing beyond those two panels).
+    layout: SIMPLE_LAYOUT,
   },
   {
     name: 'Hearts',
@@ -273,13 +287,35 @@ export const PRESETS = [
       // Named and stacked per Smith's `*user test` findings: unnamed,
       // both supplies read as "Pile" with no way to tell them apart;
       // unstacked, 40 chips spanned the table and read as a layout
-      // fault rather than a feature.
-      { kind: 'chip', ownerId: null, count: 1, name: 'Chips', deckType: 'chips', deckList: 'standard-chips' },
+      // fault rather than a feature. Explicit `id`s (2026-09-18, direct
+      // user request: "neatly organized table zones" for every preset)
+      // so `layout` below can place them - this preset had NO layout at
+      // all before, leaving both supplies to whatever `#zones`' default
+      // flex-wrap happened to do alongside the Table Zone.
+      { kind: 'chip', ownerId: null, count: 1, id: 'chips-supply', name: 'Chips', deckType: 'chips', deckList: 'standard-chips' },
       // US-112: was `kind: 'plain'` with an explicit `spread: 0.75`
       // override, same reasoning/fix as RtG's own token supply - see
       // that entry's comment.
-      { kind: 'token', ownerId: null, count: 1, name: 'Tokens', deckType: 'chips', deckList: 'standard-tokens' },
+      { kind: 'token', ownerId: null, count: 1, id: 'tokens-supply', name: 'Tokens', deckType: 'chips', deckList: 'standard-tokens' },
     ],
+    // Same `table-zone`/`score` placement as `SIMPLE_LAYOUT` (verified
+    // clear of the seat ring), with the two supplies filling the
+    // remaining width to the right of Score - verified clear of both
+    // the ring and each other by `lint:design`'s per-preset sweep
+    // (`tests/designLint.check.mjs`). `w: 176` on both supplies matches
+    // `.pile-section`'s own `min-width: 11rem` (style.css) exactly - an
+    // earlier `w: 145` here was silently widened to 176 by that floor
+    // at render time, eating the gap meant to keep them apart and
+    // overlapping by ~10px. A wider `TABLE_CANVAS_SIZE.width` (1450,
+    // not the shared 1280 default) is what makes room for both at
+    // their real rendered width beside Score without crowding it.
+    tableCanvasSize: { width: 1450, height: TABLE_CANVAS_SIZE.height },
+    layout: {
+      'table-zone': SIMPLE_LAYOUT['table-zone'],
+      score: SIMPLE_LAYOUT.score,
+      'chips-supply': { x: 980, y: 550, w: 176, h: 190 },
+      'tokens-supply': { x: 1176, y: 550, w: 176, h: 190 },
+    },
   },
   {
     name: 'Solitaire',
@@ -291,16 +327,37 @@ export const PRESETS = [
       { kind: 'foundation', ownerId: null, count: 4 },
       { kind: 'cascade', ownerId: null, count: 7 },
     ],
-    // Solitaire is solo by nature (`cardsPerPlayer: 0` - the table IS
-    // the starting layout, US-56/57's own AC), so there is no seat ring
-    // sharing the surface to dodge - the whole thing is free for a
-    // foundations-row-above-cascades-row grid, matching a real
-    // Klondike-style spread.
+    // Solitaire is solo BY DESIGN (`cardsPerPlayer: 0` - the table IS
+    // the starting layout, US-56/57's own AC) - but nothing actually
+    // PREVENTS a second player joining this preset's table today, and
+    // their own (empty) hand still claims a seat-ring position like
+    // any other player's. Accepted, not solved (same category as
+    // Recard the Gathering's own known exception below): a real fix is
+    // disallowing extra players on a solo preset, a GameConfig
+    // capability this project doesn't have. `KNOWN_EXCEPTIONS` in
+    // `tests/designLint.check.mjs`'s preset sweep names both.
+    //
+    // *fix (direct user request, 2026-09-18: "reasonable zoom level ...
+    // for all the presets"): this layout's own footprint is well short
+    // of the shared default `TABLE_CANVAS_SIZE` (1280x1050, sized for a
+    // 2-seat ring this solo preset doesn't design around) - fit-zooming
+    // a smaller footprint into the default canvas would leave it
+    // looking tiny with a lot of dead margin. A tighter, preset-
+    // specific canvas (D134) reads at a more reasonable size.
+    //
+    // *fix (same date): every column below widened to `w: 176` -
+    // `.pile-section`'s own `min-width: 11rem` (style.css) silently
+    // widened the old `w: 140`/`160` columns at render time, eating
+    // into gaps meant to keep adjacent cascades apart and causing a
+    // real, live overlap `lint:design`'s new preset sweep caught
+    // (Cascade 1 overlapping Cascade 2, and so on down the row).
+    // `tableCanvasSize.width` grown to fit the now-wider row.
+    tableCanvasSize: { width: 1450, height: 800 },
     layout: {
       ...row(['foundation-1', 'foundation-2', 'foundation-3', 'foundation-4'],
-        { x: 100, y: 70, w: 160, h: 140, gap: 20 }),
+        { x: 100, y: 70, w: 176, h: 140, gap: 20 }),
       ...row(['cascade-1', 'cascade-2', 'cascade-3', 'cascade-4', 'cascade-5', 'cascade-6', 'cascade-7'],
-        { x: 60, y: 250, w: 140, h: 240, gap: 10 }),
+        { x: 60, y: 250, w: 176, h: 240, gap: 14 }),
       'table-zone': { x: 60, y: 520, w: 300, h: 220 },
       score: { x: 900, y: 520, w: 160, h: 120 },
     },
@@ -320,10 +377,24 @@ export const PRESETS = [
     // stock (`cascade-1-<ownerId>`) can't be declared here (D53's
     // per-player ids aren't known ahead of a real join), so it's left to
     // the same seated-ring placement every personal zone already gets.
+    //
+    // *fix (direct user request, 2026-09-18): the old `y: 60` row sat
+    // only 18 local units clear of the top seat's own zone - real
+    // card-count variance could tip that into an overlap `lint:design`
+    // wouldn't catch until it actually happened live. Moved onto the
+    // SAME verified-safe row `SIMPLE_LAYOUT` uses (`y: 550`, clear of
+    // both seats' zones by a real margin), laid out side by side
+    // instead of stacked so nothing needs the vertical room this row
+    // doesn't have. `w: 176` on every column (was 150/160) matches
+    // `.pile-section`'s own `min-width: 11rem` (style.css) - the
+    // narrower declared widths were silently widened to 176 at render
+    // time, closing the gaps meant to keep RankAdjacent 1/2 apart and
+    // causing a real overlap `lint:design`'s preset sweep caught.
     layout: {
-      ...row(['rankAdjacent-1', 'rankAdjacent-2'], { x: 380, y: 260, w: 150, h: 220, gap: 30 }),
-      'table-zone': { x: 60, y: 60, w: 280, h: 150 },
-      score: { x: 900, y: 60, w: 160, h: 120 },
+      'table-zone': { x: 60, y: 550, w: 300, h: 190 },
+      'rankAdjacent-1': { x: 400, y: 550, w: 176, h: 190 },
+      'rankAdjacent-2': { x: 596, y: 550, w: 176, h: 190 },
+      score: { x: 900, y: 550, w: 176, h: 190 },
     },
   },
   {
@@ -416,6 +487,28 @@ export const PRESETS = [
     // condition C3. Grouping all fifteen table decks into one "Decks"
     // Zone (below) collapses that into a single panel; still worth a
     // real UX pass on the table as a whole.
+    //
+    // *fix attempt (direct user request, 2026-09-18: "reasonable zoom
+    // level and neatly organized table zones" for every preset) - tried
+    // and explicitly abandoned rather than forced: fitting the Decks
+    // zone's already-hard-won 1400x570 footprint into the SAME safe
+    // seat-ring band every other preset uses (`y: 480`, ~240 local
+    // units tall) is not achievable without either shrinking the deck
+    // grid to the point it's cramped again, or growing the canvas past
+    // where `TABLE_ZOOM_MIN` (0.4) can still fit it in a real viewport.
+    // A per-player RtG zone (hand + battlefield + lands + discard +
+    // exile, 5 piles) is also real content this project has never
+    // measured against the ring, unlike every other preset here. Rather
+    // than guess at numbers to chase a check this table's OWN density
+    // makes structurally hard, `tableCanvasSize` below is just widened
+    // (not squeezed into a "safe band") to give the existing layout
+    // real breathing room, and the residual seat-ring risk is accepted
+    // as the SAME known limitation Smith already flagged - a genuine
+    // UX redesign (tabs, a dedicated screen, fewer overview piles), not
+    // a coordinate tweak. `panelLayout.js`'s Save Layout is the
+    // intended per-table workaround per direct user instruction this
+    // session: "the players can organize and save their [own] presets."
+    tableCanvasSize: { width: 1850, height: 950 },
     //
     // *nit (direct user request, "fix panel and deck sizing for the
     // larger rtg cards"): the Decks zone's box was captured back when

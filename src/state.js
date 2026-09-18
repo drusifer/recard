@@ -464,6 +464,15 @@ export function createInitialState(deckConfig = {}, rng = Math.random, gameConfi
       // own box. `undefined` for every preset that doesn't declare one,
       // same "additive, no invented default" shape as `presetName`.
       cardSize: gameConfig.cardSize,
+      // D134: a preset MAY declare its own table canvas size
+      // (`tableZoom.js`'s `computeFitZoom` fits it to the real
+      // viewport) when the shared default doesn't suit its own
+      // layout's footprint - same "additive, no invented default"
+      // shape as `cardSize` above. Found missing here live: a preset
+      // that declared one still rendered with the SHARED default,
+      // silently dropped by this exact explicit-field list not
+      // knowing about it yet.
+      tableCanvasSize: gameConfig.tableCanvasSize,
     },
     zones: built.zones,
     piles: [
@@ -2305,6 +2314,10 @@ export function viewFor(state, playerId) {
       // the host does (`renderGameFromView`'s `applyCardSize` call),
       // since a card's real size is otherwise host-only config.
       cardSize: state.gameConfig?.cardSize,
+      // D134: same reasoning as `cardSize` above - a guest computes
+      // its own fit-zoom locally (`main.js`'s `applyFitZoom`), so the
+      // preset's own canvas size has to reach it through the view too.
+      tableCanvasSize: state.gameConfig?.tableCanvasSize,
     },
   };
   for (const pile of state.piles) pileInstanceFor(pile, playerId).contributeToView(view, playerId);

@@ -61,13 +61,13 @@ test('createInitialState: gameConfig.allowsPlayerZones defaults true - matches e
   // `cardsPerPlayer` joined the shape when a restored table needed to
   // recover its own deal size; `undefined` when no preset set one.
   assert.deepEqual(state.gameConfig,
-    { allowsPlayerZones: true, tableZone: true, piles: [], zones: [], cardsPerPlayer: undefined, presetName: undefined, cardSize: undefined });
+    { allowsPlayerZones: true, tableZone: true, piles: [], zones: [], cardsPerPlayer: undefined, presetName: undefined, cardSize: undefined, tableCanvasSize: undefined });
 });
 
 test('createInitialState: allowsPlayerZones can be set false via the third param', () => {
   const state = createInitialState({}, () => 0.5, { allowsPlayerZones: false });
   assert.deepEqual(state.gameConfig,
-    { allowsPlayerZones: false, tableZone: true, piles: [], zones: [], cardsPerPlayer: undefined, presetName: undefined, cardSize: undefined });
+    { allowsPlayerZones: false, tableZone: true, piles: [], zones: [], cardsPerPlayer: undefined, presetName: undefined, cardSize: undefined, tableCanvasSize: undefined });
 });
 
 test('CREATE_ZONE: rejected when the game disallows player zones', () => {

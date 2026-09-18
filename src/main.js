@@ -4,7 +4,9 @@ import { breakInto } from './pileables/ChipPileable.js';
 import { homePileKindFor } from './pileables/pileableTypes.js';
 import { makeStateMessage, makeMotionMessage, createMotionThrottler, cardDragPayload } from './protocol.js';
 import { renderShareCode, wireCopyCode } from './qrcode.js';
-import { TABLE_ZOOM_MIN, TABLE_ZOOM_MAX, zoomFromWheelDrag, TableCamera } from './tableZoom.js';
+import {
+  TABLE_ZOOM_MIN, TABLE_ZOOM_MAX, zoomFromWheelDrag, TableCamera, TABLE_CANVAS_SIZE, computeFitZoom,
+} from './tableZoom.js';
 import {
   renderZones,
   renderRoster,
@@ -90,6 +92,25 @@ zonesElement.addEventListener('drop', (event) => {
 // Declared before `wireTableZoomControls()` runs (right below), which
 // reads it immediately.
 const tableCamera = new TableCamera();
+// D132 revised (2026-09-17): `applyFitZoom` (assigned inside
+// `wireTableZoomControls`) is called again after every `renderZones` -
+// `#screen-game`/`.table-surface` measure zero-size right up until the
+// game screen is actually shown (host/join forms render first), so the
+// ONE call `wireTableZoomControls` makes at module load time can't yet
+// see real layout. A `resize` listener alone catches a later WINDOW
+// resize but not "the table just became visible for the first time,
+// window untouched" - the actual first-paint case.
+let applyFitZoom = () => {};
+// D134 (2026-09-18, direct user request: "reasonable zoom level ...
+// for all the presets"): a preset MAY declare its own `tableCanvasSize`
+// (`gameConfig.tableCanvasSize`, threaded through by `configsForPreset`
+// same as `cardSize` already is) when `TABLE_CANVAS_SIZE`'s default
+// footprint doesn't suit it - Recard the Gathering's 15-deck table
+// needs real room a 2-seat card game doesn't. `renderGameFromView`
+// updates this on every render (a `New Game` can switch presets
+// without recreating the table); `applyFitZoom` reads it instead of
+// the constant directly.
+let currentTableCanvasSize = TABLE_CANVAS_SIZE;
 wireTableZoomControls();
 wireFocusZoom();
 // *nit (2026-08-27), direct user request ("save space"): one
@@ -648,6 +669,7 @@ function finishRestore() {
   broadcastViews();
   if (latestView) renderGameFromView(latestView);
   showScreen(screens, 'game');
+  applyFitZoom(); // the surface just became visible - see applyFitZoom's own declaration
 }
 
 function startGame() {
@@ -658,6 +680,7 @@ function startGame() {
   // error (see `DEAL`'s own comment, state.js).
   dispatch({ type: 'DEAL', cardsPerPlayer, pileId: DECK_PILE_ID });
   showScreen(screens, 'game');
+  applyFitZoom(); // the surface just became visible - see applyFitZoom's own declaration
 }
 
 document.querySelector('#deal-btn').addEventListener('click', startGame);
@@ -866,6 +889,7 @@ async function resumeHostedTable() {
     }
     broadcastViews();
     showScreen(screens, 'game');
+    applyFitZoom(); // the surface just became visible - see applyFitZoom's own declaration
   } else {
     const shareContainer = document.querySelector('#share-code-container');
     renderShareCode(shareContainer, { code: myId });
@@ -918,6 +942,12 @@ function configsForPreset(preset, deckIds, allowsPlayerZones) {
     // `renderGameFromView`) sizes cards the same way the host's
     // pre-game preview already does (`onPresetSelected`, below).
     cardSize: preset.cardSize,
+    // D134: a preset MAY declare its own table canvas size (the fixed
+    // local frame `computeFitZoom` fits to the real viewport - see
+    // `tableZoom.js`) when the shared default doesn't suit its own
+    // layout's footprint. `undefined` when absent - `applyFitZoom`
+    // (main.js) falls back to `TABLE_CANVAS_SIZE` itself.
+    tableCanvasSize: preset.tableCanvasSize,
   };
   return { deckConfig, gameConfig };
 }
@@ -1036,6 +1066,7 @@ function cancelNewGameFlow() {
   document.querySelector('#host-form').hidden = true;
   document.querySelector('#host-share').hidden = false;
   showScreen(screens, 'game');
+  applyFitZoom(); // the surface just became visible - see applyFitZoom's own declaration
   // Undoes any preview drift from changing the preset dropdown while
   // this picker was open (`onPresetSelected` applies a card size live,
   // for the picker's OWN preview) - Cancel means the table underneath
@@ -1336,6 +1367,7 @@ function wireGuestSession() {
     latestView = message.payload;
     renderGameFromView(latestView);
     showScreen(screens, 'game');
+    applyFitZoom(); // the surface just became visible - see applyFitZoom's own declaration
   });
 
   // D32: losing the host is retryable. `forgetSession` is deliberately
@@ -1418,6 +1450,15 @@ function wireTableZoomControls() {
   wheelElement.setAttribute('aria-valuemin', String(TABLE_ZOOM_MIN));
   wheelElement.setAttribute('aria-valuemax', String(TABLE_ZOOM_MAX));
 
+  // D132/D134: `TABLE_CANVAS_SIZE` (`tableZoom.js`) is the DEFAULT -
+  // set here once for whatever renders before a real table exists
+  // (style.css's own `1280px`/`760px` are fallbacks below THAT, for a
+  // page that somehow paints before even this runs). `applyFitZoom`
+  // below re-sets both vars from `currentTableCanvasSize` on every
+  // call, once a preset's own size is known.
+  zonesElement.style.setProperty('--table-canvas-w', `${TABLE_CANVAS_SIZE.width}px`);
+  zonesElement.style.setProperty('--table-canvas-h', `${TABLE_CANVAS_SIZE.height}px`);
+
   // *fix (2026-09-17): reads/writes the shared `tableCamera` (module
   // scope) instead of owning its own closure state, so the SAME
   // zoom/pan this function applies visually is also what `ui.js`'s
@@ -1436,9 +1477,28 @@ function wireTableZoomControls() {
     applyPan(tableCamera.pan);
   }
 
-  applyZoom(tableCamera.zoom);
-
   const tableSurface = document.querySelector('.table-surface');
+
+  // D132 revised (2026-09-17): the STARTING zoom is computed to fit
+  // `TABLE_CANVAS_SIZE` into whatever `.table-surface` actually
+  // measures, instead of a flat constant - see `computeFitZoom`'s own
+  // doc comment for why a flat default couldn't clear `lint:design`'s
+  // zone-overlap check at every viewport. Re-applied on resize UNTIL
+  // the player drags/keys the wheel themselves (`hasUserSetZoom`) -
+  // once they've made a deliberate choice, a resize (or the mobile-
+  // rotation equivalent) must not silently override it.
+  let hasUserSetZoom = false;
+  applyFitZoom = () => {
+    zonesElement.style.setProperty('--table-canvas-w', `${currentTableCanvasSize.width}px`);
+    zonesElement.style.setProperty('--table-canvas-h', `${currentTableCanvasSize.height}px`);
+    if (hasUserSetZoom || !tableSurface) return;
+    const { width, height } = tableSurface.getBoundingClientRect();
+    if (width === 0 || height === 0) return; // not yet laid out (e.g. still on the host/join screen)
+    applyZoom(computeFitZoom(currentTableCanvasSize, { width, height }));
+  };
+  applyFitZoom();
+  window.addEventListener('resize', applyFitZoom);
+
   let panStart = null;
   tableSurface?.addEventListener('pointerdown', (event) => {
     // Only the empty table background starts a pan - a pointerdown on
@@ -1461,6 +1521,7 @@ function wireTableZoomControls() {
   let dragStartY = null;
   let zoomAtDragStart = tableCamera.zoom;
   wheelElement.addEventListener('pointerdown', (event) => {
+    hasUserSetZoom = true;
     dragStartY = event.clientY;
     zoomAtDragStart = tableCamera.zoom;
     wheelElement.setPointerCapture(event.pointerId);
@@ -1475,8 +1536,8 @@ function wireTableZoomControls() {
   // one `WHEEL_DRAG_RANGE_PX`-scaled "notch" per press, same direction
   // convention as the drag (up arrow zooms in).
   wheelElement.addEventListener('keydown', (event) => {
-    if (event.key === 'ArrowUp') applyZoom(zoomFromWheelDrag(tableCamera.zoom, -20));
-    else if (event.key === 'ArrowDown') applyZoom(zoomFromWheelDrag(tableCamera.zoom, 20));
+    if (event.key === 'ArrowUp') { hasUserSetZoom = true; applyZoom(zoomFromWheelDrag(tableCamera.zoom, -20)); }
+    else if (event.key === 'ArrowDown') { hasUserSetZoom = true; applyZoom(zoomFromWheelDrag(tableCamera.zoom, 20)); }
     else return;
     event.preventDefault();
   });
@@ -1993,6 +2054,16 @@ function renderGameFromView(view) {
   // dealCount`/`onDealCountChange` above for the one piece of deck-
   // specific state this file still owns: the Deal count input's value).
   renderZones(zonesElement, view.piles, seatedOrder(view.players, myId), view.zones, zoneOptions);
+  // D134: the ACTIVE preset's own canvas size (if it declared one -
+  // `configsForPreset` threads `tableCanvasSize` through the same way
+  // as `cardSize`), read fresh every render since `New Game` can swap
+  // presets without recreating the table.
+  currentTableCanvasSize = view.gameConfig?.tableCanvasSize ?? TABLE_CANVAS_SIZE;
+  // The table (and its real `.table-surface` size) only exists from
+  // here on - see `applyFitZoom`'s own declaration for why the single
+  // call `wireTableZoomControls` makes at load time can't do this job
+  // alone.
+  applyFitZoom();
   // *nit (2026-08-27), direct user request: "save space" - ONE
   // consolidated `<score-zone>` listing every seated player, instead of
   // one whole panel per player. No per-seat default position needed any

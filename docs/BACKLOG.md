@@ -61,6 +61,12 @@ or a live-verification session) versus being pickable directly.
 - **A focus-zoomed pile visually overlaps its parent Zone's own chrome**
   (Smith, non-blocking) — reads slightly cluttered; a shadow/dimmed-
   backdrop treatment would likely help. Real design call for the user.
+- **Pin a focus-zoomed pile open with an explicit close (X) button**
+  (nit, queued 2026-09-17, direct user request) — currently the
+  overlay shrinks back on `pointerleave`/click-away; user wants it to
+  stay zoomed (to adjust spacing/interact with cards) until they either
+  zoom into another pile or click a top-right X, rather than losing
+  focus involuntarily. Not yet triaged.
 - **SaveAs's `window.prompt()`** (Smith, non-blocking, flagged
   2026-08-27) — a browser-native prompt for naming a saved layout;
   works but is not a designed UI. Not re-confirmed as still relevant
@@ -79,12 +85,25 @@ or a live-verification session) versus being pickable directly.
 - **Browser-automation tooling for Smith's own UX gate** — distinct
   from Neo's existing Playwright test scripts; Smith's end-to-end
   sprint-close testing is currently manual.
+- **Dropping a card on a hand stack splits the stack instead of merging
+  it in** (nit, queued 2026-09-17, direct user report) — not yet
+  triaged.
 - **Deck panel resizes as its stack thins** (Trin, found 2026-09-17) —
   violates its own "keeps its size while thinning" invariant
   (`tests/uiActions.browser.mjs`, "the deck visibly thins out as it
   empties, without the panel resizing" — panel height 224px -> 119px
   observed live). Confirmed as its own independent bug, not downstream
   of the now-fixed focus-zoom/context-menu issue. Not yet triaged.
+- **Flaky test: "dragging the pile's own spread slider outside its
+  bounds does not shrink the pile mid-drag"** (Trin, found 2026-09-17,
+  `tests/focusZoom.browser.mjs`) — the post-mouseup `waitForFunction`
+  (expects the focus-zoomed overlay to shrink) intermittently times out
+  at 2000ms. Confirmed PRE-EXISTING via an 8-run baseline against
+  unmodified `dev` (1 failure in 8) - not a regression from the
+  Table-Zone/D132 zoom work done the same session, just newly noticed
+  while re-running suites for that fix. Root cause not yet
+  investigated; violates this project's own zero-flake standard, so
+  worth a dedicated pass rather than a bumped timeout.
 - **Morpheus's process note** (2026-08-27): check a record's id
   survives a round-trip before designing any future save-for-reuse
   feature on top of it - came out of a real live bug (Table pile's
@@ -100,10 +119,48 @@ superseded:
 - In-app text chat or reactions.
 - Custom card backs/themes.
 - 5+-player mobile density.
-- Per-seat anchor geometry overlap at some desktop widths/player counts.
+- ~~Per-seat anchor geometry overlap at some desktop widths/player
+  counts~~ — REVERSED same day (direct user request, later 2026-09-17
+  session): "we can actually fix it by updating the presets with a
+  table zoom that can fit all the zones." See "Not carried forward"
+  below for the actual fix - this earlier "not pursuing" call did not
+  hold.
 
 ## Not carried forward (checked, resolved)
 
+- ~~**Table Zone overlaps opponent zones at narrower desktop
+  breakpoints**~~ (`lint:design`'s "Table Zone overlaps Bob/You",
+  grown from a documented baseline of 3 to 5 findings before being
+  fixed 2026-09-17) — root cause: `#zones` used to fill whatever
+  `.table-surface` the viewport left, so the seat ring (percentage-of-
+  container, `seating.js`) and every preset's fixed-pixel shared-panel
+  coordinates (`presets.js`) only agreed at the exact size the layout
+  was calibrated against, drifting apart at every other size. Fixed by
+  giving `#zones` one fixed local canvas (D132 revised - see
+  `docs/DECISIONS.md`) plus repositioning `SIMPLE_LAYOUT`'s table-zone/
+  score panels to clear the top seat's own zone within that canvas.
+  `lint:design` clean of overlap findings at all 3 tracked breakpoints;
+  860/860 unit, 7/7 `test:tablezoom`.
+- ~~**Every preset's own layout, not just the default**~~ (D134, direct
+  user request 2026-09-18: "update all the presets to have a
+  reasonable zoom level and neatly organized table zones") —
+  `lint:design` now sweeps every preset, not only whichever one the
+  host form defaults to; found and fixed Gin Rummy's dead DevTools-
+  captured layout (replaced with the shared, verified `SIMPLE_LAYOUT`),
+  Chips & Tokens having no `layout` at all, and a `.pile-section`
+  `min-width: 11rem` floor silently widening several presets' declared
+  column widths enough to overlap their own neighbors (Solitaire's
+  cascades, Spit's RankAdjacent piles). Also found and fixed a real,
+  independent bug: `#zones`' CSS centering and its `scale()` transform
+  used mismatched pivot points, badly misaligning the table whenever a
+  preset's own `tableCanvasSize` differed much from the shared default
+  (confirmed live for War's 26-card hand). Two presets carry a KNOWN,
+  accepted zone-overlap exception (still logged, not gating): Recard
+  the Gathering (Smith's own Gate-1 C3 crowding finding) and Solitaire
+  (solo-designed, but nothing stops a second player from joining and
+  claiming a seat-ring position the solo grid never accounted for) -
+  see `tests/designLint.check.mjs`'s `KNOWN_EXCEPTIONS` and
+  `docs/DECISIONS.md` D134 for the full writeup.
 - ~~**7 cognitive-complexity lint findings**~~ (flagged 2026-08-27) —
   `npm run lint:js` reports zero `sonarjs/cognitive-complexity`
   findings as of 2026-09-17; resolved at some point without being

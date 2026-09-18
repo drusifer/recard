@@ -661,3 +661,140 @@ scattered across this project): pinch-to-zoom wiring, the queued items
 The focus-zoom/context-menu bug mentioned in earlier entries here was
 fixed 2026-09-17 (see `docs/BACKLOG.md`'s "Not carried forward" section
 and `agents/oracle.docs/memory.md`'s 2026-09-17 row) - no longer open.
+
+## `*fix Table-Zone-overlap` (2026-09-17, same day, later session): DONE, not yet committed
+
+Trin recalled a standing `lint:design` finding ("the 7 failures we keep
+ignoring" - traced to a 2026-09-13 filing, 5 of 7 already fixed
+earlier today via the focus-zoom-context-menu fix, 2 re-scoped as the
+deck-resize bug). Separately, `lint:design`'s "Table Zone overlaps
+Bob/You" zone-overlap findings (a DIFFERENT, also-standing issue - the
+Makefile's own baseline comment said 3, actual had grown to 5) turned
+out to be the SAME issue as a backlog item marked "Dropped - not
+pursuing" earlier this same session ("per-seat anchor geometry overlap
+at some desktop widths/player counts"). Direct user request reversed
+that: "we can actually fix it by updating the presets with a table
+zoom that can fit all the zones."
+
+**Root cause** (see `docs/DECISIONS.md` D133 for the full writeup):
+`#zones` filled whatever `.table-surface` the viewport left (`inset:
+0`), so the seat ring (`seating.js`, percentage-of-container) and every
+preset's fixed-pixel panel coordinates (`presets.js`) only agreed at
+one calibration size. Confirmed via a live geometry probe (Playwright,
+not guessed) that uniform zoom alone cannot fix this - scale preserves
+whether two rects intersect, only shrinks the overlap. **Fix, in
+order**: (1) `#zones` now a FIXED local canvas (`TABLE_CANVAS_SIZE`,
+`tableZoom.js`, 1280x950), (2) `SIMPLE_LAYOUT`'s table-zone/score
+panels repositioned (`y: 290 -> 480`, `presets.js`) to clear the top
+seat's own zone WITHIN that canvas - a real geometry fix, verified live
+via probe, not just a bigger number, (3) `computeFitZoom` scales that
+now-correct canvas down to fit whatever viewport is real, replacing the
+flat `TABLE_ZOOM_DEFAULT_SCALE` as the STARTING zoom (`main.js`'s
+`wireTableZoomControls`) - re-applied on every render/resize until the
+player manually zooms (`hasUserSetZoom`), never afterward.
+
+**Verified:** 860/860 unit (new `computeFitZoom` tests,
+`tableZoom.test.js`), 7/7 `test:tablezoom` (one assertion updated to
+compare against the computed value; the "zoomed in" drag test's
+viewport pinned to 1440x900 - the repositioned panel no longer fits
+Playwright's 720px-tall default at max zoom, not a regression in what
+that test verifies). `lint:design`: zone-overlap findings gone at all
+3 tracked breakpoints, only the 2 pre-existing unrelated "forced
+scroll" findings remain. `lint:js`/`lint:style` at baseline (one new
+var caught by `unicorn/consistent-boolean-name`, renamed
+`hasUserSetZoom`). `make check` PASSED.
+
+**Found, not fixed, filed to `docs/BACKLOG.md` instead** (scope
+discipline - this was already a big enough change): "dragging the
+pile's own spread slider outside its bounds does not shrink the pile
+mid-drag" (`tests/focusZoom.browser.mjs`) is flaky - confirmed
+PRE-EXISTING via an 8-run baseline against unmodified `dev` (1/8
+failed) before touching anything, so explicitly NOT attributed to this
+fix. Also queued (not investigated) via `*queue nit`, both in
+`docs/BACKLOG.md`: dropping a card on a hand stack splits instead of
+merging; pin a focus-zoomed pile open with an explicit X-close button.
+
+**Not committed yet** - awaiting Trin's `*qa test` gate per protocol
+(this was real architecture work: a D132 partial reversal, new D133
+entry, `#zones`' sizing model changed). Files touched: `Makefile`,
+`docs/BACKLOG.md`, `docs/DECISIONS.md`, `src/main.js`, `src/presets.js`,
+`src/tableZoom.js`, `style.css`, `tests/tableZoom.browser.mjs`,
+`tests/tableZoom.test.js`.
+
+## `*fix all-presets-layout` (2026-09-18): DONE, folded into the same pending Trin handoff
+
+Direct user request, same day, continuing straight from the D133 work
+above (not yet committed): "update all the presets to have a
+reasonable zoom level and neatly organized table zones." When RtG's
+own layout turned out genuinely hard to reconcile with the shared
+canvas (5 piles per player, never measured against the ring before),
+the user pre-authorized the fallback before I asked: "if hard to get
+the layout right change the preset to use a grid for the initial
+layout and the players can organize and save their presets" -
+`panelLayout.js`'s existing Save Layout feature (D61) is the intended
+per-table escape hatch, not a promise every default is perfect.
+
+**D134** (`docs/DECISIONS.md` has the full writeup): `gameConfig.
+tableCanvasSize` (optional, additive, same shape as `cardSize`) lets a
+preset declare its own canvas when the shared 1280x1050 default
+doesn't fit its content. War (26-card hand) and Recard the Gathering
+(15 decks + 5-pile player zones) got their own; Solitaire got a
+tighter one (its own content is much smaller than the 2-seat default).
+
+**Two real bugs found live, neither part of the original ask:**
+1. `state.js` reconstructs `gameConfig` via an explicit per-field
+   allowlist in TWO places (`createInitialState` AND `viewFor` - the
+   one a GUEST's render actually reads) - `tableCanvasSize` silently
+   fell back to the shared default the first time this was tried
+   because it wasn't in either list yet. Added to both.
+2. `#zones`' CSS centering (`top/left:50%` + negative margin) and its
+   `scale()` transform used MISMATCHED pivot points
+   (`transform-origin: top center`, a leftover from the old `inset:0`
+   approach) - harmless at the shared canvas' modest height, badly
+   misaligned `#zones` for War's taller dedicated canvas (confirmed
+   live: rendered 177px above the visible table surface entirely).
+   Fixed: `transform-origin: center`, matching the margin centering.
+
+**`tests/designLint.check.mjs` gained a permanent preset sweep** (one
+fresh host+guest table per preset, 1280x800, overlap check only) -
+the standing viewport sweep only ever exercised whichever preset the
+host form defaults to (War), so every OTHER preset's `layout` went
+completely unchecked by any automated gate until now. First run found,
+for real: Gin Rummy's `layout` was a years-stale raw DevTools capture
+full of dead per-connection-id entries (replaced with the shared,
+verified `SIMPLE_LAYOUT` - the game needs nothing beyond table-zone/
+score); Chips & Tokens had NO `layout` at all; Solitaire's and Spit's
+column widths (140/150/160) were silently widened to 176px by
+`.pile-section`'s own `min-width: 11rem` floor, closing the gaps
+between adjacent columns and causing real overlaps.
+
+**Two known, accepted exceptions** (in `KNOWN_EXCEPTIONS`, still
+LOGGED by the sweep, not counted toward its exit code): Recard the
+Gathering (Smith's own Gate-1 C3 crowding finding, pre-existing) and
+Solitaire (genuinely solo-designed, but nothing stops a second player
+from joining and claiming a ring position the solo grid never
+accounted for - a real fix needs a "disallow extra players"
+`GameConfig` capability this project doesn't have).
+
+**Verified:** 860/860 unit (2 exact-shape `gameConfig` assertions in
+`state.test.js` updated for the new field), 7/7 `test:tablezoom` (the
+default-zoom test now reads the ACTIVE preset's canvas size live
+instead of assuming the shared constant), `test:focuszoom` 10/11 and
+`test:ui` 19/20 (both single failures pre-existing/backlogged,
+confirmed not regressions), `make check` PASSED, `lint:js`/`lint:style`
+at baseline. `lint:design`: 2 pre-existing "forced scroll" findings
+only - every zone-overlap finding outside the two documented
+exceptions is gone across every preset, not just the default.
+
+Additional files touched beyond the D133 list above: `src/state.js`,
+`tests/designLint.check.mjs`, `tests/state.test.js`.
+
+## Next Steps
+Still hand off to Trin (`*qa test`) for ONE combined gate covering both
+D133 and D134 - nothing has been committed yet, this is all one
+uncommitted working-tree change. `docs/DECISIONS.md` D133/D134 revise
+D132 and touch shared sizing (`#zones`) plus every preset's own
+layout, which is exactly the kind of change this project's own
+protocol wants a second set of eyes on before it lands. If Trin
+passes, this is still `*fix`-shaped (found live, root-caused, fixed,
+verified) - no Smith/retro/launch ceremony needed, just commit + push.

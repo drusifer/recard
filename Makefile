@@ -96,11 +96,33 @@ art:
 
 # The pre-handoff gate: everything that MUST be green. Deliberately does
 # NOT include `lint` - this repo carries a known, accepted lint baseline
-# (7 sonarjs/cognitive-complexity findings, 3 lint:design zone overlaps,
-# all pre-existing and backlogged), so `lint` always exits non-zero and
-# folding it in here would make `check` permanently red and therefore
-# meaningless. Run `make lint` separately and COMPARE to that baseline
-# rather than expecting exit 0.
+# (2 lint:design "forced page scroll" findings at the 1440/1024
+# breakpoints, pre-existing and backlogged - docs/BACKLOG.md), so `lint`
+# always exits non-zero and folding it in here would make `check`
+# permanently red and therefore meaningless. Run `make lint` separately
+# and COMPARE to that baseline rather than expecting exit 0.
+#
+# *fix (2026-09-17, D132 revision): the 3 lint:design zone-overlap
+# findings this comment used to cite (grown to 5 by the time it was
+# fixed) are GONE - `#zones` fixed local canvas + computed fit-zoom
+# (`tableZoom.js`'s `TABLE_CANVAS_SIZE`/`computeFitZoom`) plus
+# repositioning `presets.js`' `SIMPLE_LAYOUT` table-zone/score panels
+# to clear the top seat's own zone. The 7 sonarjs/cognitive-complexity
+# findings this comment also used to cite were independently resolved
+# to 0 at some earlier point without this comment being updated -
+# see docs/BACKLOG.md's "Not carried forward" section for both.
+#
+# *fix (2026-09-18, D134): `lint:design` now sweeps EVERY preset's own
+# layout, not just whichever one the host form defaults to (found real,
+# previously-invisible bugs this way: Gin Rummy's dead DevTools capture,
+# Chips & Tokens missing a `layout` entirely, several `.pile-section`
+# `min-width: 11rem` floor mismatches). Two presets carry a KNOWN,
+# accepted zone-overlap exception, still logged by the sweep but not
+# counted toward its exit code - Recard the Gathering (Smith's Gate-1
+# C3, its own crowded 15-deck table) and Solitaire (a solo-designed
+# preset a second player can still join). See `tests/designLint.check.
+# mjs`'s `KNOWN_EXCEPTIONS` and each preset's own comment in
+# `presets.js`.
 #
 # `lint-decks` IS included: it carries no baseline debt, so it can and
 # must stay at exit 0 - an unbalanced deck is a real failure, not a

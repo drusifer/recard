@@ -1448,10 +1448,29 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    for this exact purpose before the flattening and it worked - matching
    that here instead of a percentage size sidesteps the question
    entirely, same fix shape as the pixel-based resize one. */
+/* D132 revised (direct user request, 2026-09-17): `#zones` used to be
+   `inset: 0` (fills whatever `.table-surface` happens to be, which
+   varies by viewport). That made the seat ring (`seating.js`,
+   percentage-of-this-box) and every preset's fixed-pixel shared-panel
+   coordinates (`presets.js`) resolve DIFFERENTLY relative to each
+   other at different viewport sizes - the two coordinate systems only
+   agreed at the exact size the layout was calibrated against, and
+   drifted into the `lint:design` "Table Zone overlaps Bob/You"
+   findings everywhere else. `#zones` is now a FIXED local canvas
+   (`--table-canvas-w`/`-h`, set once from `TABLE_CANVAS_SIZE` in
+   `tableZoom.js` - that file is the source of truth, these are
+   fallbacks only), centered in `.table-surface`; `main.js` computes a
+   default zoom (`computeFitZoom`) that scales this fixed canvas down
+   to fit whatever surface is actually available, so the SAME relative
+   geometry (verified overlap-free at canvas size) survives at every
+   real viewport instead of being recomputed differently each time. */
 #zones {
   position: absolute;
-  inset: 0;
-  margin: 0 auto;
+  top: 50%;
+  left: 50%;
+  width: var(--table-canvas-w, 1280px);
+  height: var(--table-canvas-h, 1050px);
+  margin: calc(var(--table-canvas-h, 1050px) / -2) 0 0 calc(var(--table-canvas-w, 1280px) / -2);
   /* NO max-height / overflow-y here, again - REVERSED a second time,
      2026-08-20, same day as the first reversal, and the reason is the
      44px button fix (design-lint) that came right after the first one.
@@ -1526,7 +1545,20 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
      a fixed pan value read as a bigger or smaller move depending on
      zoom, which is not how dragging something should feel. */
   transform: translate(var(--table-pan-x, 0), var(--table-pan-y, 0)) scale(var(--table-zoom, 1));
-  transform-origin: top center;
+  /* *fix (D134, 2026-09-18): was `top center`, matching the OLD
+     `#zones { inset: 0 }` (filled the whole surface, so scaling from
+     its top edge read as "the table pulling back from the player").
+     `#zones` is now a FIXED-size box independently centered in
+     `.table-surface` via `top/left: 50%` + a negative margin (see
+     `#zones`'s own rule) - `scale`'s pivot has to be that SAME center,
+     or the two centering mechanisms fight: `scale` shifts the already-
+     centered box around `top center` instead of in place, and the
+     mismatch grows with the canvas' own height (all but invisible at
+     the shared 1050-tall default, badly visible at War's 1300-tall
+     canvas - `#zones` rendered 177px above the visible surface
+     entirely, confirmed live). `center` makes `scale` a pure zoom
+     in/out from wherever the box already sits. */
+  transform-origin: center;
 }
 
 /* US-117 phase 111 (D132): the manual table-zoom control. Every player

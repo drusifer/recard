@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   TABLE_ZOOM_DEFAULT_SCALE, TABLE_ZOOM_MIN, TABLE_ZOOM_MAX, clampTableZoom,
   WHEEL_DRAG_RANGE_PX, zoomFromWheelDrag, zoomFromPinch, maxPan, clampPan, TableCamera,
+  TABLE_CANVAS_SIZE, computeFitZoom,
 } from '../src/tableZoom.js';
 
 // US-117 phase 111 (revised, D132, direct user correction): no
@@ -10,9 +11,49 @@ import {
 // (continuous). *fix (2026-09-17, direct user request): the old S/M/L/
 // XL quick presets are gone entirely, no back-compat shim. Pure math
 // only; the wheel's own DOM wiring lives in main.js.
+//
+// D132 REVISED (direct user request, 2026-09-17, same session as the
+// zone-overlap lint fix): "player-driven only" caused the Table Zone
+// panel (a fixed LOCAL-pixel frame, presets.js) to collide with the
+// seat ring (a PERCENTAGE-of-container frame, seating.js) whenever the
+// actual table-surface box shrank below the size the layout was
+// calibrated against - `lint:design`'s "Table Zone overlaps Bob/You"
+// findings. Uniform scale can't fix a mismatch between two coordinate
+// systems (it preserves whether two rects intersect, for any positive
+// scale from one origin - shrinking only shrinks the overlap amount,
+// never removes it), so the fix isn't "zoom out more"; it's giving
+// `#zones` one FIXED reference size (`TABLE_CANVAS_SIZE`, matching the
+// size everything was actually calibrated/verified overlap-free
+// against) so every percentage AND every fixed-pixel coordinate always
+// resolves the same way regardless of the real viewport, and then
+// computing a DEFAULT zoom (`computeFitZoom`) that scales that whole,
+// already-correct layout down to fit whatever screen is actually
+// available - never up past 1x uninvited. The player's own manual
+// wheel/keyboard zoom still works exactly as before, layered on top of
+// this computed starting point instead of a flat constant.
 
 test('the default scale is within the wheel range', () => {
   assert.ok(TABLE_ZOOM_DEFAULT_SCALE >= TABLE_ZOOM_MIN && TABLE_ZOOM_DEFAULT_SCALE <= TABLE_ZOOM_MAX);
+});
+
+test('computeFitZoom: an available box smaller than the canvas shrinks to fit', () => {
+  const zoom = computeFitZoom(TABLE_CANVAS_SIZE, { width: TABLE_CANVAS_SIZE.width / 2, height: TABLE_CANVAS_SIZE.height });
+  assert.equal(zoom, clampTableZoom(0.5));
+});
+
+test('computeFitZoom: the tighter of width/height is what binds', () => {
+  const zoom = computeFitZoom(TABLE_CANVAS_SIZE, { width: TABLE_CANVAS_SIZE.width, height: TABLE_CANVAS_SIZE.height / 4 });
+  assert.equal(zoom, clampTableZoom(0.25));
+});
+
+test('computeFitZoom: an available box bigger than the canvas never zooms IN past 1x', () => {
+  const zoom = computeFitZoom(TABLE_CANVAS_SIZE, { width: TABLE_CANVAS_SIZE.width * 3, height: TABLE_CANVAS_SIZE.height * 3 });
+  assert.equal(zoom, 1);
+});
+
+test('computeFitZoom: clamps to the wheel\'s own floor rather than returning an unreachable scale', () => {
+  const zoom = computeFitZoom(TABLE_CANVAS_SIZE, { width: 1, height: 1 });
+  assert.equal(zoom, TABLE_ZOOM_MIN);
 });
 
 test('clampTableZoom passes through an in-range value unchanged', () => {
