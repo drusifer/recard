@@ -418,3 +418,7 @@ Wrote coverage/test_audit_assets/jaccard_heatmap.png, coverage/test_audit_assets
 ---
 [<small>2026-09-17 19:47:17</small>] [**Neo**]->[**all**] *swe fix*:
  *fix table-zoom-wheel repositioned: right side of the table (position:absolute within .table-section, vertically centered), tall/thin (2.75rem x 12rem, was 2.5rem x 44px), S/M/L/XL preset buttons removed entirely (TABLE_ZOOM_PRESETS/presetScale deleted, one TABLE_ZOOM_DEFAULT_SCALE constant left). Direct user request + visual approval via screenshot. 847/847 unit, test:tablezoom 5/5, test:focuszoom 11/11, lint-design improved 8->7 violations (freed space fixed one scroll overflow).
+
+---
+[<small>2026-09-17 20:42:32</small>] [**Neo**]->[**all**] *swe fix*:
+ *fix drag-ghost misalignment when zoomed: setDragImage anchored at half the card's UNSCALED offsetWidth/offsetHeight, but the browser renders the drag image from the actual on-screen (post --table-zoom scale()) appearance - anchor drifted off-center by the zoom deviation, worse the further from 1x. Fixed: scaledDragImageAnchor() multiplies by the live zoom read off #zones. 850/850 unit, test:ui clean of anything new (only the pre-existing filed deck-resize bug remains).

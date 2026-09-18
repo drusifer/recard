@@ -317,6 +317,28 @@ export function clampMenuPosition(x, y, size, viewport) {
 }
 
 /**
+ * *fix (direct user bug report, 2026-09-17): "drag is weird, not scaled
+ * right so the dragged items fall behind the mouse pointer."
+ * `DataTransfer.setDragImage(image, x, y)` anchors the drag ghost at
+ * `(x, y)` into the image the browser ACTUALLY RENDERS - which reflects
+ * every ancestor CSS transform, including `--table-zoom`'s `scale()`
+ * on `#zones`. `offsetWidth`/`offsetHeight` are the element's UNSCALED
+ * layout size, so anchoring at exactly half of those only centers the
+ * ghost when the table happens to be at 1x zoom - at any other zoom the
+ * anchor drifts away from center by the zoom deviation. Scaling the
+ * offset by the table's own current zoom is what keeps the anchor at
+ * the true center regardless.
+ *
+ * @param {number} offsetWidth the dragged element's own unscaled `offsetWidth`
+ * @param {number} offsetHeight its unscaled `offsetHeight`
+ * @param {number} tableZoomScale the CURRENT `--table-zoom` value
+ * @returns {{x: number, y: number}}
+ */
+export function scaledDragImageAnchor(offsetWidth, offsetHeight, tableZoomScale) {
+  return { x: (offsetWidth * tableZoomScale) / 2, y: (offsetHeight * tableZoomScale) / 2 };
+}
+
+/**
 Drops any in-progress drag-target highlighting.
 */
 export function clearPileTargets() {
@@ -694,6 +716,19 @@ function wireCardLiftCue(wrapper, card, onCardLift) {
 /** Native-drag wiring (US-28/US-29/D19, US-107 extraction) - unchanged;
  * see `renderPileCards`' own call site comment for the authorization
  * reasoning behind when a card is draggable at all. */
+/** The live `--table-zoom` value `main.js`'s `wireTableZoomControls`
+ * sets on `#zones` - read back here rather than threaded through as a
+ * parameter, same as every other place this file reads a CSS custom
+ * property back off the DOM rather than duplicating the source of
+ * truth. Falls back to 1 (no scaling assumed) if `#zones` doesn't
+ * exist yet or the property is unset/unparseable. */
+function currentTableZoomScale() {
+  const zonesElement = document.querySelector('#zones');
+  const raw = zonesElement ? globalThis.getComputedStyle(zonesElement).getPropertyValue('--table-zoom') : '';
+  const scale = Number(raw.trim());
+  return Number.isFinite(scale) && scale > 0 ? scale : 1;
+}
+
 function wireCardDrag(wrapper, card, pileableActions, piles, pileView, options) {
   const { onMoveCard, onCardLift, onCardDrag } = options;
   if (!onMoveCard || pileableActions.length === 0) return;
@@ -710,7 +745,10 @@ function wireCardDrag(wrapper, card, pileableActions, piles, pileView, options) 
     // dragged image match what's actually on screen, for every card
     // shape, not just rectangular ones.
     const face = wrapper.querySelector('.card');
-    if (face) event.dataTransfer.setDragImage(face, face.offsetWidth / 2, face.offsetHeight / 2);
+    if (face) {
+      const anchor = scaledDragImageAnchor(face.offsetWidth, face.offsetHeight, currentTableZoomScale());
+      event.dataTransfer.setDragImage(face, anchor.x, anchor.y);
+    }
     highlightDragTargets(
       pileableActions.filter((a) => ['move', 'pickup'].includes(a)),
       piles,

@@ -196,4 +196,6 @@ sequenceDiagram
     Note right of Neo: "*correction (direct user<br/>clarification): zone-<br/>level privacy does NOT<br/>conflict with D83/D84 as<br/>earlier analysis claimed<br/>- that conflated the…"
     Neo->>All: "swe fix"
     Note right of Neo: "*fix table-zoom-wheel<br/>repositioned: right side<br/>of the table<br/>(position:absolute<br/>within .table-section,<br/>vertically centered),<br/>tall/thin (2.75…"
+    Neo->>All: "swe fix"
+    Note right of Neo: "*fix drag-ghost<br/>misalignment when<br/>zoomed: setDragImage<br/>anchored at half the<br/>card's UNSCALED offsetWi<br/>dth/offsetHeight, but<br/>the browser rende…"
 ```
