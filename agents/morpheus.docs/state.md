@@ -1,5 +1,11 @@
 # Agent State
 
+## Current Task (2026-09-19) - US-120 reviews: all APPROVED, shipped
+
+Approved: tableSpread preset field (declarative, via applyDeclaration);
+jev-player = CLI GAMES map -> per-game player module (gin/player.mjs play()),
+game owns its strategy names. D137 amended in place. Nothing pending.
+
 ## Current Task (2026-09-18) - *lead review harness-mcp usability fix: APPROVED
 
 Change confined to the MCP tool layer (harnessServer.mjs + .mcp.json + its

@@ -146,4 +146,10 @@ sequenceDiagram
     Note right of User: "install the commit hook"
     Tank->>User: "devops hooks"
     Note right of Tank: "Pre-commit hook<br/>installed:<br/>.githooks/pre-commit<br/>runs gitleaks on staged<br/>changes (--staged<br/>--redact). 'make hooks'<br/>sets<br/>core.hooksPath=.gith…"
+    Tank->>User: "devops release"
+    Note right of Tank: "Committed c427db8<br/>(gitleaks: make secrets,<br/>pre-commit hook, make<br/>hooks) - the hook<br/>scanned it clean. Pulled<br/>dev (up to date), pushed<br/>dev, f…"
+    User->>All: "request"
+    Note right of User: "prep for shutdown"
+    Mouse->>All: "exit"
+    Note right of Mouse: "*exit prep: US-120<br/>shipped - main == dev ==<br/>c427db8 on origin. All<br/>persona states saved<br/>(Neo, Trin, Morpheus,<br/>Oracle, Smith, Tank,<br/>Mouse),…"
 ```

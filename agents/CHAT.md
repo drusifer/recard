@@ -439,3 +439,15 @@ git config core.hooksPath .githooks
 ---
 [<small>2026-09-19 01:53:23</small>] [**Tank**]->[**User**] *devops hooks*:
  Pre-commit hook installed: .githooks/pre-commit runs gitleaks on staged changes (--staged --redact). 'make hooks' sets core.hooksPath=.githooks (once per clone); done here. Verified a staged fake ghp_ token blocks the commit (exit 1, HEAD unchanged); probe file removed. Hook fails closed if gitleaks is missing. Makefile + .githooks uncommitted.
+
+---
+[<small>2026-09-19 01:55:05</small>] [**Tank**]->[**User**] *devops release*:
+ Committed c427db8 (gitleaks: make secrets, pre-commit hook, make hooks) - the hook scanned it clean. Pulled dev (up to date), pushed dev, ff main, pushed. Both at c427db8.
+
+---
+[<small>2026-09-19 01:55:59</small>] [**User**]->[**all**] *request*:
+ prep for shutdown
+
+---
+[<small>2026-09-19 01:56:12</small>] [**Mouse**]->[**all**] *exit*:
+ *exit prep: US-120 shipped - main == dev == c427db8 on origin. All persona states saved (Neo, Trin, Morpheus, Oracle, Smith, Tank, Mouse); task.md current. Only CHAT.md/CHAT.diagram.md are uncommitted (chat log). On resume: optional sprint groom + CHAT archive (SPRINT_GIN_BOTS); Gin bot tuning is in BACKLOG.

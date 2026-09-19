@@ -1,11 +1,13 @@
 # Agent State
 
-## Current Task (2026-09-19) - Sprint US-120 Gin bots: ALL 5 PHASES DONE
+## Current Task (2026-09-19) - US-120 SHIPPED; session closed
 
-task.md "Sprint: Gin Rummy strategy bots - US-120" fully checked; Phase 5
-docs/GIN_STRATEGY.md written by Oracle from live Jev. Awaiting user: commit +
-groom (nothing committed since e3a6310); Jev threat calibration (BACKLOG
-"Gin bot tuning"). Gin discard-pile overflow: FIXED 2026-09-19 (bigger zone + tableSpread 0.7).
+All US-120 phases done + pushed: 43a958b (Gin Jev players, table talk,
+jev-player target, Gin discard fix), c427db8 (gitleaks secrets/hooks).
+main == dev == c427db8 on origin. Root screenshot deleted.
+Open (BACKLOG "Gin bot tuning"): Jev threat never >=3 live; helps Nouls
+clustered; layoffExposure unused. Not yet done: sprint groom/archive
+(`bobp chat-report --moniker SPRINT_GIN_BOTS`) - do on user request.
 
 ## Current Task (2026-09-18)
 

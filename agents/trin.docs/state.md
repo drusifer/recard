@@ -1,5 +1,12 @@
 # Agent State
 
+## Current Task (2026-09-19) - US-120 close-out verifies PASSED
+
+Gin discard fix: lint:design fills Gin Table pile with 30 discards (red before,
+clean after). jev-player: tests/jevPlayer.test.js (4) red->green; live join as
+"equilibrium". gitleaks: make secrets + pre-commit hook both proven to fail on a
+planted ghp_ token. Unit 913, lint-js clean. All committed (c427db8).
+
 ## Current Task (2026-09-19) - US-120 Phases 1-3 UAT PASSED
 
 Mutation-proved: fairness, exact melds (P1); Jev utility (after a test fix),
