@@ -7,7 +7,7 @@
 #
 # Adding a task: add the npm script first, then a one-line target here.
 
-.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-tablezoom test-focuszoom test-multiplayer test-harness-mcp test-gin jev-player lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers
+.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-tablezoom test-focuszoom test-multiplayer test-harness-mcp test-gin jev-player secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers
 
 help:
 	@echo "Recard targets (all front npm scripts):"
@@ -22,6 +22,8 @@ help:
 	@echo "  test-harness-mcp  the harness MCP server over its real stdio transport (US-119)"
 	@echo "  test-gin      a Gin bot joins a hosted table, draws and knocks out loud (US-120)"
 	@echo "  jev-player    GAME=gin STRATEGY=<name> CODE=<table code> [FIRST=bot|opponent] [HANDS=1]: a Jev player joins your table (US-120)"
+	@echo "  secrets      gitleaks: every commit + uncommitted changes to tracked files"
+	@echo "  hooks        install the gitleaks pre-commit hook (.githooks/)"
 	@echo "  lint         style + design + js"
 	@echo "  lint-js      eslint"
 	@echo "  lint-style   stylelint"
@@ -31,7 +33,7 @@ help:
 	@echo "  cards        compile content/rtg YAML -> src/decks/rtg/cards.json"
 	@echo "  art-gen      paint card art via the codex CLI (~50 min, resumable)"
 	@echo "  art          pack generated art into assets/cards/rtg/*.webp"
-	@echo "  check        cards + test + lint  (full gate)"
+	@echo "  check        cards + test + lint-decks + secrets  (full gate)"
 	@echo "  dev          dev server"
 	@echo "  build-standalone  bundle everything into build/recard-standalone.html (runs via file://)"
 	@echo "  dist         gather index.html/style.css/src/assets into dist/ for a static host upload"
@@ -72,6 +74,19 @@ test-gin:
 # (gin) with strategy STRATEGY. Jev strategies need TYPESAFE_API_KEY.
 jev-player:
 	npm run jev-player -- --game '$(GAME)' --strategy '$(STRATEGY)' --code '$(CODE)' --first '$(or $(FIRST),bot)' --hands '$(or $(HANDS),1)'
+
+# Secret scan (direct user request, 2026-09-19 - the Jev players read
+# TYPESAFE_API_KEY from the environment, and it must never land in a
+# commit). Scans all history, then the uncommitted changes to tracked files.
+secrets:
+	@command -v gitleaks >/dev/null || { echo "gitleaks is not installed - see https://github.com/gitleaks/gitleaks#installing"; exit 1; }
+	gitleaks git --no-banner --redact .
+	gitleaks git --no-banner --redact --pre-commit .
+
+# Versioned git hooks: points this clone at .githooks/ (the gitleaks
+# pre-commit hook). Run once per clone.
+hooks:
+	git config core.hooksPath .githooks
 
 lint:
 	npm run lint
@@ -145,7 +160,7 @@ art:
 # `lint-decks` IS included: it carries no baseline debt, so it can and
 # must stay at exit 0 - an unbalanced deck is a real failure, not a
 # tolerated one.
-check: cards test lint-decks
+check: cards test lint-decks secrets
 
 dev:
 	npm run dev

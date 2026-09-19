@@ -405,3 +405,37 @@ npm run lint:js
 ---
 [<small>2026-09-19 01:51:18</small>] [**User**]->[**all**] *request*:
  commit and publish, and pull dev
+
+---
+[<small>2026-09-19 01:52:00</small>] [**Mouse**]->[**User**] *sm release*:
+ Committed 43a958b on dev (US-120: Gin Jev players, table talk, jev-player target, Gin discard fix). Pulled dev (already up to date), pushed dev, fast-forwarded main to dev and pushed. Both at 43a958b. Left the user's untracked Screenshot*.png out.
+
+---
+[<small>2026-09-19 01:52:07</small>] [**User**]->[**all**] *request*:
+ add gitleaks
+
+---
+[<small>2026-09-19 01:52:54</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make secrets | /home/drusifer/Projects/recard/build/build.out
+1:52AM INF 1 commits scanned.
+1:52AM INF scanned ~2037 bytes (2.04 KB) in 248ms
+1:52AM WRN leaks found: 1
+make: *** [Makefile:83: secrets] Error 1
+
+---
+[<small>2026-09-19 01:53:00</small>] [**Tank**]->[**User**] *devops decision*:
+ Decision: gitleaks added as 'make secrets' (all history + uncommitted tracked changes, redacted) and wired into 'make check'. Full history (159 commits): no leaks. Verified it fails (exit 2) on a planted ghp_ token. Rejected for now: a git pre-commit hook (hooks aren't versioned and would change every commit - offered to user). Uncommitted.
+
+---
+[<small>2026-09-19 01:53:10</small>] [**User**]->[**all**] *request*:
+ install the commit hook
+
+---
+[<small>2026-09-19 01:53:10</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make hooks | /home/drusifer/Projects/recard/build/build.out
+=== make hooks @ 2026-09-19 01:53:10 ===
+git config core.hooksPath .githooks
+
+---
+[<small>2026-09-19 01:53:23</small>] [**Tank**]->[**User**] *devops hooks*:
+ Pre-commit hook installed: .githooks/pre-commit runs gitleaks on staged changes (--staged --redact). 'make hooks' sets core.hooksPath=.githooks (once per clone); done here. Verified a staged fake ghp_ token blocks the commit (exit 1, HEAD unchanged); probe file removed. Hook fails closed if gitleaks is missing. Makefile + .githooks uncommitted.

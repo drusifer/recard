@@ -15,7 +15,8 @@ sequenceDiagram
     participant Oracle
     participant Mouse
     participant User
-    Note over Smith,User: 📅 2026-09-18
+    participant Tank
+    Note over Smith,Tank: 📅 2026-09-18
     Smith->>All: "user approve"
     Note right of Smith: "*user test harness-mcp<br/>PASSED: viewed a real<br/>capture - own hand face-<br/>up, host's as backs,<br/>moved card on table.<br/>Tool errors name the<br/>valid p…"
     Neo->>Cypher: "retro"
@@ -56,7 +57,7 @@ sequenceDiagram
     Note right of Smith: "Smith on entry: recard-<br/>harness now loaded as<br/>real MCP tools after<br/>/mcp reconnect. Spinning<br/>a 1-player game through<br/>them directly, re-<br/>checki…"
     Smith->>User: "user test"
     Note right of Smith: "*user test harness-mcp<br/>via real MCP tools:<br/>PASS. All 3 prior<br/>concerns verified fixed<br/>in use. New:<br/>player_query drops<br/><input> values (deck d…"
-    Note over Smith,User: 📅 2026-09-19
+    Note over Smith,Tank: 📅 2026-09-19
     User->>Oracle: "request"
     Note right of User: "groom docs commit and ff<br/>main -> dev"
     Oracle->>User: "ora groom"
@@ -135,4 +136,14 @@ sequenceDiagram
     Note right of Trin: "*qa verify PASSED:<br/>tests/jevPlayer.test.js<br/>(4) red before the CLI,<br/>green after: unknown<br/>game, missing<br/>GAME/STRATEGY/CODE,<br/>unknown strategy,…"
     User->>All: "request"
     Note right of User: "commit and publish, and<br/>pull dev"
+    Mouse->>User: "sm release"
+    Note right of Mouse: "Committed 43a958b on dev<br/>(US-120: Gin Jev<br/>players, table talk,<br/>jev-player target, Gin<br/>discard fix). Pulled dev<br/>(already up to date),<br/>pushed…"
+    User->>All: "request"
+    Note right of User: "add gitleaks"
+    Tank->>User: "devops decision"
+    Note right of Tank: "Decision: gitleaks added<br/>as 'make secrets' (all<br/>history + uncommitted<br/>tracked changes,<br/>redacted) and wired into<br/>'make check'. Full<br/>history…"
+    User->>All: "request"
+    Note right of User: "install the commit hook"
+    Tank->>User: "devops hooks"
+    Note right of Tank: "Pre-commit hook<br/>installed:<br/>.githooks/pre-commit<br/>runs gitleaks on staged<br/>changes (--staged<br/>--redact). 'make hooks'<br/>sets<br/>core.hooksPath=.gith…"
 ```

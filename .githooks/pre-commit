@@ -1,0 +1,8 @@
+#!/bin/sh
+# Blocks a commit whose staged changes contain a secret (gitleaks).
+# Installed by `bobp make hooks` (core.hooksPath -> .githooks).
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "pre-commit: gitleaks is not installed - see https://github.com/gitleaks/gitleaks#installing" >&2
+  exit 1
+fi
+exec gitleaks git --no-banner --redact --pre-commit --staged .
