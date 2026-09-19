@@ -286,6 +286,9 @@ try {
   // regression beyond today's already-known findings is still visible
   // in the output.
   const KNOWN_EXCEPTIONS = new Set(['Recard the Gathering', 'Solitaire']);
+  // Presets whose Table pile collects a game's worth of discards, and how
+  // many a long hand leaves there.
+  const MID_HAND_DISCARDS = { 'Gin Rummy': 30 };
   for (const preset of PRESETS) {
     const host2 = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
     const guest2 = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
@@ -319,6 +322,34 @@ try {
           if (KNOWN_EXCEPTIONS.has(preset.name)) console.error(`  (known, accepted) ${message}`);
           else report('preset-sweep@1280x800', message);
         }
+      }
+
+      // Direct user request (2026-09-19): a real Gin hand piles its
+      // discards on the Table pile - Smith's live bot game had ~17 by the
+      // knock, and past ~7 the pile wrapped onto a second row BELOW the
+      // Table Zone's box, where the host could no longer see it. Fill the
+      // pile to a long hand's worth and require every pile to stay inside
+      // its own zone.
+      const discards = MID_HAND_DISCARDS[preset.name];
+      if (discards) {
+        await host2.evaluate((count) => {
+          const harness = globalThis.__recardHarness;
+          const stock = harness.view().piles.find((pile) => pile.id === 'deck').cards;
+          for (const card of stock.slice(0, count)) harness.act({ type: 'MOVE', pileableId: card.id, toPileId: 'table' });
+        }, discards);
+        await host2.waitForFunction(
+          (count) => globalThis.__recardHarness.view().piles.find((pile) => pile.id === 'table').cards.length === count,
+          discards, { timeout: 10_000 },
+        );
+        await host2.waitForTimeout(200); // one render after the last MOVE
+        const spills = await host2.evaluate(() => [...document.querySelectorAll('#zones .zone')].flatMap((zone) => {
+          const box = zone.getBoundingClientRect();
+          return [...zone.querySelectorAll('.pile-section')].filter((pile) => {
+            const rect = pile.getBoundingClientRect();
+            return rect.left < box.left - 1 || rect.right > box.right + 1 || rect.top < box.top - 1 || rect.bottom > box.bottom + 1;
+          }).map((pile) => `pile "${pile.dataset.pileId}" (bottom ${Math.round(pile.getBoundingClientRect().bottom)}, right ${Math.round(pile.getBoundingClientRect().right)}) spills out of zone "${zone.querySelector('.zone-name')?.textContent?.trim()}" (bottom ${Math.round(box.bottom)}, right ${Math.round(box.right)})`);
+        }));
+        for (const spill of spills) report('preset-sweep@1280x800', `[${preset.name}, ${discards} discards] ${spill}`);
       }
     } finally {
       await host2.close();

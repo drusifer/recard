@@ -3416,3 +3416,50 @@ only; the table is seen through screenshots AND DOM queries
 (`player_query`) (user decisions at the Smith gate).
 
 Sprint status: COMPLETE (D136).
+
+### US-120: Gin Rummy strategy bots — typed rule sets, live Jev judgments, a runner that joins a hosted table
+**As** a person hosting a Gin Rummy table in Recard, **I want** to
+start a bot that joins my table as a real player, picks its moves from
+a named, typed strategy (code rules plus live TypeSafe/Jev judgments),
+and reports every decision it makes, **so that** I can play against -
+and compare - several expert-informed strategies.
+
+**AC:**
+- Typed Gin core: card values, every meld (sets of 3-4, runs of 3+ in a
+  suit), the deadwood-minimising meld arrangement (a card that fits a
+  set AND a run is resolved exactly, not greedily), lay-offs.
+- A public-information observation: the bot's own hand, the discard
+  pile, stock count, the opponent's hand SIZE, and history it could see
+  (opponent's discards and the discard-pile cards it took). Recard's
+  guest view carries the opponent's real card ids; the observation
+  never does - guarded by a test.
+- A typed rule list (conditions with typed inputs/outputs) and at least
+  three strategies built from it, each an ordered rule set; opponent
+  inference (threat level, how likely a discard helps the opponent) is
+  asked of Jev live, all in ONE request per decision.
+- A runner: `bobp make jev-player GAME=gin STRATEGY=<name> CODE=<table code>` joins
+  the hosted table over the real PeerJS/WebRTC path as a guest, plays
+  its turns (draw stock/discard, discard, knock = face-down discard,
+  gin), and writes one typed JSON record per decision (observation,
+  facts, Jev answers, rules fired, decision, actions) to stdout and
+  `build/gin/`.
+- MCP: `game_join` adds a player to an externally hosted table, and
+  `gin_turn` runs one bot decision for a named player and returns its
+  record - so an agent can drive the same bot step by step.
+- Missing `TYPESAFE_API_KEY` is a clear error naming the variable, not
+  a stack trace. Tests never call Jev (injected judge).
+- `docs/GIN_STRATEGY.md`: the research (with sources), the full typed
+  rule list, the decision flow, and example evaluations of midgame and
+  late-game states.
+
+- Table talk (user request mid-sprint): a WebRTC side channel for what
+  the game protocol does not encode. Any player can say a line of text
+  (plus optional structured data for bots); every player sees the same
+  log, in the same order, in a Table Talk panel with an input. The bot
+  announces its knocks and gin there (melds + deadwood). The harness and
+  MCP can say and read it (`player_say`, `player_talk`).
+
+**Out of scope:** scoring and lay-off resolution after a knock (the
+people at the table count, as they do today); match-score (to 100)
+adjustments; more than 2 players; enforcing Gin rules in the app itself;
+table talk persistence across a host reload, private messages.

@@ -66,7 +66,79 @@ D129: `Stack`/`Stackable` (also domain model — see above) · D130: camera is a
 D20: desktop table width, pure CSS breakpoints · D24: Zone room grows at desktop breakpoints · D51: bigger cards (also drag-and-drop — see above) · D61: saved layout overrides, separate localStorage store · D133: fixed local canvas + computed fit-zoom fixes zone-overlap drift (also camera/view — see above) · D134: per-preset canvas size + every preset's own layout tuned/verified (also camera/view, testing — see above/below)
 
 **Testing & tooling**
-D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rules disabled post-autofix · D60: `tests/e2e.smoke.mjs` removed · D96: universal DnD guarantee, structural test (also drag-and-drop — see above) · D134: `lint:design` sweeps every preset, not just the default (also camera/view — see above) · D135: multi-player test harness — real peers driven over the real protocol, one `submitAction` funnel · D136: harness MCP server — agents drive a live table; read-only WebRTC traffic log
+D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rules disabled post-autofix · D60: `tests/e2e.smoke.mjs` removed · D96: universal DnD guarantee, structural test (also drag-and-drop — see above) · D134: `lint:design` sweeps every preset, not just the default (also camera/view — see above) · D135: multi-player test harness — real peers driven over the real protocol, one `submitAction` funnel · D136: harness MCP server — agents drive a live table; read-only WebRTC traffic log · D137: Gin Rummy bots — typed rules in code, Jev opponent inference, one bot core behind runner + MCP · D138: table talk — host-ordered `talk` message, not game state
+
+---
+
+### D138. Table talk — a `talk` message on the existing data channel, host-ordered, never game state
+
+US-120 (user request mid-sprint). A new message type beside
+`state`/`motion`/`identity`: `{ type: 'talk', text, data? }`. A guest
+sends it to the host; the host stamps it with the sender's IDENTITY
+(`peerToKey`, the D27 rule - an unmapped peer is ignored, a claimed name
+is never trusted), appends it to its own bounded log, and relays the
+stamped entry to EVERY guest, the sender included. The sender does not
+add its own line locally, so the host's order is the one order every
+peer sees. `data` is optional JSON for bots (a knock's melds and
+deadwood); `text` is what people read. Rendered by a `<table-talk>` Web
+Component (log + input).
+
+**Rejected:** a reducer action / replicated state (talk is not game
+state - it would be persisted, conserved and redacted like cards for no
+reason); a second WebRTC data channel (one channel already carries
+typed messages; a new type is the whole change); showing the sender's
+own line immediately (two orders on two screens).
+
+---
+
+### D137. Gin Rummy bots — pure typed rules in code, opponent inference asked of Jev, one bot core behind a CLI runner and the MCP
+
+US-120. Everything lives in `tools/gin/` (Node-side tooling beside
+`tools/mcp/`, not app code - the app stays a rules-free table):
+
+- `cards.mjs` - card values, meld enumeration, exact best-meld search
+  (backtracking over candidate melds, so a card that fits a set AND a
+  run is resolved by total deadwood, not greedily), lay-offs.
+- `observe.mjs` - `GinTracker` turns successive Recard views into a
+  public-information `GinObservation` by diffing snapshots (stock
+  count, discard-pile ids, opponent hand size): opponent draws, the
+  discard-pile cards they took, their discards. Diffs, not events,
+  because a waiting bot can miss an intermediate state. It never copies
+  an opponent card identity it did not see publicly.
+- `rules.mjs` - the typed condition set: pure functions over the
+  observation returning a boolean, enum, number, or record.
+- `judgments.mjs` - Jev questions. ONE `systemOne` request per decision
+  fans out a threat Score plus one Noul per candidate discard ("does
+  this card likely help the opponent?") - the speculative fan-out
+  pattern; the strategy uses only the answers it needs.
+- `strategies.mjs` - each strategy is an ordered rule set; `decide()`
+  returns a typed decision plus the trace of rules that fired.
+- `bot.mjs` - `GinBot` (turn detection, one decision, the actions
+  that carry it out). Its peer is anything with `view/act/waitForView`
+  (a harness peer) and its judge anything with `systemOne` (the real
+  `TypeSafeClient`, or a scripted fake in tests).
+- `player.mjs` - `play(options)`: serves this repo's app, launches headless
+  Chromium, joins the table by code as a guest (new harness
+  `joinTable()`, the same UI join path the harness already uses), loops
+  `GinBot`, writes JSONL records. Started by `tools/jevPlayer.mjs`
+  (`make jev-player GAME=gin STRATEGY=.. CODE=..`), which picks the
+  game's player module - amended 2026-09-19, replacing the Gin-only
+  `runner.mjs`/`make gin-bot` (user request).
+
+**Table conventions** (Recard enforces no rules): deck = stock, the
+shared Table pile = discard pile (top = last card), draw from discard =
+`MOVE` its top card to my hand, knock = `MOVE` the knock card to the
+table then `FLIP` it face down, gin = the same with 0 deadwood. No
+upcard is dealt, so the first player draws from stock; who goes first
+is a runner flag (default: the bot). Dead hand at 2 stock cards.
+
+**Rejected:** asking Jev for the move itself (policy stays in code,
+per TypeSafe's own guidance - judgments in, decision out); an LLM
+reasoning call per turn (slow, not typed); enforcing rules in the app
+(out of scope, and Recard's premise is a free table); reading the
+opponent's real cards from the guest view (the view carries them -
+that would be cheating, so the observation strips them and a test
+proves it).
 
 ---
 

@@ -1,5 +1,12 @@
 # Agent State
 
+## Current Task (2026-09-19) - Sprint US-120 Gin bots: ALL 5 PHASES DONE
+
+task.md "Sprint: Gin Rummy strategy bots - US-120" fully checked; Phase 5
+docs/GIN_STRATEGY.md written by Oracle from live Jev. Awaiting user: commit +
+groom (nothing committed since e3a6310); Jev threat calibration (BACKLOG
+"Gin bot tuning"). Gin discard-pile overflow: FIXED 2026-09-19 (bigger zone + tableSpread 0.7).
+
 ## Current Task (2026-09-18)
 
 US-119 shipped in 3 phases (traffic log / server / screenshots), task.md

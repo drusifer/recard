@@ -1,5 +1,25 @@
 # Agent State
 
+NOTE 2026-09-19: user overrode my "Bot (<strategy>)" naming condition - a Jev
+player now joins named just `<strategy>` (e.g. "equilibrium").
+
+## Current Task (2026-09-19) - `*user test gin-bot` (US-120): PASS, 3 findings
+
+Real flow: MCP hosted a Gin table (standing in for the user's browser),
+`bobp make gin-bot CODE=.. STRATEGY=knock-early` joined as "Bot (knock-early)",
+host re-dealt, I played 10 host turns. Bot drew, took useful upcards
+(takeUpcardIfGain/IfMelds), knocked at deadwood 4 face down, said
+"Knock! 2♣ 2♦ 2♠ · A♦ A♥ A♠ · 9♣ 10♣ J♣ | deadwood 4: 4♥" - visible in the
+host's Table Talk panel; runner exited 0 after 1/1 hands.
+Findings: (1) first hand logged as "hand 2" - FIXED (pre-deal look isn't a
+hand); (2) summary showed raw ids ("4-clubs-0") - FIXED (card names).
+(3) PRE-EXISTING, NOT FIXED, reported to user: in the Gin Rummy preset the
+Table (discard) pile renders BELOW the table zone's box (cards at y~577,
+zone ends ~540) - the host cannot see discards or the face-down knock card
+at the default layout. SIMPLE_LAYOUT's 190px zone height; user's call.
+Root cause (Neo, 2026-09-19): past ~7 cards the Table pile wraps to a 2nd row
+below the zone box. User then asked to fix: FIXED (bigger zone + tableSpread 0.7).
+
 ## Current Task (2026-09-18, spin 2) - `*user test harness-mcp` via REAL MCP tools
 
 recard-harness loaded after `/mcp` reconnect. 1-player War: start -> status

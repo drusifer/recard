@@ -48,6 +48,8 @@ import './components/ZonePanel.js';
 import './components/PilePanel.js';
 import './components/FanPile.js';
 import './components/DeckStack.js';
+import './components/TableTalk.js';
+import { createTalkLog, makeTalkMessage } from './tableTalk.js';
 import './components/ChipTray.js';
 import './components/HeaderActions.js';
 import './components/SpreadSlider.js';
@@ -128,6 +130,8 @@ let myId = null;
 let myName = '';
 let gameState = null; // authoritative, host only
 let latestView = null; // last view received from host, join only
+// D138: table talk - not game state; host-ordered, relayed to everyone.
+const talkLog = createTalkLog();
 let isSessionEnded = false;
 
 // *fix (direct user report: rejoining as the "joiner" left them looking
@@ -577,6 +581,14 @@ session.on('roster', (transportRoster) => {
 });
 
 session.on('data', ({ fromId, msg }) => {
+  if (msg.type === 'talk') {
+    // D27/D138: the line is stamped with the identity this address
+    // speaks for - never a name the sender claims. Unmapped peers are
+    // ignored, same as their actions.
+    const speakerKey = peerToKey.get(fromId);
+    if (speakerKey) publishTalk(speakerKey, msg);
+    return;
+  }
   if (msg.type === 'motion') {
     applyIncomingMotion(peerToKey.get(fromId) ?? fromId, msg);
     relayMotion(fromId, msg);
@@ -948,6 +960,9 @@ function configsForPreset(preset, deckIds, allowsPlayerZones) {
     // layout's footprint. `undefined` when absent - `applyFitZoom`
     // (main.js) falls back to `TABLE_CANVAS_SIZE` itself.
     tableCanvasSize: preset.tableCanvasSize,
+    // How much the built-in Table pile overlaps its cards (`undefined`:
+    // the plain pile's own default).
+    tableSpread: preset.tableSpread,
   };
   return { deckConfig, gameConfig };
 }
@@ -1185,7 +1200,56 @@ globalThis.__recardHarness = {
   myId: () => myId,
   // US-119: this player's protocol traffic (read-only), `{type, limit}`.
   traffic: (options) => session?.traffic.entries(options) ?? [],
+  // D138: table talk.
+  say: (text, data) => say(text, data),
+  talk: () => talkLog.entries(),
 };
+
+/**
+ * D138: host only - stamps a line with its speaker's seat name, logs it,
+ * and relays the stamped entry to every guest (the speaker included), so
+ * the host's order is the one order every screen shows.
+ */
+function publishTalk(speakerKey, message) {
+  let line;
+  try {
+    line = makeTalkMessage(message.text, message.data);
+  } catch (error) {
+    console.warn('Rejected table talk from', speakerKey, error);
+    return;
+  }
+  const name = gameState?.players.find((player) => player.id === speakerKey)?.name ?? speakerKey;
+  const entry = talkLog.add({ from: speakerKey, name, text: line.text, ...(line.data !== undefined && { data: line.data }) });
+  renderTalk();
+  const players = gameState?.players ?? [];
+  for (const player of players) {
+    if (player.id === myId) continue;
+    const peerId = peerFor(player.id, peerToKey);
+    if (peerId) session.sendTo(peerId, { type: 'talk', entry });
+  }
+}
+
+/**
+ * D138: say a line to the table. A guest's line goes to the host, which
+ * stamps and relays it back - it appears here when it comes back.
+ */
+function say(text, data) {
+  const message = makeTalkMessage(text, data);
+  if (role === 'host') publishTalk(myId, message);
+  else session.send(message);
+}
+
+function renderTalk() {
+  document.querySelector('table-talk')?.render(talkLog.entries());
+}
+
+document.querySelector('table-talk')?.addEventListener('talk-say', (event) => {
+  try {
+    say(event.detail.text);
+  } catch (error) {
+    console.warn(error);
+  }
+});
 
 function dispatch(action) {
   gameState = reduce(gameState, action);
@@ -1386,6 +1450,11 @@ function wireGuestSession() {
     }
     if (message.type === 'motion') {
       applyIncomingMotion(message.fromId, message);
+      return;
+    }
+    if (message.type === 'talk') {
+      talkLog.add(message.entry);
+      renderTalk();
       return;
     }
     if (message.type !== 'state') return;

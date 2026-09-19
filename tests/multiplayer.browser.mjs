@@ -82,3 +82,25 @@ test('another player\'s hand renders face-down in a guest\'s DOM, their own face
   assert.equal(bobCards.length, CARDS_PER_PLAYER);
   assert.ok(bobCards.every((card) => !card.classes.includes('card-back')), 'Bob sees their own cards\' faces');
 });
+
+test('table talk: the host stamps who said it and relays one order to every peer, sender included (D138)', async () => {
+  const { host, guests } = fixture.table;
+  const [alice, bob] = guests;
+  const aliceId = await alice.myId();
+
+  await alice.say('Knock - deadwood 4', { declare: 'knock', deadwood: 4 });
+  await host.say('good game');
+
+  for (const peer of [host, alice, bob]) {
+    const talk = await peer.waitForTalk(2);
+    assert.deepEqual(talk.map(({ from, text }) => ({ from, text })), [
+      { from: aliceId, text: 'Knock - deadwood 4' },
+      { from: await host.myId(), text: 'good game' },
+    ]);
+    assert.equal(talk[0].name, 'Guest 1', 'named by the host from the seat, not by the sender');
+    assert.deepEqual(talk[0].data, { declare: 'knock', deadwood: 4 });
+  }
+
+  const shown = await bob.query(['table-talk .talk-line']);
+  assert.deepEqual(shown['table-talk .talk-line'].map((line) => line.text), ['Guest 1: Knock - deadwood 4', 'Host: good game']);
+});

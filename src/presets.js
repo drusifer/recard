@@ -231,7 +231,22 @@ export const PRESETS = [
     // frozen - replaced with `SIMPLE_LAYOUT`, the same clean, verified-
     // overlap-free table-zone/score placement War/Hearts/Poker/Pinochle
     // already use (this game needs nothing beyond those two panels).
-    layout: SIMPLE_LAYOUT,
+    //
+    // *fix (direct user request, 2026-09-19: "make the zone a little
+    // bigger"): SIMPLE_LAYOUT's rows, with the Table Zone 110 wider (and
+    // Score shifted right to match) - a whole hand's discards, tightened
+    // below, then fit beside the Deck on one row instead of wrapping out
+    // of the zone's box. Gin is 2 players, so nothing sits beside it.
+    layout: {
+      'table-zone': { ...SIMPLE_LAYOUT['table-zone'], x: 60, w: 760 },
+      score: { ...SIMPLE_LAYOUT.score, x: 840 },
+    },
+    // Direct user request (2026-09-19): discards pile up on the Table
+    // pile all hand - laid side by side, a long hand's ~20 outgrew the
+    // Table Zone and wrapped out of sight below it. Overlapped, each card
+    // still shows its rank corner (`lint:design` fills it with 30, about
+    // the most a hand can leave: the stock is 32, dead at 2).
+    tableSpread: 0.7,
   },
   {
     name: 'Hearts',

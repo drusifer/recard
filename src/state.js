@@ -478,7 +478,9 @@ export function createInitialState(deckConfig = {}, rng = Math.random, gameConfi
     piles: [
       ...(hasTableZone ? [
         makeDeckPile(deckConfig, rng, TABLE_ZONE_ID),
-        makePile('plain', { id: DEFAULT_PILE_ID, name: 'Table', zoneId: TABLE_ZONE_ID }),
+        // A preset MAY tighten the Table pile (Gin's discards: direct user
+        // request, 2026-09-19) - the same pile `spread` Tighten/Loosen writes.
+        applyDeclaration(makePile('plain', { id: DEFAULT_PILE_ID, name: 'Table', zoneId: TABLE_ZONE_ID }), { spread: gameConfig.tableSpread }, rng),
       ] : []),
       ...built.piles,
     ],

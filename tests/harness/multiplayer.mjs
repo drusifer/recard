@@ -84,6 +84,38 @@ class HarnessPeer {
   }
 
   /**
+   * Waits until the host has seated this player under its own identity.
+   */
+  waitForSeat({ timeout = JOIN_TIMEOUT_MS } = {}) {
+    return this.page.waitForFunction(() => {
+      const harness = globalThis.__recardHarness;
+      return harness.view()?.players.some((player) => player.id === harness.myId());
+    }, undefined, { timeout });
+  }
+
+  /**
+   * Say a line of table talk (D138), with optional structured data.
+   */
+  say(text, data) {
+    return this.page.evaluate(([t, d]) => globalThis.__recardHarness.say(t, d), [text, data]);
+  }
+
+  /**
+   * This player's table-talk log, host-ordered (D138).
+   */
+  talk() {
+    return this.page.evaluate(() => globalThis.__recardHarness.talk());
+  }
+
+  /**
+   * Waits until this player's table-talk log holds at least `count` lines.
+   */
+  async waitForTalk(count, { timeout = VIEW_TIMEOUT_MS } = {}) {
+    await this.page.waitForFunction((n) => globalThis.__recardHarness.talk().length >= n, count, { timeout });
+    return this.talk();
+  }
+
+  /**
    * This player's WebRTC protocol traffic (US-119), `{ type, limit }`.
    */
   traffic(options) {
@@ -119,40 +151,48 @@ class HarnessPeer {
   }
 }
 
-/**
- * Stands up a table: a host plus `players - 1` guests, each in its own
- * browser context (separate localStorage, so separate player identities),
- * joined by the real table code, then started with a real Deal of
- * `cardsPerPlayer`. Resolves `{ host, guests, close() }`.
- */
-export async function createTable({ browser, baseUrl, players, preset, cardsPerPlayer }) {
-  const contexts = [];
-  async function openPeer() {
-    const context = await browser.newContext();
-    contexts.push(context);
-    const page = await context.newPage();
-    await page.goto(baseUrl);
-    return new HarnessPeer(page);
-  }
+async function openPeer(browser, baseUrl) {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.goto(baseUrl);
+  return { peer: new HarnessPeer(page), context };
+}
 
-  const host = await openPeer();
+/**
+ * Hosts a new table (not dealt yet). Resolves `{ host, code, close() }`.
+ */
+export async function hostTable({ browser, baseUrl, preset }) {
+  const { peer: host, context } = await openPeer(browser, baseUrl);
   await host.page.click('#show-host');
   if (preset) await host.page.selectOption('#host-preset', { label: preset });
   await host.page.click('#create-table');
   await host.page.waitForSelector('#host-share:not([hidden])', { timeout: JOIN_TIMEOUT_MS });
-  const code = await host.myId();
+  return { host, code: await host.myId(), close: () => context.close() };
+}
 
-  const guests = [];
-  for (let index = 1; index < players; index++) {
-    const guest = await openPeer();
-    await guest.page.click('#show-join');
-    await guest.page.fill('#join-name', `Guest ${index}`);
-    await guest.page.fill('#join-code', code);
-    await guest.page.click('#join-btn');
-    guests.push(guest);
-  }
+/**
+ * Joins the table `code` as `name` through the real join screen - its own
+ * browser context, so its own player identity. `baseUrl` serves the app
+ * the guest runs; the host can be anywhere the PeerJS broker reaches (a
+ * table someone else is hosting). Resolves `{ peer, close() }` once the
+ * join is sent; the host decides when it is seated.
+ */
+export async function joinTable({ browser, baseUrl, code, name }) {
+  const { peer, context } = await openPeer(browser, baseUrl);
+  await peer.page.click('#show-join');
+  await peer.page.fill('#join-name', name);
+  await peer.page.fill('#join-code', code);
+  await peer.page.click('#join-btn');
+  return { peer, close: () => context.close() };
+}
+
+/**
+ * Waits for `players` connected seats on the host, then deals
+ * `cardsPerPlayer` through the real Deal button, and waits for every
+ * guest to hold its deal under its host-assigned identity.
+ */
+export async function dealTable(host, guests, { players, cardsPerPlayer }) {
   await host.waitForView((view, count) => view.players.filter((p) => p.connection === 'connected').length === count, players, { timeout: JOIN_TIMEOUT_MS });
-
   await host.page.fill('#cards-per-player', String(cardsPerPlayer));
   await host.page.click('#deal-btn');
   for (const guest of guests) {
@@ -163,10 +203,27 @@ export async function createTable({ browser, baseUrl, players, preset, cardsPerP
       return harness.view()?.myHand.length === count && harness.view().players.some((p) => p.id === harness.myId());
     }, cardsPerPlayer, { timeout: VIEW_TIMEOUT_MS });
   }
+}
 
+/**
+ * Stands up a table: a host plus `players - 1` guests, each in its own
+ * browser context (separate localStorage, so separate player identities),
+ * joined by the real table code, then started with a real Deal of
+ * `cardsPerPlayer`. Resolves `{ host, guests, close() }`.
+ */
+export async function createTable({ browser, baseUrl, players, preset, cardsPerPlayer }) {
+  const hosted = await hostTable({ browser, baseUrl, preset });
+  const closers = [hosted.close];
+  const guests = [];
+  for (let index = 1; index < players; index++) {
+    const joined = await joinTable({ browser, baseUrl, code: hosted.code, name: `Guest ${index}` });
+    closers.push(joined.close);
+    guests.push(joined.peer);
+  }
+  await dealTable(hosted.host, guests, { players, cardsPerPlayer });
   return {
-    host,
+    host: hosted.host,
     guests,
-    close: () => Promise.all(contexts.map((context) => context.close())),
+    close: () => Promise.all(closers.map((close) => close())),
   };
 }

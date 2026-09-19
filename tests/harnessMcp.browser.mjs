@@ -46,7 +46,7 @@ async function call(name, arguments_ = {}) {
 test('lists the harness tools', async () => {
   const { tools } = await fixture.client.listTools();
   const names = new Set(tools.map((tool) => tool.name));
-  for (const name of ['game_start', 'game_status', 'game_stop', 'player_act', 'player_view', 'player_wait', 'player_query', 'player_traffic', 'screenshot']) {
+  for (const name of ['game_start', 'game_status', 'game_stop', 'game_join', 'gin_turn', 'player_act', 'player_view', 'player_wait', 'player_query', 'player_traffic', 'player_say', 'player_talk', 'screenshot']) {
     assert.ok(names.has(name), `missing tool ${name}`);
   }
 });
@@ -138,4 +138,27 @@ test('screenshot with no player captures every player as one step', async () => 
   assert.deepEqual(files.map((file) => path.basename(file)), ['002-host.png', '002-guest1.png']);
   const run = await readdir(path.dirname(files[0]));
   assert.deepEqual(run.toSorted(), ['001-guest1-after-move.png', '002-guest1.png', '002-host.png', 'index.html']);
+});
+
+test('game_join seats a new named player at a table by its code; table talk flows both ways', async () => {
+  const { data: started } = await call('game_start', { players: 1, preset: 'Gin Rummy', cardsPerPlayer: 10 });
+  const { data: joined } = await call('game_join', { code: started.code, player: 'bot', name: 'Bot (knock-early)' });
+  assert.deepEqual(joined.players, ['host', 'bot']);
+  const { result: seated } = await call('player_wait', { player: 'host', predicate: '(view) => view.players.length === 2', path: 'players.1.name' });
+  assert.equal(JSON.parse(seated.content[0].text), 'Bot (knock-early)');
+
+  await call('player_say', { player: 'bot', text: 'hello', data: { hi: true } });
+  await call('player_say', { player: 'host', text: 'welcome' });
+  const { data: heard } = await call('player_talk', { player: 'bot', waitFor: 2 });
+  assert.deepEqual(heard.map(({ name, text }) => [name, text]), [['Bot (knock-early)', 'hello'], ['Host', 'welcome']]);
+});
+
+test('gin_turn: one bot decision as a typed record - a bot dealt no cards just waits', async () => {
+  const { data: record } = await call('gin_turn', { player: 'bot', strategy: 'knock-early', waitMs: 500 });
+  assert.equal(record.phase, 'wait');
+  assert.equal(record.decision, null);
+  assert.equal(record.strategy, 'knock-early');
+  const { result } = await call('gin_turn', { player: 'bot', strategy: 'no-such' });
+  assert.ok(result.isError);
+  assert.match(result.content[0].text, /knock-early, gin-hunter, equilibrium, defensive/);
 });

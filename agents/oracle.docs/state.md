@@ -1,14 +1,18 @@
 # Agent State
 
-## Current Task (2026-09-19)
+## Current Task (2026-09-19) - US-120 Phase 5: docs/GIN_STRATEGY.md (100% DONE)
 
-Groomed the harness-MCP usability *fix: D136 amended in place (registration
-path + agent-facing errors) - not a new D, same decision corrected; index
-line unchanged. BACKLOG harness-MCP follow-ups += Smith's 4 player_query/
-player_wait concerns from the live-tools spin. Removed 3 empty stray root
-files (Drop-in/Fetch/Use, 0 bytes, created by a stray shell command). Left
-the untracked root screenshot alone - user's file, flagged. Committed on
-dev, fast-forwarded main to dev (not pushed).
+Written from live Jev (`node tools/gin/examples.mjs`, key set, run
+2026-09-19): research table w/ sources, typed inputs, 13-rule catalog,
+4 strategies, mermaid flow, edge cases, 5-example table + findings.
+Linked from README doc index; task.md T5.1 checked; BACKLOG += "Gin bot
+tuning" (threat never >=3 live, helps Nouls clustered, layoffExposure
+unused). Gin discard-pile item fixed 2026-09-19 (Neo).
+
+## Next Steps
+- Sprint groom when user asks: DECISIONS D137/D138 already recorded;
+  archive CHAT via `bobp chat-report --moniker SPRINT_GIN_BOTS`; commit
+  only if the user asks (all US-120 work uncommitted since e3a6310).
 
 ## Earlier (2026-09-18)
 

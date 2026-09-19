@@ -70,6 +70,14 @@ test('createInitialState: allowsPlayerZones can be set false via the third param
     { allowsPlayerZones: false, tableZone: true, piles: [], zones: [], cardsPerPlayer: undefined, presetName: undefined, cardSize: undefined, tableCanvasSize: undefined });
 });
 
+test('createInitialState: gameConfig.tableSpread sets the built-in Table pile\'s overlap; absent, the Table pile keeps its kind\'s default', () => {
+  // Direct user request (2026-09-19): "tighten the pile to fit more
+  // cards" - a Gin hand's discards outgrew the Table Zone laid side by side.
+  const table = (state) => state.piles.find((p) => p.id === 'table');
+  assert.equal(table(createInitialState({}, () => 0.5, { tableSpread: 0.7 })).spread, 0.7);
+  assert.equal(table(createInitialState({}, () => 0.5)).spread, undefined);
+});
+
 test('CREATE_ZONE: rejected when the game disallows player zones', () => {
   const state = createInitialState({}, () => 0.5, { allowsPlayerZones: false });
   assert.throws(() => reduce(state, { type: 'CREATE_ZONE', name: 'x' }), /does not allow/);

@@ -1,5 +1,11 @@
 # Agent State
 
+## Current Task (2026-09-19) - US-120 Phases 1-3 UAT PASSED
+
+Mutation-proved: fairness, exact melds (P1); Jev utility (after a test fix),
+chase plan, one-request fan-out (P2); talk relay-to-sender, identity stamping
+(P3). Unit 901/901, test-multiplayer 5/5, full lint clean.
+
 ## Current Task (2026-09-18) - *qa uat harness-mcp usability fix: PASSED
 
 10/10 test-harness-mcp. Mutation-proved: .mcp.json test (red with the old

@@ -7,7 +7,7 @@
 #
 # Adding a task: add the npm script first, then a one-line target here.
 
-.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-tablezoom test-focuszoom test-multiplayer test-harness-mcp lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers
+.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-tablezoom test-focuszoom test-multiplayer test-harness-mcp test-gin jev-player lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers
 
 help:
 	@echo "Recard targets (all front npm scripts):"
@@ -20,6 +20,8 @@ help:
 	@echo "  test-focuszoom  Infinity Table: focus-zoom grow-pile-in-place mechanism"
 	@echo "  test-multiplayer  host + 2 guests driven over the real protocol (US-118 harness)"
 	@echo "  test-harness-mcp  the harness MCP server over its real stdio transport (US-119)"
+	@echo "  test-gin      a Gin bot joins a hosted table, draws and knocks out loud (US-120)"
+	@echo "  jev-player    GAME=gin STRATEGY=<name> CODE=<table code> [FIRST=bot|opponent] [HANDS=1]: a Jev player joins your table (US-120)"
 	@echo "  lint         style + design + js"
 	@echo "  lint-js      eslint"
 	@echo "  lint-style   stylelint"
@@ -62,6 +64,14 @@ test-multiplayer:
 
 test-harness-mcp:
 	npm run test:harness-mcp
+
+test-gin:
+	npm run test:gin
+
+# US-120: a Jev player joins the table CODE you are hosting, playing GAME
+# (gin) with strategy STRATEGY. Jev strategies need TYPESAFE_API_KEY.
+jev-player:
+	npm run jev-player -- --game '$(GAME)' --strategy '$(STRATEGY)' --code '$(CODE)' --first '$(or $(FIRST),bot)' --hands '$(or $(HANDS),1)'
 
 lint:
 	npm run lint

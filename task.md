@@ -1885,3 +1885,31 @@ contact sheet; WebRTC exposure is a READ-ONLY traffic log; headless only.
 
 ## Phase 3 — Screenshots ✅ DONE
 - [x] T3.1 `screenshot` tool: one/all players, inline PNG + `build/screenshots/<run>/` + regenerated `index.html` contact sheet; test extended
+
+---
+
+## Sprint: Gin Rummy strategy bots — US-120 (2026-09-19)
+
+Tier 2. Story: US-120. Arch: D137. Smith conditions: bot named after its
+strategy; human one-line turn summary on stderr beside the JSONL.
+
+## Phase 1 — Typed Gin core (unit, TDD) ✅ DONE
+- [x] T1.1 `tools/gin/cards.mjs`: values, melds, exact best-meld search, lay-offs + `tests/ginCards.test.js`
+- [x] T1.2 `tools/gin/observe.mjs`: `GinTracker` snapshot diffs -> `GinObservation` (no opponent ids - fairness test) + `tests/ginObserve.test.js`
+
+## Phase 2 — Rules, Jev judgments, strategies (unit, TDD, fake judge) ✅ DONE
+- [x] T2.1 `tools/gin/rules.mjs` typed conditions + tests
+- [x] T2.2 `tools/gin/judgments.mjs` one fan-out request (threat Score + per-discard Nouls); `@typesafe-ai/sdk` devDep
+- [x] T2.3 `tools/gin/strategies.mjs` >=3 strategies as ordered rule sets, `decide()` + trace
+
+## Phase 3 — Table talk (D138) ✅ DONE
+- [x] T3a.1 `src/tableTalk.js` bounded log + message validation (unit, TDD)
+- [x] T3a.2 main.js host stamp/relay + guest receive; `<table-talk>` component; harness `say`/`talk`; multiplayer browser test
+
+## Phase 4 — Bot, runner, MCP (browser) ✅ DONE
+- [x] T4.1 harness `joinTable()`; `tools/gin/bot.mjs` `GinBot` (turn detection, act, record)
+- [x] T4.2 `tools/gin/player.mjs` + `tools/jevPlayer.mjs` + `jev-player` make target (was `gin-bot`); missing-key error; stderr summary
+- [x] T4.3 MCP `game_join` + `gin_turn` + `player_say`/`player_talk`; `tests/ginBot.browser.mjs` (bot vs harness host) + `test-gin` target
+
+## Phase 5 — Strategy doc ✅ DONE
+- [x] T5.1 `docs/GIN_STRATEGY.md`: research + sources, typed rule list, decision flow, example evaluations (generated)

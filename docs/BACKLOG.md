@@ -82,6 +82,13 @@ or a live-verification session) versus being pickable directly.
   authors; `createTable` without `cardsPerPlayer` times out instead of
   failing fast; concurrent `bobp make` runs clobber each other's
   `build/build.out`.
+- **Gin bot tuning** (US-120, 2026-09-19): in the live Jev examples
+  (`docs/GIN_STRATEGY.md` §7) the opponent-threat Score never reached 3,
+  even in a state written as "one card from gin" (1.57), so
+  `knockUnderThreat(3)` never fired; the helps Nouls sat close together
+  (.19-.34). Options: lower the threshold, or give Jev more history.
+  Also: `layoffExposure` is computed but no strategy uses it to decide
+  whether to knock (undercut risk).
 - **Harness MCP follow-ups** (US-119 retro, 2026-09-18): `screenshot`
   of one element (`selector`) and/or a `viewport` option on
   `game_start` - at the default 1280x720 a big preset canvas (War) fits

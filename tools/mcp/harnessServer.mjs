@@ -16,7 +16,10 @@ import { fileURLToPath, URL } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { launchChromium, startStaticServer, createTable } from '../../tests/harness/multiplayer.mjs';
+import { TypeSafeClient } from '@typesafe-ai/sdk';
+import { launchChromium, startStaticServer, createTable, joinTable } from '../../tests/harness/multiplayer.mjs';
+import { GinBot, summaryLine } from '../gin/bot.mjs';
+import { STRATEGIES } from '../gin/strategies.mjs';
 
 const PORT = Number(process.env.RECARD_HARNESS_PORT ?? 8220);
 const SCREENSHOT_ROOT = process.env.RECARD_SCREENSHOT_DIR
@@ -27,14 +30,16 @@ const SCREENSHOT_ROOT = process.env.RECARD_SCREENSHOT_DIR
  * `guest1`, ...) to its harness peer - names, not PeerJS ids, because
  * an agent addresses players across calls and ids change per table.
  */
-const game = { staticServer: undefined, browser: undefined, table: undefined, players: new Map(), shots: undefined };
+const game = { staticServer: undefined, browser: undefined, table: undefined, players: new Map(), shots: undefined, closers: [], bots: new Map() };
 
 async function stopGame() {
+  await Promise.all(game.closers.map((close) => close()));
   await game.table?.close();
   await game.browser?.close();
   await game.staticServer?.close();
-  Object.assign(game, { staticServer: undefined, browser: undefined, table: undefined, shots: undefined });
+  Object.assign(game, { staticServer: undefined, browser: undefined, table: undefined, shots: undefined, closers: [] });
   game.players.clear();
+  game.bots.clear();
 }
 
 function player(name) {
@@ -96,14 +101,58 @@ server.registerTool('game_start', {
   },
 }, tool(async ({ players, preset, cardsPerPlayer }) => {
   await stopGame();
-  game.staticServer = await startStaticServer(PORT);
-  game.browser = await launchChromium();
+  await startBrowser();
   game.table = await createTable({ browser: game.browser, baseUrl: game.staticServer.baseUrl, players, preset, cardsPerPlayer });
   game.players.set('host', game.table.host);
   for (const [index, guest] of game.table.guests.entries()) game.players.set(`guest${index + 1}`, guest);
+  return asJson({ players: game.players.keys().toArray(), code: await game.table.host.myId() });
+}));
+
+async function startBrowser() {
+  game.staticServer = await startStaticServer(PORT);
+  game.browser = await launchChromium();
   // One screenshot folder per game, so a run's contact sheet is that game only.
   game.shots = { dir: path.join(SCREENSHOT_ROOT, new Date().toISOString().replaceAll(':', '-')), steps: [] };
-  return asJson({ players: game.players.keys().toArray(), code: await game.table.host.myId() });
+}
+
+server.registerTool('game_join', {
+  description: 'Seat a new named player at a table by its code - one this server started, or one a person is hosting in their own browser (US-120). Joins through the real join screen over WebRTC and returns once the host has seated it.',
+  inputSchema: {
+    code: z.string().describe('the table code the host shows'),
+    player: z.string().describe('the name tools address this player by, e.g. "bot"'),
+    name: z.string().optional().describe('the seat name everyone at the table sees (default: `player`)'),
+  },
+}, tool(async ({ code, player: name, name: seatName }) => {
+  if (game.players.has(name)) throw new Error(`There is already a player "${name}" - pick another name`);
+  if (!game.browser) await startBrowser();
+  const joined = await joinTable({ browser: game.browser, baseUrl: game.staticServer.baseUrl, code, name: seatName ?? name });
+  game.closers.push(joined.close);
+  await joined.peer.waitForSeat();
+  game.players.set(name, joined.peer);
+  return asJson({ players: game.players.keys().toArray() });
+}));
+
+server.registerTool('gin_turn', {
+  description: 'Gin Rummy bot (US-120): wait (bounded) for this player\'s move, then make ONE decision with the named strategy - code rules plus live Jev judgments for Jev strategies (needs TYPESAFE_API_KEY) - and act it out. Returns the typed record: observation, facts, judgments, rules fired, decision, actions, announcement.',
+  inputSchema: {
+    player: playerName,
+    strategy: z.string().describe(`one of: ${Object.keys(STRATEGIES).join(', ')}`),
+    firstPlayer: z.enum(['bot', 'opponent']).default('bot').describe('who draws first in a hand'),
+    waitMs: z.number().int().positive().max(600_000).default(30_000).describe('how long to wait for this player\'s move'),
+  },
+}, tool(async ({ player: name, strategy: strategyName, firstPlayer, waitMs }) => {
+  const peer = player(name);
+  const strategy = STRATEGIES[strategyName];
+  if (!strategy) throw new Error(`Unknown strategy "${strategyName}" - choose one of: ${Object.keys(STRATEGIES).join(', ')}`);
+  let entry = game.bots.get(name);
+  if (entry && entry.strategy !== strategyName) throw new Error(`"${name}" is already playing ${entry.strategy} - one strategy per player per game`);
+  if (!entry) {
+    entry = { strategy: strategyName, bot: new GinBot({ peer, strategy, judge: strategy.usesJev ? new TypeSafeClient() : null, firstPlayer }) };
+    game.bots.set(name, entry);
+  }
+  await entry.bot.waitForTurn({ timeoutMs: waitMs });
+  const record = await entry.bot.step();
+  return asJson({ summary: summaryLine(record), ...record });
 }));
 
 server.registerTool('game_status', {
@@ -157,6 +206,22 @@ server.registerTool('player_wait', {
     const now = JSON.stringify(pick(await peer.view(), path) ?? null);
     throw new Error(`Timed out after ${timeoutMs}ms waiting for ${predicate} - ${path ?? 'the view'} is now: ${now}`, { cause: error });
   }
+}));
+
+server.registerTool('player_say', {
+  description: 'Say a line of table talk as this player (D138) - what the game protocol does not encode. Optional `data` is JSON for machines. The host stamps who said it and relays it to everyone.',
+  inputSchema: { player: playerName, text: z.string().min(1), data: z.unknown().optional() },
+}, tool(async ({ player: name, text, data }) => {
+  await player(name).say(text, data);
+  return asJson({ said: text });
+}));
+
+server.registerTool('player_talk', {
+  description: 'This player\'s table-talk log, in the host\'s order: [{seq, at, from, name, text, data?}]. `waitFor` waits (bounded) until at least that many lines have arrived.',
+  inputSchema: { player: playerName, waitFor: z.number().int().positive().optional(), timeoutMs: z.number().int().positive().max(60_000).default(15_000) },
+}, tool(async ({ player: name, waitFor, timeoutMs }) => {
+  const peer = player(name);
+  return asJson(waitFor ? await peer.waitForTalk(waitFor, { timeout: timeoutMs }) : await peer.talk());
 }));
 
 server.registerTool('player_query', {

@@ -1,5 +1,31 @@
 # Agent State
 
+## Current Task (2026-09-19) - make jev-player: DONE, verified
+
+`bobp make jev-player GAME=gin STRATEGY=<name> CODE=<code> [FIRST] [HANDS]` ->
+tools/jevPlayer.mjs (CLI, GAMES map) -> tools/gin/player.mjs `play()` (was
+runner.mjs; throws UsageError -> exit 2, else exit 1). gin-bot target/npm script
+removed. Player name = strategy name (user). tests/jevPlayer.test.js (4). Unit
+913, lint-js clean, live join verified. Uncommitted.
+
+## Current Task (2026-09-19) - *fix Gin discards: DONE, reviewed
+
+User reversed "strike": zone bigger + tighter pile. `tableSpread` preset field ->
+main.js configsForPreset -> createInitialState applies it to the Table pile via
+applyDeclaration. Gin: tableSpread 0.7, own layout (table-zone x60 w760, score
+x840). lint:design: MID_HAND_DISCARDS {Gin Rummy: 30} + pile-inside-zone check.
+tools/gin/examples.mjs split -> CLI + exampleStates.mjs (lint). Unit 909, lint-js
++ lint-design clean. Uncommitted.
+
+## Current Task (2026-09-19) - US-120 Phases 1-4 DONE (80%), code complete
+
+tools/gin/{cards,observe,rules,judgments,strategies,bot,runner,examples}.mjs;
+table talk (D138) src/tableTalk.js + <table-talk>; harness hostTable/joinTable/
+dealTable/waitForSeat/say/talk; MCP game_join/gin_turn/player_say/player_talk;
+make gin-bot / test-gin. Last green: unit 907 (+ginExamples), multiplayer 5,
+gin 1, MCP 12, lint clean. After restart with key: live check one Jev request
+(`node tools/gin/examples.mjs`), then live `bobp make gin-bot CODE=.. STRATEGY=equilibrium`.
+
 ## Current Task (2026-09-18) - *fix harness-mcp usability: DONE, handed to Trin
 
 From Smith's 1-player `*user test harness-mcp`:

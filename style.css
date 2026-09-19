@@ -3278,3 +3278,27 @@ button.card-rtg.rtg-art-missing {
 .rtg-c-g.rtg-c-u,
 .rtg-c-g.rtg-c-b,
 .rtg-c-g.rtg-c-r { --rtg-fallback-b: #20401d; }
+
+/* US-120/D138: table talk - fixed to the bottom-left corner so it never
+   pushes the table; desktop-only pass, like the rest of this UI. */
+table-talk {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 50;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+}
+.talk-heading { margin: 0; font-size: 12px; color: var(--muted); }
+.talk-log { margin: 0; padding: 0; list-style: none; max-height: 140px; overflow-y: auto; }
+.talk-line { overflow-wrap: anywhere; }
+.talk-form { display: flex; gap: 6px; }
+.talk-input { flex: 1; min-width: 0; }

@@ -191,5 +191,6 @@ Full rationale: `docs/ARCHITECTURE.md`.
 - [`docs/USER_STORIES.md`](docs/USER_STORIES.md) — user stories + acceptance criteria
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — technical design (D1-D54), testing strategy
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) — decision log with context/consequences
+- [`docs/GIN_STRATEGY.md`](docs/GIN_STRATEGY.md) — Gin Rummy bot strategies: research, typed rule catalog, live Jev examples (US-120)
 - [`task.md`](task.md) — sprint task board
 - `agents/` — Bob Protocol persona docs, state, and team chat log (`agents/CHAT.md`)
