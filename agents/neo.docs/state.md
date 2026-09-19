@@ -1,5 +1,33 @@
 # Agent State
 
+## Current Task (2026-09-18) — US-119 Harness MCP server
+
+Sprint plan: root `task.md` ("Harness MCP Server — US-119"), arch
+`agents/morpheus.docs/harness_mcp_arch.md`. User gate: MCP SDK + zod
+devDeps OK; screenshots inline + saved contact sheet; WebRTC exposure
+READ-ONLY traffic log (no raw send); headless only; DOM query stays a
+tool (`player_query`) - user reminder mid-sprint.
+
+- Phase 1 DONE: `src/trafficLog.js` (pure bounded log, entries
+  `{seq, at, direction, peer, type, message}`, unit-tested) fed by every
+  `Session` send/receive; `window.__recardHarness.traffic({type, limit})`.
+  Session traffic itself is only exercised live - Phase 2's MCP test
+  must assert `player_traffic` returns real action/state entries.
+- Phase 2 DONE: `tools/mcp/harnessServer.mjs` (game_start/status/stop,
+  player_act/view/wait/query/traffic; named players host/guestN; every
+  tool error -> isError, server survives), registered in `.mcp.json` as
+  `recard-harness` (absolute path), default port 8220 via
+  RECARD_HARNESS_PORT. `tests/harnessMcp.browser.mjs` 5/5 over real
+  stdio (port 8221). Gotcha: `.middle-card` AND its inner `.card` both
+  carry data-pileable-id - scope DOM selectors to the wrapper.
+
+Earlier this day (committed, ef9d641/b26ae52): US-118 harness (D135,
+`submitAction` funnel) and the old-failing-tests cleanup (focus-zoom
+z-index 19, New Game button row, stale tests mutation-proved).
+- Phase 3 DONE: `screenshot` tool + contact sheet. Sprint shipped (D136).
+  Full regression green (check 863, ui 20, rtg 16, hostsetup 7, newgame 5,
+  tablezoom 7, focuszoom 11, multiplayer 4, harness-mcp 7).
+
 ## Context
 
 **D129 (user-confirmed, this session) is the binding model for stacking.**

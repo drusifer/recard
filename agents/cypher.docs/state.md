@@ -1,5 +1,10 @@
 # Agent State
 
+## Current Task (2026-09-18)
+
+US-119 (harness MCP) COMPLETE, D136. Backlog: screenshot selector/
+viewport, reconnect resets a guest's traffic log.
+
 ## Context
 ### Recent Decisions
 - Project kickoff: "Recard" — P2P, no-server-infra, same-room virtual deck

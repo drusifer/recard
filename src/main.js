@@ -1183,6 +1183,8 @@ globalThis.__recardHarness = {
   act: submitAction,
   view: currentView,
   myId: () => myId,
+  // US-119: this player's protocol traffic (read-only), `{type, limit}`.
+  traffic: (options) => session?.traffic.entries(options) ?? [],
 };
 
 function dispatch(action) {

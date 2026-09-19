@@ -1,5 +1,17 @@
 # Agent State
 
+## Current Task (2026-09-18) — US-119 Harness MCP server UAT
+
+- Phase 1 UAT PASSED: trafficLog unit tests 3/3, capacity-bound
+  mutation (drop the `shift()`) caught. `Session`'s own recording is
+  NOT unit-testable (PeerJS) - Phase 2's stdio MCP test MUST assert
+  real `action` (guest out) and `state` (guest in) traffic entries, or
+  the Session tap is unproven. Hold Phase 2 to that.
+- Phase 2 UAT PASSED: 5/5 over real stdio; mutation (guest send not
+  recorded) fails the traffic test - condition met.
+- Phase 3 UAT PASSED; full regression green. Lesson re-learned: never
+  run `bobp make` while another make loop runs - build.out is shared.
+
 ## Context
 
 `*qa uat stackable` iteration 1 (D129 domain model). The model itself

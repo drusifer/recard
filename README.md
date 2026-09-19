@@ -124,6 +124,13 @@ Multi-peer behaviour is tested headless by `npm run test:multiplayer`:
 a real host and two real guests driven over the real protocol (see
 `docs/ARCHITECTURE.md`'s Testing Strategy).
 
+Agents (Claude Code etc.) can drive a live table through the
+`recard-harness` MCP server (`tools/mcp/harnessServer.mjs`, registered in
+the committed `.mcp.json`; needs `npm install` for its SDK):
+start a game with N players, act as any of them, read their views, DOM
+and WebRTC traffic, and take screenshots - saved with a contact sheet
+under `build/screenshots/`.
+
 ## Known limitations
 
 - **If the host's tab closes, the session ends for everyone** (you'll see

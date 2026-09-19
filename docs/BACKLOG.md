@@ -82,6 +82,12 @@ or a live-verification session) versus being pickable directly.
   authors; `createTable` without `cardsPerPlayer` times out instead of
   failing fast; concurrent `bobp make` runs clobber each other's
   `build/build.out`.
+- **Harness MCP follow-ups** (US-119 retro, 2026-09-18): `screenshot`
+  of one element (`selector`) and/or a `viewport` option on
+  `game_start` - at the default 1280x720 a big preset canvas (War) fits
+  at small zoom and card detail is hard to read in a capture; a guest's
+  traffic log resets on reconnect (new Session) - fine today, surprising
+  if someone debugs a reconnect with it.
 - **Browser-automation tooling for Smith's own UX gate** — distinct
   from Neo's existing Playwright test scripts; Smith's end-to-end
   sprint-close testing is currently manual.

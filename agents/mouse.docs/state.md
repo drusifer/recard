@@ -1,5 +1,10 @@
 # Agent State
 
+## Current Task (2026-09-18)
+
+US-119 shipped in 3 phases (traffic log / server / screenshots), task.md
+section marked SHIPPED. No blockers; one self-inflicted build.out clobber.
+
 ## Context
 ### Recent Decisions
 - Sprint 1 ("v1 playable deck") broken into 5 phases in `task.md`, 2-3

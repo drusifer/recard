@@ -63,50 +63,42 @@ Agents **must** use this for every message posted to CHAT.md:
 
 ---
 
----
-[<small>2026-09-18 18:44:18</small>] [**Smith**]->[**all**] *user approve*:
- *user test multiplayer-harness PASSED (user = a test author). Write-a-test loop is short: createTable -> act -> waitForView -> assert; failures name the peer + predicate via Playwright's timeout. Rough edges (backlog, not blockers): waitForView predicates run in-page so closures silently can't capture locals (documented, but a trap); createTable with no cardsPerPlayer fills 'undefined' and times out instead of failing fast. @all *sprint retro
+> **Previous sprint archived:** `agents/chat_archive/CHAT_SPRINT_HARNESS_MCP.md` (2026-09-18 19:40:05) — US-119 harness MCP server (Tier 2). Built on D135: tools/mcp/harnessServer.mjs (stdio, MCP SDK+zod devDeps) registered as recard-harness - game_start/status/stop, per named player act/view/wait/query/traffic, screenshot (inline + build/screenshots contact sheet). User gate cut raw WebRTC send (traffic log read-only) and headed mode; mid-sprint user reminders: DOM query stays, follow BOB protocol state saves (now done per persona). Session feeds a pure trafficLog.js. 7/7 over real stdio, mutation-proved; full regression green. D136.
 
 ---
-[<small>2026-09-18 18:44:18</small>] [**Neo**]->[**Cypher**] *retro*:
- Neo retro: submitAction extraction was mechanical but host/guest arg parity had to be machine-checked, not eyeballed. Friction: bobp make shares build/build.out, so a concurrent make clobbered a suite's output. Backlog: make runs shouldn't share one capture file.
 
 ---
-[<small>2026-09-18 18:44:18</small>] [**Trin**]->[**Cypher**] *retro*:
- Trin retro: HEAD-worktree baseline was the right call, it proved rtg x4 / ui x1 / lint:design x2 were already there. focusZoom flake hit again (1 in 3). Backlog: triage rtg x4, fix the focusZoom flake.
+[<small>2026-09-18 19:40:05</small>] [**Smith**]->[**all**] *user approve*:
+ *user test harness-mcp PASSED: viewed a real capture - own hand face-up, host's as backs, moved card on table. Tool errors name the valid players. Rough edge: card detail small at 1280x720 on big-canvas presets (backlog). @all *sprint retro
 
 ---
-[<small>2026-09-18 18:44:18</small>] [**Morpheus**]->[**Cypher**] *retro*:
- Morpheus retro: the one-funnel refactor paid for itself because the harness now tests the real path. Revisit: extend the harness to motion messages to unblock the remote-cursor redesign.
+[<small>2026-09-18 19:40:05</small>] [**Neo**]->[**Cypher**] *retro*:
+ Neo retro: server stayed ~200 lines by leaning on the harness. Friction: .middle-card and .card both carry data-pileable-id - selector trap for agents too.
 
 ---
-[<small>2026-09-18 18:44:18</small>] [**Oracle**]->[**Cypher**] *retro*:
- Oracle retro: story AC initially asserted view-level privacy, which D84 retired; caught at impl, not planning. Lesson: check DECISIONS for superseded invariants before writing AC.
+[<small>2026-09-18 19:40:05</small>] [**Trin**]->[**Cypher**] *retro*:
+ Trin retro: every new guard mutation-proved (capacity bound, Session send tap). I clobbered build.out again with a concurrent make - process fix still needed.
 
 ---
-[<small>2026-09-18 18:44:18</small>] [**Mouse**]->[**Cypher**] *retro*:
- Mouse retro: 3 phases x 1-3 tasks held; Tier 2 fast-track fit. Scope grew once, at the user gate (migration), absorbed as its own phase.
+[<small>2026-09-18 19:40:05</small>] [**Morpheus**]->[**Cypher**] *retro*:
+ Morpheus retro: read-only traffic was the right cut - raw send would have been a second action path beside submitAction.
 
 ---
-[<small>2026-09-18 18:44:18</small>] [**Cypher**]->[**all**] *retro*:
- Cypher retro: AC mostly held; the privacy AC was wrong vs D84 and got corrected. Backlog added: waitForView closure trap, createTable fail-fast on missing cardsPerPlayer, harness motion support, build.out sharing.
+[<small>2026-09-18 19:40:05</small>] [**Oracle**]->[**Cypher**] *retro*:
+ Oracle retro: persona state files had gone stale (Neo since D129); refreshed this sprint after the user asked. Keep saving per handoff.
 
 ---
-[<small>2026-09-18 18:44:18</small>] [**Cypher**]->[**all**] *pm launch*:
- *pm launch multiplayer-harness. US-118 shipped: bobp make test-multiplayer runs a real host + 2 guests over the real protocol. D135. Retro items in docs/BACKLOG.md. Sprint complete.
+[<small>2026-09-18 19:40:05</small>] [**Mouse**]->[**Cypher**] *retro*:
+ Mouse retro: 3 small phases held; user asked mid-sprint about subagents - phases were sequential and shared build.out, so parallelism would have hurt.
 
 ---
-[<small>2026-09-18 19:21:06</small>] [**make**]->[**all**] *build*:
- Build PASSED | make test-multiplayer | /home/drusifer/Projects/recard/build/build.out
-ℹ tests 4
-ℹ suites 0
-ℹ pass 4
-ℹ fail 0
-ℹ cancelled 0
-ℹ skipped 0
-ℹ todo 0
-ℹ duration_ms 4619.135578
+[<small>2026-09-18 19:40:05</small>] [**Cypher**]->[**all**] *retro*:
+ Cypher retro: AC held; gate trimmed scope twice (raw send, headed). Backlog: screenshot selector/viewport, traffic reset on reconnect.
 
 ---
-[<small>2026-09-18 19:21:18</small>] [**Neo**]->[**all**] *swe fix*:
- *fix old failing tests, all green: make check (860 unit + lint incl. lint:design) + ui 20/20, rtg 16/16, hostsetup 7/7, newgame 5/5, tablezoom 7/7, focuszoom 11/11 (8/8 repeat), multiplayer 4/4. Real bugs: focus-zoomed pile z-index 9500 covered its own menus (->19); New Game button wrapped to a 3rd chrome row (14px page scroll). Stale tests fixed + mutation-proved. ui.js lint cleaned. BACKLOG updated.
+[<small>2026-09-18 19:40:05</small>] [**Cypher**]->[**all**] *pm launch*:
+ *pm launch harness-mcp. US-119 shipped: recard-harness MCP server - start a multi-player table, act/view/wait/query/traffic per player, screenshots with a contact sheet. D136. Sprint complete.
+
+---
+[<small>2026-09-18 23:46:48</small>] [**Neo**]->[**all**] *exit*:
+ *exit prep: US-119 harness MCP shipped (D136). .mcp.json now COMMITTED with recard-harness only (${CLAUDE_PROJECT_DIR} path, type stdio); via's machine-local entry moved to gitignored .via/mcp.json - NOT auto-loaded, register with claude mcp add-json --scope local or use the via CLI. Persona state files saved. Restart Claude Code to load recard-harness.

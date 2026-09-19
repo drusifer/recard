@@ -10,6 +10,8 @@
  * the host, never to each other.
  */
 
+import { createTrafficLog } from './trafficLog.js';
+
 const PeerCtor = () => globalThis.Peer;
 
 // Excludes visually-ambiguous characters (0/O, 1/I) since this is read
@@ -51,6 +53,10 @@ export class Session {
   // is final. They are separate events because a client about to retry
   // must never first be told the session is over (Smith Gate 1 #2).
   handlers = { data: [], roster: [], 'host-lost': [], 'session-ended': [] };
+  // US-119: every message this session sends or receives, bounded - read
+  // by the harness MCP server. Per Session, so a guest's reconnect (a
+  // brand-new Session) starts a fresh log.
+  traffic = createTrafficLog();
 
   /**
    * Host: create a table and wait for others to join. Uses a short,
@@ -105,7 +111,10 @@ export class Session {
         const conn = peer.connect(hostId, { metadata: { name, playerKey } });
         session.hostConn = conn;
         conn.on('open', () => resolve(id));
-        conn.on('data', (message) => session.emit('data', message));
+        conn.on('data', (message) => {
+          session.traffic.record('in', hostId, message);
+          session.emit('data', message);
+        });
         // D32: losing the host is RETRYABLE and must not be announced as
         // the end of the session - a client about to retry that is first
         // told "session ended" has been scared and then corrected, which
@@ -158,7 +167,10 @@ export class Session {
       record.status = 'connected';
       this.#emitRoster();
     });
-    conn.on('data', (message) => this.emit('data', { fromId: conn.peer, msg: message }));
+    conn.on('data', (message) => {
+      this.traffic.record('in', conn.peer, message);
+      this.emit('data', { fromId: conn.peer, msg: message });
+    });
     conn.on('close', () => {
       record.status = 'disconnected';
       this.#emitRoster();
@@ -182,6 +194,7 @@ export class Session {
   broadcast(message) {
     for (const record of this.peers.values()) {
       if (record.status !== 'connected') continue;
+      this.traffic.record('out', record.id, message);
       record.conn.send(message);
     }
   }
@@ -190,7 +203,10 @@ export class Session {
   Host only: send a message to one specific peer (used for per-player views).
   */
   sendTo(peerId, message) {
-    this.peers.get(peerId)?.conn?.send(message);
+    const conn = this.peers.get(peerId)?.conn;
+    if (!conn) return;
+    this.traffic.record('out', peerId, message);
+    conn.send(message);
   }
 
   /**
@@ -212,6 +228,7 @@ export class Session {
   Join side only: send a message to the host.
   */
   send(message) {
+    this.traffic.record('out', this.hostConn.peer, message);
     this.hostConn.send(message);
   }
 

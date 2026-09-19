@@ -1,5 +1,16 @@
 # Agent State
 
+## Current Task (2026-09-18) — US-119 Harness MCP server
+
+Arch: `morpheus.docs/harness_mcp_arch.md`. Phase 1 (traffic log)
+review PASSED: pure module + thin Session tap, per-Session lifetime is
+the right call (a reconnect is a new transport). Watch in Phase 2: the
+server must stay a thin layer over `tests/harness/multiplayer.mjs` -
+no second copy of table setup.
+- Phase 2+3 review PASSED; US-119 shipped as D136. Revisit: screenshot
+  of one element / viewport option (backlog) - the capture is only as
+  useful as the table's fit-zoom at 1280x720.
+
 ## Context
 
 `*design multi-player test harness` (2026-09-18, direct user request).

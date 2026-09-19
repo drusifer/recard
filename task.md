@@ -1866,3 +1866,22 @@ User gate decisions: submitAction() extraction approved; hook named
 
 ## Phase 3 — Migrate existing browser tests ✅ DONE
 - [x] T3.1 uiActions/rtgPlaythrough/hostSetup/newGame/tableZoom/focusZoom `.browser.mjs` + `designLint.check.mjs` import the shared server/launchChromium; delete duplicate copies
+
+---
+
+## Sprint: Harness MCP Server — US-119 (2026-09-18) — SHIPPED
+
+Tier 2. Arch: `agents/morpheus.docs/harness_mcp_arch.md`.
+User gate: MCP SDK + zod devDeps approved; screenshots inline + saved
+contact sheet; WebRTC exposure is a READ-ONLY traffic log; headless only.
+
+## Phase 1 — Traffic log ✅ DONE
+- [x] T1.1 `src/trafficLog.js` bounded ring buffer + unit tests (TDD)
+- [x] T1.2 `Session` records every sent/received message; `window.__recardHarness.traffic()`
+
+## Phase 2 — MCP server ✅ DONE
+- [x] T2.1 devDeps + `tools/mcp/harnessServer.mjs` (game_start/status/stop, player_act/view/wait/query/traffic) + `.mcp.json`
+- [x] T2.2 `tests/harnessMcp.browser.mjs` over real stdio transport (written first) + npm/make target
+
+## Phase 3 — Screenshots ✅ DONE
+- [x] T3.1 `screenshot` tool: one/all players, inline PNG + `build/screenshots/<run>/` + regenerated `index.html` contact sheet; test extended

@@ -1,5 +1,11 @@
 # Agent State
 
+## Current Task (2026-09-18)
+
+Groomed US-119 / D136: DECISIONS D136 + index line, ARCHITECTURE
+Testing Strategy + README point at `recard-harness` MCP, BACKLOG harness
+MCP follow-ups, CHAT archived as SPRINT_HARNESS_MCP.
+
 ## Context
 ### Recent Decisions
 - Sprint 2 (v1.1) groom complete: `docs/DECISIONS.md` +1 entry (v1.1

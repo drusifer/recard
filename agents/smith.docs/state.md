@@ -1,5 +1,11 @@
 # Agent State
 
+## Current Task (2026-09-18)
+
+US-119 gate: user approved; cut raw send + headed mode, kept DOM query.
+User test: real capture reviewed - per-player rendering right; card
+detail small at 1280x720 on big presets (backlog: selector/viewport).
+
 ## Context
 
 `*user test stackable` iteration 2 — the UX gate on the tray/cascade

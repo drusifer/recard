@@ -11,6 +11,8 @@
     "test:tablezoom": "node --test tests/tableZoom.browser.mjs",
     "test:focuszoom": "node --test tests/focusZoom.browser.mjs",
     "test:multiplayer": "node --test tests/multiplayer.browser.mjs",
+    "test:harness-mcp": "node --test tests/harnessMcp.browser.mjs",
+    "harness-mcp": "node tools/mcp/harnessServer.mjs",
     "dev": "node tools/devserver.mjs",
     "build:standalone": "node tools/buildStandalone.mjs",
     "build:dist": "node tools/buildDistribution.mjs",
@@ -30,6 +32,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "c8": "^12.0.0",
     "esbuild": "^0.28.2",
     "eslint": "^10.9.1",
@@ -39,6 +42,7 @@
     "playwright": "^1.62.1",
     "stylelint": "^17.14.1",
     "stylelint-config-standard": "^40.0.0",
-    "yaml": "^2.9.0"
+    "yaml": "^2.9.0",
+    "zod": "^4.6.5"
   }
 }

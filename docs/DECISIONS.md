@@ -66,7 +66,37 @@ D129: `Stack`/`Stackable` (also domain model — see above) · D130: camera is a
 D20: desktop table width, pure CSS breakpoints · D24: Zone room grows at desktop breakpoints · D51: bigger cards (also drag-and-drop — see above) · D61: saved layout overrides, separate localStorage store · D133: fixed local canvas + computed fit-zoom fixes zone-overlap drift (also camera/view — see above) · D134: per-preset canvas size + every preset's own layout tuned/verified (also camera/view, testing — see above/below)
 
 **Testing & tooling**
-D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rules disabled post-autofix · D60: `tests/e2e.smoke.mjs` removed · D96: universal DnD guarantee, structural test (also drag-and-drop — see above) · D134: `lint:design` sweeps every preset, not just the default (also camera/view — see above) · D135: multi-player test harness — real peers driven over the real protocol, one `submitAction` funnel
+D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rules disabled post-autofix · D60: `tests/e2e.smoke.mjs` removed · D96: universal DnD guarantee, structural test (also drag-and-drop — see above) · D134: `lint:design` sweeps every preset, not just the default (also camera/view — see above) · D135: multi-player test harness — real peers driven over the real protocol, one `submitAction` funnel · D136: harness MCP server — agents drive a live table; read-only WebRTC traffic log
+
+---
+
+### D136. Harness MCP server — agents drive a live multi-player table; WebRTC exposure is a read-only traffic log
+
+US-119 (Tier 2 sprint, direct user request). `tools/mcp/harnessServer.mjs`
+is a stdio MCP server (`@modelcontextprotocol/sdk` + `zod`, devDeps)
+registered as `recard-harness` in the committed `.mcp.json`. It is a thin tool layer
+over D135's harness: `game_start/status/stop`, and per NAMED player
+(`host`, `guest1`...) `player_act` (the `submitAction` funnel),
+`player_view` (dotted `path`, views are large), `player_wait`,
+`player_query` (DOM), `player_traffic`, plus `screenshot`. One table
+per process; every tool error is an MCP `isError` result, never a dead
+server. Tested over its real stdio transport
+(`tests/harnessMcp.browser.mjs`, `make test-harness-mcp`).
+
+**WebRTC exposure:** `Session` feeds a bounded, pure
+`src/trafficLog.js` with every message it sends/receives; read via
+`__recardHarness.traffic()`. **Read-only by user decision at the Smith
+gate** - a raw-send tool was designed and cut; acting stays on
+`submitAction`.
+
+**Screenshots:** returned inline (the agent sees them immediately) AND
+saved to `build/screenshots/<game>/NNN-<player>-<label>.png` with an
+`index.html` contact sheet (row per capture, column per player),
+rewritten after every capture.
+
+**Rejected / cut:** headed browsers (user: headless only - screenshots
+and DOM queries are how the table is seen); multiple concurrent tables;
+names by PeerJS id (they change per table - stable names don't).
 
 ---
 

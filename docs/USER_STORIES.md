@@ -3380,3 +3380,39 @@ repeatable test instead of manual two-tab sessions (closes the
 `protocol.js`; logic-only/non-browser robot peers; UI changes.
 
 Sprint status: COMPLETE (D135).
+
+### US-119: Harness MCP server — agents start and drive a live multi-player table
+**As** an agent working on Recard (or a person pairing with one), **I
+want** an MCP server that wraps the multi-player harness (US-118), **so
+that** I can start a real game with several players, act as any of
+them, watch the WebRTC traffic between them, and capture screenshots to
+review - without writing a test file first.
+
+**AC:**
+- A project-registered MCP server (`.mcp.json`) exposes tools to start
+  a table (players, preset, cards per player), report its status, and
+  stop it. One table at a time; starting a new one stops the old one.
+- Any player (`host`, `guest1`, ...) can: perform a reducer action via
+  the same `submitAction` funnel the UI uses; return its current view;
+  wait (bounded) for a view predicate; query its DOM via the harness's
+  one `query()` helper.
+- WebRTC interface: any player can read a bounded log of the protocol
+  messages (`action`/`state`/`motion`/`identity`) it has sent and
+  received over its real data channel. Read-only - acting stays on the
+  `submitAction` funnel (user decision at the Smith gate).
+- Screenshots: capture one player or all players; each capture is
+  returned inline (so the agent sees it immediately) AND saved under
+  `build/screenshots/` with a regenerated contact sheet
+  (`index.html`) for a person to review the whole run.
+- Tool failures come back as MCP tool errors with the reason, never a
+  crashed server.
+- Covered by an automated test driving the server over its real stdio
+  MCP transport.
+
+**Out of scope:** multiple concurrent tables; driving a real remote
+player's browser; any new wire message in the game protocol itself;
+sending raw protocol messages; headed (visible) browsers - headless
+only; the table is seen through screenshots AND DOM queries
+(`player_query`) (user decisions at the Smith gate).
+
+Sprint status: COMPLETE (D136).

@@ -151,6 +151,12 @@ messages (live drag/cursor sync) aren't asserted yet. The harness also
 supplies the static server and Chromium launcher every browser test
 file uses.
 
+The same harness is exposed to agents as an MCP server (US-119, D136):
+`tools/mcp/harnessServer.mjs`, registered as `recard-harness` in
+the committed `.mcp.json`. It starts a live table, acts as any named player, reads
+views/DOM/WebRTC traffic (`Session`'s bounded `trafficLog`), and
+captures screenshots with a saved contact sheet.
+
 Several single-client, real-Playwright-browser suites fill the gap for
 everything that doesn't need a second peer, each its own `npm run test:*`
 script (see Module Layout above for the file list): card-action wiring

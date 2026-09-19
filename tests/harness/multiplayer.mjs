@@ -84,6 +84,13 @@ class HarnessPeer {
   }
 
   /**
+   * This player's WebRTC protocol traffic (US-119), `{ type, limit }`.
+   */
+  traffic(options) {
+    return this.page.evaluate((o) => globalThis.__recardHarness.traffic(o), options);
+  }
+
+  /**
    * Waits until `predicate(view, argument)` holds on this peer's own
    * view, then returns that view. Convergence is awaited, never slept
    * for. `predicate` runs IN the page, so it must be self-contained -

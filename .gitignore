@@ -1,5 +1,5 @@
-# Bob Protocol / via — machine-local config and index, not portable
-.mcp.json
+# via — machine-local index, log and MCP config (.via/mcp.json), not portable.
+# The project's own .mcp.json IS committed (portable servers only).
 .via/
 
 # Node
