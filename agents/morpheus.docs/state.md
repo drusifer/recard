@@ -1,5 +1,12 @@
 # Agent State
 
+## Current Task (2026-09-18) - *lead review harness-mcp usability fix: APPROVED
+
+Change confined to the MCP tool layer (harnessServer.mjs + .mcp.json + its
+stdio test); harness/src untouched. errorText lives in the one tool() wrapper.
+Non-blocking notes: game_status reads host view twice; errorText keeps only
+line 1 (fine while reducer errors are single-line). D136 amended, not a new D.
+
 ## Current Task (2026-09-18) — US-119 Harness MCP server
 
 Arch: `morpheus.docs/harness_mcp_arch.md`. Phase 1 (traffic log)

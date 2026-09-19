@@ -1,6 +1,16 @@
 # Agent State
 
-## Current Task (2026-09-18)
+## Current Task (2026-09-19)
+
+Groomed the harness-MCP usability *fix: D136 amended in place (registration
+path + agent-facing errors) - not a new D, same decision corrected; index
+line unchanged. BACKLOG harness-MCP follow-ups += Smith's 4 player_query/
+player_wait concerns from the live-tools spin. Removed 3 empty stray root
+files (Drop-in/Fetch/Use, 0 bytes, created by a stray shell command). Left
+the untracked root screenshot alone - user's file, flagged. Committed on
+dev, fast-forwarded main to dev (not pushed).
+
+## Earlier (2026-09-18)
 
 Groomed US-119 / D136: DECISIONS D136 + index line, ARCHITECTURE
 Testing Strategy + README point at `recard-harness` MCP, BACKLOG harness

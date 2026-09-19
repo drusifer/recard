@@ -94,6 +94,22 @@ saved to `build/screenshots/<game>/NNN-<player>-<label>.png` with an
 `index.html` contact sheet (row per capture, column per player),
 rewritten after every capture.
 
+**Registration path (amended 2026-09-18):** `.mcp.json` passes the
+relative `tools/mcp/harnessServer.mjs`, not
+`${CLAUDE_PROJECT_DIR}/...` - Claude Code does not set that variable
+for MCP servers, so the shipped config expanded to
+`/tools/mcp/harnessServer.mjs` and never connected. Project servers
+start in the project root, so the relative path is enough. The stdio
+test now launches the server from `.mcp.json` itself with the variable
+unset, so the config is under test, not just the server.
+
+**Agent-facing errors (same pass, from Smith's 1-player test):**
+`game_status` also lists every pile (id, name, kind, card count) so an
+agent can find pile ids without dumping `piles`; tool errors are the
+app's own first line (Playwright's `page.*:` prefix and the in-page
+stack are dropped); a `player_wait` timeout names the predicate and
+what the view holds now at `path`.
+
 **Rejected / cut:** headed browsers (user: headless only - screenshots
 and DOM queries are how the table is seen); multiple concurrent tables;
 names by PeerJS id (they change per table - stable names don't).

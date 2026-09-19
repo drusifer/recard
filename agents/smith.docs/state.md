@@ -1,10 +1,46 @@
 # Agent State
 
-## Current Task (2026-09-18)
+## Current Task (2026-09-18, spin 2) - `*user test harness-mcp` via REAL MCP tools
 
-US-119 gate: user approved; cut raw send + headed mode, kept DOM query.
-User test: real capture reviewed - per-player rendering right; card
-detail small at 1280x720 on big presets (backlog: selector/viewport).
+recard-harness loaded after `/mcp` reconnect. 1-player War: start -> status
+(piles 47+5=52 conserved) -> DRAW -> MOVE 10C,10S to table -> wait -> screenshot
+(matches state) -> stop. All 3 earlier concerns VERIFIED FIXED in real use:
+pile directory in game_status; "Pile nowhere does not exist"; wait timeout
+"...myHand.length is now: 4". PASS.
+
+New concerns (not filed as bugs - awaiting user):
+A. #1 player_query omits form values: deck's deal-count <input> shows "26" on
+   screen, query text "". Fix: include `value` for input/select/textarea.
+B. #8 player_query reports hidden elements like visible ones: 3 closed
+   `.pile-action-menu`s come back with 293px rects. Fix: `visible` flag (or
+   skip hidden) per match.
+C. #9 minor: a predicate that throws returns bare "TypeError: Cannot read
+   properties of undefined (reading 'length')" - prefix "predicate threw:".
+D. #8 minor: `text` concatenates children with no separator ("PileDeckHand...").
+Still backlogged: small render at 1280x720 (table uses ~1/4 of the frame).
+
+## Earlier (2026-09-18) - first stdio test
+
+`*user test harness-mcp` 1-player run: PASSED with 3 concerns (not filed as
+bugs yet - awaiting user). recard-harness was NOT loaded as Claude tools
+this session (Connection closed), so I drove tools/mcp/harnessServer.mjs
+over real stdio with the MCP SDK Client (driver kept in scratchpad only,
+nothing left in repo). Flow: tools/list -> game_start{players:1} ->
+view -> DRAW -> player_wait(hand 6) -> MOVE real card to table ->
+player_query -> screenshot -> game_stop -> game_status(running:false).
+All worked; screenshot shows card on table, 2 in hand.
+
+Concerns:
+1. #6/#8 No cheap pile directory: had to probe `piles.N.id` one call at a
+   time; `piles` dumps every deck card. Fix idea: game_status (or a
+   view summary) lists pile id/name/kind/count.
+2. #9 player_act errors carry the Playwright `page.evaluate:` prefix and
+   an in-page stack trace; the first line ("Card QQQ is not in any pile",
+   "Unknown action type: BOGUS") is good - strip the rest.
+3. #9 player_wait timeout says only "page.waitForFunction: Timeout
+   1500ms exceeded" - no predicate echo, no current value at `path`.
+Known/backlogged: cards ~19x26px at 1280x720 (still true). Config:
+.mcp.json ${CLAUDE_PROJECT_DIR} arg likely unexpanded (Neo resume note).
 
 ## Context
 

@@ -60,6 +60,16 @@ function pick(value, path) {
 const asJson = (value) => ({ content: [{ type: 'text', text: JSON.stringify(value ?? null, null, 1) }] });
 
 /**
+ * An error thrown inside a player's page reaches us as Playwright's
+ * `page.evaluate: Error: <message>` followed by the in-page stack. The
+ * agent only needs the app's own message - the first line, unwrapped.
+ */
+function errorText(error) {
+  const [firstLine] = error.message.split('\n', 1);
+  return firstLine.replace(/^page\.\w+: (?:Error: )?/, '');
+}
+
+/**
  * Every tool body goes through here: a thrown error becomes an MCP tool
  * error carrying its message, so one bad call never kills the server
  * (or the table the agent is in the middle of).
@@ -69,7 +79,7 @@ function tool(handler) {
     try {
       return await handler(arguments_);
     } catch (error) {
-      return { isError: true, content: [{ type: 'text', text: error.message }] };
+      return { isError: true, content: [{ type: 'text', text: errorText(error) }] };
     }
   };
 }
@@ -97,14 +107,16 @@ server.registerTool('game_start', {
 }));
 
 server.registerTool('game_status', {
-  description: 'Every player of the running table: name, player id, hand size.',
+  description: 'Every player of the running table (name, player id, hand size) and every pile as the host sees it (id, name, kind, card count) - the ids player_act takes.',
 }, tool(async () => {
   const players = [];
   for (const [name, peer] of game.players) {
     const view = await peer.view();
     players.push({ name, id: await peer.myId(), handSize: view?.myHand.length ?? 0 });
   }
-  return asJson({ running: game.players.size > 0, players });
+  const hostView = await game.players.get('host')?.view();
+  const piles = (hostView?.piles ?? []).map(({ id, name, kind, cards }) => ({ id, name, kind, cards: cards.length }));
+  return asJson({ running: game.players.size > 0, players, piles });
 }));
 
 server.registerTool('game_stop', {
@@ -137,8 +149,14 @@ server.registerTool('player_wait', {
     path: z.string().optional(),
   },
 }, tool(async ({ player: name, predicate, arg, timeoutMs, path }) => {
-  const view = await player(name).waitForView(predicate, arg, { timeout: timeoutMs });
-  return asJson(pick(view, path));
+  const peer = player(name);
+  try {
+    return asJson(pick(await peer.waitForView(predicate, arg, { timeout: timeoutMs }), path));
+  } catch (error) {
+    if (error.name !== 'TimeoutError') throw error;
+    const now = JSON.stringify(pick(await peer.view(), path) ?? null);
+    throw new Error(`Timed out after ${timeoutMs}ms waiting for ${predicate} - ${path ?? 'the view'} is now: ${now}`, { cause: error });
+  }
 }));
 
 server.registerTool('player_query', {

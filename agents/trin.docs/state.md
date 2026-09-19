@@ -1,5 +1,12 @@
 # Agent State
 
+## Current Task (2026-09-18) - *qa uat harness-mcp usability fix: PASSED
+
+10/10 test-harness-mcp. Mutation-proved: .mcp.json test (red with the old
+${CLAUDE_PROJECT_DIR} arg - Connection closed), errorText (reverting -> reducer
+error test fails), TimeoutError catch (reverting -> wait test fails). Restored
++ re-run green. No src/ changes, so unit suite not re-run (bounded testing).
+
 ## Current Task (2026-09-18) — US-119 Harness MCP server UAT
 
 - Phase 1 UAT PASSED: trafficLog unit tests 3/3, capacity-bound

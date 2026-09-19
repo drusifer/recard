@@ -19,11 +19,17 @@ const fixture = { client: undefined, shots: undefined };
 before(async () => {
   fixture.shots = await mkdtemp(path.join(tmpdir(), 'recard-shots-'));
   fixture.client = new Client({ name: 'harness-mcp-test', version: '0.0.0' });
+  // Launched exactly as the committed .mcp.json registers it, from the
+  // project root, with no CLAUDE_PROJECT_DIR - Claude Code does not set
+  // that variable for MCP servers, so a config leaning on it never connects.
+  const { mcpServers } = JSON.parse(await readFile(path.join(ROOT, '.mcp.json'), 'utf8'));
+  const { command, args } = mcpServers['recard-harness'];
+  const { CLAUDE_PROJECT_DIR: _unset, ...environment } = process.env;
   await fixture.client.connect(new StdioClientTransport({
-    command: process.execPath,
-    args: ['tools/mcp/harnessServer.mjs'],
+    command,
+    args,
     cwd: ROOT,
-    env: { ...process.env, RECARD_HARNESS_PORT: PORT, RECARD_SCREENSHOT_DIR: fixture.shots },
+    env: { ...environment, RECARD_HARNESS_PORT: PORT, RECARD_SCREENSHOT_DIR: fixture.shots },
   }));
 });
 
@@ -52,6 +58,13 @@ test('game_start stands up a named multi-player table', async () => {
 
   const { data: status } = await call('game_status');
   assert.deepEqual(status.players.map((player) => [player.name, player.handSize]), [['host', 3], ['guest1', 3]]);
+});
+
+test('game_status lists every pile by id with a card count - no probing piles.N.id', async () => {
+  const { data: status } = await call('game_status');
+  const { data: piles } = await call('player_view', { player: 'host', path: 'piles' });
+  assert.deepEqual(status.piles, piles.map((pile) => ({ id: pile.id, name: pile.name, kind: pile.kind, cards: pile.cards.length })));
+  assert.ok(status.piles.some((pile) => pile.id === 'deck' && pile.cards > 0));
 });
 
 test('a guest acts, the host converges, and both see it through their own tools', async () => {
@@ -88,6 +101,19 @@ test('a bad call is a tool error, not a dead server', async () => {
   assert.match(result.content[0].text, /guest9/);
   const { data } = await call('game_status');
   assert.equal(data.players.length, 2, 'still serving the same table');
+});
+
+test('an action the reducer rejects reports its own message - no browser prefix or in-page stack', async () => {
+  const { result } = await call('player_act', { player: 'host', action: { type: 'BOGUS' } });
+  assert.ok(result.isError);
+  assert.equal(result.content[0].text, 'Unknown action type: BOGUS');
+});
+
+test('a player_wait timeout says what it waited for and what the view holds now', async () => {
+  const predicate = '(view) => view.myHand.length === 99';
+  const { result } = await call('player_wait', { player: 'host', predicate, timeoutMs: 500, path: 'myHand.length' });
+  assert.ok(result.isError);
+  assert.equal(result.content[0].text, `Timed out after 500ms waiting for ${predicate} - myHand.length is now: 3`);
 });
 
 test('screenshot of one player comes back inline AND lands on disk with a contact sheet', async () => {

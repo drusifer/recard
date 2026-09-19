@@ -1,5 +1,18 @@
 # Agent State
 
+## Current Task (2026-09-18) - *fix harness-mcp usability: DONE, handed to Trin
+
+From Smith's 1-player `*user test harness-mcp`:
+- `.mcp.json` arg `${CLAUDE_PROJECT_DIR}/tools/...` -> `tools/mcp/harnessServer.mjs`
+  (var is unset for MCP servers; `claude mcp get recard-harness` now Connected).
+- `game_status` returns `piles: [{id,name,kind,cards}]` from the host view.
+- `errorText()` in harnessServer.mjs: first line, `page.X: (Error: )?` stripped.
+- `player_wait` catches Playwright TimeoutError -> "Timed out after Nms waiting
+  for <predicate> - <path> is now: <json>" (cause attached).
+- tests/harnessMcp.browser.mjs: launches from .mcp.json with CLAUDE_PROJECT_DIR
+  unset (was red = same Connection closed) + 3 new tests. 10/10, lint-js clean.
+- D136 amended in docs/DECISIONS.md.
+
 ## Current Task (2026-09-18) — US-119 Harness MCP server
 
 Sprint plan: root `task.md` ("Harness MCP Server — US-119"), arch

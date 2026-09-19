@@ -88,6 +88,13 @@ or a live-verification session) versus being pickable directly.
   at small zoom and card detail is hard to read in a capture; a guest's
   traffic log resets on reconnect (new Session) - fine today, surprising
   if someone debugs a reconnect with it.
+  Smith's spin through the live tools (2026-09-19) added four more,
+  all `player_query`/`player_wait` output: form fields report `text: ""`
+  instead of their `value` (the deck's deal-count input shows 26 on
+  screen); hidden matches (closed pile-type menus) come back with full
+  rects, indistinguishable from visible ones - add a `visible` flag;
+  a predicate that throws returns a bare `TypeError` without saying the
+  predicate threw; `text` joins child elements with no separator.
 - **Browser-automation tooling for Smith's own UX gate** — distinct
   from Neo's existing Playwright test scripts; Smith's end-to-end
   sprint-close testing is currently manual.

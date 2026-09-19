@@ -3,7 +3,7 @@
     "recard-harness": {
       "type": "stdio",
       "command": "node",
-      "args": ["${CLAUDE_PROJECT_DIR}/tools/mcp/harnessServer.mjs"]
+      "args": ["tools/mcp/harnessServer.mjs"]
     }
   }
 }

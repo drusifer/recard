@@ -102,3 +102,82 @@ Agents **must** use this for every message posted to CHAT.md:
 ---
 [<small>2026-09-18 23:46:48</small>] [**Neo**]->[**all**] *exit*:
  *exit prep: US-119 harness MCP shipped (D136). .mcp.json now COMMITTED with recard-harness only (${CLAUDE_PROJECT_DIR} path, type stdio); via's machine-local entry moved to gitignored .via/mcp.json - NOT auto-loaded, register with claude mcp add-json --scope local or use the via CLI. Persona state files saved. Restart Claude Code to load recard-harness.
+
+---
+[<small>2026-09-18 23:52:09</small>] [**Neo**]->[**User**] *resume*:
+ Session init (cold start). Last handoff: Neo *exit after US-119 (D136). recard-harness MCP FAILED to connect this session (Connection closed), but the server answers initialize fine when run by hand from the repo root - likely ${CLAUDE_PROJECT_DIR} not expanded in .mcp.json args at MCP launch. Awaiting user direction.
+
+---
+[<small>2026-09-18 23:52:31</small>] [**User**]->[**Smith**] *request*:
+ try using the new mcp to control a 1 player game
+
+---
+[<small>2026-09-18 23:52:37</small>] [**Smith**]->[**all**] *user test*:
+ Smith on entry: recard-harness isn't loaded as tools this session, so I'll drive tools/mcp/harnessServer.mjs over real stdio with the MCP SDK client - same protocol path an agent would use. 1-player game test.
+
+---
+[<small>2026-09-18 23:53:38</small>] [**Smith**]->[**User**] *user test*:
+ *user test harness-mcp (1 player) PASSED over real stdio: start/view/DRAW/MOVE/wait/query/screenshot/stop all work, card seen on table. Concerns (#6/#9): no cheap pile-id listing; act errors leak Playwright stack; wait timeout doesn't say what it saw. MCP not loaded as tools this session (config). Details: smith.docs/state.md. @User triage?
+
+---
+[<small>2026-09-18 23:54:31</small>] [**User**]->[**Neo**] *request*:
+ *fix usablility issues
+
+---
+[<small>2026-09-18 23:56:36</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-js | /home/drusifer/Projects/recard/build/build.out
+=== make lint-js @ 2026-09-18 23:56:14 ===
+npm run lint:js
+
+> lint:js
+> eslint 'src/**/*.js' 'tools/**/*.mjs' 'tests/**/*.js' 'tests/**/*.mjs'
+
+
+---
+[<small>2026-09-18 23:56:59</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ *swe fix done. Root cause confirmed: CLAUDE_PROJECT_DIR is unset for MCP servers, so .mcp.json launched /tools/mcp/harnessServer.mjs -> now relative path; claude mcp get: Connected. Chose relative path over a wrapper script (project servers start in the repo root). Also: game_status lists piles (id/name/kind/count), errors = app's first line, wait timeouts name predicate + current value. Tests-first: suite launches from .mcp.json; 10/10, lint clean. D136 amended. @Trin *qa uat
+
+---
+[<small>2026-09-18 23:57:24</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-harness-mcp | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5136.307645
+
+---
+[<small>2026-09-18 23:57:30</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat PASSED: 10/10. Mutation-proved all 3 guards (old .mcp.json arg -> Connection closed; drop errorText -> reducer-error test fails; drop TimeoutError catch -> wait test fails), restored, re-run green. No src/ changes so unit suite not re-run. @Morpheus *lead review
+
+---
+[<small>2026-09-18 23:57:40</small>] [**Morpheus**]->[**User**] *lead review*:
+ *lead review APPROVED. Fix stays in the MCP tool layer; errorText in the one tool() wrapper, no per-tool special cases. Amended D136 rather than a new D (same decision, corrected config). Non-blocking: game_status reads the host view twice; errorText keeps line 1 only. *fix loop complete - uncommitted, awaiting user.
+
+---
+[<small>2026-09-18 23:58:44</small>] [**User**]->[**Smith**] *request*:
+ take it for a spin
+
+---
+[<small>2026-09-18 23:58:44</small>] [**Smith**]->[**all**] *user test*:
+ Smith on entry: recard-harness now loaded as real MCP tools after /mcp reconnect. Spinning a 1-player game through them directly, re-checking the 3 fixed concerns.
+
+---
+[<small>2026-09-18 23:59:45</small>] [**Smith**]->[**User**] *user test*:
+ *user test harness-mcp via real MCP tools: PASS. All 3 prior concerns verified fixed in use. New: player_query drops <input> values (deck deal-count shows 26, query says "") and reports hidden elements (closed type menus) like visible ones - both #1/#8, worth a *nit. Minor: predicate-throw error unlabeled; query text has no separators. Details smith.docs/state.md. @User
+
+---
+[<small>2026-09-19 00:01:00</small>] [**User**]->[**Oracle**] *request*:
+ groom docs commit and ff main -> dev
+
+---
+[<small>2026-09-19 00:01:17</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
+No duplicate decision numbers, and the modern section is newest-first. Clean.
+
+---
+[<small>2026-09-19 00:01:28</small>] [**Oracle**]->[**User**] *ora groom*:
+ *ora groom done. D136 amended in place (config path + error text), not a new D - same decision, corrected. BACKLOG harness-MCP follow-ups += Smith's 4 query/wait concerns. Removed 3 empty stray root files (Drop-in/Fetch/Use); left the root Screenshot*.png untracked (user's). Committing on dev, then ff main to dev; not pushing.
