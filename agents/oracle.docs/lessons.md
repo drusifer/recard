@@ -537,3 +537,24 @@ This file contains critical lessons and rules derived from past errors, technica
   read identically except for one verb string and one mutation -
   worth pattern-matching on `git diff`/code-review, not just "this
   function is a bit long."
+
+## Sprint US-120 (2026-09-19): Gin Rummy Jev players
+
+- **Assumed model answers are not a stand-in for live ones.** The
+  example states were written with assumed Jev answers (threat 3.6 for
+  "opponent one card from gin"); live Jev scored the same state 1.57 and
+  kept every threat under 3, so `knockUnderThreat(3)` never fired. A rule
+  keyed to a model's score needs its threshold set from live answers - the
+  doc's example table was generated live for this reason.
+- **Reproduce with the real content volume, not a token amount.** The Gin
+  discard bug looked fine at 1 and 6 cards and only broke past ~7; the
+  repeatable check now fills a full hand's worth (30), which is what
+  caught the second, width-only failure at 30 after the first fix.
+- **A script that grows exports is two files.** `examples.mjs` started as
+  a CLI and picked up exports for a test, which the linter rejects
+  (`no-exports-in-scripts`); the fix was a module plus a thin CLI - the
+  same shape `jevPlayer.mjs` / `gin/player.mjs` used from the start.
+- **A user's "strike it" can be reversed minutes later - record both.**
+  The discard item was struck, then fixed; posting each decision to chat
+  as it happened kept the backlog and state files honest across the flip.
+

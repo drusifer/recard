@@ -1888,7 +1888,7 @@ contact sheet; WebRTC exposure is a READ-ONLY traffic log; headless only.
 
 ---
 
-## Sprint: Gin Rummy strategy bots — US-120 (2026-09-19)
+## Sprint: Gin Rummy strategy bots — US-120 (2026-09-19) — SHIPPED (43a958b, c427db8)
 
 Tier 2. Story: US-120. Arch: D137. Smith conditions: bot named after its
 strategy; human one-line turn summary on stderr beside the JSONL.
@@ -1913,3 +1913,8 @@ strategy; human one-line turn summary on stderr beside the JSONL.
 
 ## Phase 5 — Strategy doc ✅ DONE
 - [x] T5.1 `docs/GIN_STRATEGY.md`: research + sources, typed rule list, decision flow, example evaluations (generated)
+
+## Close-out (user requests after Phase 5) ✅ DONE
+- [x] Gin discards stay in view: `tableSpread` + wider Gin Table Zone, lint:design 30-discard check (D139)
+- [x] `make jev-player GAME STRATEGY CODE` replaces `make gin-bot`; player named after its strategy (D137 amended)
+- [x] gitleaks: `make secrets` in `make check`, `.githooks/pre-commit`, `make hooks` (D140)

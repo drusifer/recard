@@ -53,7 +53,10 @@ Builds run through `make`, which fronts the npm scripts and captures
 output rather than flooding the terminal:
 
 ```
-make check          # the gate: compile card content + unit tests + deck balance
+make check          # the gate: compile card content + unit tests + deck balance + secret scan
+make secrets        # gitleaks: all history + uncommitted tracked changes
+make hooks          # once per clone: gitleaks pre-commit hook (.githooks/)
+make jev-player GAME=gin STRATEGY=equilibrium CODE=<code>  # a Jev player joins your table
 make test           # unit tests only
 make lint           # style + design + js (see the known-baseline note below)
 make lint-decks     # Recard the Gathering deck balance

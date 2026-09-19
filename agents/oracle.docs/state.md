@@ -1,5 +1,12 @@
 # Agent State
 
+## Current Task (2026-09-19) - US-120 groom: DONE
+
+DECISIONS +D139 (Gin tableSpread/wider zone), +D140 (gitleaks), index lines,
+D137 amended (jev-player). lessons.md + US-120 section (4 lessons). README
+make targets (secrets/hooks/jev-player). task.md sprint SHIPPED + close-out.
+CHAT archived as SPRINT_GIN_BOTS. Open: BACKLOG "Gin bot tuning".
+
 ## Current Task (2026-09-19) - US-120 Phase 5: docs/GIN_STRATEGY.md (100% DONE)
 
 Written from live Jev (`node tools/gin/examples.mjs`, key set, run

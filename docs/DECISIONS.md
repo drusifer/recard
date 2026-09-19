@@ -63,10 +63,57 @@ D9: score is a flat map · D10: presets/rules reference are static data · D11: 
 D129: `Stack`/`Stackable` (also domain model — see above) · D130: camera is a pure CSS transform layer · D131: focus interaction — grow the Pile in place · D132: Infinity Table overview — manual dial + presets · D133: default zoom computed to fit a fixed canvas (D132 partially reversed) · D134: per-preset canvas size, lint:design preset sweep, transform-origin fix
 
 **Layout & responsive design**
-D20: desktop table width, pure CSS breakpoints · D24: Zone room grows at desktop breakpoints · D51: bigger cards (also drag-and-drop — see above) · D61: saved layout overrides, separate localStorage store · D133: fixed local canvas + computed fit-zoom fixes zone-overlap drift (also camera/view — see above) · D134: per-preset canvas size + every preset's own layout tuned/verified (also camera/view, testing — see above/below)
+D20: desktop table width, pure CSS breakpoints · D24: Zone room grows at desktop breakpoints · D51: bigger cards (also drag-and-drop — see above) · D61: saved layout overrides, separate localStorage store · D133: fixed local canvas + computed fit-zoom fixes zone-overlap drift (also camera/view — see above) · D134: per-preset canvas size + every preset's own layout tuned/verified (also camera/view, testing — see above/below) · D139: Gin's Table Zone widened + Table pile tightened (`tableSpread`), discards checked by lint:design
 
 **Testing & tooling**
-D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rules disabled post-autofix · D60: `tests/e2e.smoke.mjs` removed · D96: universal DnD guarantee, structural test (also drag-and-drop — see above) · D134: `lint:design` sweeps every preset, not just the default (also camera/view — see above) · D135: multi-player test harness — real peers driven over the real protocol, one `submitAction` funnel · D136: harness MCP server — agents drive a live table; read-only WebRTC traffic log · D137: Gin Rummy bots — typed rules in code, Jev opponent inference, one bot core behind runner + MCP · D138: table talk — host-ordered `talk` message, not game state
+D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rules disabled post-autofix · D60: `tests/e2e.smoke.mjs` removed · D96: universal DnD guarantee, structural test (also drag-and-drop — see above) · D134: `lint:design` sweeps every preset, not just the default (also camera/view — see above) · D135: multi-player test harness — real peers driven over the real protocol, one `submitAction` funnel · D136: harness MCP server — agents drive a live table; read-only WebRTC traffic log · D137: Gin Rummy bots — typed rules in code, Jev opponent inference, one bot core behind runner + MCP · D138: table talk — host-ordered `talk` message, not game state · D139: lint:design fills Gin's Table pile with a hand's discards (also layout — see above) · D140: gitleaks — `make secrets` in `make check`, versioned pre-commit hook
+
+---
+
+### D140. Secret scanning — gitleaks in `make check`, plus a versioned pre-commit hook
+
+Direct user request, 2026-09-19, right after the Jev players started
+reading `TYPESAFE_API_KEY` from the environment. `make secrets` runs
+`gitleaks git` over all history, then `--pre-commit` over uncommitted
+changes to tracked files, redacted; it is part of `make check`.
+`.githooks/pre-commit` runs `gitleaks git --staged` and blocks the
+commit on a finding; `make hooks` sets `core.hooksPath=.githooks` (once
+per clone). Both were proven to fail on a planted `ghp_` token. The
+hook fails closed when gitleaks is missing (prints the install link).
+History at adoption: 159 commits, no leaks.
+
+**Rejected:** a hook in `.git/hooks` (unversioned - every clone would
+need it copied by hand); failing open when gitleaks is absent (a
+missing tool would silently disable the check); a working-directory
+scan (`gitleaks dir`) - it walks `node_modules`/`build/` and untracked
+files, slow and noisy; the staged scan covers a new file once it is
+added.
+
+---
+
+### D139. Gin's discards stay visible — wider Table Zone, tighter Table pile (`tableSpread`)
+
+Found in Smith's live bot game (US-120): the Gin preset has no discard
+pile of its own (an earlier user *nit), so discards go on the built-in
+Table pile, laid side by side at spread 0. After ~7 discards it no longer
+fit beside the Deck and wrapped onto a second row below the Table Zone's
+box, out of sight. The user first struck the item, then asked for "the
+zone a little bigger" and to "tighten the pile to fit more cards":
+
+- New preset field `tableSpread` -> `gameConfig.tableSpread` ->
+  `createInitialState` sets the built-in Table pile's `spread` through
+  `applyDeclaration` (the same field Tighten/Loosen writes; absent = the
+  plain pile's default). Gin: `0.7` - each card's rank corner still shows.
+- Gin gets its own layout: Table Zone `x: 60, w: 760` (was 110/650),
+  Score `x: 840`. Two players only, so nothing sits beside it.
+- `lint:design`'s preset sweep fills Gin's Table pile with 30 discards
+  (about a full hand: stock 32, dead at 2) and fails if any pile leaves
+  its zone's box. Red before the fix (pile bottom 615 vs zone 540).
+
+**Rejected:** a stacked Discard pile (hides the discard history Gin
+players read, and the user asked for bigger + tighter); growing the zone
+downward (the bottom seat starts ~58 units below it); changing
+`SIMPLE_LAYOUT` for every preset (only Gin collects a hand's discards).
 
 ---
 
