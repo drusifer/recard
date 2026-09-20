@@ -70,6 +70,181 @@ D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rul
 
 ---
 
+### D146. Travel is animated with the Web Animations API, and browser tests run with reduced motion
+
+US-123, found while building Phase 8. The first implementation wrote
+`element.style.transform` and cleared it a frame later. A render landing
+between those two moments left a live card carrying a stale offset, and
+the table's geometry stopped being stable - it broke three RTG cascade
+assertions that had nothing to do with this sprint. `element.animate()`
+with `composite: 'add'` never writes the card's own layout, so the
+failure mode cannot occur, and a card's existing transform (a fan, a
+rotation) is composited with rather than overwritten.
+
+The same instability would hit any test that measures geometry right
+after a change, so `launchChromium` now wraps `newContext` to set
+`reducedMotion: 'reduce'` for every browser suite, and `playTravels`
+honours it (people who ask for less motion get none - an accessibility
+win, not a test accommodation). A suite ABOUT the motion opts back in
+with `launchChromium({ motion: true })`.
+
+**Rejected:** Chromium's `--force-prefers-reduced-motion` flag (checked
+directly: it does not reach `matchMedia`); per-suite settle loops in
+each geometry test (the same fix written eight times, and every new
+test would have to remember it); not animating spread/sort changes (a
+special case carved out to suit the tests rather than the user).
+
+---
+
+### D145. A spectator's hand is never DEALT, but never REFUSED either
+
+US-124, Phase 1, resolving a conflict raised by Neo between D141 and a
+sprint-plan note ("never create a hand pile for a spectator anywhere").
+`ensureHandPile` is also reached lazily from DRAW and PICKUP, not only
+DEAL. So: a spectator gets no hand pile and no seat zone at JOIN, and
+DEAL/DEAL_MORE/RESHUFFLE_DEAL and scoring count SEATED players only -
+but the lazy paths stay permissive. A spectator who deliberately draws
+or picks up a card gets a hand pile at that moment.
+
+**Rejected:** refusing `ensureHandPile` for spectators - that is
+precisely the permission check D141 rejected, on a table whose premise
+(D82-D85) is that there are none, and the user's own answer was that a
+spectator "can move stuff same as any other player". The distinction
+that matters is being dealt to, not being able to hold a card.
+
+---
+
+### D144. Moved Pileables travel (FLIP) and glow in the actor's colour; the actor is one replicated stamp, the fade is local
+
+US-123. Two mechanisms, deliberately separate:
+
+- **Motion is derived, not messaged.** Before each render the renderer
+  captures every rendered Pileable's rect by id; after the render, any
+  id whose rect changed is given the inverse transform and released to
+  identity (FLIP). Nothing about motion goes on the wire - every peer
+  derives it from the state change it already received, which is why a
+  deal (one render, many cards) animates as one group for free, and why
+  a bot's move animates on every screen without the bot sending
+  anything. A render arriving mid-animation re-captures the element's
+  live (transformed) rect, so a superseded move retargets instead of
+  snapping. Cosmetic only (PRD Principle 6 / D4): cutting it short,
+  skipping it, or a card having no before/after rect (a collapsed pile)
+  costs smoothness, never correctness, and never blocks input.
+- **"Who touched it" is replicated; the fade is not.** The reducer
+  stamps one state-level `lastTouch: { by, pileableIds, seq }`,
+  overwritten by each action that moves or acts on Pileables. Each
+  client keeps its OWN fade timers keyed by pileable id, so a glow that
+  is already fading is not restarted or cut short by someone else's
+  later action, and a client that joins mid-fade simply doesn't glow.
+  One shared constant, ~1.5s including the fade (US-123 AC11).
+- **Player colours are derived, not stored.** A pure `playerColors.js`
+  maps a person's index in the replicated `state.players` to a palette
+  entry, so every screen agrees without colour ever going on the wire;
+  spectators and bots included. Colour is the primary "who" cue, never
+  the only one (Gate 1 condition 4) - the roster/seat naming stays
+  the accessible answer.
+
+Only Pileables (cards, chips, tokens) animate and glow - zones and
+piles do not (user, 2026-09-19).
+
+**Rejected:** per-card `lastTouchBy`/`lastTouchAt` fields (cards are
+conserved and redacted - widening the card record for a cosmetic is
+cost with no need); motion messages for the animation (D4's motion
+class exists for a live DRAG, where there is no state change to derive
+from; a completed move already has one); a replicated fade/expiry (the
+host would have to broadcast a state change just to stop a glow).
+
+---
+
+### D143. Adding a Jev bot from the table: a request on the talk channel that the already-running Jev player answers
+
+US-122. The browser app has no server and cannot start processes, and
+the user's precondition is that a Jev player is already running. That
+running player is itself a peer at the table (a headless page joined as
+a guest, D137), with a Node supervisor behind it - so it is the thing
+that can spawn another bot, and the table's own channel is how to ask.
+
+- On join, a Jev player posts a `talk` entry with
+  `data: { kind: 'jev-ready', games, strategies }`. The app offers
+  "Add Jev bot" exactly while such an entry exists from a CONNECTED
+  peer, listing that peer's own strategies - so the control's presence
+  is evidence, not configuration.
+- Anyone at the table (player or spectator, user 2026-09-19) picks a
+  strategy; the app posts `{ kind: 'spawn-bot', strategy, requestId }`.
+  The supervisor reads its page's talk log, spawns another bot, and
+  answers `{ kind: 'spawn-bot-result', requestId, ok | error }`. The
+  requester shows in-flight state from the moment it asks (Gate 1
+  condition 3) and the error text when one comes back.
+
+**Rejected:** an HTTP endpoint or local service the app calls (the
+no-server-infra premise is the product); the app spawning processes
+(impossible in a browser); driving it through the harness MCP (that is
+an agent's path, not a player's); a new message type (D138's `data` is
+exactly this - structured payload for bots beside human-readable text).
+
+---
+
+### D142. Thought bubbles are the talk log, rendered per seat
+
+US-121. Every bot decision is already a typed record (D137), and D138
+already gives a host-ordered, everyone-sees-the-same-order log with a
+`data` field for bots. So a bot posts one talk entry per decision -
+`text` is the move in a few words ("discarded 9♣"), `data` is the
+record (rules evaluated and which fired, Jev's threat Score and each
+candidate's helps-Noul, the facts). A `<thought-bubble>` Web Component
+per seat renders the newest entry collapsed, and expands into a
+scrolling window over that sender's entries - the history is the log,
+filtered, not a second store. Bounded log = bounded history, accepted.
+
+**Open/close (Gate 1 condition 1):** click to open, click outside to
+close. Unlike pile focus-zoom, `pointerleave` must NOT close an
+expanded bubble - it holds scrolling content, and closing it when the
+pointer drifts past an edge destroys the reading position. It reuses
+`focusZoom.js`'s clamp math for placing the overlay, not its pointer
+watchers.
+
+**Rejected:** a replicated reducer action (reasoning is not game state
+- it would be persisted, conserved and redacted like cards); a
+separate decisions panel (the user asked for the bubble itself to
+carry the history); reading `build/gin/*.jsonl` from the app (the
+files are Node-side, and a guest at the table has no access).
+
+---
+
+### D141. Spectators are a role on the one roster, not a second list
+
+US-124. `state.players[].role: 'player' | 'spectator'` (absent reads as
+`'player'`), set at JOIN. One roster, because a spectator is a person
+at the table in every way except being dealt to: they move cards, deal,
+talk, have a cursor and a colour, exactly as D82-D85's fully permissive
+table already allows (user, 2026-09-19). Only the places that mean
+SEATED players filter by role - dealing, seat/hand creation, scores,
+seating.
+
+- **No seat means no seat furniture:** a spectator gets no hand pile
+  and no personal seat zone at JOIN.
+- **Forced spectator:** the host downgrades a `'player'` join to
+  `'spectator'` when the game is full or started (US-124 AC10) - full
+  being a new per-preset `playerLimit` (Gin = 2) - the host's
+  `expectedPlayers` setting is a START TRIGGER and deliberately not a
+  capacity limit (US-42, unchanged; the user revised their earlier
+  "either limit" answer when this conflict surfaced, and asked that
+  spectating simply be an option on the join screen); started being
+  `dealtThisGame`, set by DEAL and cleared by RESET/new game. The
+  downgraded joiner is TOLD, in words, which of the two it was (Gate 1
+  condition 2); the reason is derivable from the state they already
+  have, so no new message carries it.
+
+**Rejected:** a separate `spectators` array (every existing roster
+read, cursor, talk and permission path would need a second lookup, and
+D82-D85 says the table does not care who you are); blocking spectators
+from touching cards (the user's own answer, and it would be the only
+permission check on a table whose premise is that there are none);
+enforcing the player limit in the app's rules (Recard referees nothing
+- the limit gates SEATING, not play).
+
+---
+
 ### D140. Secret scanning — gitleaks in `make check`, plus a versioned pre-commit hook
 
 Direct user request, 2026-09-19, right after the Jev players started

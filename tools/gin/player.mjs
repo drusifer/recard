@@ -8,6 +8,7 @@
 // the real PeerJS/WebRTC path. Every decision is one JSON line on stdout
 // (and in build/gin/), plus one readable line on stderr. Knocks and gin
 // are announced on table talk. Jev strategies need TYPESAFE_API_KEY.
+import { spawn } from 'node:child_process';
 import { mkdir, appendFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
@@ -15,6 +16,10 @@ import { TypeSafeClient } from '@typesafe-ai/sdk';
 import { launchChromium, startStaticServer, joinTable } from '../../tests/harness/multiplayer.mjs';
 import { GinBot, summaryLine } from './bot.mjs';
 import { STRATEGIES } from './strategies.mjs';
+import { pendingSpawnRequests, spawnRefusal, readyAnnouncement } from '../botRequests.mjs';
+
+const SPAWN_POLL_MS = 1000;
+const RUNNER = fileURLToPath(new URL('../jevPlayer.mjs', import.meta.url));
 
 const LOG_DIR = fileURLToPath(new URL('../../build/gin', import.meta.url));
 const TURN_TIMEOUT_MS = 30 * 60_000;
@@ -45,6 +50,59 @@ function judgeFor(strategy) {
   } catch (error) {
     throw new UsageError(`${strategy.name} asks Jev for judgments: ${error.message}`);
   }
+}
+
+/**
+ * US-122/D143: answers "add a Jev bot" requests from the table for as
+ * long as this player is at it. Polls its own talk log (the requests
+ * arrive as talk `data`), spawns a second runner against the SAME
+ * served app and table code, and says what happened - so the person
+ * who pressed the button sees either a bot sitting down or the reason
+ * it didn't.
+ * `startBot` is injected so request handling can be tested without
+ * spawning real processes (the default spawns the runner for real).
+ * @returns {{ stop: () => void, poll: () => Promise<void> }}
+ */
+export function serveSpawnRequests({ peer, code, baseUrl, startBot = spawnRunner, pollMs = SPAWN_POLL_MS }) {
+  const handled = new Set();
+  let running = true;
+  const answer = (requestId, data, text) => peer.say(text, { kind: 'spawn-bot-result', requestId, ...data });
+
+  const poll = async () => {
+    for (const request of pendingSpawnRequests(await peer.talk(), handled)) {
+      handled.add(request.requestId);
+      const refusal = spawnRefusal(request, { games: ['gin'], strategies: STRATEGIES, env: process.env });
+      const failure = refusal ?? await startBot({ ...request, code, baseUrl });
+      await answer(request.requestId, failure ? { ok: false, error: failure } : { ok: true },
+        failure ? `Could not add a ${request.strategy} bot: ${failure}` : `Adding a ${request.strategy} bot - it is joining now.`);
+      process.stderr.write(`jev-player: spawn request ${request.requestId} (${request.strategy}) - ${failure ?? 'started'}\n`);
+    }
+  };
+
+  const loop = async () => {
+    while (running) {
+      await poll();
+      await new Promise((resolve) => setTimeout(resolve, pollMs));
+    }
+  };
+  loop().catch((error) => process.stderr.write(`jev-player: spawn watcher stopped: ${error.message}\n`));
+  return { stop: () => { running = false; }, poll };
+}
+
+/**
+ * Starts another runner against the SAME served app and table code.
+ * Resolves `null` once the process is up, or the reason it wasn't -
+ * "it started", not "it finished": the requester is waiting for a seat
+ * to fill, and the bot plays on for the rest of the game.
+ */
+function spawnRunner({ game, strategy, code, baseUrl }) {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, [
+      RUNNER, '--game', game, '--strategy', strategy, '--code', code, '--url', baseUrl,
+    ], { stdio: 'inherit' });
+    child.once('spawn', () => resolve(null));
+    child.once('error', (error) => resolve(error.message));
+  });
 }
 
 async function playHands({ bot, hands, logFile }) {
@@ -91,7 +149,17 @@ export async function play(options) {
       throw new Error(`not seated within ${SEAT_TIMEOUT_MS / 1000}s - is table ${options.code} open, and hosted from the same Recard version?`, { cause: error });
     }
     process.stderr.write('jev-player: seated - waiting for the deal\n');
-    await playHands({ bot: new GinBot({ peer, strategy, judge, firstPlayer: options.first }), hands, logFile });
+    // US-122: announce what this player can deal in, so the table can
+    // offer "Add Jev bot" at all (D143 - the control's presence is
+    // evidence a Jev player is running).
+    const ready = readyAnnouncement({ game: 'gin', strategies: STRATEGIES });
+    await peer.say(ready.text, ready.data);
+    const spawnWatcher = serveSpawnRequests({ peer, code: options.code, baseUrl: options.url ?? server.baseUrl });
+    try {
+      await playHands({ bot: new GinBot({ peer, strategy, judge, firstPlayer: options.first }), hands, logFile });
+    } finally {
+      spawnWatcher.stop();
+    }
   } finally {
     await browser.close();
     await server?.close();

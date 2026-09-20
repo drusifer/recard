@@ -1,5 +1,22 @@
 # Agent State
 
+## Current Task (2026-09-19) - Gate 1 on US-121..124: APPROVED w/ 4 conditions
+
+Sprint "Jev at the table" (US-121 bubble, US-122 add bot, US-123
+animate+glow, US-124 spectator). Conditions, full text in
+docs/USER_STORIES.md "Gate 1 (Smith, 2026-09-19)":
+1. US-121 expanded bubble must NOT close on pointerleave (scrolling
+   history); click to open, click outside to close.
+2. US-124 forced spectator role must be announced in words.
+3. US-122 must show the add-bot request in flight.
+4. US-123 colour is not the only identity carrier (WCAG 1.4.1).
+Flagged non-blocking: 4 stories is a big sprint; US-124+US-122 deliver
+the user's goal, US-121/123 are separable.
+
+## Next Steps
+Gate 2 after Morpheus's architecture: check the bubble's open/close
+model, the spectator role's wording, the add-bot feedback path.
+
 NOTE 2026-09-19: user overrode my "Bot (<strategy>)" naming condition - a Jev
 player now joins named just `<strategy>` (e.g. "equilibrium").
 

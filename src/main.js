@@ -49,7 +49,13 @@ import './components/PilePanel.js';
 import './components/FanPile.js';
 import './components/DeckStack.js';
 import './components/TableTalk.js';
+import './components/AddBot.js';
+import './components/ThoughtBubble.js';
 import { createTalkLog, makeTalkMessage } from './tableTalk.js';
+import { botOffers, spawnResult, spawnRequestLine } from './botOffers.js';
+import { decisionsBySpeaker } from './botThoughts.js';
+import { colorForPlayer } from './playerColors.js';
+import { captureRects, travels, playTravels, glow } from './cardMotion.js';
 import './components/ChipTray.js';
 import './components/HeaderActions.js';
 import './components/SpreadSlider.js';
@@ -544,7 +550,7 @@ function seatRosterEntry(r, state) {
   }
   let next = state;
   if (next.players.every((p) => p.id !== key)) {
-    next = reduce(next, { type: 'JOIN', playerId: key, name: r.name });
+    next = reduce(next, { type: 'JOIN', playerId: key, name: r.name, role: r.role });
   }
   return reduce(next, { type: 'SET_CONNECTION', playerId: key, connection: r.connection });
 }
@@ -614,6 +620,10 @@ session.on('data', ({ fromId, msg }) => {
  * which is exactly the behaviour before this existed.
  */
 let expectedPlayers = 0;
+// US-124: the role this client ASKED for on the join screen; compared
+// against the role the host actually gave it, to explain a downgrade.
+let requestedRole = 'player';
+let forcedSpectatorNoticed = false;
 
 /**
  * US-45/D33: who a restored table is still waiting for. Only players who
@@ -963,6 +973,9 @@ function configsForPreset(preset, deckIds, allowsPlayerZones) {
     // How much the built-in Table pile overlaps its cards (`undefined`:
     // the plain pile's own default).
     tableSpread: preset.tableSpread,
+    // D141 (US-124): how many SEATS the game has (Gin = 2); everyone
+    // after that joins as a spectator.
+    playerLimit: preset.playerLimit,
   };
   return { deckConfig, gameConfig };
 }
@@ -1015,7 +1028,10 @@ document.querySelector('#create-table').addEventListener('click', async () => {
   }
   createErrorElement.hidden = true;
 
-  gameState = reduce(createInitialState(deckConfig, Math.random, gameConfig), { type: 'JOIN', playerId: myId, name: myName });
+  // US-124 AC2: a host who is only watching takes no seat, so the game
+  // is just the players (two bots, say) - the table still runs here.
+  requestedRole = document.querySelector('#host-spectate')?.checked ? 'spectator' : 'player';
+  gameState = reduce(createInitialState(deckConfig, Math.random, gameConfig), { type: 'JOIN', playerId: myId, name: myName, role: requestedRole });
 
   // Table is created - the setup form no longer does anything, so stop
   // implying it's still live (Smith Gate-close finding #2).
@@ -1241,7 +1257,68 @@ function say(text, data) {
 
 function renderTalk() {
   document.querySelector('table-talk')?.render(talkLog.entries());
+  renderAddBot();
+  // A new decision changes what the bubbles show, and the roster is
+  // where they live - same "re-render the cached view after a local
+  // change" pattern the split picker uses.
+  rerender();
 }
+
+// US-121: which bot's thought bubble this client has open. Client-local
+// (everyone chooses for themselves, AC5) and held here because every
+// broadcast rebuilds the roster DOM underneath it.
+let openThoughtId = null;
+
+document.addEventListener('thought-toggle', (event) => {
+  const bubble = event.target.closest?.('thought-bubble');
+  if (!bubble) return;
+  openThoughtId = event.detail.open ? bubble.dataset.playerId : null;
+});
+
+// US-122: the bot this client last asked for, so the control can say
+// what came of it. Local only - someone else's request is their own
+// business, and the talk log already shows everyone the answer.
+let myBotRequest = null;
+
+/**
+ * US-122/D143: offer "Add Jev bot" exactly while a Jev player is at the
+ * table to answer it, and follow this client's own request through to
+ * its answer (Smith, Gate 1 condition 3 - pressing it must visibly do
+ * something while a bot takes seconds to sit down).
+ */
+function renderAddBot() {
+  const control = document.querySelector('add-bot');
+  if (!control) return;
+  const talk = talkLog.entries();
+  const [offer] = botOffers(talk, currentView()?.players ?? []);
+  let status = '';
+  if (myBotRequest) {
+    const result = spawnResult(talk, myBotRequest.requestId);
+    if (result?.ok) {
+      status = `${myBotRequest.strategy} bot is joining.`;
+      myBotRequest = null;
+    } else if (result) {
+      status = `Could not add a ${myBotRequest.strategy} bot: ${result.error ?? 'the Jev player refused'}`;
+      myBotRequest = null;
+    } else {
+      status = `Asking ${myBotRequest.by} for a ${myBotRequest.strategy} bot\u2026`;
+    }
+  }
+  control.render({ offer: offer ?? null, status });
+}
+
+document.querySelector('add-bot')?.addEventListener('add-bot', (event) => {
+  const requestId = `bot-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  myBotRequest = { requestId, strategy: event.detail.strategy, by: event.detail.by };
+  const line = spawnRequestLine({ game: event.detail.game ?? 'gin', strategy: event.detail.strategy, requestId });
+  try {
+    say(line.text, line.data);
+  } catch (error) {
+    myBotRequest = null;
+    console.warn(error);
+  }
+  renderAddBot();
+});
 
 document.querySelector('table-talk')?.addEventListener('talk-say', (event) => {
   try {
@@ -1371,7 +1448,7 @@ async function attemptReconnect() {
   if (!remembered) { stopReconnecting(); endSessionForGood('Host disconnected \u{2014} session ended.'); return; }
   let storedKey = null;
   try { storedKey = localStorage.getItem(CLIENT_KEY_STORAGE); } catch { /* private mode */ }
-  const attempt = Session.join(remembered.code, { name: remembered.name, playerKey: storedKey });
+  const attempt = Session.join(remembered.code, { name: remembered.name, playerKey: storedKey, role: requestedRole });
   try {
     // `ready()` resolves on the data connection opening. When the host
     // simply isn't there, PeerJS opens the *peer* happily and the
@@ -1407,7 +1484,11 @@ document.querySelector('#join-btn').addEventListener('click', async () => {
   // seat, so a stale key can never wedge the join.
   let storedKey = null;
   try { storedKey = localStorage.getItem(CLIENT_KEY_STORAGE); } catch { /* private mode */ }
-  session = Session.join(hostId, { name: myName, playerKey: storedKey });
+  // US-124: what this person asked to be. The host still decides - a
+  // full or already-started table seats them as a spectator either way,
+  // and `noticeForcedSpectator` (below) tells them which it was.
+  requestedRole = document.querySelector('#join-role').value === 'spectator' ? 'spectator' : 'player';
+  session = Session.join(hostId, { name: myName, playerKey: storedKey, role: requestedRole });
   try {
     myId = await session.ready();
     // US-39: remember where we were, so a reload rejoins the game in
@@ -2061,6 +2142,11 @@ function buildZoneOptions(nameById) {
     // own doc comment (module scope, above) for the full reasoning.
     camera: tableCamera,
     resolveOwnerName: (ownerId) => nameById.get(ownerId) ?? ownerId,
+    // US-121/D142: each bot's own decisions, filtered out of the talk
+    // log (the history IS the log), and which bubble this client has
+    // open - the bubble hangs off its owner's seat panel.
+    thoughts: decisionsBySpeaker(talkLog.entries()),
+    openThoughtId,
     onReveal: (pileableId) => revealCard(pileableId),
     onRotate: (pileableId) => rotateCard(pileableId),
     onPickup: (pileableId) => pickupCard(pileableId),
@@ -2124,8 +2210,18 @@ function buildZoneOptions(nameById) {
   };
 }
 
+// US-123/D144: the fade timers for cards glowing on THIS screen, and
+// the last touch this client has already shown. Local, never shared -
+// a glow is not worth a broadcast to start or to end.
+const glowTimers = new Map();
+let lastShownTouchSeq = 0;
+
 function renderGameFromView(view) {
   noticeNewGameIfPresetChanged(view);
+  noticeForcedSpectator(view);
+  // Where every card is BEFORE this render redraws the table - the
+  // other half of the travel is taken right after (D144).
+  const rectsBefore = captureRects(document);
   // *fix (direct user report): "rtg deck pile's cards too small and
   // don't match the top card" - the single render funnel both host and
   // guest go through, so this is what keeps a GUEST's own cards sized
@@ -2174,6 +2270,15 @@ function renderGameFromView(view) {
   });
   reapplyFocusZoom();
   renderRosterOnly();
+  // US-123/D144: the table has just been redrawn - play the difference
+  // (every card that changed place travels from where it was), then
+  // glow whatever this action touched, in the colour of whoever did it.
+  playTravels(document, travels(rectsBefore, captureRects(document)));
+  const touch = view.lastTouch;
+  if (touch?.seq > lastShownTouchSeq) {
+    lastShownTouchSeq = touch.seq;
+    glow(document, touch.pileableIds ?? [], colorForPlayer(view.players, touch.by), glowTimers);
+  }
 }
 
 // *nit (show/hide): one dispatcher for both directions - `FLIP`
@@ -2524,6 +2629,26 @@ function noticeNewGameIfPresetChanged(view) {
   clearTimeout(newGameNoticeTimer);
   renderBanner(bannerElement, presetName ? `Host started a new game: ${presetName}` : 'Host started a new game.', { tone: 'info' });
   newGameNoticeTimer = setTimeout(() => renderBanner(bannerElement, ''), 5000);
+}
+
+/**
+ * US-124 (Smith Gate 1 condition 2): someone who asked to PLAY and was
+ * seated as a spectator has to be told, in words, which limit they hit
+ * - a silent role change reads as the app being broken. Both reasons
+ * are derivable from the view the guest already has (D141), so nothing
+ * on the wire carries this. Said once: the view re-renders constantly,
+ * and repeating the banner would bury whatever else happens next.
+ */
+function noticeForcedSpectator(view) {
+  if (forcedSpectatorNoticed || requestedRole !== 'player') return;
+  const me = view.players?.find((p) => p.id === myId);
+  if (me?.role !== 'spectator') return;
+  forcedSpectatorNoticed = true;
+  const limit = view.gameConfig?.playerLimit;
+  const message = view.dealtThisGame
+    ? "The game has already started \u2014 you've joined as a spectator."
+    : `The game is full${limit ? ` (${limit} players)` : ''} \u2014 you've joined as a spectator.`;
+  renderBanner(bannerElement, message, { tone: 'info' });
 }
 
 // D91/D92 (direct user request, "we're missing... split pile" / "split

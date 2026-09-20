@@ -64,6 +64,18 @@ test-focuszoom:
 test-multiplayer:
 	npm run test:multiplayer
 
+test-spectator:
+	npm run test:spectator
+
+test-addbot:
+	npm run test:addbot
+
+test-thoughts:
+	npm run test:thoughts
+
+test-motion:
+	npm run test:motion
+
 test-harness-mcp:
 	npm run test:harness-mcp
 

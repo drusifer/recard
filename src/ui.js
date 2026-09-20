@@ -2087,6 +2087,19 @@ function renderOneZone(zoneId, pilesInZone, piles, zoneRecords, seatedPlayers, c
 
   const ownerName = options.resolveOwnerName?.(record.ownerId) ?? record.ownerId;
   zoneElement.render(record.id, ownerName, pilesInZone, piles, options);
+  // US-121/D142: a bot's thought bubble belongs on its SEAT - which is
+  // this panel, since the in-game roster ring was retired. The
+  // decisions come from the talk log (`decisionsBySpeaker`); which
+  // bubble is open is client-local state `main.js` holds across the
+  // re-render every broadcast causes.
+  const thoughts = options.thoughts?.get(record.ownerId);
+  if (thoughts?.decisions.length) {
+    const bubble = document.createElement('thought-bubble');
+    bubble.dataset.who = ownerName;
+    bubble.dataset.playerId = record.ownerId;
+    zoneElement.append(bubble);
+    bubble.render({ decisions: thoughts.decisions, open: options.openThoughtId === record.ownerId });
+  }
   // AFTER `.render()`, not before - `renderZonePanel`'s own first
   // line (`zoneEl.className = 'zone'`) would otherwise wipe this
   // class out.
@@ -2527,6 +2540,10 @@ function renderMiniHand(container, count) {
 function renderRosterEntry(container, p, index, players, { movingIds, scores, onAdjustScore, myId, seated } = {}) {
   const li = document.createElement('li');
   li.className = `roster-player roster-${p.connection}`;
+  // US-124: a spectator is on the same roster as everyone else (D141),
+  // marked rather than hidden - people need to know who is watching.
+  const isSpectator = p.role === 'spectator';
+  if (isSpectator) li.classList.add('roster-spectator');
   if (seated) {
     const { leftPct, topPct } = seatPosition(index, players.length);
     li.style.left = `${leftPct}%`;
@@ -2537,10 +2554,11 @@ function renderRosterEntry(container, p, index, players, { movingIds, scores, on
   const count = typeof p.handCount === 'number' ? ` (${p.handCount} cards)` : '';
   const moving = movingIds?.has(p.id) ? ' \u{270B} organizing hand' : '';
   const youTag = seated && p.id === myId ? ' \u{1F9D1} You' : '';
+  const spectatorTag = isSpectator ? ' \u{1F440} spectating' : '';
 
   const info = document.createElement('span');
   info.className = 'seat-info';
-  info.append(`${p.name} - ${p.connection}${count}${moving}${youTag}`);
+  info.append(`${p.name} - ${p.connection}${count}${moving}${youTag}${spectatorTag}`);
 
   if (p.id !== myId && typeof p.handCount === 'number') {
     const miniHandElement = document.createElement('div');
@@ -2579,14 +2597,22 @@ function renderRosterEntry(container, p, index, players, { movingIds, scores, on
 
 export function renderRoster(container, players, options = {}) {
   container.replaceChildren();
-  for (const [index, p] of players.entries()) {
+  // US-124/D141: spectators have no seat, so they take no place in the
+  // ring - seat index and angle are computed against the SEATED players
+  // only, and a spectator is drawn as a plain row instead.
+  const seatedPlayers = players.filter((p) => p.role !== 'spectator');
+  for (const p of players.filter((entry) => entry.role === 'spectator')) {
+    if (p.id === options.hideId) continue;
+    renderRosterEntry(container, p, 0, seatedPlayers, { ...options, seated: false });
+  }
+  for (const [index, p] of seatedPlayers.entries()) {
     // UX follow-up: the viewer's own seat now lives in the merged
     // hand+zone panel (`renderSeatZones`'s `opts.own`), not the ring -
     // skipping the `<li>` here (not filtering `players` itself) keeps
     // everyone ELSE's seat index/angle math unchanged, since it's still
     // computed against the real roster length and position.
     if (p.id === options.hideId) continue;
-    renderRosterEntry(container, p, index, players, options);
+    renderRosterEntry(container, p, index, seatedPlayers, options);
   }
 }
 

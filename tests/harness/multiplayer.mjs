@@ -50,13 +50,34 @@ export async function startStaticServer(port) {
 /**
  * Playwright's bundled Chromium, falling back to a system install.
  */
-export async function launchChromium() {
+/**
+ * US-123/D144: cards travel to their new place now, so a browser test
+ * that measures geometry would otherwise race the animation. Every
+ * suite launches with reduced motion forced ON (browser-wide, so a
+ * suite that builds its own contexts gets it too); a suite ABOUT the
+ * motion passes `{ motion: true }`.
+ */
+export async function launchChromium({ motion = false } = {}) {
+  const args = ['--no-sandbox'];
+  const launched = await launchAnyChromium(args);
+  if (motion) return launched;
+  // Reduced motion has to be set per CONTEXT - Chromium's
+  // `--force-prefers-reduced-motion` flag does NOT reach `matchMedia`
+  // (checked directly). Wrapping `newContext` here means every suite
+  // gets it, including the ones that build their own contexts, without
+  // each one remembering to ask.
+  const newContext = launched.newContext.bind(launched);
+  launched.newContext = (options = {}) => newContext({ reducedMotion: 'reduce', ...options });
+  return launched;
+}
+
+async function launchAnyChromium(args) {
   try {
-    return await chromium.launch({ args: ['--no-sandbox'] });
+    return await chromium.launch({ args });
   } catch (error) {
     for (const executablePath of SYSTEM_CHROMIUM_PATHS) {
       try {
-        return await chromium.launch({ executablePath, args: ['--no-sandbox'] });
+        return await chromium.launch({ executablePath, args });
       } catch { /* try the next candidate */ }
     }
     throw error;
@@ -151,6 +172,11 @@ class HarnessPeer {
   }
 }
 
+/**
+ * US-123/D144: browser tests run with reduced motion ON by default, so
+ * a geometry assertion measures where a card IS rather than racing its
+ * travel. A test about the motion itself passes `motion: true`.
+ */
 async function openPeer(browser, baseUrl) {
   const context = await browser.newContext();
   const page = await context.newPage();
@@ -161,10 +187,12 @@ async function openPeer(browser, baseUrl) {
 /**
  * Hosts a new table (not dealt yet). Resolves `{ host, code, close() }`.
  */
-export async function hostTable({ browser, baseUrl, preset }) {
+export async function hostTable({ browser, baseUrl, preset, spectate }) {
   const { peer: host, context } = await openPeer(browser, baseUrl);
   await host.page.click('#show-host');
   if (preset) await host.page.selectOption('#host-preset', { label: preset });
+  // US-124: host the table without taking a seat in the game.
+  if (spectate) await host.page.check('#host-spectate');
   await host.page.click('#create-table');
   await host.page.waitForSelector('#host-share:not([hidden])', { timeout: JOIN_TIMEOUT_MS });
   return { host, code: await host.myId(), close: () => context.close() };
@@ -177,11 +205,14 @@ export async function hostTable({ browser, baseUrl, preset }) {
  * table someone else is hosting). Resolves `{ peer, close() }` once the
  * join is sent; the host decides when it is seated.
  */
-export async function joinTable({ browser, baseUrl, code, name }) {
+export async function joinTable({ browser, baseUrl, code, name, role }) {
   const { peer, context } = await openPeer(browser, baseUrl);
   await peer.page.click('#show-join');
   await peer.page.fill('#join-name', name);
   await peer.page.fill('#join-code', code);
+  // US-124: what this joiner ASKS to be. Omitted, the select keeps its
+  // default ('player'), so every existing caller is unchanged.
+  if (role) await peer.page.selectOption('#join-role', role);
   await peer.page.click('#join-btn');
   return { peer, close: () => context.close() };
 }

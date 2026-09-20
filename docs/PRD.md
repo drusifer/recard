@@ -79,7 +79,8 @@ a valid, supported use, not just a degenerate case of the group scenario.
   interpreting scores. The app calculating/enforcing scores per a
   specific game's rules remains out of scope. See `docs/USER_STORIES.md`
   "v1.1 backlog: quick-start game presets + score keeping."
-- Remote / cross-room play, matchmaking, or spectating.
+- Remote / cross-room play or matchmaking. (Spectating moved in scope
+  2026-09-19, same-room only - US-124.)
 - Accounts, persistent stats, leaderboards.
 - Voice/video chat (basic reactions/text chat may be a stretch goal).
 

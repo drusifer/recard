@@ -77,6 +77,13 @@
           <input id="host-expected-players" type="number" min="2" max="8" placeholder="any" />
           players <small>(optional)</small>
         </label>
+        <!-- US-124 AC2: the host can be at the table without a seat in
+             the game - which is how two bots play each other while the
+             person who set it up watches. -->
+        <label class="checkbox-row">
+          <input id="host-spectate" type="checkbox" />
+          Watch only (no seat in the game)
+        </label>
         <button id="create-table" type="button" class="btn-primary">Create Table</button>
         <p id="host-create-error" class="error-text" hidden></p>
       </div>
@@ -127,6 +134,15 @@
     <div id="join-form" class="panel">
       <label>Your name <input id="join-name" type="text" maxlength="20" /></label>
       <label>Table code <input id="join-code" type="text" /></label>
+      <!-- US-124: spectating is just an option here (user, 2026-09-19).
+           A spectator is at the table in every way except having a seat
+           in the game: no hand, never dealt to. -->
+      <label>I want to
+        <select id="join-role">
+          <option value="player">play</option>
+          <option value="spectator">watch (spectate)</option>
+        </select>
+      </label>
       <button id="join-btn" type="button" class="btn-primary">Join</button>
       <p id="join-status" class="deck-config"></p>
     </div>
@@ -170,6 +186,9 @@
          (a bot's knock, "your turn"). Fixed to a corner so it never
          pushes the table. -->
     <table-talk></table-talk>
+    <!-- US-122: only rendered while a Jev player is at the table to
+         answer (D143) - hidden otherwise. -->
+    <add-bot hidden></add-bot>
     <section class="panel panel-felt table-section">
       <h2 class="sr-only">Table</h2>
       <!-- US-117 phase 111 (D132): every player's own table zoom, fully

@@ -70,3 +70,289 @@ Agents **must** use this for every message posted to CHAT.md:
 > **Previous sprint archived:** `agents/chat_archive/CHAT_SPRINT_GIN_BOTS.md` (2026-09-19 01:58:45) — US-120: Gin Rummy Jev players (typed rules + live Jev), table talk (D138), jev-player make target, Gin discard fix (D139), gitleaks (D140).
 
 ---
+
+---
+[<small>2026-09-19 14:57:36</small>] [**User**]->[**all**] *request*:
+ init load Cypher
+
+---
+[<small>2026-09-19 14:58:01</small>] [**Cypher**]->[**User**] *pm init*:
+ Cypher online. State loaded: US-120 (Gin Jev players, D138-D140) shipped + archived; no active sprint. Backlog of record is docs/BACKLOG.md - top product items: reconnect-after-refresh, zone-level privacy, flip radio box, remote-cursor redesign, Gin bot tuning, harness MCP follow-ups. Next story id US-121. Awaiting user direction.
+
+---
+[<small>2026-09-19 15:03:02</small>] [**User**]->[**all**] *request*:
+ *newrec see jav login in game. When jav player make a move add a thought bubble that i can expand to see what was chosen and why, open the thought bubble in the same click to close way as pile zooming. Finally add ux to add a new jav strategy to a game (the jav player must be running).
+
+---
+[<small>2026-09-19 15:09:33</small>] [**Cypher**]->[**Smith**] *pm story*:
+ US-121 (Jev thought bubble: move on the bot's seat, opens like pile focus-zoom into a scrolling history of rules fired + Jev scores + facts; every player sees full detail incl. bot hand, per user) + US-122 (Add Jev bot from the table when a Jev player is running) in docs/USER_STORIES.md. User chose 'add another bot' over authoring/switching strategies. Open: Gin is 2-player; who may add. @Smith *user review US-121,US-122
+
+---
+[<small>2026-09-19 15:11:46</small>] [**User**]->[**all**] *request*:
+ *newreq animate moves so it's easy to see which cards have just been moved. maybe you can also add a fading glow affect on items that are touched or moved
+
+---
+[<small>2026-09-19 15:12:07</small>] [**Cypher**]->[**Smith**] *pm story*:
+ US-123 (every card move animates old spot->new spot on every screen, grouped moves together; moved/touched items glow then fade; privacy unchanged - hidden cards travel as backs; cosmetic only per Principle 6/D4) added to docs/USER_STORIES.md. Open: glow tinted by who moved?, glow duration, do zones/piles glow too. Queued behind US-121/122 Gate 1 unless user reprioritises. @Smith *user review US-123
+
+---
+[<small>2026-09-19 15:13:06</small>] [**User**]->[**all**] *request*:
+ re: 2 players. yes two only, the human needs 'spectator' access
+
+---
+[<small>2026-09-19 15:13:26</small>] [**Cypher**]->[**Smith**] *pm decision*:
+ Decision (user): Gin stays 2 players; bot-vs-bot means the human watches as a spectator. Rejected: letting a human + 2 bots share a Gin game. Spectating was PRD Out-of-Scope - now in scope, same-room only (PRD updated). New US-124 spectator access in docs/USER_STORIES.md; US-122's open Q closed. Open: spectator sees hands face-up?, can touch cards?, chosen at join or switchable. @Smith *user review US-124
+
+---
+[<small>2026-09-19 16:25:20</small>] [**User**]->[**all**] *request*:
+ answers: 1 all hands closed. 2 spectators can move stuff same as any player, just no seat; can deal. 3 select when joining, always spectator when game is full/started. 4 anyone can add a bot. 5 glow tinted by player color. 6 just pileables glow.
+
+---
+[<small>2026-09-19 16:25:46</small>] [**Cypher**]->[**Smith**] *pm decision*:
+ User answers recorded in USER_STORIES: anyone can Add Jev bot (US-122); glow tinted by mover's colour - Recard has no player colours yet, so US-123 introduces them; only Pileables glow, not zones/piles. US-124: spectators see all hands closed, can move/deal like any player (no seat), choose at join, forced spectator when game full/started. Open: define 'full' - host expected-players vs new per-preset limit (Gin=2). @Smith *user review US-121..124
+
+---
+[<small>2026-09-20 11:12:38</small>] [**User**]->[**all**] *request*:
+ c
+
+---
+[<small>2026-09-20 11:12:38</small>] [**Cypher**]->[**Smith**] *pm handoff*:
+ US-124 AC closed: 'full' = either the host's expectedPlayers count (when set) OR a new per-preset player limit (Gin=2), whichever applies - user chose both over either alone, since a preset limit alone ignores the host's own count and expectedPlayers alone leaves Gin unbounded. Presets gain a player limit. 'Started' = cards dealt this game. US-121..124 have no open user questions left. @Smith *user review US-121, US-122, US-123, US-124
+
+---
+[<small>2026-09-20 11:13:31</small>] [**User**]->[**all**] *request*:
+ the glow should only last a second or two
+
+---
+[<small>2026-09-20 11:13:31</small>] [**Cypher**]->[**Smith**] *pm story*:
+ US-123 AC11: glow lasts a second or two (one shared constant, ~1.5s incl. fade; Gate 2 may nudge within that range, not beyond). User answer, replacing 'tune by feel at Gate 2' with a stated bound. US-121..124 now fully specified. @Smith *user review US-121, US-122, US-123, US-124
+
+---
+[<small>2026-09-20 11:14:56</small>] [**Smith**]->[**Morpheus**] *user approve*:
+ *user approve US-121..124 with 4 binding conditions: (1) US-121 expanded bubble must NOT close on pointerleave - click to open, click outside to close; a scrolling history that closes when the pointer drifts is unreadable (Nielsen #3). (2) US-124 forced spectator must be told why, in words. (3) US-122 must show the bot request in flight. (4) US-123 colour cannot be the only identity carrier. Full text: docs/USER_STORIES.md Gate 1. @Morpheus *lead arch sprint
+
+---
+[<small>2026-09-20 11:16:20</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
+No duplicate decision numbers, and the modern section is newest-first. Clean.
+
+---
+[<small>2026-09-20 11:16:43</small>] [**Smith**]->[**Mouse**] *user approve*:
+ *user approve architecture (D141-D144) with 2 conditions: (a) D141's forced-spectator message must name WHICH limit was hit ('the game is full (2 players)' vs 'the game has already started'), not one generic line - the two have different user responses; (b) D143's strategy picker must show each strategy's own description, not bare names - 'equilibrium' means nothing at first sight (Nielsen #6). D142's click-to-open/click-outside-to-close satisfies Gate 1 cond 1. @Mouse *sm plan sprint
+
+---
+[<small>2026-09-20 11:17:19</small>] [**Mouse**]->[**Morpheus**] *sm handoff*:
+ Sprint planned in task.md: 8 phases, 2-3 tasks each. 1 spectator model, 2 joining as spectator, 3 jev-player spawn protocol, 4 Add Jev bot UI, 5 bots narrate decisions, 6 thought-bubble component, 7 player colours + lastTouch, 8 motion+glow. Ordered so a watchable bot-vs-bot table exists by Phase 4, polish after. @Morpheus *lead review sprint plan
+
+---
+[<small>2026-09-20 11:17:28</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ *lead review sprint plan: APPROVED. Phase order matches D141-D144 dependencies (model before UI; tools-side spawn before the control that calls it; colours/lastTouch before the render that reads them). One binding note for Neo: Phase 1 must not create a hand pile for a spectator anywhere - ensureHandPile is called lazily from draw/pickup paths too, not just DEAL. @Neo *swe impl phase-1
+
+---
+[<small>2026-09-20 11:18:30</small>] [**Neo**]->[**Morpheus**] *swe ask*:
+ @Morpheus *lead decide - Phase 1 conflict: your note says never create a hand pile for a spectator ANYWHERE, but ensureHandPile is also called lazily by DRAW/PICKUP (state.js:1311,1352,1761,1813), and D141 explicitly rejected permission checks on spectators (they may move cards and deal, per user). Refusing there IS a permission check; allowing it means a spectator who deliberately draws gets a hand. Which?
+
+---
+[<small>2026-09-20 11:18:30</small>] [**Morpheus**]->[**Neo**] *lead decision*:
+ D145: a spectator gets no hand pile or seat zone AT JOIN and is never dealt to, but the lazy ensureHandPile paths (DRAW/PICKUP) stay permissive - a spectator who deliberately draws a card gets a hand pile at that moment. Chose this over refusing there, because a refusal is exactly the permission check D141 rejected, and the user said spectators act like any player. Seating/scoring still count seated players only. Full text: docs/DECISIONS.md. @Neo *swe impl phase-1
+
+---
+[<small>2026-09-20 11:19:44</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 919
+ℹ suites 0
+ℹ pass 919
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3725.612358
+
+---
+[<small>2026-09-20 11:20:06</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 1 impl complete (TDD, 6 new state tests, all green, full suite clean). state.js: players[].role at JOIN (absent = player), no hand pile/seat zone/score for a spectator; DEAL/DEAL_MORE/RESHUFFLE_DEAL/RESET_SCORES count seatedPlayers() only; lazy ensureHandPile left permissive per D145. Mutation-proved: reverting seatedPlayers to state.players fails 7 tests. @Trin *qa uat phase-1
+
+---
+[<small>2026-09-20 11:20:21</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+11:20AM INF no leaks found
+11:20AM INF 1 commits scanned.
+11:20AM INF scanned ~399752 bytes (399.75 KB) in 461ms
+11:20AM INF no leaks found
+
+---
+[<small>2026-09-20 11:20:29</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 1 PASSED. make check clean (lint + full suite + gitleaks, exit 0). Verified against US-124 AC1/2 + D141/D145: role replicates to guests (viewFor passes state.players through, so every peer sees who is spectating), spectator has no hand pile/seat zone/score, deal share unchanged by a spectator's presence, conservation (D88) holds, and the D145 permissive draw is covered. Neo's mutation proof reproduced. @Morpheus *lead review phase-1
+
+---
+[<small>2026-09-20 11:20:29</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 1 review PASSED. seatedPlayers() is one predicate used at every seating-sensitive site rather than inline role checks scattered through the reducer; absent role reading as 'player' keeps every pre-D141 state and saved layout valid without a migration. No back-compat shim added. @Neo *swe impl phase-2
+
+---
+[<small>2026-09-20 11:24:57</small>] [**Cypher**]->[**Neo**] *pm decision*:
+ User decision: 'Start automatically at N players' stays a START TRIGGER only (US-42 unchanged) - capacity is the new per-preset playerLimit alone (Gin=2), and spectating is simply an option on the join screen. Rejected the earlier 'either limit' answer once Neo found it reversed US-42's explicit Gate 1 wording ('a 5th player may still join a table expecting 4'). US-124 AC10/11, D141 and task.md T2.1 updated. @Neo *swe impl phase-2
+
+---
+[<small>2026-09-20 11:30:49</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+gitleaks git --no-banner --redact --pre-commit .
+11:30AM INF 1 commits scanned.
+11:30AM INF scanned ~412130 bytes (412.13 KB) in 465ms
+11:30AM INF no leaks found
+
+---
+[<small>2026-09-20 11:31:01</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 2 PASSED. make check clean; test-spectator green (2/2, real host+2 guests, Gin). Verified US-124 AC8/9/10/11 and Gate 1 cond 2 (banner says 'The game is full (2 players)'), AC4 roster marking, and that a rejoining seated player is never demoted. Regression: test-multiplayer green. @Morpheus *lead review phase-2
+
+---
+[<small>2026-09-20 11:31:01</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 2 review PASSED. The requested role travels as connection metadata and the HOST decides - no guest can claim a seat by asserting one, matching D27's 'a claimed name is never trusted'. The downgrade reason is derived from the replicated view, so no new message type. @Neo *swe impl phase-3
+
+---
+[<small>2026-09-20 11:33:54</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+11:33AM INF no leaks found
+11:33AM INF 1 commits scanned.
+11:33AM INF scanned ~417190 bytes (417.19 KB) in 465ms
+11:33AM INF no leaks found
+
+---
+[<small>2026-09-20 11:34:12</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 3 PASSED. make check clean. Mutation-proved the double-spawn guard: dropping the answered-in-log check fails the 'second jev-player must not double-spawn' test. Verified US-122 AC2/AC3 tools half + Gate 2 cond b (jev-ready carries name+description per strategy) and the AC 'missing TYPESAFE_API_KEY names the variable' - refusal text checked directly. @Morpheus *lead review phase-3
+
+---
+[<small>2026-09-20 11:34:28</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 3 review PASSED. The pure half (botRequests.mjs) is game-agnostic and the Gin glue stays in gin/player.mjs, so a second game reuses the protocol without touching it. Refusals are decided supervisor-side, which is what makes a reason reach the person who pressed the button instead of a child process exiting 2 offscreen. @Neo *swe impl phase-4
+
+---
+[<small>2026-09-20 11:40:27</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+11:40AM INF no leaks found
+11:40AM INF 1 commits scanned.
+11:40AM INF scanned ~423410 bytes (423.41 KB) in 461ms
+11:40AM INF no leaks found
+
+---
+[<small>2026-09-20 11:40:43</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 4 PASSED. make check clean; test-addbot 4/4 incl. the hidden-when-nobody-is-running case and the failure text. Mutation-proved the connected-only guard (dropping it fails 'a Jev player that has left takes its offer with it'). US-122 AC1-3 verified end to end at a real table. @Morpheus *lead review phase-4
+
+---
+[<small>2026-09-20 11:40:43</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 4 review PASSED. The control derives entirely from the replicated talk log + roster, so no new state and no capability flag: a Jev player leaving removes the offer by itself. Web Component per project convention, session-agnostic (emits add-bot). @Neo *swe impl phase-5
+
+---
+[<small>2026-09-20 11:42:35</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+gitleaks git --no-banner --redact --pre-commit .
+11:42AM INF 1 commits scanned.
+11:42AM INF scanned ~429693 bytes (429.69 KB) in 474ms
+11:42AM INF no leaks found
+
+---
+[<small>2026-09-20 11:42:35</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 5 PASSED. make check clean, full suite green. Verified one line per decision, no double-talk on a knock, silence while waiting, and that the record carries the rule that fired + the facts. Note for Phase 6: the bubble's history is bounded by the talk log's 100-entry cap (D142 accepted that). @Morpheus *lead review phase-5
+
+---
+[<small>2026-09-20 11:42:35</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 5 review PASSED. decisionTalk is a pure function taking the record, so the MCP gin_turn path narrates identically without duplicated formatting, and the announcement merge keeps ONE talk line per decision - the log stays readable for people while carrying machine data. @Neo *swe impl phase-6
+
+---
+[<small>2026-09-20 11:51:24</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-spectator | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11496.627234
+
+---
+[<small>2026-09-20 11:51:36</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 6 PASSED. make check clean; test-thoughts 6/6, test-spectator 3/3 (incl. the new host-spectator case). The Gate 1 condition is verified as behaviour, not just code: pointerleave on both the bubble and its panel leaves it open, an outside click closes it. Noted: Neo caught that US-124 AC2 was unimplemented while writing the two-bot case - the sprint's own test shape is what surfaced it. @Morpheus *lead review phase-6
+
+---
+[<small>2026-09-20 11:51:36</small>] [**Morpheus**]->[**Neo**] *lead decision*:
+ Phase 6 review PASSED. Decision to record: the bubble hangs off the seat ZONE PANEL, not a roster row - the in-game roster ring was retired when seats became zone panels, so a roster-attached bubble would only ever have rendered on the pre-game screen. Chose the panel over reviving a ring. @Neo *swe impl phase-7
+
+---
+[<small>2026-09-20 11:55:04</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+11:55AM INF no leaks found
+11:55AM INF 1 commits scanned.
+11:55AM INF scanned ~442992 bytes (442.99 KB) in 464ms
+11:55AM INF no leaks found
+
+---
+[<small>2026-09-20 11:55:04</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 7 PASSED. make check clean. Mutation-proved the reorder branch (3 fail when disabled) - it survived the first pass, which is exactly why the SORT_PILE case was added rather than assumed. Verified the stamp reaches guests through viewFor and that a no-op action leaves the previous touch standing. @Morpheus *lead review phase-7
+
+---
+[<small>2026-09-20 11:55:04</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 7 review PASSED. Deriving the touch in reduce() instead of per-reducer is the whole reason this cost one function rather than twenty edits, and it cannot drift as actions are added. Colour stays derived, so nothing new is replicated for it. @Neo *swe impl phase-8
+
+---
+[<small>2026-09-20 12:17:06</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
+No duplicate decision numbers, and the modern section is newest-first. Clean.
+
+---
+[<small>2026-09-20 12:17:06</small>] [**Morpheus**]->[**Oracle**] *lead decision*:
+ D146 recorded: travel uses element.animate(composite:add), never inline transforms - a render landing mid-flight used to leave stale offsets on live cards and destabilised table geometry (3 RTG failures). Browser suites now launch with reducedMotion per context; Chromium's --force-prefers-reduced-motion was rejected because it does not reach matchMedia (verified). Full text: docs/DECISIONS.md. Phase 8 review PASSED - all 8 phases done. @Oracle *ora groom
+
+---
+[<small>2026-09-20 12:18:08</small>] [**Oracle**]->[**Smith**] *ora handoff*:
+ Docs groomed: ARCHITECTURE.md gains the talk-channel class, the spectator role (D141) and lastTouch (D144) in the replication model plus 6 new modules in the map; memory.md has the sprint row; lessons.md has 5 lessons (the animation/geometry coupling, verifying a flag in situ, the hard-to-write test that named a missing feature, asking when an answer contradicts the record, updating assertions a new signal made wrong). @Smith *user test jev-at-the-table
+
+---
+[<small>2026-09-20 12:23:30</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-thoughts | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5643.707569
+
+---
+[<small>2026-09-20 12:24:05</small>] [**Smith**]->[**Cypher**] *user bug*:
+ *user bug (non-blocking, filed not fixed): table talk now carries every bot decision - 3 decisions produced 4 lines and buried the humans' own conversation. The bubble already shows this detail, so the talk PANEL arguably should not repeat it (knock/gin announcements should stay). Not fixed: hiding a message class from the log is a product call, not a UX tidy-up, and this sprint's rule was to implement exactly what was asked. @Cypher for the backlog.
+
+---
+[<small>2026-09-20 12:24:25</small>] [**Neo**]->[**Cypher**] *retro*:
+ Neo retro: 8 phases, zero fix loops, but two defects reached Smith's gate that tests said were fine - both were 'the property is right, the pixels are wrong'. Taking forward: for any component that hides itself, assert getClientRects().length, never el.hidden; and any position:fixed inside #zones is fixed to the ZOOM BOX, not the viewport. Tech debt: none added; botRequests/botOffers/botThoughts/cardMotion/playerColors are all pure and separately tested.
+
+---
+[<small>2026-09-20 12:24:25</small>] [**Trin**]->[**Cypher**] *retro*:
+ Trin retro: 5 new browser suites (spectator/addbot/thoughts/motion + gin updated), every load-bearing guard mutation-proved. The miss worth naming: my property-based assertions PASSED on a panel that was fully visible on screen - a test can assert the exact right field and still not see the app. Also: two pre-existing suites needed updating for intended new behaviour; both were updated to assert the new meaning, not filtered around.
+
+---
+[<small>2026-09-20 12:24:25</small>] [**Morpheus**]->[**Cypher**] *retro*:
+ Morpheus retro: D141-D146. The load-bearing choice was deriving things instead of storing them - the talk log IS the bubble history, the roster index IS the colour, a diff in reduce() IS the touch stamp. That is why 4 stories added exactly one replicated field (lastTouch) and one roster field (role). Worth revisiting: the talk log's 100-entry cap silently bounds a bot's visible history.
+
+---
+[<small>2026-09-20 12:24:25</small>] [**Mouse**]->[**Cypher**] *retro*:
+ Mouse retro: 8 phases, 2-3 tasks each, all closed in order with no re-planning. Ordering by 'when does the user's actual goal become reachable' put spectator+add-bot first, and that paid: the two-bot test in phase 6 is what exposed the unimplemented US-124 AC2. One scope change mid-sprint (T3.3) when a live two-bot game proved to need an API key - re-scoped in the plan, not silently dropped.
+
+---
+[<small>2026-09-20 12:24:25</small>] [**Smith**]->[**Cypher**] *retro*:
+ Smith retro: the gates earned their keep - Gate 1's 'a scrolling history must not close on pointerleave' shaped D142 before a line was written, and Gate 2's 'name which limit was hit' is now a test. But my own gate is the only reason two visible defects did not ship, and both were invisible to a green suite. Standing ask: a UX gate should always LOOK, never read a test report.
+
+---
+[<small>2026-09-20 12:24:25</small>] [**Oracle**]->[**Cypher**] *retro*:
+ Oracle retro: D141-D146 recorded as decided, not at close, so the reasoning survives. ARCHITECTURE.md gained the talk-message class it was missing since D138. Gap to watch: docs/UI_ARCHITECTURE.md was not updated for the 3 new components - filing it rather than pretending it is done.
+
+---
+[<small>2026-09-20 12:24:39</small>] [**Cypher**]->[**all**] *pm launch*:
+ *pm launch jev-at-the-table. US-121 thought bubbles, US-122 Add Jev bot, US-123 moves animate + touched cards glow in the mover's colour, US-124 spectator access - all shipped, D141-D146. make check clean, 13 browser suites green. 3 retro items to docs/BACKLOG.md (talk-log flooding, the 100-entry history cap, UI_ARCHITECTURE gap). Sprint complete.
+
+---
+[<small>2026-09-20 12:24:51</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+12:24PM INF no leaks found
+12:24PM INF 1 commits scanned.
+12:24PM INF scanned ~464326 bytes (464.33 KB) in 466ms
+12:24PM INF no leaks found

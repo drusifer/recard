@@ -43,6 +43,35 @@ function factsSummary(facts) {
   };
 }
 
+/**
+ * US-121/D142: what the bot SAYS about a decision - the move in a few
+ * words for the people at the table, and the whole record as `data` for
+ * `<thought-bubble>` to expand. One line per decision: a knock keeps
+ * its own announcement text (melds + deadwood) rather than being said
+ * twice, with the record merged onto the same line.
+ * @returns {{ text: string, data: object }}
+ */
+export function decisionTalk(record, announcement) {
+  const { decision } = record;
+  const thrown = decision.type === 'discard' && record.observation.hand.find((card) => card.id === decision.cardId);
+  const text = decision.type === 'draw'
+    ? `Drew from ${decision.source === 'discard' ? 'the discard pile' : 'stock'}`
+    : `Discarded ${short(thrown)}`;
+  return {
+    text: announcement?.text ?? text,
+    data: {
+      kind: 'bot-decision',
+      ...(announcement?.data ?? {}),
+      strategy: record.strategy, iteration: record.iteration, handNumber: record.handNumber,
+      phase: record.phase, decision, actions: record.actions,
+      trace: record.trace, judgments: record.judgments, facts: record.facts,
+      hand: record.observation.hand.map((card) => short(card)),
+      discardTop: record.observation.discardTop && short(record.observation.discardTop),
+      stockCount: record.observation.stockCount, opponentHandSize: record.observation.opponentHandSize,
+    },
+  };
+}
+
 function announcementFor(decision, facts) {
   const kept = facts.bestDiscard.card.id === decision.cardId
     ? facts.bestDiscard
@@ -163,12 +192,14 @@ export class GinBot {
     const jev = this.#strategy.usesJev ? await askJev(this.#judge, obs, facts) : null;
     const { decision, trace } = decide(this.#strategy, { obs, facts, jev });
     const actions = await this.#execute(decision, obs);
-    let announcement = null;
-    if (decision.type === 'discard' && decision.declare !== 'none') {
-      const { text, data } = announcementFor(decision, facts);
-      await this.#peer.say(text, data);
-      announcement = text;
-    }
-    return { ...record, facts: factsSummary(facts), judgments: jev, trace, decision, actions, announcement };
+    const declared = decision.type === 'discard' && decision.declare !== 'none'
+      ? announcementFor(decision, facts)
+      : null;
+    // US-121: every decision is narrated, not just knocks - one line,
+    // carrying the record the thought bubble expands (D142).
+    const full = { ...record, facts: factsSummary(facts), judgments: jev, trace, decision, actions };
+    const line = decisionTalk(full, declared);
+    await this.#peer.say(line.text, line.data);
+    return { ...full, announcement: declared?.text ?? null };
   }
 }

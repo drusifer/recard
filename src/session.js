@@ -96,7 +96,7 @@ export class Session {
   /**
   Join an existing table by the host's PeerJS id.
   */
-  static join(hostId, { name, playerKey }) {
+  static join(hostId, { name, playerKey, role }) {
     const session = new Session('join');
     const Peer = PeerCtor();
     const peer = new Peer();
@@ -108,7 +108,7 @@ export class Session {
         session.selfId = id;
         // US-38: a returning player presents the key the host gave them last
         // time, so the host can reunite them with their seat and hand.
-        const conn = peer.connect(hostId, { metadata: { name, playerKey } });
+        const conn = peer.connect(hostId, { metadata: { name, playerKey, role } });
         session.hostConn = conn;
         conn.on('open', () => resolve(id));
         conn.on('data', (message) => {
@@ -159,7 +159,10 @@ export class Session {
 
   #wireIncomingConnection(conn) {
     const name = conn.metadata?.name ?? conn.peer;
-    const record = { id: conn.peer, name, playerKey: conn.metadata?.playerKey ?? null, status: 'connecting', conn };
+    // D141 (US-124): what the joiner ASKED for - the host decides what
+    // they actually get (a full or started table seats them as a
+    // spectator regardless).
+    const record = { id: conn.peer, name, playerKey: conn.metadata?.playerKey ?? null, role: conn.metadata?.role ?? 'player', status: 'connecting', conn };
     this.peers.set(conn.peer, record);
     this.#emitRoster();
 
@@ -184,7 +187,7 @@ export class Session {
   #emitRoster() {
     this.emit(
       'roster',
-      this.peers.values().map(({ id, name, playerKey, status }) => ({ id, name, playerKey, connection: status })).toArray(),
+      this.peers.values().map(({ id, name, playerKey, role, status }) => ({ id, name, playerKey, role, connection: status })).toArray(),
     );
   }
 

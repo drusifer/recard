@@ -123,11 +123,13 @@ test('a knock is a face-down discard, announced on table talk with melds and dea
   assert.equal(knock.decision.declare, 'knock');
   assert.deepEqual(knock.actions.map((action) => action.type), ['MOVE', 'FLIP']);
   assert.equal(table.piles.table.at(-1).faceUp, false, 'the knock card lies face down');
-  assert.equal(table.talk.length, 1);
-  assert.match(table.talk[0].text, /^Knock! .* deadwood 4/);
-  assert.equal(table.talk[0].data.declare, 'knock');
-  assert.equal(table.talk[0].data.deadwood, 4);
-  assert.equal(table.talk[0].data.melds.length, 3);
+  // US-121: every decision is narrated now, so the draw speaks first
+  // and the knock is the last line - still ONE line for the knock.
+  assert.equal(table.talk.length, 2);
+  assert.match(table.talk.at(-1).text, /^Knock! .* deadwood 4/);
+  assert.equal(table.talk.at(-1).data.declare, 'knock');
+  assert.equal(table.talk.at(-1).data.deadwood, 4);
+  assert.equal(table.talk.at(-1).data.melds.length, 3);
   assert.match(summaryLine(knock), /hand 1 discard: KNOCK 5♦ \(knockWhenAble\) \| deadwood 4/, 'card names, not ids');
 
   const after = await bot.step();
@@ -163,4 +165,57 @@ test('a bot with no hand yet (joined before the deal) waits rather than drawing'
   const record = await bot.step();
   assert.equal(record.phase, 'wait');
   assert.deepEqual(table.actions, []);
+});
+
+// ---- US-121/D142: every decision is narrated on table talk ----
+
+test('an ordinary draw is said at the table, with the whole decision record attached', async () => {
+  const table = new FakeTable({ mine: HEAVY, theirs: THEIRS, stock: STOCK });
+  const bot = new GinBot({ peer: table, strategy: knockEarly() });
+  const record = await bot.step();
+
+  assert.equal(table.talk.length, 1, 'one line per decision');
+  const [line] = table.talk;
+  assert.match(line.text, /^Drew from stock/, 'the text is the move in a few words');
+  assert.equal(line.data.kind, 'bot-decision');
+  assert.equal(line.data.strategy, record.strategy);
+  assert.equal(line.data.iteration, record.iteration);
+  assert.equal(line.data.decision.type, 'draw');
+  assert.ok(line.data.trace.some((step) => step.fired), 'the rule that fired travels with it');
+  assert.equal(typeof line.data.facts.deadwood, 'number', 'the facts the rules read travel too');
+});
+
+test('a discard says which card, by name', async () => {
+  const table = new FakeTable({ mine: HEAVY, theirs: THEIRS, stock: STOCK });
+  const bot = new GinBot({ peer: table, strategy: knockEarly() });
+  await bot.step();
+  table.talk.length = 0;
+  await bot.step();
+
+  assert.equal(table.talk.length, 1);
+  assert.match(table.talk[0].text, /^Discarded [0-9AJQK]+[\u2660\u2663\u2665\u2666]$/);
+  assert.equal(table.talk[0].data.decision.type, 'discard');
+});
+
+test('a waiting turn says nothing - the table is not narrated at, only decided at', async () => {
+  const table = new FakeTable({ mine: HEAVY, theirs: THEIRS, stock: STOCK });
+  const bot = new GinBot({ peer: table, strategy: knockEarly(), firstPlayer: 'opponent' });
+  await bot.step();
+  assert.deepEqual(table.talk, []);
+});
+
+test('a knock still reads as a knock, and carries the decision record on the same line', async () => {
+  const table = new FakeTable({ mine: 'Ah 2h 3h 9c 9d 9s Js Qs Ks 5d', theirs: THEIRS, stock: STOCK });
+  const bot = new GinBot({ peer: table, strategy: knockEarly() });
+  await bot.step();
+  table.talk.length = 0;
+  await bot.step();
+
+  assert.equal(table.talk.length, 1, 'a knock is not said twice');
+  const [line] = table.talk;
+  assert.match(line.text, /^Knock!/);
+  assert.equal(line.data.kind, 'bot-decision');
+  assert.equal(line.data.declare, 'knock');
+  assert.ok(line.data.decision, 'the decision record rides along with the announcement');
+  assert.equal(line.data.melds.length, 3, 'the knock details are still there');
 });

@@ -1918,3 +1918,73 @@ strategy; human one-line turn summary on stderr beside the JSONL.
 - [x] Gin discards stay in view: `tableSpread` + wider Gin Table Zone, lint:design 30-discard check (D139)
 - [x] `make jev-player GAME STRATEGY CODE` replaces `make gin-bot`; player named after its strategy (D137 amended)
 - [x] gitleaks: `make secrets` in `make check`, `.githooks/pre-commit`, `make hooks` (D140)
+
+---
+
+# Sprint: Jev at the table (US-121..124) — 2026-09-19
+
+Stories: `docs/USER_STORIES.md` (US-121 thought bubble, US-122 add bot,
+US-123 animate+glow, US-124 spectator) + Gate 1 conditions.
+Architecture: D141-D144 (`docs/DECISIONS.md`). Gate 2 approved with 2
+conditions (specific forced-spectator wording; strategy descriptions).
+Order chosen so a bot-vs-bot table a human can watch exists by Phase 4,
+before the polish (Smith's non-blocking Gate 1 note).
+
+## Phase 1 — Spectator role in the model (D141, US-124 AC1/2)
+- [x] T1.1 `state.js`: `players[].role` set at JOIN (absent = 'player');
+      no hand pile and no seat zone for a spectator
+- [x] T1.2 DEAL/DEAL_MORE/scores/seating count SEATED players only
+- [x] T1.3 `tests/state.test.js`: dealing with a spectator present deals
+      to players only; card conservation (D88) still holds
+
+## Phase 2 — Joining as a spectator (D141, US-124 AC8/9/10 + Gate 2a)
+- [x] T2.1 Per-preset `playerLimit` (Gin = 2) is the only capacity
+      limit (expectedPlayers stays a start trigger, US-42 unchanged);
+      `dealtThisGame` set by DEAL, cleared by RESET/new game
+- [x] T2.2 Host/join UI: choose play or spectate; forced downgrade tells
+      the joiner WHICH limit was hit, in words
+- [x] T2.3 Roster shows spectators distinctly; tests for both limits
+
+## Phase 3 — The Jev player answers spawn requests (D143, tools side)
+- [x] T3.1 `jev-ready` talk entry on join (games + strategies with
+      descriptions); supervisor watches its page's talk log
+- [x] T3.2 `spawn-bot` -> spawn another bot; `spawn-bot-result` with
+      `ok` or a reason (missing TYPESAFE_API_KEY names the variable)
+- [x] T3.3 Request handling tested with an injected `startBot` (a live
+      two-bot game needs TYPESAFE_API_KEY and a full hand - the spawn
+      path itself is what this phase owns); real two-bot play is
+      exercised at sprint close
+
+## Phase 4 — Add Jev bot from the table (D143, US-122 + Gate 1c/2b)
+- [x] T4.1 Control offered only while a connected peer's `jev-ready`
+      exists; lists strategies WITH their descriptions
+- [x] T4.2 In-flight state from the moment it asks; failure shows the
+      returned reason
+- [x] T4.3 Browser test: control absent with no Jev player, present with
+
+## Phase 5 — Bots narrate their decisions (D142, tools side)
+- [x] T5.1 `bot.mjs`/`player.mjs` post one talk entry per decision: text
+      = the move in a few words, `data` = the decision record
+- [x] T5.2 Test: records reach the table in order, never leak an
+      opponent card the observation didn't have
+
+## Phase 6 — `<thought-bubble>` (D142, US-121 + Gate 1a)
+- [x] T6.1 Component: collapsed move on the bot's seat; expands into a
+      scrolling history over that sender's talk entries
+- [x] T6.2 Click to open, click OUTSIDE to close; pointerleave does NOT
+      close; overlay placed with `focusZoom.js` clamp math
+- [x] T6.3 Browser test: open, scroll back, stays open under the
+      pointer, closes on an outside click; two bots = two histories
+
+## Phase 7 — Who touched it (D144, US-123 AC9/10)
+- [x] T7.1 `playerColors.js`: pure, index-in-roster -> palette entry
+- [x] T7.2 Reducer stamps `lastTouch { by, pileableIds, seq }`
+- [x] T7.3 Unit tests for both; colour identical across peers
+
+## Phase 8 — Motion and glow (D144, US-123 AC1-8/11)
+- [x] T8.1 FLIP motion from per-render rect capture; grouped moves in
+      one pass; mid-flight re-render retargets, never snaps
+- [x] T8.2 Glow in the actor's colour, local fade timers, ~1.5s, only
+      Pileables; hidden cards travel as backs
+- [x] T8.3 Browser test: a deal animates as a group; a card with no
+      before-rect glows without animating; input is never blocked

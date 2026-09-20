@@ -61,13 +61,13 @@ test('createInitialState: gameConfig.allowsPlayerZones defaults true - matches e
   // `cardsPerPlayer` joined the shape when a restored table needed to
   // recover its own deal size; `undefined` when no preset set one.
   assert.deepEqual(state.gameConfig,
-    { allowsPlayerZones: true, tableZone: true, piles: [], zones: [], cardsPerPlayer: undefined, presetName: undefined, cardSize: undefined, tableCanvasSize: undefined });
+    { allowsPlayerZones: true, tableZone: true, piles: [], zones: [], cardsPerPlayer: undefined, presetName: undefined, cardSize: undefined, tableCanvasSize: undefined, playerLimit: undefined });
 });
 
 test('createInitialState: allowsPlayerZones can be set false via the third param', () => {
   const state = createInitialState({}, () => 0.5, { allowsPlayerZones: false });
   assert.deepEqual(state.gameConfig,
-    { allowsPlayerZones: false, tableZone: true, piles: [], zones: [], cardsPerPlayer: undefined, presetName: undefined, cardSize: undefined, tableCanvasSize: undefined });
+    { allowsPlayerZones: false, tableZone: true, piles: [], zones: [], cardsPerPlayer: undefined, presetName: undefined, cardSize: undefined, tableCanvasSize: undefined, playerLimit: undefined });
 });
 
 test('createInitialState: gameConfig.tableSpread sets the built-in Table pile\'s overlap; absent, the Table pile keeps its kind\'s default', () => {
@@ -3647,4 +3647,153 @@ test('FLIP_STACK: a hand (FAN-default) flips to vertical then back to fan - not 
 
   state = reduce(state, { type: 'FLIP_STACK', pileId: handPileId, stackKey: DEFAULT_STACK_KEY });
   assert.equal(state.piles.find((p) => p.id === handPileId).stacks[DEFAULT_STACK_KEY].direction, 'fan', 'a second flip must restore the fan, not advance to horizontal');
+});
+
+// ---- US-124 / D141 / D145: spectators are a role on the one roster ----
+
+const withSpectator = (state, id) => reduce(state, { type: 'JOIN', playerId: id, name: id, role: 'spectator' });
+
+test('US-124: a spectator joins the one roster with role spectator; a plain join is a player', () => {
+  const state = withSpectator(withPlayers(createInitialState(), ['alice']), 'sam');
+  assert.deepEqual(state.players.map((p) => [p.id, p.role]), [['alice', 'player'], ['sam', 'spectator']]);
+});
+
+test('US-124: a spectator gets no hand pile and no seat zone at JOIN', () => {
+  const state = withSpectator(withPlayers(createInitialState(), ['alice']), 'sam');
+  assert.equal(state.piles.some((p) => p.kind === 'hand' && p.ownerId === 'sam'), false);
+  assert.equal(state.zones.some((z) => z.ownerId === 'sam'), false);
+  // the seated player still gets their seat zone (D55)
+  assert.equal(state.zones.some((z) => z.ownerId === 'alice'), true);
+});
+
+test('US-124: DEAL deals to seated players only, and conserves every card', () => {
+  const joined = withSpectator(withPlayers(createInitialState({}, () => 0.5), ['alice', 'bob']), 'sam');
+  const dealt = reduce(joined, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 5 });
+  assert.equal(handOf(dealt, 'alice').length, 5);
+  assert.equal(handOf(dealt, 'bob').length, 5);
+  assert.equal(dealt.piles.some((p) => p.kind === 'hand' && p.ownerId === 'sam'), false);
+  assert.equal(deckOf(dealt).length, 52 - 10);
+  assertCardsConserved(joined, dealt);
+});
+
+test('US-124: a spectator does not consume a deal share (2 players + spectator deal the same as 2 players)', () => {
+  const base = withPlayers(createInitialState({}, () => 0.5), ['alice', 'bob']);
+  const withSam = withSpectator(base, 'sam');
+  const deal = (s) => deckOf(reduce(s, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 10 })).length;
+  assert.equal(deal(withSam), deal(base));
+});
+
+test('US-124 / D145: a spectator who deliberately draws DOES get a hand pile (no permission check)', () => {
+  const joined = withSpectator(withPlayers(createInitialState({}, () => 0.5), ['alice']), 'sam');
+  const drawn = reduce(joined, { type: 'DRAW', playerId: 'sam', pileId: 'deck' });
+  assert.equal(handOf(drawn, 'sam').length, 1);
+  assertCardsConserved(joined, drawn);
+});
+
+test('US-124: scores cover seated players only', () => {
+  const joined = withSpectator(withPlayers(createInitialState(), ['alice']), 'sam');
+  assert.deepEqual(Object.keys(reduce(joined, { type: 'RESET_SCORES' }).scores), ['alice']);
+  assert.equal('sam' in joined.scores, false);
+});
+
+// ---- US-124 Phase 2 / D141: seats are capped by the preset, not by the start trigger ----
+
+test('US-124: joining a full table seats you as a spectator, whatever you asked for', () => {
+  const state = withPlayers(createInitialState({}, () => 0.5, { playerLimit: 2 }), ['alice', 'bob', 'carol']);
+  assert.deepEqual(state.players.map((p) => p.role), ['player', 'player', 'spectator']);
+});
+
+test('US-124: joining after the deal seats you as a spectator even with a seat free', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5, { playerLimit: 4 }), ['alice', 'bob']);
+  assert.equal(state.dealtThisGame, false);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 5 });
+  assert.equal(state.dealtThisGame, true);
+  state = withPlayers(state, ['carol']);
+  assert.equal(state.players.find((p) => p.id === 'carol').role, 'spectator');
+});
+
+test('US-124: RESET clears dealtThisGame, so the next joiner can take a seat again', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5, { playerLimit: 4 }), ['alice']);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 5 });
+  state = reduce(state, { type: 'RESET' });
+  assert.equal(state.dealtThisGame, false);
+  state = withPlayers(state, ['bob']);
+  assert.equal(state.players.find((p) => p.id === 'bob').role, 'player');
+});
+
+test('US-124: a preset with no playerLimit never forces a spectator on capacity', () => {
+  const state = withPlayers(createInitialState({}, () => 0.5), ['a', 'b', 'c', 'd', 'e']);
+  assert.deepEqual([...new Set(state.players.map((p) => p.role))], ['player']);
+});
+
+test('US-124: a rejoining player keeps their seat, and a full table does not demote them', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5, { playerLimit: 2 }), ['alice', 'bob']);
+  state = withPlayers(state, ['alice']);
+  assert.equal(state.players.find((p) => p.id === 'alice').role, 'player');
+  assert.equal(state.players.filter((p) => p.role === 'player').length, 2);
+});
+
+test('US-124: the view carries the seat limit and dealtThisGame, so a guest can say WHY it is spectating', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5, { playerLimit: 2 }), ['alice', 'bob']);
+  state = withPlayers(state, ['carol']);
+  const view = viewFor(state, 'carol');
+  assert.equal(view.gameConfig.playerLimit, 2);
+  assert.equal(view.dealtThisGame, false);
+});
+
+// ---- US-123 / D144: who touched what, stamped once per action ----
+
+test('US-123: moving a card stamps who touched it and which pileable', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['alice', 'bob']);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
+  const [card] = handOf(state, 'alice');
+  const moved = reduce(state, { type: 'MOVE', playerId: 'alice', pileableId: card.id, toPileId: 'table' });
+  assert.equal(moved.lastTouch.by, 'alice');
+  assert.deepEqual(moved.lastTouch.pileableIds, [card.id]);
+  assert.equal(moved.lastTouch.seq, state.lastTouch.seq + 1, 'each touch is a new one, even of the same card');
+});
+
+test('US-123: a deal stamps every card it moved, as one touch', () => {
+  const state = withPlayers(createInitialState({}, () => 0.5), ['alice', 'bob']);
+  const dealt = reduce(state, { type: 'DEAL', playerId: 'alice', pileId: 'deck', cardsPerPlayer: 3 });
+  assert.equal(dealt.lastTouch.by, 'alice');
+  assert.equal(dealt.lastTouch.pileableIds.length, 6, 'all six dealt cards are one touch, not six');
+});
+
+test('US-123: acting on a card without moving it counts as touching it', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['alice', 'bob']);
+  const pileableId = 'shared-c';
+  state = { ...state, piles: state.piles.map((p) => (p.id === 'table'
+    ? { ...p, cards: [{ id: pileableId, rank: '7', suit: 'clubs', owner: null, faceUp: false }] } : p)) };
+
+  const flipped = reduce(state, { type: 'FLIP', playerId: 'bob', pileableId });
+  assert.deepEqual(flipped.lastTouch.pileableIds, [pileableId]);
+  assert.equal(flipped.lastTouch.by, 'bob');
+});
+
+test('US-123: an action that moves nothing leaves the previous touch alone', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['alice']);
+  state = reduce(state, { type: 'DEAL', playerId: 'alice', pileId: 'deck', cardsPerPlayer: 3 });
+  const before = state.lastTouch;
+  const after = reduce(state, { type: 'SET_SCORE', playerId: 'alice', value: 5 });
+  assert.deepEqual(after.lastTouch, before);
+});
+
+test('US-123: the touch reaches every client through the view', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['alice', 'bob']);
+  state = reduce(state, { type: 'DEAL', playerId: 'alice', pileId: 'deck', cardsPerPlayer: 3 });
+  assert.deepEqual(viewFor(state, 'bob').lastTouch, state.lastTouch);
+});
+
+test('US-123: rearranging a pile in place is a touch - the cards that changed position, not the whole pile', () => {
+  const state = handStateWith([
+    { id: 'a', rank: 'K', suit: 'clubs' },
+    { id: 'b', rank: '2', suit: 'hearts' },
+    { id: 'c', rank: '2', suit: 'clubs' },
+  ]);
+  const sorted = reduce(state, { type: 'SORT_PILE', pileId: 'hand:p1', playerId: 'p1', by: 'rank' });
+  assert.equal(sorted.lastTouch.by, 'p1');
+  // K moved from the front to the back and the 2s swapped past it; 'b'
+  // happens to stay at index 1, so it is NOT reported as touched.
+  assert.deepEqual(sorted.lastTouch.pileableIds.sort(), ['a', 'c']);
 });

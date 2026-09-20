@@ -3463,3 +3463,223 @@ and compare - several expert-informed strategies.
 people at the table count, as they do today); match-score (to 100)
 adjustments; more than 2 players; enforcing Gin rules in the app itself;
 table talk persistence across a host reload, private messages.
+
+---
+
+## Sprint: Jev at the table (2026-09-19)
+
+User request (`*newrec`): show how TypeSafe/Jev is evaluating a bot's
+strategy at the table, as a thought bubble per move that expands into a
+scrolling history, and let a player add another Jev bot from the table.
+User answers (2026-09-19): the "log" IS the bubble's history (not a
+separate panel); "add a strategy" means add another bot; every player
+sees the bubbles, full detail, and each decides whether to expand them.
+
+### US-121: A Jev player's thought bubble — what it chose and why, with scrollable history
+**As** a player at a table with a Jev bot, **I want** a thought bubble
+on the bot's seat each time it moves, that I can open to see what it
+chose and how Jev evaluated it, and scroll back through its earlier
+decisions, **so that** I can see how a strategy actually thinks.
+
+**AC:**
+1. Every decision a Jev player makes (US-120's decision record) shows a
+   collapsed thought bubble attached to that bot's seat at the table,
+   updated on each move. The collapsed bubble shows only the move in a
+   few words (e.g. "drew from discard", "discarded 9♣", "knocked").
+2. Opening it follows the same open/close model as pile focus-zoom:
+   hover-intent or a click grows it; pointer leaving it, or a click
+   outside it, closes it. No separate close button (the pinned-open X
+   is its own backlog item for piles too).
+3. Expanded, it is a scrolling window: the newest decision at the
+   bottom and in view, earlier decisions reachable by scrolling up,
+   back to the bot's first decision this session.
+4. Each decision entry shows the instrumentation: the decision and its
+   actions; the rules evaluated in order and which one fired (the
+   strategy's trace); Jev's answers for that decision (the opponent-
+   threat Score and each candidate discard's "helps the opponent"
+   Noul); the facts the rules read (deadwood, melds, etc.).
+5. Every player sees every bot's bubbles, host or not, in full detail,
+   including the bot's own cards (user decision - learning and
+   comparing strategies outweighs hiding the bot's hand). Expanding is
+   each viewer's own local choice; it never opens anyone else's.
+6. Bubble data reaches every peer over the table's existing channel -
+   no new server. A bot with no decisions yet shows no bubble.
+7. Works for two bots at one table (each seat has its own bubble and
+   history).
+
+**Out of scope:** hiding the bot's hand from its opponent; persisting
+bubble history across a host reload; editing a decision; bubbles for
+human players.
+
+### US-122: Add another Jev bot from the table
+**As** the person at a table where a Jev player is already running,
+**I want** to add another Jev bot with a strategy I pick, from the
+table itself, **so that** I don't have to go to a terminal and can set
+up strategy-vs-strategy games.
+
+**AC:**
+1. Precondition (user-stated): a Jev player must already be running
+   at the table. When one is, the table offers an "Add Jev bot" control
+   listing the game's named strategies (for Gin: knock-early,
+   gin-hunter, equilibrium, defensive), each with its description.
+   When none is, the control is not offered.
+2. Choosing a strategy adds a new Jev bot to the table that joins as a
+   real player over the normal join path and plays that strategy
+   exactly as a `make jev-player` bot would (same records, same
+   thought bubbles per US-121).
+3. Success and failure are visible at the table: the new bot shows up
+   in its seat; if it can't be started (e.g. missing
+   `TYPESAFE_API_KEY`), the requester sees the reason in words, not
+   nothing.
+4. The request travels over the table's existing channel to the
+   already-running Jev player process; the browser app never gains a
+   server or launches processes itself.
+
+**Out of scope:** authoring new strategies in the UI; removing or
+switching a bot's strategy mid-game; bots for games other than Gin.
+
+**Open questions for Gate 1 / the user:**
+- ~~Gin is two-player: how do a human + 2 bots work?~~ ANSWERED by the
+  user 2026-09-19: "two only, the human needs spectator access" - Gin
+  stays two players; bot-vs-bot means the human watches as a
+  spectator. See US-124.
+- ~~Who may press "Add Jev bot"?~~ ANSWERED 2026-09-19: anyone at the
+  table (players and spectators alike).
+
+---
+
+## Request (2026-09-19): see what just moved
+
+User request (`*newreq`): "animate moves so it's easy to see which cards
+have just been moved. maybe you can also add a fading glow affect on
+items that are touched or moved". Builds on PRD Principle 6 (live,
+best-effort motion) - today a live drag already streams, but a move that
+arrives as a state change (Move menu, deal, draw, take pile, a bot's
+move, a remote drop) lands in place with no motion, so nobody can tell
+what changed.
+
+### US-123: Moved cards travel, and touched/moved items glow then fade
+**As** a player at the table, **I want** every card move to animate from
+where it was to where it lands, and anything just touched or moved to
+glow briefly and fade, **so that** I can see at a glance what just
+changed, especially moves made by someone else or by a bot.
+
+**AC:**
+1. When a card changes pile or position (from any source: my own drop,
+   another player's action, a bot, a Move/Deal/Take action), every
+   player's screen shows it travelling from its previous on-screen spot
+   to its new one instead of appearing there.
+2. Cards moved together (deal, take pile, split) animate together, not
+   one after another.
+3. A moved card glows when it lands, and the glow fades out on its own
+   with no click needed to clear it.
+4. "Touched" items glow too: a card that is lifted/picked up, flipped,
+   or otherwise acted on without changing pile glows the same way.
+5. Every player sees the animation and the glow, including the player
+   who made the move.
+6. Privacy is unchanged: a card moving into, out of, or within a place
+   I can't see the face of animates as a card back. The animation never
+   reveals an identity the state doesn't already give me.
+7. Animation is cosmetic only (PRD Principle 6 / D4): if it's cut short,
+   skipped, or superseded by a newer move, the table still ends in the
+   correct state, and it never blocks me from acting on a card.
+8. A card that isn't on screen for me before or after the move (e.g. in
+   a collapsed pile) still glows where it becomes visible, and doesn't
+   animate from or to a spot that doesn't exist.
+
+9. The glow is tinted with the colour of the person who moved/touched
+   it (user answer 2026-09-19), so it also shows WHO just acted. Every
+   person at the table (player, spectator, bot) has a distinct colour,
+   the same on every screen. Recard has no player colours today - this
+   story introduces them.
+10. Only Pileables glow and animate (cards, chips, tokens - user answer
+    2026-09-19). Zones and piles being moved/resized do not glow.
+
+11. The glow lasts a second or two and is fully gone by then (user
+    answer 2026-09-19) - one shared constant, ~1.5s including the
+    fade. Gate 2 may nudge the exact value by feel within that range,
+    not beyond it.
+
+**Out of scope:** changing the live drag stream; sound; a move history
+or undo; per-player animation settings.
+
+---
+
+### US-124: Spectator access — be at the table without a seat in the game
+**As** the person running a table where two Jev bots play each other,
+**I want** to be at the table as a spectator rather than a player,
+**so that** the game is exactly two players (the bots) while I still
+watch it, read their thought bubbles, and add bots.
+
+User answer (2026-09-19): Gin stays two players only; "the human needs
+spectator access". This reverses PRD Out-of-Scope "spectating"
+(PRD updated, same day).
+
+**AC:**
+1. A person at the table can be a spectator: present at the table,
+   but not a seat in the game - no hand, not dealt to, not counted as
+   a player by the game (a Gin deal to "all players" deals to the two
+   bots only).
+2. The host can be a spectator. The host's table keeps working as
+   today (the table stays up, bots can join, US-122's Add Jev bot is
+   available to the spectating host).
+3. A spectator sees the table live, as it moves (including US-123
+   animations/glow) and every bot's thought bubbles (US-121).
+4. The roster shows who is spectating, distinct from the players.
+5. Spectating is a table feature, not a Gin one: any game's table can
+   have spectators.
+
+6. A spectator sees every hand closed (card backs), the same as any
+   player sees hands that aren't theirs. (The bubbles still show a
+   bot's cards per US-121 - that is the bot's reasoning, not the hand.)
+7. A spectator can move and act on anything at the table exactly as a
+   player can (D82-D85 fully permissive table) - including dealing.
+   The only difference from a player is having no seat.
+8. Joining or hosting offers a choice: play or spectate.
+9. When the game is full or already started, a newcomer joins as a
+   spectator, whatever they chose.
+
+10. "Full" means the game's own player limit (a new per-preset
+    `playerLimit`; Gin = 2). The host's "Start automatically at N
+    players" setting is NOT a capacity limit and does not count -
+    US-42's decision stands unchanged (user, 2026-09-19, revising the
+    earlier option-c answer once the conflict surfaced). "Started"
+    means cards have been dealt this game.
+11. Spectating is offered as an option on the join screen; the forced
+    downgrade covers only a table that is already full or started.
+
+**Out of scope:** remote/cross-room spectating (still same-room only);
+more than two players in Gin; spectator chat beyond Table Talk.
+
+### Gate 1 (Smith, 2026-09-19): APPROVED with 4 binding conditions
+
+1. **US-121 - the bubble must not close under the pointer while it is
+   being read.** Pile focus-zoom closes on `pointerleave`, which is
+   right for a pile you hover; it is hostile for a scrolling history
+   (Nielsen #3, user control): scrolling up moves the pointer, and any
+   overshoot past the bubble's edge destroys the reading position. The
+   user's words were "the same click to close way" - so the binding
+   part is CLICK to open, CLICK OUTSIDE to close. `pointerleave` must
+   NOT close an expanded bubble. Hover may still preview it.
+2. **US-124 AC9 - a forced role change must be visible and explained.**
+   Someone who chose "play" and is seated as a spectator because the
+   game is full/started must be TOLD, in the moment, in those words
+   ("the game is already under way - you've joined as a spectator"),
+   not silently demoted (Nielsen #1, #2). Silent role changes are how
+   people conclude the app is broken.
+3. **US-122 AC3 - starting a bot is not instant; show that it started.**
+   The control must show the request is in flight (and that the bot is
+   joining) rather than appearing to do nothing until a seat fills
+   (Nielsen #1). Failure already has to say why - AC3 keeps that.
+4. **US-123 AC9 - colour alone cannot be the only carrier.** Tinting
+   the glow by player colour is approved as the primary cue, but "who
+   moved it" must also be recoverable without colour vision - the
+   existing roster/seat naming is acceptable for that; what is NOT
+   acceptable is inventing a colour code that only colour-sighted
+   players can read as identity (WCAG 1.4.1). Non-blocking if the
+   glow's job stays "something moved" and identity is secondary.
+
+**Not blocking, flagged for Mouse:** four stories is a large sprint,
+and the user's actual goal (watch two bots play) needs US-124 +
+US-122. US-121 and US-123 are independently shippable - suggest
+sequencing so a bot-vs-bot table is reachable before the polish lands.

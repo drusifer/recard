@@ -68,6 +68,24 @@ Two message classes travel over the one PeerJS data channel (D4):
    for the app to stay correct — losing motion frames costs smoothness,
    never correctness.
 
+3. **Talk messages** (D138): a line anyone can say, host-stamped and
+   relayed to everyone in one order. Never game state. Its optional
+   `data` field is what bots speak through - a Jev player announces
+   itself and narrates every decision there (D142), and "add a Jev bot"
+   is a request/answer pair on the same channel (D143).
+
+**Who is at the table** (D141): one roster, `state.players[]`, where a
+record's `role` is `'player'` or `'spectator'` (absent reads as player).
+A spectator is present in every way except having a seat - no hand, never
+dealt to, no seat zone - and the table stays fully permissive for them,
+so they move cards and deal like anyone else (D82-D85, D145). Only
+seating, dealing and scoring filter by role.
+
+**What just happened** (D144): each action stamps one `lastTouch`
+(`{by, pileableIds, seq}`), derived in `reduce()` by comparing where
+every Pileable was against where it is. Clients animate and glow from
+it; nothing about motion is messaged, and the fade is local.
+
 **Local-only view state** is a third category that never touches the
 network at all: each player's own table zoom level, table pan offset,
 and which pile (if any) is currently focus-zoomed are per-browser,
@@ -98,6 +116,9 @@ src/presets.js           static game-preset definitions (deck lists, table layou
 src/rulesReference.js    static in-app rules-reference content
 src/hostSettings.js      host's own sticky pre-game settings (deck/preset choice)
 
+tools/botRequests.mjs    pure: unanswered "add a bot" requests + refusals
+tools/gin/               the Gin bot core, strategies and the runner (D137)
+
 src/pileables/           the Pileable -> Stackable -> Card/Chip/Token hierarchy
 src/piles/               the Pile -> Stack (+ every derived pile KIND) hierarchy
 src/zones/                the Zone -> SharedZone/PerPlayerZone hierarchy
@@ -118,6 +139,10 @@ src/touchDrag.js         pure press-and-hold touch-drag gesture recognizer
 src/panelLayout.js       per-browser persisted pile/zone move+resize state
 src/layoutOverrides.js   preset-declared default layout overrides
 src/focusZoom.js         pure clamp math for the focus-zoom overlay
+src/cardMotion.js        pure travel math + the FLIP/glow players (US-123)
+src/playerColors.js      pure: a person's seat index -> their colour (US-123)
+src/botOffers.js         pure: which Jev players are offering bots (US-122)
+src/botThoughts.js       pure: a bot's decisions, filtered out of table talk
 src/tableZoom.js         pure math for the table-zoom wheel, drag-to-pan, pinch
 src/qrcode.js            vendored QR renderer (no runtime network call)
 src/assetPath.js         static asset path resolution

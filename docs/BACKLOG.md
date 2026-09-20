@@ -17,6 +17,20 @@ or a live-verification session) versus being pickable directly.
 
 ## Product
 
+- **Bot decisions flood table talk** (Smith's gate, 2026-09-20, US-121):
+  every bot decision is now a talk line, so three decisions buried the
+  humans' own conversation under four lines. The thought bubble already
+  carries that detail. Candidate: keep `bot-decision` lines out of the
+  `<table-talk>` panel (they still travel, and the bubbles still show
+  them), while knock/gin announcements stay visible. NOT done in-sprint:
+  hiding a message class from the log is a product call.
+- **A bot's visible history is capped at the talk log's 100 entries**
+  (Morpheus, US-121 retro): a long game's earliest decisions fall off
+  the top of the bubble. Accepted in D142; revisit if it bites.
+- **`docs/UI_ARCHITECTURE.md` has no entry for the three new components**
+  (Oracle, 2026-09-20): `<thought-bubble>`, `<add-bot>` and the
+  spectator roster marking. Filed rather than claimed done.
+
 - **Reconnect-to-session after refresh/drop** — if a client's own tab
   reloads (or the host's does), there is no way to resume the session;
   a known v1 limitation, standing since the original architecture

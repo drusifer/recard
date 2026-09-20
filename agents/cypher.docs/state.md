@@ -1,9 +1,22 @@
 # Agent State
 
-## Current Task (2026-09-18)
+## Current Task (2026-09-20) - Sprint "Jev at the table" LAUNCHED
 
-US-119 (harness MCP) COMPLETE, D136. Backlog: screenshot selector/
-viewport, reconnect resets a guest's traffic log.
+US-121 (bot thought bubbles), US-122 (Add Jev bot from the table),
+US-123 (moves animate, touched Pileables glow in the mover's colour),
+US-124 (spectator access, incl. a spectating HOST) all shipped.
+Decisions D141-D146 (docs/DECISIONS.md). 8 phases, no fix loops.
+User answers that shaped it: spectating is an option on the join screen
+(US-42's "start automatically at N" stays a START trigger, NOT a seat
+cap - the earlier "either limit" answer was revised when the conflict
+surfaced); everyone sees every bubble in full detail; glow tinted by
+player colour; Pileables only; "a second or two" (1.5s).
+
+## Next Steps
+Backlog (docs/BACKLOG.md) gained 3 items from this sprint: bot decisions
+flooding table talk (Smith's filing - a product call, deliberately not
+fixed in-sprint), the 100-entry cap on a bubble's history, and the
+missing UI_ARCHITECTURE entries for the 3 new components.
 
 ## Context
 ### Recent Decisions

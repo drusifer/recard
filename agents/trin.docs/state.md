@@ -1,36 +1,16 @@
 # Agent State
 
-## Current Task (2026-09-19) - US-120 close-out verifies PASSED
+## Current Task (2026-09-20) - Sprint "Jev at the table": phases 1-3 UAT PASSED
 
-Gin discard fix: lint:design fills Gin Table pile with 30 discards (red before,
-clean after). jev-player: tests/jevPlayer.test.js (4) red->green; live join as
-"equilibrium". gitleaks: make secrets + pre-commit hook both proven to fail on a
-planted ghp_ token. Unit 913, lint-js clean. All committed (c427db8).
+Each phase mutation-proved before passing: P1 `seatedPlayers()` ->
+state.players (7 fail), P2 `tableClosed=false` (5 fail), P3 dropping the
+answered-in-log check (3 fail). `make check` clean at every gate;
+`make test-spectator` 2/2 over real WebRTC; `make test-multiplayer`
+green as a regression check.
 
-## Current Task (2026-09-19) - US-120 Phases 1-3 UAT PASSED
-
-Mutation-proved: fairness, exact melds (P1); Jev utility (after a test fix),
-chase plan, one-request fan-out (P2); talk relay-to-sender, identity stamping
-(P3). Unit 901/901, test-multiplayer 5/5, full lint clean.
-
-## Current Task (2026-09-18) - *qa uat harness-mcp usability fix: PASSED
-
-10/10 test-harness-mcp. Mutation-proved: .mcp.json test (red with the old
-${CLAUDE_PROJECT_DIR} arg - Connection closed), errorText (reverting -> reducer
-error test fails), TimeoutError catch (reverting -> wait test fails). Restored
-+ re-run green. No src/ changes, so unit suite not re-run (bounded testing).
-
-## Current Task (2026-09-18) — US-119 Harness MCP server UAT
-
-- Phase 1 UAT PASSED: trafficLog unit tests 3/3, capacity-bound
-  mutation (drop the `shift()`) caught. `Session`'s own recording is
-  NOT unit-testable (PeerJS) - Phase 2's stdio MCP test MUST assert
-  real `action` (guest out) and `state` (guest in) traffic entries, or
-  the Session tap is unproven. Hold Phase 2 to that.
-- Phase 2 UAT PASSED: 5/5 over real stdio; mutation (guest send not
-  recorded) fails the traffic test - condition met.
-- Phase 3 UAT PASSED; full regression green. Lesson re-learned: never
-  run `bobp make` while another make loop runs - build.out is shared.
+## Next Steps
+Phase 4 UAT: the Add Jev bot control - present only with a live
+`jev-ready`, strategies with descriptions, in-flight state, failure text.
 
 ## Context
 

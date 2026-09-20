@@ -449,6 +449,12 @@ export function createInitialState(deckConfig = {}, rng = Math.random, gameConfi
       // `undefined` when a preset does not set one rather than
       // defaulting, so nothing invents a hand size that was never chosen.
       cardsPerPlayer: gameConfig.cardsPerPlayer,
+      // D141 (US-124): how many SEATS this game has (Gin = 2).
+      // `undefined` for a preset that doesn't care - then nobody is
+      // ever forced to spectate on capacity. Deliberately NOT the
+      // host's "start automatically at N" setting, which is a start
+      // trigger and not a capacity limit (US-42, unchanged).
+      playerLimit: gameConfig.playerLimit,
       // D116 (US-116, New Game): the only way a GUEST can tell which
       // preset is live, since `deckConfig`/the rest of `gameConfig`
       // carry no human-readable name. Left `undefined` for a caller
@@ -485,6 +491,15 @@ export function createInitialState(deckConfig = {}, rng = Math.random, gameConfi
       ...built.piles,
     ],
     players: [],
+    // D144 (US-123): who last moved or acted on which Pileables, so
+    // every client can glow the same things in the same person's
+    // colour. One stamp, overwritten per action; the FADE is local
+    // (a glow is not worth a broadcast to end).
+    lastTouch: { by: null, pileableIds: [], seq: 0 },
+    // D141 (US-124): "the game has started" for seating purposes -
+    // set by a deal, cleared by RESET/New Game. Someone arriving
+    // mid-game spectates even when a seat is free.
+    dealtThisGame: false,
     scores: {},
     // Set once, by the first JOIN (below) - the host always joins its own
     // table before a share code exists for anyone else to reach it (D3),
@@ -635,6 +650,17 @@ function toDeckCard(card) {
  * ANYTHING (own kind irrelevant - the check above already proved it's
  * not a hand) keeps every pile id unique, always.
  */
+/**
+ * D141: the roster holds everyone at the table; only the people with a
+ * SEAT are dealt to, scored, and seated. A record with no `role` reads
+ * as a player, so every pre-D141 state (and every JOIN that doesn't ask
+ * to spectate) keeps its meaning.
+ * @param {{players: {id: string, role?: string}[]}} state
+ */
+function seatedPlayers(state) {
+  return state.players.filter((p) => p.role !== 'spectator');
+}
+
 function ensureHandPile(piles, playerId) {
   if (piles.some((p) => p.kind === 'hand' && p.ownerId === playerId)) return piles;
   const canonicalId = handPileId(playerId);
@@ -862,7 +888,20 @@ const ACTIONS = {
     // 'perPlayer'` (e.g. Spit's per-player stock) builds here, on first
     // join - its count isn't knowable any earlier than this, since it's
     // created once per actual player.
-    const perPlayerPiles = alreadyJoined
+    // D141: a spectator has no seat, so none of the seat furniture -
+    // per-player piles, a seat zone, a score - is built for them. Their
+    // hand pile is not built either, here or by DEAL; the lazy
+    // `ensureHandPile` paths stay permissive though (D145).
+    const existing = state.players.find((p) => p.id === action.playerId);
+    const seatLimit = state.gameConfig?.playerLimit;
+    const seatsTaken = state.players.filter((p) => p.role !== 'spectator' && p.id !== action.playerId).length;
+    const tableClosed = (seatLimit !== undefined && seatsTaken >= seatLimit) || state.dealtThisGame === true;
+    // A rejoining person keeps whatever they already were - a full or
+    // started table must never demote someone who already has a seat.
+    const isSpectator = existing
+      ? existing.role === 'spectator'
+      : action.role === 'spectator' || tableClosed;
+    const perPlayerPiles = alreadyJoined || isSpectator
       ? []
       : (state.gameConfig?.piles ?? [])
           .filter((z) => z.ownerId === 'perPlayer')
@@ -887,15 +926,17 @@ const ACTIONS = {
       hostId: state.hostId ?? action.playerId,
       players: [
         ...state.players.filter((p) => p.id !== action.playerId),
-        { id: action.playerId, name: action.name, connection: 'connected' },
+        { id: action.playerId, name: action.name, connection: 'connected', role: isSpectator ? 'spectator' : 'player' },
       ],
       piles: alreadyJoined ? state.piles : [...state.piles, ...perPlayerPiles],
       // D55: every player gets a real Zone record for their own seat,
       // seeded at JOIN (before their hand pile even exists - `ensureHandPile`
       // still creates that lazily) so `zoneId: player-<id>` always
       // resolves to something real once the hand pile does show up.
-      zones: alreadyJoined ? state.zones : ensureZoneRecord(state.zones, playerZoneId(action.playerId), null, action.playerId, 'perPlayer'),
-      scores: { [action.playerId]: 0, ...state.scores },
+      zones: alreadyJoined || isSpectator
+        ? state.zones
+        : ensureZoneRecord(state.zones, playerZoneId(action.playerId), null, action.playerId, 'perPlayer'),
+      scores: isSpectator ? state.scores : { [action.playerId]: 0, ...state.scores },
     };
   },
 
@@ -944,7 +985,7 @@ const ACTIONS = {
    */
   DEAL(state, action) {
     const isFresh = action.type === 'DEAL';
-    const players = state.players;
+    const players = seatedPlayers(state);
     const pile = state.piles.find((p) => p.id === action.pileId);
     const reclaimed = isFresh
       ? state.piles.filter((p) => p.kind === 'hand').flatMap((p) => p.cards.map((card) => toDeckCard(card)))
@@ -967,7 +1008,7 @@ const ACTIONS = {
       const newCards = dealt[index].map((card) => toHandCard(card, p.ownerId));
       return withCards(p, [...(isFresh ? [] : p.cards), ...newCards]);
     });
-    return { ...state, piles };
+    return { ...state, piles, dealtThisGame: true };
   },
 
   // D45: `action.kind` lets a host create any table-side pile TYPE, not
@@ -1506,7 +1547,7 @@ const ACTIONS = {
       return kept.length === p.cards.length ? p : withCards(p, kept);
     });
 
-    const players = state.players;
+    const players = seatedPlayers(state);
     const { remaining, dealt } = dealRoundRobin(
       shuffle(gathered, rng),
       players.length,
@@ -2003,7 +2044,7 @@ const ACTIONS = {
 
   RESET_SCORES(state) {
     const scores = {};
-    for (const player of state.players) scores[player.id] = 0;
+    for (const player of seatedPlayers(state)) scores[player.id] = 0;
     return { ...state, scores };
   },
 
@@ -2038,6 +2079,10 @@ const ACTIONS = {
     const declaredDeckLists = declaredCardDeckDeclarations(state.gameConfig.piles ?? []);
     return {
       ...state,
+      // D141: a reset starts the game over, so the table takes seats
+      // again - someone who was forced to spectate mid-game can sit
+      // down for the next one.
+      dealtThisGame: false,
       piles: [
         // Hand piles are dropped outright rather than emptied, so
         // `handsOf()` is `{}` again exactly as pre-D23 `hands: {}` was.
@@ -2252,13 +2297,59 @@ export function assertCardsConserved(before, after, actionType) {
 }
 
 /**
+ * D144 (US-123): which Pileables this action moved or changed, derived
+ * by comparing where every Pileable was against where it is now -
+ * rather than making twenty reducers each remember to report it. A
+ * Pileable counts as touched when it changed pile, position, or its own
+ * state (turned over, rotated). An action that changed no Pileable
+ * (a score edit, a rename) leaves the previous touch standing.
+ */
+function placementsOf(state) {
+  const placements = new Map();
+  const membership = new Map();
+  for (const pile of state.piles ?? []) {
+    const ids = [];
+    for (const [index, pileable] of (pile.cards ?? []).entries()) {
+      placements.set(pileable.id, { pileId: pile.id, index, faceUp: pileable.faceUp, rotation: pileable.rotation ?? 0 });
+      ids.push(pileable.id);
+    }
+    membership.set(pile.id, ids.join(','));
+  }
+  return { placements, membership };
+}
+
+function stampTouch(before, after, action) {
+  // A new epoch rebuilds every card with new ids (D144 follows D24's
+  // own carve-out): nothing was "touched", the table was replaced.
+  if (action.type === 'RESET' || action.type === 'NEW_GAME') return after;
+  const was = placementsOf(before);
+  const now = placementsOf(after);
+  const touched = [];
+  for (const [id, place] of now.placements) {
+    const previous = was.placements.get(id);
+    if (!previous) { touched.push(id); continue; }              // it arrived from somewhere
+    if (previous.pileId !== place.pileId) { touched.push(id); continue; }
+    if (previous.faceUp !== place.faceUp || previous.rotation !== place.rotation) { touched.push(id); continue; }
+    // Same pile, same state: order only counts as a touch when the
+    // pile's membership did NOT change - otherwise every card after a
+    // removed one would "move" just by closing the gap behind it.
+    const settled = was.membership.get(place.pileId) !== undefined
+      && was.membership.get(place.pileId).split(',').length === now.membership.get(place.pileId).split(',').length;
+    if (settled && previous.index !== place.index) touched.push(id);
+  }
+  if (touched.length === 0) return after;
+  const seq = (before.lastTouch?.seq ?? 0) + 1;
+  return { ...after, lastTouch: { by: action.playerId ?? null, pileableIds: touched, seq } };
+}
+
+/**
  * @param {ReturnType<typeof createInitialState>} state
  * @param {{type: string, [key: string]: any}} action
  */
 export function reduce(state, action) {
   const apply = ACTIONS[action.type];
   if (!apply) throw new Error(`Unknown action type: ${action.type}`);
-  const next = apply(state, action);
+  const next = stampTouch(state, apply(state, action), action);
   // RESET and NEW_GAME are the legitimate "new epoch" actions - each
   // rebuilds the deck with brand new card ids on purpose (a new round,
   // or D116's wholesale preset swap), same reason RESET is already
@@ -2293,6 +2384,13 @@ export function reduce(state, action) {
 export function viewFor(state, playerId) {
   const view = {
     myHand: [], otherHandCounts: {}, piles: [], players: state.players, scores: state.scores,
+    // D144 (US-123): the same touch on every screen - each client
+    // animates and glows from this, nothing about motion is messaged.
+    lastTouch: state.lastTouch ?? { by: null, pileableIds: [], seq: 0 },
+    // D141: with `gameConfig.playerLimit` below, this is everything a
+    // guest needs to say WHY it was seated as a spectator (full vs
+    // already started) - no message carries the reason.
+    dealtThisGame: state.dealtThisGame === true,
     // D55/D90: the real Zone registry (`{id, name, ownerId}`). Used to be
     // named `zoneRecords` specifically to avoid colliding with a `zones`
     // field that was actually an array of PILE views (the exact
@@ -2320,6 +2418,7 @@ export function viewFor(state, playerId) {
       // its own fit-zoom locally (`main.js`'s `applyFitZoom`), so the
       // preset's own canvas size has to reach it through the view too.
       tableCanvasSize: state.gameConfig?.tableCanvasSize,
+      playerLimit: state.gameConfig?.playerLimit,
     },
   };
   for (const pile of state.piles) pileInstanceFor(pile, playerId).contributeToView(view, playerId);

@@ -202,6 +202,14 @@ test('the hand offers RtG-specific sort actions, and cost sits at the card\'s le
   assert.ok(sortButtons.includes('Sort by type'), `expected a type sort button, got ${sortButtons}`);
   assert.ok(sortButtons.every((label) => !/rank|suit/i.test(label)), 'rank/suit sort makes no sense for RtG cards');
 
+  // US-123/D144: cards travel to their place now, so measure once the
+  // geometry has stopped changing rather than mid-flight.
+  for (let attempt = 0, previous = -1; attempt < 20; attempt++) {
+    const x = (await page.locator('[data-kind="hand"] .card-rtg').first().boundingBox()).x;
+    if (Math.abs(x - previous) < 0.01) break;
+    previous = x;
+    await page.waitForTimeout(60);
+  }
   const cardBox = await page.locator('[data-kind="hand"] .card-rtg').first().boundingBox();
   const costBox = await page.locator('[data-kind="hand"] .rtg-top').first().boundingBox();
   assert.ok(Math.abs(costBox.x - cardBox.x) < 5, `cost should sit at the card's left edge, offset was ${costBox.x - cardBox.x}px`);

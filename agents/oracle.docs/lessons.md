@@ -558,3 +558,36 @@ This file contains critical lessons and rules derived from past errors, technica
   The discard item was struck, then fixed; posting each decision to chat
   as it happened kept the backlog and state files honest across the flip.
 
+
+## Sprint "Jev at the table" (2026-09-20): US-121..124, D141-D146
+
+- **A cosmetic animation can destabilise everything that measures the
+  DOM.** Writing `element.style.transform` and clearing it a frame later
+  left a stale offset on a live card whenever a render landed in
+  between - and it surfaced as three *RTG cascade* assertions failing,
+  in a file this sprint never touched. Two lessons: `element.animate()`
+  (with `composite: 'add'`) never writes the element's own layout, so
+  the failure mode cannot occur; and every geometry assertion in the
+  suite was, silently, an assertion that nothing animates. Browser
+  suites now launch with `reducedMotion: 'reduce'` per CONTEXT.
+- **Verify the mechanism you reach for, in the environment you run in.**
+  Chromium's `--force-prefers-reduced-motion` flag does not reach
+  `matchMedia` - checked directly rather than assumed, after the flag
+  "worked" (the tests still failed identically, which was the tell).
+- **The test that is hardest to write is often naming a missing
+  feature.** "Two bots at one table" would not go green, because Gin
+  seats two and the human held one of them. The blocker was not the
+  test: US-124 AC2 ("the host can be a spectator") had simply never
+  been built. The two-bot shape is the ONLY shape that needs it, which
+  is why phase 2 could pass without it.
+- **Ask when an answer contradicts a decision already on the record.**
+  The user's "both limits" answer for what "full" means would have
+  reversed US-42's explicit Gate 1 wording ("a 5th player may still
+  join a table expecting 4"). Surfacing that got a different answer -
+  seats are capped by the preset alone, and spectating is just an
+  option on the join screen - instead of a silent regression.
+- **A new signal can make an existing assertion wrong without making it
+  a failure.** Bots narrate every decision now, so a knock is the LAST
+  talk line rather than the only one. Two suites asserted "the only
+  one"; both were updated to assert what the feature now means, not
+  worked around with a filter.

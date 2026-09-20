@@ -216,6 +216,10 @@ export const PRESETS = [
     numDecks: 1,
     jokers: 0,
     cardsPerPlayer: 10,
+    // D141 (US-124): Gin is two-handed - a third person at the table
+    // watches. The only capacity limit in the app; every other preset
+    // leaves it unset and seats everyone.
+    playerLimit: 2,
     tableZone: true,
     // *nit (direct user request): no discard pile - this game doesn't
     // use one. The generic shared Table zone covers whatever ad hoc

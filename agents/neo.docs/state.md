@@ -1,71 +1,22 @@
 # Agent State
 
-## Current Task (2026-09-19) - make jev-player: DONE, verified
+## Current Task (2026-09-20) - Sprint "Jev at the table": ALL 8 PHASES DONE
 
-`bobp make jev-player GAME=gin STRATEGY=<name> CODE=<code> [FIRST] [HANDS]` ->
-tools/jevPlayer.mjs (CLI, GAMES map) -> tools/gin/player.mjs `play()` (was
-runner.mjs; throws UsageError -> exit 2, else exit 1). gin-bot target/npm script
-removed. Player name = strategy name (user). tests/jevPlayer.test.js (4). Unit
-913, lint-js clean, live join verified. Uncommitted.
+Shipped US-121..124 / D141-D146. New: src/botOffers.js, src/botThoughts.js,
+src/cardMotion.js, src/playerColors.js, tools/botRequests.mjs,
+src/components/ThoughtBubble.js, src/components/AddBot.js; state.js gained
+players[].role, gameConfig.playerLimit, dealtThisGame and a lastTouch
+stamp derived in reduce(). Browser suites: spectator/addbot/thoughts/
+motion (+ gin and uiActions/rtg updated).
 
-## Current Task (2026-09-19) - *fix Gin discards: DONE, reviewed
+Two traps worth remembering:
+- A component that hides itself: assert getClientRects(), never
+  el.hidden - `display: flex` beats the hidden attribute.
+- position: fixed inside #zones is fixed to the ZOOM BOX, not the
+  viewport: an overlay must move to body (focus-zoom's precedent).
 
-User reversed "strike": zone bigger + tighter pile. `tableSpread` preset field ->
-main.js configsForPreset -> createInitialState applies it to the Table pile via
-applyDeclaration. Gin: tableSpread 0.7, own layout (table-zone x60 w760, score
-x840). lint:design: MID_HAND_DISCARDS {Gin Rummy: 30} + pile-inside-zone check.
-tools/gin/examples.mjs split -> CLI + exampleStates.mjs (lint). Unit 909, lint-js
-+ lint-design clean. Uncommitted.
-
-## Current Task (2026-09-19) - US-120 Phases 1-4 DONE (80%), code complete
-
-tools/gin/{cards,observe,rules,judgments,strategies,bot,runner,examples}.mjs;
-table talk (D138) src/tableTalk.js + <table-talk>; harness hostTable/joinTable/
-dealTable/waitForSeat/say/talk; MCP game_join/gin_turn/player_say/player_talk;
-make gin-bot / test-gin. Last green: unit 907 (+ginExamples), multiplayer 5,
-gin 1, MCP 12, lint clean. After restart with key: live check one Jev request
-(`node tools/gin/examples.mjs`), then live `bobp make gin-bot CODE=.. STRATEGY=equilibrium`.
-
-## Current Task (2026-09-18) - *fix harness-mcp usability: DONE, handed to Trin
-
-From Smith's 1-player `*user test harness-mcp`:
-- `.mcp.json` arg `${CLAUDE_PROJECT_DIR}/tools/...` -> `tools/mcp/harnessServer.mjs`
-  (var is unset for MCP servers; `claude mcp get recard-harness` now Connected).
-- `game_status` returns `piles: [{id,name,kind,cards}]` from the host view.
-- `errorText()` in harnessServer.mjs: first line, `page.X: (Error: )?` stripped.
-- `player_wait` catches Playwright TimeoutError -> "Timed out after Nms waiting
-  for <predicate> - <path> is now: <json>" (cause attached).
-- tests/harnessMcp.browser.mjs: launches from .mcp.json with CLAUDE_PROJECT_DIR
-  unset (was red = same Connection closed) + 3 new tests. 10/10, lint-js clean.
-- D136 amended in docs/DECISIONS.md.
-
-## Current Task (2026-09-18) — US-119 Harness MCP server
-
-Sprint plan: root `task.md` ("Harness MCP Server — US-119"), arch
-`agents/morpheus.docs/harness_mcp_arch.md`. User gate: MCP SDK + zod
-devDeps OK; screenshots inline + saved contact sheet; WebRTC exposure
-READ-ONLY traffic log (no raw send); headless only; DOM query stays a
-tool (`player_query`) - user reminder mid-sprint.
-
-- Phase 1 DONE: `src/trafficLog.js` (pure bounded log, entries
-  `{seq, at, direction, peer, type, message}`, unit-tested) fed by every
-  `Session` send/receive; `window.__recardHarness.traffic({type, limit})`.
-  Session traffic itself is only exercised live - Phase 2's MCP test
-  must assert `player_traffic` returns real action/state entries.
-- Phase 2 DONE: `tools/mcp/harnessServer.mjs` (game_start/status/stop,
-  player_act/view/wait/query/traffic; named players host/guestN; every
-  tool error -> isError, server survives), registered in `.mcp.json` as
-  `recard-harness` (absolute path), default port 8220 via
-  RECARD_HARNESS_PORT. `tests/harnessMcp.browser.mjs` 5/5 over real
-  stdio (port 8221). Gotcha: `.middle-card` AND its inner `.card` both
-  carry data-pileable-id - scope DOM selectors to the wrapper.
-
-Earlier this day (committed, ef9d641/b26ae52): US-118 harness (D135,
-`submitAction` funnel) and the old-failing-tests cleanup (focus-zoom
-z-index 19, New Game button row, stale tests mutation-proved).
-- Phase 3 DONE: `screenshot` tool + contact sheet. Sprint shipped (D136).
-  Full regression green (check 863, ui 20, rtg 16, hostsetup 7, newgame 5,
-  tablezoom 7, focuszoom 11, multiplayer 4, harness-mcp 7).
+## Next Steps
+Nothing assigned. Backlog in docs/BACKLOG.md.
 
 ## Context
 

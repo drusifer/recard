@@ -244,10 +244,26 @@ const spreadOf = () => handRow().evaluate((row) => row.querySelector('.card-stac
 // pileable is positioned from its own index within its stack - so the
 // honest question is how far apart two neighbours sit on screen. That
 // is also the property a player can see, which a margin never was.
-const gapPx = () => handRow().evaluate((row) => {
+// US-123/D144: cards TRAVEL to their new place now, so a geometry read
+// taken the instant after a change is a read of a card in mid-flight.
+// `gapPx` waits for the row's geometry to STOP changing before it
+// measures - cards legitimately carry transforms of their own (fanning,
+// rotation), so "no transform" is not the question; "has it arrived" is.
+const rawGap = () => handRow().evaluate((row) => {
   const [first, second] = row.querySelectorAll('.middle-card');
   return second.getBoundingClientRect().x - first.getBoundingClientRect().x;
 });
+const gapPx = async () => {
+  let previous = await rawGap();
+  for (let attempt = 0; attempt < 20; attempt++) {
+    await fixture.page.waitForTimeout(60);
+    const current = await rawGap();
+    if (Math.abs(current - previous) < 0.01) return current;
+    previous = current;
+  }
+  return previous;
+};
+
 // The slider's own internal `<input type=range>` (`SpreadSlider.js`) -
 // a HIGHER value means MORE overlap (tighter, smaller gap), a LOWER
 // value means LESS overlap (looser, bigger gap): `ChipPile`'s own

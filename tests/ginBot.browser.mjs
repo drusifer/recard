@@ -70,14 +70,18 @@ test('a bot joins a hosted Gin table, draws, and knocks face down with a table-t
   }, knock.decision.cardId);
   assert.equal(hostView.piles.find((pile) => pile.id === `hand:${botId}`).cards.length, 10);
 
-  // ...and hears it: the line is the bot's, by its seat name.
-  const [line] = await hosted.host.waitForTalk(1);
+  // ...and hears it: the line is the bot's, by its seat name. US-121:
+  // every decision is narrated now, so the knock is the LAST line, not
+  // the only one - the draw that set it up spoke first.
+  const talk = await hosted.host.waitForTalk(1);
+  const line = talk.at(-1);
   assert.equal(line.name, BOT_NAME);
   assert.match(line.text, /^Knock! /);
   assert.equal(line.data.declare, 'knock');
   assert.ok(line.data.deadwood <= 5);
+  assert.equal(line.data.kind, 'bot-decision', 'the decision record rides the same line (D142)');
   const shown = await hosted.host.query(['table-talk .talk-line']);
-  assert.match(shown['table-talk .talk-line'][0].text, /^Bot \(knock-early\): Knock! /);
+  assert.match(shown['table-talk .talk-line'].at(-1).text, /^Bot \(knock-early\): Knock! /);
 
   const after = await bot.step();
   assert.equal(after.phase, 'hand-over');

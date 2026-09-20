@@ -1,5 +1,28 @@
 # Agent State
 
+## Current Task (2026-09-19) - Sprint "Jev at the table": architecture DONE
+
+US-121..124 (Smith Gate 1 approved w/ 4 conditions, docs/USER_STORIES.md).
+Architecture = D141-D144 in docs/DECISIONS.md:
+- D141 spectator role on `state.players[].role`; only seating/deal/scores
+  filter; no hand pile or seat zone; host downgrades to spectator when
+  full (expectedPlayers OR new per-preset `playerLimit`, Gin=2) or
+  `dealtThisGame`; reason derivable client-side (Gate 1 cond 2).
+- D142 `<thought-bubble>` renders the D138 talk log filtered by sender;
+  bot posts text + `data` = decision record. Click to open, click
+  OUTSIDE to close, NOT pointerleave (Gate 1 cond 1); reuses
+  focusZoom.js clamp math only.
+- D143 `jev-ready` / `spawn-bot` / `spawn-bot-result` talk `data`
+  messages; supervisor (player.mjs) spawns; in-flight state required.
+- D144 FLIP motion derived from renders (no wire traffic), state-level
+  `lastTouch {by,pileableIds,seq}`, local fade timers ~1.5s, derived
+  `playerColors.js` from player index; only Pileables.
+
+## Next Steps
+Smith Gate 2, then Mouse phases (1-3 tasks each). Suggested phase order:
+spectator role -> add-bot -> bubble -> animation/glow (US-124+122 give
+the user's goal first, per Smith's non-blocking note).
+
 ## Current Task (2026-09-19) - US-120 reviews: all APPROVED, shipped
 
 Approved: tableSpread preset field (declarative, via applyDeclaration);

@@ -1,5 +1,16 @@
 # Agent State
 
+## Current Task (2026-09-19) - Sprint "Jev at the table" planned
+
+8 phases in task.md (US-121..124, D141-D144), 2-3 tasks each:
+1 spectator model, 2 joining as spectator, 3 jev-player spawn protocol,
+4 Add Jev bot UI, 5 bots narrate decisions, 6 <thought-bubble>,
+7 player colours + lastTouch, 8 motion + glow. Ordered so a watchable
+bot-vs-bot table exists by Phase 4.
+
+## Next Steps
+Track phase completion in task.md as Neo/Trin/Morpheus close each one.
+
 ## Current Task (2026-09-19) - US-120 SHIPPED; session closed
 
 All US-120 phases done + pushed: 43a958b (Gin Jev players, table talk,

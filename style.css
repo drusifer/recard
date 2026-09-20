@@ -1659,6 +1659,14 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 
 
+/* US-124: a spectator is on the roster but has no seat in the ring -
+   drawn as a plain row, quieter than a seat, and never absolutely
+   positioned (renderRoster passes `seated: false` for them). */
+.roster-player.roster-spectator {
+  opacity: 0.8;
+  font-style: italic;
+}
+
 /* Seats (roster rows) positioned around the table surface's edge instead
    of stacked in a plain list - same content as the pre-redesign roster
    list, just relocated (Smith Gate 1: WHERE it's drawn changes, not
@@ -3297,6 +3305,96 @@ table-talk {
   color: var(--text);
   font-size: 13px;
 }
+/* US-123/D144: what was just touched glows in the colour of whoever
+   touched it, and fades out on its own in about a second and a half
+   (the user's "a second or two"). Colour is the primary "who" cue, not
+   the only one - names stay on every seat (Gate 1 condition 4). The
+   animation is cosmetic: it never blocks a pointer. */
+@keyframes just-touched-fade {
+  from { box-shadow: 0 0 0 3px var(--touch-color, #f2b134), 0 0 12px 4px var(--touch-color, #f2b134); }
+  to { box-shadow: 0 0 0 0 transparent, 0 0 0 0 transparent; }
+}
+.just-touched {
+  animation: just-touched-fade 1.5s ease-out forwards;
+  pointer-events: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .just-touched { animation-duration: 0.01ms; }
+}
+
+/* US-124: the host's own "watch only" option on the create screen. */
+.checkbox-row { display: flex; align-items: center; gap: 6px; }
+
+/* US-121/D142: a bot's thought bubble, on its seat. Collapsed it is one
+   line; expanded it is a fixed panel holding the whole history, placed
+   with the focus-zoom clamp so a seat at the table's edge still shows
+   it fully. It closes on a click OUTSIDE, never on pointerleave - it
+   scrolls, and a pointer-close would snatch it away mid-read. */
+thought-bubble { display: block; margin-top: 2px; }
+.thought-summary {
+  max-width: 18rem;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+.thought-open .thought-summary { border-color: var(--text); }
+.thought-panel {
+  position: fixed;
+  z-index: 60;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  text-align: left;
+  cursor: auto;
+}
+/* `hidden` must beat the panel's own `display: flex` - without this the
+   whole history renders inline, unplaced, before anyone clicks it
+   (found by LOOKING at the table, not by a test: the tests asserted the
+   `hidden` PROPERTY, which was correct all along). */
+.thought-panel[hidden] { display: none; }
+.thought-entry { display: flex; flex-direction: column; gap: 2px; border-top: 1px solid var(--border); padding-top: 6px; }
+.thought-entry:first-child { border-top: 0; padding-top: 0; }
+.thought-move { font-weight: 600; }
+.thought-considered, .thought-facts, .thought-jev-help { color: var(--muted); }
+.thought-hand { overflow-wrap: anywhere; }
+
+/* US-122: sits directly above table talk, in the same corner and the
+   same panel language - it is part of the same conversation with the
+   Jev player, and it is hidden entirely unless one is there (D143). */
+add-bot {
+  position: fixed;
+  left: 12px;
+  bottom: 232px;
+  z-index: 50;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+}
+add-bot[hidden] { display: none; }
+.add-bot-heading { margin: 0; font-size: 12px; color: var(--muted); }
+.add-bot-row { display: flex; gap: 6px; }
+.add-bot-strategy { flex: 1; min-width: 0; }
+.add-bot-status { margin: 0; color: var(--muted); overflow-wrap: anywhere; }
+
 .talk-heading { margin: 0; font-size: 12px; color: var(--muted); }
 .talk-log { margin: 0; padding: 0; list-style: none; max-height: 140px; overflow-y: auto; }
 .talk-line { overflow-wrap: anywhere; }
