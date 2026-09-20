@@ -6,9 +6,10 @@
  * paths just fine, so this is a copy, not a transform. Contrast with
  * tools/buildStandalone.mjs, which exists only because file:// can't.
  */
-import { cp, rm, mkdir } from 'node:fs/promises';
+import { cp, rm, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildStandaloneHtml } from './buildStandalone.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = path.join(ROOT, 'dist');
@@ -20,6 +21,10 @@ export async function buildDistribution() {
   await mkdir(DIST, { recursive: true });
   await Promise.all(ENTRIES.map((entry) =>
     cp(path.join(ROOT, entry), path.join(DIST, entry), { recursive: true })));
+  // The single-file `file://` bundle ships alongside the deploy folder,
+  // because this function CLEARS dist/ first - a bundle built into it
+  // separately would simply vanish on the next `make dist`.
+  await writeFile(path.join(DIST, 'recard-standalone.html'), await buildStandaloneHtml());
   return DIST;
 }
 

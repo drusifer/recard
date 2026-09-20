@@ -35,7 +35,7 @@ help:
 	@echo "  art          pack generated art into assets/cards/rtg/*.webp"
 	@echo "  check        cards + test + lint-decks + secrets  (full gate)"
 	@echo "  dev          dev server"
-	@echo "  build-standalone  bundle everything into build/recard-standalone.html (runs via file://)"
+	@echo "  build-standalone  bundle everything into dist/recard-standalone.html (runs via file://)"
 	@echo "  dist         gather index.html/style.css/src/assets into dist/ for a static host upload"
 	@echo "  check-decisions  verify docs/DECISIONS.md's modern section is newest-first, no duplicate D-numbers"
 	@echo "  check-story-numbers  verify docs/USER_STORIES.md has no duplicate US-numbers"

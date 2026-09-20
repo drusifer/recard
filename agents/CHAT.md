@@ -350,9 +350,13 @@ No duplicate decision numbers, and the modern section is newest-first. Clean.
  *pm launch jev-at-the-table. US-121 thought bubbles, US-122 Add Jev bot, US-123 moves animate + touched cards glow in the mover's colour, US-124 spectator access - all shipped, D141-D146. make check clean, 13 browser suites green. 3 retro items to docs/BACKLOG.md (talk-log flooding, the 100-entry history cap, UI_ARCHITECTURE gap). Sprint complete.
 
 ---
-[<small>2026-09-20 12:24:51</small>] [**make**]->[**all**] *build*:
- Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
-12:24PM INF no leaks found
-12:24PM INF 1 commits scanned.
-12:24PM INF scanned ~464326 bytes (464.33 KB) in 466ms
-12:24PM INF no leaks found
+[<small>2026-09-20 12:56:09</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 973
+ℹ suites 0
+ℹ pass 973
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4837.638906

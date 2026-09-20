@@ -22,7 +22,10 @@ import { fileURLToPath } from 'node:url';
 import esbuild from 'esbuild';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const OUT = path.join(ROOT, 'build', 'recard-standalone.html');
+// dist/ (gitignored), beside `make dist`'s deploy folder - a build
+// artifact does not belong in the repo, and the old tracked copy under
+// build/ only ever showed up as a dirty file nobody meant to commit.
+const OUT = path.join(ROOT, 'dist', 'recard-standalone.html');
 
 async function walkFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
