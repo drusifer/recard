@@ -57,12 +57,17 @@ test('every path in every shipped strategy resolves against a real projected sta
   }
 });
 
-test('a strategy asks about every candidate slot, so no turn is half-judged', () => {
+test('a slot question is ONE question over the candidates, not one per card', () => {
   for (const name of listStrategies()) {
-    const ids = Object.keys(loadStrategy(name).questions);
-    const slots = ids.filter((id) => /^candidate_\d+_/.test(id));
-    const distinct = new Set(slots.map((id) => id.match(/^candidate_(\d+)_/)[1]));
-    assert.equal(distinct.size, CANDIDATE_SLOTS, `${name} covers ${distinct.size} slots, not ${CANDIDATE_SLOTS}`);
+    const { questions } = loadStrategy(name);
+    assert.ok(Object.keys(questions).length <= 6,
+      `${name} has ${Object.keys(questions).length} questions - a file this repetitive is a template, not a strategy`);
+    for (const [id, question] of Object.entries(questions)) {
+      assert.doesNotMatch(id, /_\d+$/, `${id} is a per-card copy; ask one Choice over the slots instead`);
+      if (question.type !== 'choice') continue;
+      // Every slot is an option, so no turn is half-judged.
+      assert.equal(Object.keys(question.criteria).length, CANDIDATE_SLOTS, `${name}.${id}`);
+    }
   }
 });
 

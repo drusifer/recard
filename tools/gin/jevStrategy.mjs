@@ -15,15 +15,14 @@ export function questionsFor(strategy, state) {
   const filled = state.candidates.filter(Boolean).length;
   const asked = {};
   for (const [id, question] of Object.entries(strategy.questions)) {
-    const slot = id.match(/^candidate_(\d+)_/);
-    if (slot && Number(slot[1]) >= filled) continue;
     if (id === 'knock_now' && !state.me.can_knock) continue;
     if (id === 'take_upcard' && (state.me.phase !== 'draw' || !state.upcard)) continue;
-    if (id === 'discard_choice') {
+    if (question.type === 'choice') {
+      // A slot question is ONE question over the candidates, and its
+      // options are the slots this turn actually filled: the model
+      // cannot choose an option that is not offered, so it can never
+      // name a card the hand does not hold.
       if (state.me.phase !== 'discard') continue;
-      // Only real slots are offered: the model cannot choose an option
-      // that is not there, and must not be able to choose a card the
-      // hand does not hold.
       asked[id] = { ...question, criteria: Object.fromEntries(
         Object.entries(question.criteria).filter(([key]) => Number(key) < filled)) };
       continue;
@@ -43,11 +42,14 @@ export function questionsFor(strategy, state) {
  */
 export function judgmentsFrom(answers, facts) {
   const threat = answers.opponent_is_close;
+  // One Choice, not one question per card: a Choice's DISTRIBUTION
+  // compares the competing options, so the probability on each slot is
+  // that card's "they want it" reading - the same number eleven Nouls
+  // used to produce, from one question.
   const helps = {};
-  for (const [id, answer] of Object.entries(answers)) {
-    const slot = id.match(/^candidate_(\d+)_helps_opponent$/);
-    const card = slot && facts.discards?.[Number(slot[1])]?.card;
-    if (card) helps[card.id] = answer.noul;
+  for (const [slot, probability] of Object.entries(answers.opponent_wants?.probabilities ?? {})) {
+    const card = facts.discards?.[Number(slot)]?.card;
+    if (card) helps[card.id] = probability;
   }
   if (!threat && Object.keys(helps).length === 0) return null;
   return {

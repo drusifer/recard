@@ -39,8 +39,8 @@ test('a discard turn asks only the questions that apply, and never about an empt
   const asked = questionsFor(strategy, state);
   const filled = state.candidates.filter(Boolean).length;
   assert.equal(filled, 3, 'three real candidates, eight empty slots');
-  assert.equal(Object.keys(asked).some((id) => id.startsWith(`candidate_${filled}_`)), false,
-    'a question about an empty slot would be asked about nothing');
+  assert.equal(Object.keys(asked.opponent_wants.criteria).length, filled,
+    'an empty slot is not offered as an option - a question about nothing');
   assert.ok(asked.discard_choice, 'the move question is there');
   assert.equal(Object.keys(asked.discard_choice.criteria).length, filled, 'only real slots are offered as options');
 });
@@ -147,12 +147,11 @@ test('the record carries the same judgments shape a rule-list strategy does', as
     discard_choice: choice(1, { 1: 0.6, 0: 0.4 }),
     knock_now: noul(0.1),
     opponent_is_close: score(2.4),
-    candidate_0_helps_opponent: noul(0.3),
-    candidate_1_helps_opponent: noul(0.7),
+    opponent_wants: choice(1, { 0: 0.3, 1: 0.7 }),
   });
   const { record } = await decideByQuestions({ strategy, obs: discardObs, facts, judge });
   assert.equal(record.judgments.threat, 2.4);
-  assert.equal(record.judgments.helps[facts.discards[1].card.id], 0.7, 'helps is keyed by card id, like the rule-list shape');
+  assert.equal(record.judgments.helps[facts.discards[1].card.id], 0.7, 'the Choice distribution IS the per-card reading');
   const line = summaryLine({ ...record, iteration: 1, handNumber: 1, trace: [{ rule: 'discard_choice', fired: true }],
     decision: { type: 'discard', cardId: facts.discards[1].card.id, declare: 'none' },
     observation: discardObs, facts: { deadwood: facts.deadwood } });

@@ -530,9 +530,9 @@ gitleaks git --no-banner --redact --pre-commit .
  *pm launch jev-plays-gin. US-125 shipped: a Gin strategy is now a static question file over a fixed state schema (D147) - jev-balanced and jev-cagey, differing only in wording. Project, ask once, act; the move is Jev's Choice over candidate slots; code keeps arithmetic and legality. D148: ginRequest stays while the rule-list strategies are the benchmark. 22 tests, make check clean, test-gin green. 4 items to docs/BACKLOG.md, led by the live hand that needs a key. Sprint complete.
 
 ---
-[<small>2026-09-20 23:02:38</small>] [**make**]->[**all**] *build*:
+[<small>2026-09-20 23:42:26</small>] [**make**]->[**all**] *build*:
  Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
-11:02PM INF no leaks found
-11:02PM INF 1 commits scanned.
-11:02PM INF scanned ~9938 bytes (9.94 KB) in 247ms
-11:02PM INF no leaks found
+11:42PM INF no leaks found
+11:42PM INF 1 commits scanned.
+11:42PM INF scanned ~7334 bytes (7.33 KB) in 250ms
+11:42PM INF no leaks found
