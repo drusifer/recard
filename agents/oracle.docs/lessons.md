@@ -614,3 +614,28 @@ This file contains critical lessons and rules derived from past errors, technica
   true (a hand of 11 fills every candidate slot; a bare field name in
   backticks is not a path). Both looked like implementation bugs for a
   minute. Read the fixture before changing the subject.
+
+## Sprint "RtG plays itself" (2026-09-21): US-127, D151
+
+- **Writing the rules down is the feature.** RtG ships three sentences
+  of rules; the game file states ten, because the three assume
+  conventions they never say. Authoring those (from knowledge, once)
+  rather than referencing them at play time makes the rules auditable -
+  a person can disagree with "attacking taps the creature", which they
+  cannot do with something a model recalled mid-game.
+- **A wrong test premise reads as a bug, again.** The "rules must not
+  defer to another game" test failed on the word "Gathering" - which is
+  in this game's OWN name. Second time this sprint pattern has appeared
+  (see US-125): read the fixture before suspecting the code.
+- **Negations before affirmations, in any yes/no parsing.** "no, you
+  can't" contains "you can". A bot that reads a refusal as permission
+  breaks a rule while believing it had consent, which is worse than any
+  amount of asking again.
+- **The option set is the real constraint.** Rules-as-Nouls are a
+  second line; what makes an illegal move unreachable is that it is not
+  offered. Proved by the test where a 0.99 answer names an option that
+  was never on the list and simply cannot take effect.
+- **Resources end a turn better than a counter would.** The user
+  rejected a step budget ("the budget is inherent in mana cost"), and
+  they were right: the option set shrank to `pass` on its own in live
+  play, one step after the land drop was spent.

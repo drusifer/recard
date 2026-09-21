@@ -11,6 +11,9 @@ import { parseArgs } from 'node:util';
 
 const GAMES = {
   gin: () => import('./gin/player.mjs'),
+  // US-127: RtG plays by the rules in its own game file, so it takes no
+  // strategy name - `rules` is the only one there is.
+  rtg: () => import('./rtg/player.mjs'),
 };
 
 const { values: options } = parseArgs({
@@ -23,6 +26,8 @@ const { values: options } = parseArgs({
     name: { type: 'string' },
     url: { type: 'string' },
     port: { type: 'string', default: '8230' },
+    deck: { type: 'string' },   // RtG: which shared deck pile is my library
+    steps: { type: 'string' },  // RtG: how many decisions this RUN may take
   },
 });
 
@@ -35,6 +40,7 @@ const games = Object.keys(GAMES).join(', ');
 if (!options.game) fail(`pass the game to play: GAME=<${games}> (node: --game)`);
 if (!Object.hasOwn(GAMES, options.game)) fail(`unknown game "${options.game}" - choose one of: ${games}`);
 if (!options.strategy) fail('pass the strategy to play: STRATEGY=<name> (node: --strategy)');
+if (options.game === 'rtg' && options.strategy !== 'rules') fail('rtg plays by its game file: STRATEGY=rules');
 if (!options.code) fail('pass the table code you are hosting: CODE=ABC123 (node: --code)');
 
 const player = await GAMES[options.game]();

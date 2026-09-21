@@ -126,6 +126,15 @@ tools/gin/strategyFile.mjs  loads a question-file strategy; rejects any
 tools/gin/strategies/    question-file strategies, static JSON (D147)
 tools/gin/jevStrategy.mjs  project, ask once, act - no rule list (D147)
 tools/gin/strategyKinds.mjs  one lookup resolving a name to either kind
+tools/rtg/game.json      RtG's rules written out in full + the named
+                          constraints that judge a proposed move (D151)
+tools/rtg/gameFile.mjs   loads a game file; a constraint must cite a
+                          rule the game actually states
+tools/rtg/playState.mjs  the RtG projection; mana and costs in CODE
+tools/rtg/options.mjs    the legal next actions, from resources
+tools/rtg/decide.mjs     ask what next, check it against the rules, act
+tools/rtg/table.mjs      hearing the table: announcements, asking, answers
+tools/rtg/player.mjs     the RtG runner (`make jev-player GAME=rtg`)
 
 src/pileables/           the Pileable -> Stackable -> Card/Chip/Token hierarchy
 src/piles/               the Pile -> Stack (+ every derived pile KIND) hierarchy

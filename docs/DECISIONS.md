@@ -70,6 +70,47 @@ D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rul
 
 ---
 
+### D151. A game is a rules file; the turn is emergent; the table is asked
+
+US-127. RtG's rules live in `tools/rtg/game.json` beside the Gin
+strategies' files, with three parts:
+
+- **`rules`** - the game written out in full, authored now (Magic
+  knowledge used at AUTHORING time, per the user: "research it now, not
+  during a game"). Every convention RtG's three sentences assume is
+  stated explicitly, so a human can check the file against how the game
+  is really played, and play never depends on what the model recalls.
+- **`constraints`** - one named Noul each, judging a PROPOSED move
+  against `rules` by path. They judge timing and permission only: mana,
+  costs and life are computed by code (`parseManaCost`, the Score
+  panel) and arrive as state.
+- **`step`** - the emergent flow. One `__step__` Choice asked
+  repeatedly, whose options are the legal next actions and whose
+  criteria carry the game's own description of each.
+
+**No turn order is coded, and nothing counts steps.** Every action
+consumes something - a tapped land, the one land drop, a creature's
+untapped state - so the option set shrinks and a turn ends when only
+"pass" remains. Code computes that option set from resources; the
+sequence is whatever the model walks.
+
+**Being drawn in is heard, not signalled.** Recard has no priority
+mechanism, so the bot acts on table talk (D138): an announcement draws
+it into blocking, responding or taking damage. When the table is silent
+and the state moved in a way that might involve it, the bot ASKS -
+"are you attacking?" - and waits. When a constraint comes back
+unconvinced, it asks too, and abides by the answer. A bot is never
+allowed to be silently stuck (Smith, Gate 1).
+
+**Rejected:** a step budget (the user's own correction - mana already
+limits a turn, and a counter would end legal turns early); coded phase
+order (the flow is the thing being tested); referencing Magic at play
+time (rules that exist only in the model cannot be audited or argued
+with); thresholding an uncertain rule reading (asking is what a person
+at the table would do).
+
+---
+
 ### D150. A strategy is a read, then a move: two questions, personality in the criteria
 
 US-126, direct user direction ("I want to really lean on typesafe for

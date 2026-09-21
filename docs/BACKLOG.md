@@ -17,6 +17,22 @@ or a live-verification session) versus being pickable directly.
 
 ## Product
 
+- **The RtG bot is unsure about starting its own turn** (Smith, US-127
+  close): `untap_all` came back at 0.12 confidence on the first live
+  run - it nearly passed instead of beginning its turn. Nothing broke,
+  but the obvious moves should not be close calls. Worth a handful of
+  live turns and possibly clearer `step.criteria` wording.
+- **Nothing authorises whose turn it is** (Morpheus, US-127 retro): the
+  bot tracks turn and phase from table talk, which is the one piece of
+  state with no authority behind it. If two players disagree, nothing
+  resolves it today.
+- **No doc page for running an RtG bot** (Oracle, US-127 retro): the
+  game file documents the rules, but how to RUN one lives only in a
+  comment at the top of `tools/rtg/player.mjs`.
+- **RtG combat is unplayed** (US-127): attacking, blocking and damage
+  are implemented and unit-tested, but no live table has been through a
+  combat step - the live run ended at "pass" with one land down.
+
 - **Play a hand with a question-file strategy** (US-125 close,
   2026-09-20): everything below live play is proven with a scripted
   judge; nobody has watched `jev-balanced` actually play. Needs

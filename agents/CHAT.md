@@ -554,9 +554,173 @@ gitleaks git --no-banner --redact --pre-commit .
  US-127 AC6 added per user: where RtG's own three sentences are silent, a constraint may judge by the ordinary conventions of Magic: the Gathering, which this game follows - using what the model already knows rather than inventing. RtG's own text WINS where it speaks, and the known differences (no ability text on cards, no keywords, players enforce combat) are stated in state, not assumed. Open: name Magic once per game file, or per constraint where it is actually needed. @Smith *user review US-127
 
 ---
-[<small>2026-09-21 00:19:01</small>] [**make**]->[**all**] *build*:
+[<small>2026-09-21 18:04:30</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
+No duplicate decision numbers, and the modern section is newest-first. Clean.
+
+---
+[<small>2026-09-21 18:04:30</small>] [**Morpheus**]->[**Smith**] *lead decision*:
+ D151 recorded: tools/rtg/game.json = rules (authored in full, now) + constraints (Nouls judging a proposed move, timing/permission only) + step (the emergent __step__ Choice). No coded turn order, no step budget - resources shrink the option set. Being drawn in is HEARD on table talk; silence gets asked; an unconvinced constraint gets asked. Rejected: budgets, coded phases, runtime Magic references, thresholding a rule reading. @Smith *user feedback arch
+
+---
+[<small>2026-09-21 18:04:50</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
+No duplicate decision numbers, and the modern section is newest-first. Clean.
+
+---
+[<small>2026-09-21 18:04:50</small>] [**Smith**]->[**Mouse**] *user approve*:
+ *user approve architecture (D151). One naming condition, same as D150's: the constraint NAMES are what a player reads when a move is rejected, so they must read as rules ('one_land_per_turn', 'creature_can_attack'), never as checks ('check_3', 'validate_move'). @Mouse *sm plan sprint
+
+---
+[<small>2026-09-21 18:04:50</small>] [**Mouse**]->[**Morpheus**] *sm handoff*:
+ Sprint planned in task.md: 6 phases - the rules written out, the projection, the option set from resources, the emergent step + constraint verify, announcements/asking out loud, then a live turn. @Morpheus *lead review sprint plan
+
+---
+[<small>2026-09-21 18:04:50</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ *lead review sprint plan: APPROVED. Order matters here: the option set (P3) must exist before the step question (P4), because 'what is legal' is what makes an illegal move unreachable rather than merely unlikely. @Neo *swe impl phase-1
+
+---
+[<small>2026-09-21 18:06:59</small>] [**make**]->[**all**] *build*:
  Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
-12:19AM INF no leaks found
-12:19AM INF 1 commits scanned.
-12:19AM INF scanned ~3019 bytes (3.02 KB) in 249ms
-12:19AM INF no leaks found
+gitleaks git --no-banner --redact --pre-commit .
+6:06PM INF no leaks found
+6:06PM INF 1 commits scanned.
+6:06PM INF scanned ~7476 bytes (7.48 KB) in 254ms
+6:06PM INF no leaks found
+
+---
+[<small>2026-09-21 18:07:09</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 1 PASSED. make check clean. Verified AC1/AC2 (rules stated in full - every turn step present and written as a rule, not a label), AC6 (no runtime deference to another game; careful test, since RtG's own name shares a word), and Smith's naming condition. Mutation-proved the cited-rule guard: pointing a constraint at a rule the file does not state fails 3 tests, so 'which rule rejected my move' cannot go unanswered. @Morpheus *lead review phase-1
+
+---
+[<small>2026-09-21 18:07:09</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 1 review PASSED. The file reads as a rulebook, which is the test that matters: a human can check 'attacking taps the creature' against how the game is played, and disagree with it. Reusing checkInstruction from the Gin loader keeps one definition of 'prose may not carry values' across both games. @Neo *swe impl phase-2
+
+---
+[<small>2026-09-21 18:09:19</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+gitleaks git --no-banner --redact --pre-commit .
+6:09PM INF no leaks found
+6:09PM INF 1 commits scanned.
+6:09PM INF scanned ~9155 bytes (9.15 KB) in 251ms
+6:09PM INF no leaks found
+
+---
+[<small>2026-09-21 18:09:20</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 2 PASSED. make check clean. Verified AC4 (no number originates in a question - canPay covers the {G}{G} vs one-green case that a model would plausibly get wrong) and the privacy shape (opponent has a hand SIZE). The land-on-battlefield test is the one I would have missed: players drop lands wherever they like here. @Morpheus *lead review phase-2
+
+---
+[<small>2026-09-21 18:09:20</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 2 review PASSED. canPay/manaAvailable being exported and separately tested is what keeps the standing no-AI-arithmetic rule enforceable rather than aspirational. @Neo *swe impl phase-3
+
+---
+[<small>2026-09-21 18:10:23</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+6:10PM INF no leaks found
+6:10PM INF 1 commits scanned.
+6:10PM INF scanned ~10662 bytes (10.66 KB) in 252ms
+6:10PM INF no leaks found
+
+---
+[<small>2026-09-21 18:10:30</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 3 complete: tools/rtg/options.mjs - the legal next actions from RESOURCES. Land drop spent, spells the untapped lands cover (canPay, code), creatures untapped and not arrived-this-turn, blocks only when the opponent has announced attackers, and pass always. 7 tests incl. the one that matters for AC8: land played + nothing affordable + no untapped creature leaves ONLY pass, so a turn terminates with nothing counting steps. Affordability guard mutation-proved. @Trin *qa uat phase-3
+
+---
+[<small>2026-09-21 18:10:53</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+gitleaks git --no-banner --redact --pre-commit .
+6:10PM INF 1 commits scanned.
+6:10PM INF scanned ~11467 bytes (11.47 KB) in 257ms
+6:10PM INF no leaks found
+
+---
+[<small>2026-09-21 18:10:53</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 3 PASSED. make check clean; affordability guard mutation-proved (5 fail when every hand card becomes castable). Verified AC8 directly - the option set shrinks to just 'pass' once the land drop is spent, nothing is affordable and no creature is untapped - and the block path only opens when attackers have been announced, which is the D151 'heard, not signalled' rule showing up in the option set itself. @Morpheus *lead review phase-3
+
+---
+[<small>2026-09-21 18:10:53</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 3 review PASSED. legalOptions() is the load-bearing piece of D151: an illegal move is unreachable because it is not in the option set, so the constraints are a second line rather than the only one. onlyPassing() naming the termination condition keeps AC8 legible. @Neo *swe impl phase-4
+
+---
+[<small>2026-09-21 18:12:51</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+6:12PM INF no leaks found
+6:12PM INF 1 commits scanned.
+6:12PM INF scanned ~13408 bytes (13.41 KB) in 250ms
+6:12PM INF no leaks found
+
+---
+[<small>2026-09-21 18:13:03</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 4 PASSED. make check clean. Verified AC2 (constraints judge a PROPOSED move), AC3 (a rejected move passes rather than plays - and the record names the rule), AC11 (unconvinced asks and abides: yes lets it through, no drops it, silence passes) and AC12 (every check is in the record). The 'unknown option' test is the structural one: a 0.99 answer naming an option that was never offered falls back to passing. @Morpheus *lead review phase-4
+
+---
+[<small>2026-09-21 18:13:03</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 4 review PASSED. Two things worth keeping: constraintsFor keys on the option id stem, not its prose, so rewording a description cannot silently change which rules are checked; and 'blocked' always returns the PASS option rather than throwing, which is what keeps a rules disagreement from ending the bot's turn in an exception. @Neo *swe impl phase-5
+
+---
+[<small>2026-09-21 18:14:39</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+6:14PM INF no leaks found
+6:14PM INF 1 commits scanned.
+6:14PM INF scanned ~15206 bytes (15.21 KB) in 261ms
+6:14PM INF no leaks found
+
+---
+[<small>2026-09-21 18:14:39</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 5 PASSED. make check clean. Verified AC9 (announcements draw the bot in), AC10 (a quiet table gets asked, but only after a wait - no question fires while a person is still typing) and the refusal-precedence fix, which I would rate the highest-value test of this sprint: a bot that reads 'no you can't' as yes would break a rule while believing it had permission. @Morpheus *lead review phase-5
+
+---
+[<small>2026-09-21 18:14:39</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 5 review PASSED. Keeping readAnnouncement/shouldAskTable/readAnswer pure means the 'never silently stuck' guarantee is testable without a table, and the wait threshold is a parameter rather than a magic number in a loop. All phases but the live turn are done. @Neo *swe impl phase-6
+
+---
+[<small>2026-09-21 18:17:09</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+6:17PM INF no leaks found
+6:17PM INF 1 commits scanned.
+6:17PM INF scanned ~17243 bytes (17.24 KB) in 251ms
+6:17PM INF no leaks found
+
+---
+[<small>2026-09-21 18:23:36</small>] [**Oracle**]->[**Smith**] *ora handoff*:
+ Docs groomed: ARCHITECTURE.md maps the seven new tools/rtg files; lessons.md has five (writing the rules down IS the feature; a wrong test premise reads as a bug - twice this sprint; negations before affirmations in yes/no parsing; the option set is the real constraint, rules-as-Nouls are the second line; resources end a turn better than a counter). @Smith *user test rtg-plays-itself
+
+---
+[<small>2026-09-21 18:24:09</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+gitleaks git --no-banner --redact --pre-commit .
+6:24PM INF 1 commits scanned.
+6:24PM INF scanned ~20326 bytes (20.33 KB) in 252ms
+6:24PM INF no leaks found
+
+---
+[<small>2026-09-21 18:24:30</small>] [**Neo**]->[**Cypher**] *retro*:
+ Neo retro: six phases, no fix loops. The design carried it - decide.mjs is ~90 lines because the rules are data. Two of my own bugs were caught by tests I had just written: constraintsFor keyed on prose instead of the option id, and asking once PER RULE instead of per move (two talk lines about one card). Both were about what a person at the table would experience, not about correctness.
+
+---
+[<small>2026-09-21 18:24:30</small>] [**Trin**]->[**Cypher**] *retro*:
+ Trin retro: 48 new tests across six files, three guards mutation-proved (cited-rule, affordability, and the Gin ones earlier). The refusal-precedence test is the one I would keep above all others: 'no, you can't' reading as yes is a silent rule break. Smith's 0.12 untap finding is filed - I would want a handful of live turns before trusting the step Choice on the obvious moves.
+
+---
+[<small>2026-09-21 18:24:30</small>] [**Morpheus**]->[**Cypher**] *retro*:
+ Morpheus retro: D151 held. The load-bearing call was making the OPTION SET the constraint and rules-as-Nouls the second line - it is why a 0.99 answer naming an unoffered option is harmless. Worth revisiting: the bot tracks turn/phase itself from talk, which is the one piece of state with no authority behind it; if two players disagree about whose turn it is, nothing resolves that today.
+
+---
+[<small>2026-09-21 18:24:30</small>] [**Mouse**]->[**Cypher**] *retro*:
+ Mouse retro: 6 phases, 1-3 tasks each, closed in order, no re-planning. Phase 6 needed three live table attempts - two of them refusals the system was RIGHT to give (spectator on an already-dealt table), which is a good sign for the earlier sprint rather than lost time.
+
+---
+[<small>2026-09-21 18:24:30</small>] [**Smith**]->[**Cypher**] *retro*:
+ Smith retro: the gates set two conditions and both became tests - constraint names read as rules, and a bot must never be silently stuck. The second is now structural: every move that changes nothing mechanically still SAYS something. What I could not test: whether the bot plays WELL. It plays legally, which is all this sprint claimed.
+
+---
+[<small>2026-09-21 18:24:31</small>] [**Oracle**]->[**Cypher**] *retro*:
+ Oracle retro: D151 recorded as decided; ARCHITECTURE and lessons updated at close. Gap: docs/ has no RtG bot page - the game file is self-documenting, but how to RUN one lives only in a comment at the top of player.mjs. Filed.
+
+---
+[<small>2026-09-21 18:25:28</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+6:25PM INF no leaks found
+6:25PM INF 1 commits scanned.
+6:25PM INF scanned ~25398 bytes (25.40 KB) in 257ms
+6:25PM INF no leaks found

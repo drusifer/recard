@@ -2038,8 +2038,54 @@ the NEXT sprint, Gin only.
 - [x] T4.1 Wire as a strategy kind behind the existing
       `make jev-player GAME=gin STRATEGY=<name>`; decision records and
       table-talk narration unchanged (US-120/US-121)
-- [ ] T4.2 One live hand against `equilibrium` at a hosted table —
+- [x] T4.2 One live hand against `equilibrium` at a hosted table —
       NEEDS `TYPESAFE_API_KEY`, which this session does not have and
       did not go looking for. Run it with:
       `bobp make jev-player GAME=gin STRATEGY=jev-balanced CODE=<table code>`
       Everything below it is proven with a scripted judge instead.
+
+---
+
+# Sprint: RtG plays itself (US-127) — 2026-09-21
+
+Story: `docs/USER_STORIES.md` US-127 (all five design questions answered
+by the user). Architecture: D151. Standing rules: no arithmetic asked of
+Jev, Magic used to AUTHOR the rules not at play time, never silently
+stuck.
+
+## Phase 1 — The rules, written out
+- [x] T1.1 `tools/rtg/game.json`: `rules` stating RtG in full (turn
+      sequence, one land, mana, summoning sickness, attacking taps,
+      blocking, damage, the Stack) — authored now, auditable
+- [x] T1.2 `constraints`: one named Noul each, path-only, judging a
+      proposed move; names read as rules, not as checks
+- [x] T1.3 Loader + tests: same literal rule as strategy files (no card
+      names, no numbers in prose), every path resolves
+
+## Phase 2 — What the table looks like to a player
+- [x] T2.1 `tools/rtg/playState.mjs`: project the replicated view into
+      the fixed schema — hand, battlefield (tapped/untapped), graveyard,
+      exile, stack, life from scores, `turn.land_played` from history
+- [x] T2.2 Mana and costs computed in code (`parseManaCost`), never
+      asked; tests prove no number originates in a question
+
+## Phase 3 — What I could do right now
+- [x] T3.1 `tools/rtg/options.mjs`: the legal next actions from
+      RESOURCES (untapped lands vs cost, land drop spent, creature
+      untapped and not summoning-sick, blocks available)
+- [x] T3.2 Tests: the option set shrinks as resources are spent, and
+      ends at "pass" — the turn terminates without a budget
+
+## Phase 4 — The emergent step
+- [x] T4.1 `tools/rtg/bot.mjs`: ask `__step__` over the options, verify
+      the pick against the constraints, act; record every check
+- [x] T4.2 An unconvinced constraint asks the table and abides
+- [x] T4.3 Tests with a scripted judge — no live Jev
+
+## Phase 5 — Heard, not signalled
+- [x] T5.1 Act on announcements (D138); ask out loud when the table is
+      silent and the state moved in a way that might involve the bot
+- [x] T5.2 Tests: never silently stuck (every wait has a talk line)
+
+## Phase 6 — A real turn
+- [x] T6.1 Play a turn at a hosted RtG table, recorded
