@@ -17,6 +17,22 @@ or a live-verification session) versus being pickable directly.
 
 ## Product
 
+- **Play a hand with a question-file strategy** (US-125 close,
+  2026-09-20): everything below live play is proven with a scripted
+  judge; nobody has watched `jev-balanced` actually play. Needs
+  `TYPESAFE_API_KEY`:
+  `bobp make jev-player GAME=gin STRATEGY=jev-balanced CODE=<code>`.
+- **Tune the question files against played hands** (the user's own
+  sequencing: "+1 for tuning but that comes next"). Needs a bench -
+  bot vs bot over N hands, scored - before any weight or threshold is
+  argued about.
+- **`docs/GIN_STRATEGY.md` still documents only the rule catalogue**
+  (Oracle, US-125 retro): no mention of question-file strategies or
+  the fixed state schema.
+- **Retire the rule-list strategies** (D148): `ginRequest()`,
+  `askJev()` and `strategies.mjs` go together, in the sprint that
+  retires the benchmark - not before.
+
 - **Bot decisions flood table talk** (Smith's gate, 2026-09-20, US-121):
   every bot decision is now a talk line, so three decisions buried the
   humans' own conversation under four lines. The thought bubble already

@@ -19,7 +19,7 @@ import { z } from 'zod';
 import { TypeSafeClient } from '@typesafe-ai/sdk';
 import { launchChromium, startStaticServer, createTable, joinTable } from '../../tests/harness/multiplayer.mjs';
 import { GinBot, summaryLine } from '../gin/bot.mjs';
-import { STRATEGIES } from '../gin/strategies.mjs';
+import { resolveStrategy, allStrategyNames } from '../gin/strategyKinds.mjs';
 
 const PORT = Number(process.env.RECARD_HARNESS_PORT ?? 8220);
 const SCREENSHOT_ROOT = process.env.RECARD_SCREENSHOT_DIR
@@ -136,14 +136,13 @@ server.registerTool('gin_turn', {
   description: 'Gin Rummy bot (US-120): wait (bounded) for this player\'s move, then make ONE decision with the named strategy - code rules plus live Jev judgments for Jev strategies (needs TYPESAFE_API_KEY) - and act it out. Returns the typed record: observation, facts, judgments, rules fired, decision, actions, announcement.',
   inputSchema: {
     player: playerName,
-    strategy: z.string().describe(`one of: ${Object.keys(STRATEGIES).join(', ')}`),
+    strategy: z.string().describe(`one of: ${allStrategyNames().join(', ')}`),
     firstPlayer: z.enum(['bot', 'opponent']).default('bot').describe('who draws first in a hand'),
     waitMs: z.number().int().positive().max(600_000).default(30_000).describe('how long to wait for this player\'s move'),
   },
 }, tool(async ({ player: name, strategy: strategyName, firstPlayer, waitMs }) => {
   const peer = player(name);
-  const strategy = STRATEGIES[strategyName];
-  if (!strategy) throw new Error(`Unknown strategy "${strategyName}" - choose one of: ${Object.keys(STRATEGIES).join(', ')}`);
+  const strategy = resolveStrategy(strategyName);
   let entry = game.bots.get(name);
   if (entry && entry.strategy !== strategyName) throw new Error(`"${name}" is already playing ${entry.strategy} - one strategy per player per game`);
   if (!entry) {

@@ -1008,7 +1008,11 @@ const ACTIONS = {
       const newCards = dealt[index].map((card) => toHandCard(card, p.ownerId));
       return withCards(p, [...(isFresh ? [] : p.cards), ...newCards]);
     });
-    return { ...state, piles, dealtThisGame: true };
+    // A deal of ZERO cards is a table being SET UP, not a game starting
+    // - found by running it live (US-125): the harness stands a table up
+    // that way, and treating it as started silently demoted the next
+    // joiner to spectator, so a bot joining to play was never dealt in.
+    return { ...state, piles, dealtThisGame: state.dealtThisGame || action.cardsPerPlayer > 0 };
   },
 
   // D45: `action.kind` lets a host create any table-side pile TYPE, not

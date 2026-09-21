@@ -1,22 +1,23 @@
 # Agent State
 
-## Current Task (2026-09-20) - Sprint "Jev at the table" LAUNCHED
+## Current Task (2026-09-20) - US-125 LAUNCHED
 
-US-121 (bot thought bubbles), US-122 (Add Jev bot from the table),
-US-123 (moves animate, touched Pileables glow in the mover's colour),
-US-124 (spectator access, incl. a spectating HOST) all shipped.
-Decisions D141-D146 (docs/DECISIONS.md). 8 phases, no fix loops.
-User answers that shaped it: spectating is an option on the join screen
-(US-42's "start automatically at N" stays a START trigger, NOT a seat
-cap - the earlier "either limit" answer was revised when the conflict
-surfaced); everyone sees every bubble in full detail; glow tinted by
-player colour; Pileables only; "a second or two" (1.5s).
+"Jev plays Gin" shipped. A Gin strategy is now a static question file
+(`tools/gin/strategies/*.json`) over a fixed state schema projected from
+the replicated view (D147). Two strategies - jev-balanced, jev-cagey -
+differing only in wording. The move is Jev's Choice over 11 candidate
+slots; code keeps arithmetic and legality. D148: ginRequest/askJev/
+strategies.mjs stay while the rule-list strategies are the benchmark,
+and retire together when it does.
+
+NOT done, on purpose: a live hand (needs TYPESAFE_API_KEY, which this
+session did not have and did not go looking for). Everything below live
+play is proven with a scripted judge.
 
 ## Next Steps
-Backlog (docs/BACKLOG.md) gained 3 items from this sprint: bot decisions
-flooding table talk (Smith's filing - a product call, deliberately not
-fixed in-sprint), the 100-entry cap on a bubble's history, and the
-missing UI_ARCHITECTURE entries for the 3 new components.
+Backlog (docs/BACKLOG.md), in the user's own order: play a live hand,
+then build a bench (bot vs bot over N hands, scored), then tune. Also
+filed: GIN_STRATEGY.md documents only the rule catalogue.
 
 ## Context
 ### Recent Decisions

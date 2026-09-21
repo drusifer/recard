@@ -70,6 +70,109 @@ D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rul
 
 ---
 
+### D148. `ginRequest()` stays while the rule-list strategies are the benchmark
+
+US-125, phase 4. The sprint plan said to delete `ginRequest()`'s
+per-turn question assembly once the question-file path covered it, per
+the standing no-back-compat rule. It is not deleted, because it is not
+a shim: `ginRequest()` is how the D137 rule-list strategies ask their
+questions, and those strategies are the benchmark the question files
+have to beat - the exception US-125 states in its own scope. Deleting
+it now would remove the comparison, not the duplication.
+
+What was avoided instead is the thing the rule actually forbids: two
+ways to reach the same place. `strategyKinds.mjs` is ONE lookup that
+resolves a name to either kind, so the runner, the MCP and the tests
+all offer both without any caller knowing which is which - no alias, no
+flag, no wrapper.
+
+`ginRequest()`, `askJev()` and `strategies.mjs` retire together, in the
+sprint that retires the benchmark.
+
+**Rejected:** deleting it now (loses the benchmark mid-experiment);
+keeping a `useQuestions` flag on the old path (exactly the switchable
+back-compat the rule exists to prevent).
+
+---
+
+### D147. A Gin strategy is a static question file over a fixed state schema
+
+US-125, direct user direction. The Gin bot's strategies are ordered
+lists of code rules today (D137), with the Jev request assembled per
+turn by `ginRequest()` - card names and computed numbers interpolated
+into instruction strings. That is backwards for two reasons the user
+named: the decision belongs to Jev ("use typesafe logic to play"), and
+"the field names should not be parameters; the values should be
+parameters."
+
+So, following the TypeSafe Playground's own shape:
+
+- **One fixed state schema**, the same field names every turn:
+  `rules`, `me` (hand/melds/deadwood/can_knock), `candidates[]` (each
+  with its `card` and computed `deadwood_after`), `opponent`
+  (hand_size/discarded/took_from_discard), `stock`, `upcard`. Code
+  fills it; only values change.
+- **A strategy is a static JSON file of questions**, never rebuilt per
+  turn. Instructions reference state ONLY by path -
+  `candidates[0].card`, `opponent.took_from_discard`, `me.deadwood` -
+  exactly as the Playground example asks about
+  `trace.tool_calls[1].arguments.unit`. No card name, rank, suit or
+  number ever appears in a question. Per-candidate questions occupy
+  fixed indexed slots; code ignores slots this turn's state left empty.
+- **Code keeps arithmetic and legality** (standing user rule, from
+  D137 and restated here): `cards.mjs`/`rules.mjs` compute melds,
+  deadwood, the candidate list and what is legal, and those arrive as
+  state. A question may cite a computed value by path; it may never be
+  asked to derive one, and a question about an illegal move is not
+  asked at all.
+
+**The state is mapped, not modelled** (direct user direction: "use the
+existing state representation that we have with the webrtc/local
+storage stuff we already built"). Every field above is a rename of
+something the peer already holds: the replicated `viewFor` payload
+(hands, piles, stock, players), `observe.mjs`'s tracker over successive
+views for the opponent's public history, `computeFacts` for the exact
+numbers, and D144's `lastTouch` for who moved what. The builder is a
+projection into the fixed schema - it introduces no second source of
+truth, replicates nothing new, and reads nothing from disk.
+
+Extending those layers is expected where the projection needs something
+they do not carry yet (a move log, for instance) - the rule the user
+set is DRY, not "touch nothing": extend the shared layer so every
+caller gains it, never keep a private copy in the bot. And per the
+standing project rule, whatever this supersedes is deleted with its
+tests - `ginRequest()`'s per-turn question assembly first - never
+aliased or left switchable. The rule-list strategies survive only as
+long as they are the benchmark.
+
+**Consequences.** Writing a strategy is writing questions: two
+strategies differ only by their question file, and that diff reads as a
+difference in play style. Nothing interpolates, so a strategy is
+reviewable and diffable as a document. A value exists once, in state,
+so prose can never drift from fact.
+
+**The runner** (Gate 1's answers, D147 amended): a strategy file is
+`{ questions: {...} }` with 11 fixed candidate slots. One request per
+decision sends the projected state plus every question in the file;
+answers for slots this turn's state left empty are discarded. The move
+comes from a Choice over the slots (`discard_choice`), not from weights
+in code, and `knock_now`/`take_upcard` Nouls decide the declarations.
+Code's whole remaining job is: project the state, filter the options to
+the legal ones, send, read `choice`, act. The record keeps the winning
+slot AND the distribution, so the bubble can say why one card beat
+another (Gate 1 condition).
+
+**Rejected:** generating the questions per turn from the candidate list
+(what `ginRequest()` does today - it puts values in two places and
+makes the prompt unreviewable); embedding computed numbers in
+`criteria` text ("Leaves 5 deadwood") - the same drift, plus it asks
+the model to compare arithmetic read out of sentences; asking Jev to
+compute melds or deadwood (exact combinatorics, free and perfect in
+code); deleting the rule-list strategies - they stay as the benchmark
+this has to beat.
+
+---
+
 ### D146. Travel is animated with the Web Animations API, and browser tests run with reduced motion
 
 US-123, found while building Phase 8. The first implementation wrote

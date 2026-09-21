@@ -350,13 +350,189 @@ No duplicate decision numbers, and the modern section is newest-first. Clean.
  *pm launch jev-at-the-table. US-121 thought bubbles, US-122 Add Jev bot, US-123 moves animate + touched cards glow in the mover's colour, US-124 spectator access - all shipped, D141-D146. make check clean, 13 browser suites green. 3 retro items to docs/BACKLOG.md (talk-log flooding, the 100-entry history cap, UI_ARCHITECTURE gap). Sprint complete.
 
 ---
-[<small>2026-09-20 12:56:09</small>] [**make**]->[**all**] *build*:
- Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
-ℹ tests 973
+[<small>2026-09-20 13:58:38</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
+No duplicate decision numbers, and the modern section is newest-first. Clean.
+
+---
+[<small>2026-09-20 13:58:59</small>] [**Mouse**]->[**Smith**] *sm plan*:
+ Sprint plan for US-125 in task.md: 4 phases - fixed state schema, strategy files + a loader that REJECTS any instruction containing a literal card name or number, the runner (scripted judge in tests), then a live hand against equilibrium as the benchmark. Not started; Smith Gate 1 first. @Smith *user review US-125
+
+---
+[<small>2026-09-20 13:59:43</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
+No duplicate decision numbers, and the modern section is newest-first. Clean.
+
+---
+[<small>2026-09-20 13:59:43</small>] [**Cypher**]->[**Smith**] *pm story*:
+ US-125/D147 amended per user: the state schema is a PROJECTION of what the peer already holds - the replicated viewFor payload over WebRTC, observe.mjs's tracker, computeFacts, and D144 lastTouch. No second source of truth, no new observation model, nothing new replicated, nothing read from disk. Added as AC9/AC10 and a task.md T1.1 rewrite. @Smith *user review US-125
+
+---
+[<small>2026-09-20 14:01:42</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
+No duplicate decision numbers, and the modern section is newest-first. Clean.
+
+---
+[<small>2026-09-20 14:01:42</small>] [**Cypher**]->[**Smith**] *pm story*:
+ US-125/D147 corrected again per user: extending the existing view/persistence layer IS allowed - the rule is DRY (extend the shared layer so every caller gains it, never a private copy in the bot), not 'add nothing'. Plus the standing no-back-compat rule made explicit: ginRequest()'s per-turn question assembly is deleted with its tests when the loader path covers it - no alias, no switch. Rule-list strategies survive only while they are the benchmark. @Smith *user review US-125
+
+---
+[<small>2026-09-20 14:03:14</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
+No duplicate decision numbers, and the modern section is newest-first. Clean.
+
+---
+[<small>2026-09-20 14:03:14</small>] [**Morpheus**]->[**Smith**] *lead decision*:
+ D147 amended with the runner: strategy file = questions + 11 fixed slots; one request per decision; unfilled slots discarded; the move is answers.discard_choice, declarations from knock_now/take_upcard nouls; code projects state, filters to legal options, acts. Record keeps the winning slot AND the distribution. Rejected weights-in-code (puts policy back where this story is removing it). @Smith *user feedback arch
+
+---
+[<small>2026-09-20 14:03:14</small>] [**Smith**]->[**Mouse**] *user approve*:
+ *user approve architecture. The runner reads as 'project, ask, act' with nothing in between, which is the point. One naming condition: the strategy FILES are what a person will read to understand a bot's personality, so the question ids must read as play (take_upcard, knock_now, discard_choice), never as plumbing (q1, slot_0_noul). @Mouse *sm plan sprint
+
+---
+[<small>2026-09-20 14:03:14</small>] [**Mouse**]->[**Morpheus**] *sm handoff*:
+ Sprint plan for US-125 already in task.md (4 phases, 2-3 tasks each) and unchanged by the gates except T3.2, which is now settled: the move is a Choice over slots. @Morpheus *lead review sprint plan
+
+---
+[<small>2026-09-20 14:03:14</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ *lead review sprint plan: APPROVED. Order is right - the projection must exist before a question can reference a path, and the loader's reject-literals guard must exist before a strategy file is written against it. @Neo *swe impl phase-1
+
+---
+[<small>2026-09-20 14:04:31</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+2:04PM INF no leaks found
+2:04PM INF 1 commits scanned.
+2:04PM INF scanned ~18245 bytes (18.25 KB) in 249ms
+2:04PM INF no leaks found
+
+---
+[<small>2026-09-20 14:04:31</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 1 complete: tools/gin/playState.mjs projects the D147 schema from the existing observation + computeFacts - a rename of what the peer already holds, no second model, nothing new replicated, nothing read from disk. 11 fixed candidate slots, unfilled ones null. 7 tests: field names identical across every example phase, every number traced back to facts/observation, the opponent has a hand SIZE and never cards. @Trin *qa uat phase-1
+
+---
+[<small>2026-09-20 14:04:31</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 1 PASSED. make check clean. Verified AC1 (fixed field names across all example phases), AC4 (no number originates in the projection - each asserted equal to its computeFacts/observation source) and AC9 (every field traces to the view; the privacy property of observe.mjs survives the projection). @Morpheus *lead review phase-1
+
+---
+[<small>2026-09-20 14:04:31</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 1 review PASSED. PLAY_STATE_FIELDS being asserted by a test is what stops the schema drifting away from the paths the strategy files are written against - the failure it prevents is a silently unresolvable question. @Neo *swe impl phase-2
+
+---
+[<small>2026-09-20 14:06:41</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+gitleaks git --no-banner --redact --pre-commit .
+2:06PM INF 1 commits scanned.
+2:06PM INF scanned ~20635 bytes (20.64 KB) in 261ms
+2:06PM INF no leaks found
+
+---
+[<small>2026-09-20 14:06:41</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 2 complete: tools/gin/strategyFile.mjs (loader + checkInstruction + resolvePath) and two static strategies - jev-balanced, jev-cagey. Same question ids, different wording: that diff IS the play style. The loader rejects an instruction that names a card or carries a number (backticked paths exempt - a reference is not a value), and a test walks every backticked path in every shipped file against a really-projected state. 8 tests, guard mutation-proved (3 fail when disabled). @Trin *qa uat phase-2
+
+---
+[<small>2026-09-20 14:06:41</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 2 PASSED. make check clean. Verified AC2 (no interpolation anywhere - the files are literal JSON on disk), AC3 (two strategies differing only in wording; ids identical), and Smith's Gate 2 naming condition (ids read as play: take_upcard, knock_now, discard_choice, candidate_N_helps_opponent). The path-resolution test is the one I would have missed by hand: it caught a bare field name that looked like a path but resolved to nothing. @Morpheus *lead review phase-2
+
+---
+[<small>2026-09-20 14:06:41</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 2 review PASSED. checkInstruction exempting backticked text is the line that makes the rule workable - it distinguishes a reference from a value, which is exactly the distinction the user drew. @Neo *swe impl phase-3
+
+---
+[<small>2026-09-20 14:08:23</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+2:08PM INF no leaks found
+2:08PM INF 1 commits scanned.
+2:08PM INF scanned ~22921 bytes (22.92 KB) in 258ms
+2:08PM INF no leaks found
+
+---
+[<small>2026-09-20 14:08:33</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 3 PASSED. make check clean. Verified AC5 (illegal knock never asked AND never produced - a 0.99 yes still yields 'none' when canKnock is false; mutation-proved) and AC6 (the move is Jev's slot: the test makes Jev pick a card that is NOT the cheapest and asserts that card is thrown). Also checked one request per decision carrying the full projected state. @Morpheus *lead review phase-3
+
+---
+[<small>2026-09-20 14:08:33</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 3 review PASSED. The split is exactly where D147 put it: facts decide what is legal and what is true (gin), the file decides what is wise. decideByQuestions has no branch that consults a rule table, which is the property this sprint exists to establish. @Neo *swe impl phase-4
+
+---
+[<small>2026-09-20 14:10:06</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+gitleaks git --no-banner --redact --pre-commit .
+2:10PM INF 1 commits scanned.
+2:10PM INF scanned ~26183 bytes (26.18 KB) in 248ms
+2:10PM INF no leaks found
+
+---
+[<small>2026-09-20 14:10:06</small>] [**Morpheus**]->[**Trin**] *lead decision*:
+ D148: ginRequest() is NOT deleted this sprint, against T4.0 as written. It is the rule-list strategies' request builder, and those are the benchmark US-125 must beat - deleting it now removes the benchmark, not a shim. Chose 'delete when the benchmark retires' over 'delete now and lose the comparison'. No alias or switch was added; both kinds resolve through one lookup (strategyKinds.mjs). Full text: docs/DECISIONS.md. @Trin *qa uat phase-4
+
+---
+[<small>2026-09-20 14:10:36</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-gin | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 1
 ℹ suites 0
-ℹ pass 973
+ℹ pass 1
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 4837.638906
+ℹ duration_ms 4705.597018
+
+---
+[<small>2026-09-20 14:11:02</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 4 PASSED. make check clean, test-gin green (the rule-list bot is untouched at a real table). Verified AC7 (a question-file decision produces the same record shape and the same table-talk narration - asserted, not assumed) and AC8's wiring: CLI and MCP both resolve either kind through one lookup and now offer all six names. D148 accepted: deleting ginRequest would have deleted the benchmark. T4.2 (a live hand) is the one thing NOT done - it needs TYPESAFE_API_KEY. @Morpheus *lead review phase-4
+
+---
+[<small>2026-09-20 14:11:02</small>] [**Morpheus**]->[**Oracle**] *lead handoff*:
+ Phase 4 review PASSED. bot.step() branches once on strategy.kind and everything after it - acting, narrating, the record - is shared, so a question file is not a second bot. FakeTable was extracted to tests/helpers rather than copied for the new suite (user's DRY rule). @Oracle *ora groom
+
+---
+[<small>2026-09-20 14:11:02</small>] [**Smith**]->[**all**] *user test*:
+ *user test jev-plays-gin: PASS on what can be tested without a key. The strategy FILES read as personalities - 'takes points when they are there, keeps an eye on what the opponent is collecting' vs 'gives the opponent nothing, and would rather carry deadwood than feed a meld' - and the diff between them is the play style, which is the story's whole claim. Both CLI and MCP list all six strategies, so neither kind is second-class. Not signed off: live play, which needs the key.
+
+---
+[<small>2026-09-20 14:11:20</small>] [**Oracle**]->[**all**] *ora handoff*:
+ Docs groomed: ARCHITECTURE.md module map gains the five new tools/gin files; lessons.md has three (a question carrying a value duplicates state; 'no back-compat' is not 'delete on schedule' - D148; a wrong test premise reads as an implementation bug). D147/D148 were recorded as decided, not at close. @all *sprint retro
+
+---
+[<small>2026-09-20 14:11:49</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+2:11PM INF no leaks found
+2:11PM INF 1 commits scanned.
+2:11PM INF scanned ~33658 bytes (33.66 KB) in 254ms
+2:11PM INF no leaks found
+
+---
+[<small>2026-09-20 14:12:07</small>] [**Neo**]->[**Cypher**] *retro*:
+ Neo retro: four phases, no fix loops. The design did the work - questionsFor() and decideByQuestions() are ~60 lines total because the strategy stopped living in code. Friction: two of my own test premises were wrong about the fixtures (a hand of 11 fills every slot; a bare backticked field is not a path), and both cost a cycle. Extracted FakeTable to tests/helpers rather than copy it.
+
+---
+[<small>2026-09-20 14:12:07</small>] [**Trin**]->[**Cypher**] *retro*:
+ Trin retro: 22 new tests, three guards mutation-proved (the literal-rejecting loader, the legality filter, seatedPlayers last sprint). The test I value most is the path walk - it loads every shipped strategy and resolves every backticked path against a really-projected state, so a question can never refer to a field that is not there. That class of bug is invisible until a live call returns nonsense.
+
+---
+[<small>2026-09-20 14:12:07</small>] [**Morpheus**]->[**Cypher**] *retro*:
+ Morpheus retro: D147 held up - the projection made the question files possible, and one branch on strategy.kind was the entire integration. D148 is the interesting one: a standing rule met a case it did not anticipate, and the answer was to honour its INTENT (one way to reach a place) rather than its letter (delete on schedule). Watch: ginRequest/askJev/strategies.mjs now have a scheduled retirement tied to the benchmark.
+
+---
+[<small>2026-09-20 14:12:07</small>] [**Mouse**]->[**Cypher**] *retro*:
+ Mouse retro: 4 phases, all closed in order, no re-planning. One task changed meaning mid-sprint (T4.0) and was rewritten in place with its reason rather than ticked off - the board should read true, not tidy. T4.2 is left open on purpose: it needs a key this session does not have.
+
+---
+[<small>2026-09-20 14:12:07</small>] [**Smith**]->[**Cypher**] *retro*:
+ Smith retro: my Gate 1 decided both open questions instead of deferring them, and the Choice-over-slots call is the one that kept policy out of code. Gate 2's naming condition is now a test. The gap I cannot close: I have not seen this bot play a hand, so 'does it play WELL' is unanswered by design this sprint.
+
+---
+[<small>2026-09-20 14:12:07</small>] [**Oracle**]->[**Cypher**] *retro*:
+ Oracle retro: D147 was amended twice mid-flight (state projection, then the runner) and both amendments were posted when decided, so the reasoning is legible. Gap: docs/GIN_STRATEGY.md still describes only the rule catalogue and does not mention question-file strategies - filed, not pretended.
+
+---
+[<small>2026-09-20 14:12:20</small>] [**Cypher**]->[**all**] *pm launch*:
+ *pm launch jev-plays-gin. US-125 shipped: a Gin strategy is now a static question file over a fixed state schema (D147) - jev-balanced and jev-cagey, differing only in wording. Project, ask once, act; the move is Jev's Choice over candidate slots; code keeps arithmetic and legality. D148: ginRequest stays while the rule-list strategies are the benchmark. 22 tests, make check clean, test-gin green. 4 items to docs/BACKLOG.md, led by the live hand that needs a key. Sprint complete.
+
+---
+[<small>2026-09-20 20:28:55</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+gitleaks git --no-banner --redact --pre-commit .
+8:28PM INF 1 commits scanned.
+8:28PM INF scanned ~42082 bytes (42.08 KB) in 270ms
+8:28PM INF no leaks found

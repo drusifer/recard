@@ -114,6 +114,15 @@ class HarnessPeer {
     }, undefined, { timeout });
   }
 
+  /** US-124: 'player' or 'spectator' - what the HOST actually seated
+   *  this peer as, which is not always what it asked for. */
+  async myRole() {
+    return this.page.evaluate(() => {
+      const harness = globalThis.__recardHarness;
+      return harness.view()?.players.find((player) => player.id === harness.myId())?.role ?? null;
+    });
+  }
+
   /**
    * Say a line of table talk (D138), with optional structured data.
    */

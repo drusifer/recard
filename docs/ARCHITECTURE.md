@@ -118,6 +118,13 @@ src/hostSettings.js      host's own sticky pre-game settings (deck/preset choice
 
 tools/botRequests.mjs    pure: unanswered "add a bot" requests + refusals
 tools/gin/               the Gin bot core, strategies and the runner (D137)
+tools/gin/playState.mjs  projects the replicated view into the fixed state
+                          schema a question file refers to by path (D147)
+tools/gin/strategyFile.mjs  loads a question-file strategy; rejects any
+                          instruction carrying a card name or a number
+tools/gin/strategies/    question-file strategies, static JSON (D147)
+tools/gin/jevStrategy.mjs  project, ask once, act - no rule list (D147)
+tools/gin/strategyKinds.mjs  one lookup resolving a name to either kind
 
 src/pileables/           the Pileable -> Stackable -> Card/Chip/Token hierarchy
 src/piles/               the Pile -> Stack (+ every derived pile KIND) hierarchy

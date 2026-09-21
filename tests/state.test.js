@@ -3797,3 +3797,21 @@ test('US-123: rearranging a pile in place is a touch - the cards that changed po
   // happens to stay at index 1, so it is NOT reported as touched.
   assert.deepEqual(sorted.lastTouch.pileableIds.sort(), ['a', 'c']);
 });
+
+test('US-124: dealing NO cards does not start the game - a table being set up still seats people', () => {
+  // Found by running it live (US-125): the harness stands a table up
+  // with `cardsPerPlayer: 0`, which marked the game as started and
+  // silently demoted the next joiner - a bot - to spectator, so it was
+  // never dealt in and simply waited forever.
+  let state = withPlayers(createInitialState({}, () => 0.5, { playerLimit: 4 }), ['alice']);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 0 });
+  assert.equal(state.dealtThisGame, false, 'nothing was dealt, so nothing started');
+  state = withPlayers(state, ['bob']);
+  assert.equal(state.players.find((p) => p.id === 'bob').role, 'player');
+});
+
+test('US-124: a real deal still starts the game', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5, { playerLimit: 4 }), ['alice']);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 7 });
+  assert.equal(state.dealtThisGame, true);
+});

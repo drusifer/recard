@@ -8,6 +8,7 @@
 import { GinTracker } from './observe.mjs';
 import { computeFacts } from './rules.mjs';
 import { askJev } from './judgments.mjs';
+import { decideByQuestions } from './jevStrategy.mjs';
 import { decide } from './strategies.mjs';
 
 /**
@@ -189,15 +190,23 @@ export class GinBot {
     if (obs.phase !== 'draw' && obs.phase !== 'discard') return record;
 
     const facts = computeFacts(obs);
-    const jev = this.#strategy.usesJev ? await askJev(this.#judge, obs, facts) : null;
-    const { decision, trace } = decide(this.#strategy, { obs, facts, jev });
+    // US-125/D147: a question-file strategy decides by asking its own
+    // questions; a rule-list one (D137) runs its rules. Everything
+    // after this point - acting, narrating, the record - is identical.
+    const asked = this.#strategy.kind === 'questions'
+      ? await decideByQuestions({ strategy: this.#strategy, obs, facts, judge: this.#judge })
+      : null;
+    const jev = asked ? null : (this.#strategy.usesJev ? await askJev(this.#judge, obs, facts) : null);
+    const { decision, trace } = asked
+      ? { decision: asked.decision, trace: [{ rule: 'discard_choice', fired: true, slot: asked.record.slot, distribution: asked.record.distribution }] }
+      : decide(this.#strategy, { obs, facts, jev });
     const actions = await this.#execute(decision, obs);
     const declared = decision.type === 'discard' && decision.declare !== 'none'
       ? announcementFor(decision, facts)
       : null;
     // US-121: every decision is narrated, not just knocks - one line,
     // carrying the record the thought bubble expands (D142).
-    const full = { ...record, facts: factsSummary(facts), judgments: jev, trace, decision, actions };
+    const full = { ...record, facts: factsSummary(facts), judgments: jev ?? asked?.record.judgments ?? null, trace, decision, actions };
     const line = decisionTalk(full, declared);
     await this.#peer.say(line.text, line.data);
     return { ...full, announcement: declared?.text ?? null };

@@ -3683,3 +3683,89 @@ more than two players in Gin; spectator chat beyond Table Talk.
 and the user's actual goal (watch two bots play) needs US-124 +
 US-122. US-121 and US-123 are independently shippable - suggest
 sequencing so a bot-vs-bot table is reachable before the polish lands.
+
+---
+
+## Sprint: Jev plays Gin (2026-09-20) — planned, not started
+
+Direct user direction, after reviewing the current bot against the
+TypeSafe skill and a Playground example: "I want to use typesafe logic
+to play, it's what it's made for", and — on seeing question text that
+had card names and numbers baked into it — "the field names should not
+be parameters; the values should be parameters."
+
+### US-125: A Gin strategy is a file of questions, not a file of rules
+**As** someone exploring what TypeSafe can do, **I want** a Jev player
+whose strategy is a static set of questions over a fixed state schema,
+**so that** writing a new strategy means writing questions, not code,
+and the bot plays by Jev's judgments rather than by hand-coded
+conditions.
+
+**AC:**
+1. **A fixed state schema.** Every request sends the same field names -
+   `rules`, `me`, `candidates[]`, `opponent`, `stock`, `upcard`. Only
+   the VALUES change between turns. Code fills it.
+2. **Questions are static files.** Each strategy is a JSON file of
+   questions that is never rebuilt per turn: no string interpolation,
+   no card names, no numbers in instructions. Every instruction refers
+   to state by path (`candidates[0].card`, `opponent.took_from_discard`,
+   `me.deadwood`), the way the TypeSafe Playground example does.
+   Per-candidate questions use fixed indexed slots; code ignores the
+   answers for slots this turn's state did not fill.
+3. **Two strategies at least, differing only in their question file** -
+   the diff between them is readable as a difference in play style.
+4. **No arithmetic is ever asked of Jev** (standing user rule). Melds,
+   deadwood, legality and the candidate list are computed by existing
+   code (`cards.mjs`, `rules.mjs`) and arrive as state. A question may
+   reference a computed value by path; it may never be asked to derive
+   one.
+5. **Legality stays code-side.** A question about an illegal move is
+   not asked, and an answer can never produce an illegal action.
+6. **The decision is Jev's.** Code picks the move by combining the
+   answers (and state values) it asked for - not by consulting a
+   hand-written rule list.
+7. **Every decision is still one typed record** (US-120/D137) carrying
+   the state sent, the questions asked, the answers, and the chosen
+   move - so `<thought-bubble>` (US-121) shows it with no UI change.
+8. **It plays a real hand** at a hosted table through the existing
+   `make jev-player` path, against a person or another bot.
+
+9. **It is built on the state we already have** (direct user
+   direction). The D147 schema is a MAPPING of the replicated view the
+   app already sends over WebRTC (`viewFor`) - plus what is already
+   derived from it: `observe.mjs`'s tracker for the opponent's public
+   history, `computeFacts` for the exact numbers, and D144's
+   `lastTouch` for the move log. No second source of truth, no new
+   observation model, nothing read from disk: the bot is a guest at the
+   table and judges from exactly what every other peer receives.
+10. **Extend what exists; never duplicate it** (direct user
+    direction). If the projection needs something the view or the
+    persistence layer does not carry yet - a move log, say - EXTEND
+    that layer so every caller gains it, rather than keeping a private
+    copy inside the bot. The test is duplication, not novelty: a
+    second implementation of something the app already does is the
+    thing this forbids.
+11. **No back-compat** (standing project rule). Where this replaces an
+    existing path - `ginRequest()`'s per-turn question assembly is the
+    obvious one - the old path and its tests are deleted outright, not
+    aliased, wrapped or left switchable. The rule-list strategies are
+    the one deliberate exception while they serve as the benchmark
+    (AC in "Out of scope"); when they stop being the benchmark, they
+    go too.
+
+**Out of scope:** tuning weights or thresholds from played hands (the
+user's own sequencing: "+1 for tuning but that comes next"); games
+other than Gin ("stay focused on Gin for our usecase"); removing or
+changing the existing rule-list strategies, which stay as the
+benchmark to beat; any change to how state is replicated.
+
+**Gate 1 (Smith, 2026-09-20): APPROVED**, both open questions decided:
+- **11 candidate slots**, fixed. A Gin hand is 10-11 cards, so the file
+  is a constant length and code ignores unfilled slots.
+- **The move is a Choice over the slots, not weights in the file.**
+  Weights would put the policy back in code - the opposite of the
+  direction this story exists to follow. Composite scoring stays
+  available for the tuning sprint, where it belongs.
+- **Condition:** the decision record must carry the winning slot AND
+  the Choice's distribution, or `<thought-bubble>` cannot explain why
+  one card beat another.

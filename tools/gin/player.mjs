@@ -16,6 +16,7 @@ import { TypeSafeClient } from '@typesafe-ai/sdk';
 import { launchChromium, startStaticServer, joinTable } from '../../tests/harness/multiplayer.mjs';
 import { GinBot, summaryLine } from './bot.mjs';
 import { STRATEGIES } from './strategies.mjs';
+import { resolveStrategy, allStrategyNames } from './strategyKinds.mjs';
 import { pendingSpawnRequests, spawnRefusal, readyAnnouncement } from '../botRequests.mjs';
 
 const SPAWN_POLL_MS = 1000;
@@ -35,8 +36,12 @@ export class UsageError extends Error {}
  * @returns {{ strategy: import('./strategies.mjs').GinStrategy, hands: number }}
  */
 function checkOptions(options) {
-  const strategy = STRATEGIES[options.strategy];
-  if (!strategy) throw new UsageError(`unknown gin strategy "${options.strategy}" - choose one of: ${Object.keys(STRATEGIES).join(', ')}`);
+  let strategy;
+  try {
+    strategy = resolveStrategy(options.strategy);
+  } catch {
+    throw new UsageError(`unknown gin strategy "${options.strategy}" - choose one of: ${allStrategyNames().join(', ')}`);
+  }
   if (!['bot', 'opponent'].includes(options.first)) throw new UsageError(`FIRST must be "bot" or "opponent", not "${options.first}"`);
   const hands = Number(options.hands);
   if (!Number.isSafeInteger(hands) || hands < 1) throw new UsageError(`HANDS must be a whole number >= 1, not "${options.hands}"`);
@@ -147,6 +152,13 @@ export async function play(options) {
       await peer.waitForSeat({ timeout: SEAT_TIMEOUT_MS });
     } catch (error) {
       throw new Error(`not seated within ${SEAT_TIMEOUT_MS / 1000}s - is table ${options.code} open, and hosted from the same Recard version?`, { cause: error });
+    }
+    // US-124/US-125: a full or already-started table seats a newcomer as
+    // a SPECTATOR, which has no hand and is never dealt to. Found live:
+    // the bot sat there "seated" forever, waiting for a deal that could
+    // not come. Say so instead.
+    if (await peer.myRole() === 'spectator') {
+      throw new UsageError(`seated as a SPECTATOR at table ${options.code}, so I will never be dealt in - the game is full (Gin seats 2) or already under way. Start a fresh hand, or host a table with a free seat.`);
     }
     process.stderr.write('jev-player: seated - waiting for the deal\n');
     // US-122: announce what this player can deal in, so the table can

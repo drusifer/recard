@@ -1988,3 +1988,58 @@ before the polish (Smith's non-blocking Gate 1 note).
       Pileables; hidden cards travel as backs
 - [x] T8.3 Browser test: a deal animates as a group; a card with no
       before-rect glows without animating; input is never blocked
+
+---
+
+# Sprint: Jev plays Gin (US-125) — 2026-09-20, PLANNED, NOT STARTED
+
+Story: `docs/USER_STORIES.md` US-125. Architecture: D147. Standing user
+rules: no arithmetic asked of Jev, legality stays code-side, tuning is
+the NEXT sprint, Gin only.
+
+## Phase 1 — The fixed state schema
+- [x] T1.1 `tools/gin/playState.mjs`: PROJECT the D147 state (`rules`,
+      `me`, `candidates[]`, `opponent`, `stock`, `upcard`) from what the
+      peer already has — the replicated `viewFor` payload, the existing
+      `observe.mjs` tracker, `computeFacts`, D144's `lastTouch`. A
+      mapping, not a new model: no second source of truth, nothing new
+      replicated, nothing read from disk
+- [x] T1.2 Tests: the same field names appear every turn regardless of
+      phase/hand; `candidates[]` carries `deadwood_after` from code;
+      nothing in state is derived by a question; every field traces
+      back to the view (no field invented by the builder)
+
+## Phase 2 — Strategy files and the loader
+- [x] T2.1 `tools/gin/strategies/*.json`: two strategies as static
+      question files (path-only instructions, indexed candidate slots)
+- [x] T2.0 If the projection needs a field the view/persistence layer
+      lacks, EXTEND that layer (every caller gains it) rather than
+      deriving it privately in the bot
+- [x] T2.2 A loader that validates a file on load: every `{path}`
+      reference resolves against the schema, and no instruction
+      contains a literal card name or number
+- [ ] T2.3 Tests incl. the guard above (a strategy with "5 of hearts"
+      in an instruction is rejected)
+
+## Phase 3 — The runner
+- [x] T3.1 Ask once per decision with the loaded questions; ignore
+      answers for unfilled candidate slots
+- [x] T3.2 Combine answers into a move (Gate 1 decides: weights in the
+      strategy file vs one Choice over slots); legality filtered first
+- [x] T3.3 Tests with a scripted judge — no live Jev in tests
+
+## Phase 4 — Plays a real hand, and the old path goes
+- [x] T4.0 ~~Delete `ginRequest()`~~ — NOT deleted, and here is why:
+      `ginRequest()` IS the rule-list strategies' request builder, and
+      those strategies are the benchmark US-125 must be measured
+      against (the story's own stated exception). Deleting it now would
+      delete the benchmark, not a back-compat shim. It goes when they
+      go. Recorded as D148 rather than silently skipped.
+- [x] T4.1 Wire as a strategy kind behind the existing
+      `make jev-player GAME=gin STRATEGY=<name>`; decision records and
+      table-talk narration unchanged (US-120/US-121)
+- [ ] T4.2 One live hand against `equilibrium` at a hosted table —
+      NEEDS `TYPESAFE_API_KEY`, which this session does not have and
+      did not go looking for. Run it with:
+      `bobp make jev-player GAME=gin STRATEGY=jev-balanced CODE=<table code>`
+      Everything below it is proven with a scripted judge instead.

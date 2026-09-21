@@ -591,3 +591,26 @@ This file contains critical lessons and rules derived from past errors, technica
   talk line rather than the only one. Two suites asserted "the only
   one"; both were updated to assert what the feature now means, not
   worked around with a filter.
+
+## Sprint "Jev plays Gin" (2026-09-20): US-125, D147-D148
+
+- **A question that contains a value has put that value in two
+  places.** The user's correction - "the field names should not be
+  parameters; the values should be parameters" - is the whole design:
+  fixed state field names, fixed question text, only values change.
+  The loader enforces it by rejecting any instruction that names a card
+  or carries a number, with backticked paths exempt, because a
+  reference is not a value. That single rule is what makes a strategy a
+  reviewable document instead of a template.
+- **"No back-compat" is not "delete on schedule".** The plan said to
+  delete `ginRequest()` in phase 4; doing so would have deleted the
+  benchmark the sprint exists to be measured against, since it is the
+  rule-list strategies' request builder, not a shim. What the rule
+  actually forbids is two ways to reach the same place - answered with
+  ONE lookup (`strategyKinds.mjs`) rather than a flag. Recorded as
+  D148 instead of quietly skipped.
+- **A test premise can be wrong while the code is right.** Two tests
+  this sprint asserted things about the example data that were not
+  true (a hand of 11 fills every candidate slot; a bare field name in
+  backticks is not a path). Both looked like implementation bugs for a
+  minute. Read the fixture before changing the subject.

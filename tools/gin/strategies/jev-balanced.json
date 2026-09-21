@@ -1,0 +1,129 @@
+{
+  "description": "Balanced: takes points when they are there, keeps an eye on what the opponent is collecting.",
+  "questions": {
+    "take_upcard": {
+      "type": "noul",
+      "instructions": "Would taking `upcard` into `me.hand` complete or extend one of `me.melds`, or clearly reduce `me.deadwood`?"
+    },
+    "knock_now": {
+      "type": "noul",
+      "instructions": "Given `me.can_knock`, `me.deadwood`, `rules.knock_limit` and `stock.remaining`, is ending the hand now better than playing on for a stronger one?"
+    },
+    "opponent_is_close": {
+      "type": "score",
+      "instructions": "From `opponent.discarded` (oldest first), `opponent.took_from_discard` and `stock.drawn_so_far`, how close is the opponent to being able to knock?",
+      "criteria": [
+        "Far from knocking: still throwing high cards, with no melds evident.",
+        "Building melds, but likely still holding a lot of deadwood.",
+        "Could plausibly knock within the next two or three turns.",
+        "Able to knock now or on the next turn.",
+        "One card away from gin."
+      ]
+    },
+    "discard_choice": {
+      "type": "choice",
+      "instructions": "Which of `candidates` should I throw this turn? Weigh the cost each slot carries in `candidates` against how likely the opponent is to want it, judged from `opponent.discarded` and `opponent.took_from_discard`. Answer with the slot number.",
+      "criteria": {
+        "0": "The card in `candidates[0]`, whose exact cost is `candidates[0].deadwood_after`.",
+        "1": "The card in `candidates[1]`, whose exact cost is `candidates[1].deadwood_after`.",
+        "2": "The card in `candidates[2]`, whose exact cost is `candidates[2].deadwood_after`.",
+        "3": "The card in `candidates[3]`, whose exact cost is `candidates[3].deadwood_after`.",
+        "4": "The card in `candidates[4]`, whose exact cost is `candidates[4].deadwood_after`.",
+        "5": "The card in `candidates[5]`, whose exact cost is `candidates[5].deadwood_after`.",
+        "6": "The card in `candidates[6]`, whose exact cost is `candidates[6].deadwood_after`.",
+        "7": "The card in `candidates[7]`, whose exact cost is `candidates[7].deadwood_after`.",
+        "8": "The card in `candidates[8]`, whose exact cost is `candidates[8].deadwood_after`.",
+        "9": "The card in `candidates[9]`, whose exact cost is `candidates[9].deadwood_after`.",
+        "10": "The card in `candidates[10]`, whose exact cost is `candidates[10].deadwood_after`."
+      }
+    },
+    "candidate_0_helps_opponent": {
+      "type": "noul",
+      "instructions": "Would the opponent likely meld the card in `candidates[0]`, judged from `opponent.discarded` and `opponent.took_from_discard`?"
+    },
+    "candidate_0_still_useful": {
+      "type": "noul",
+      "instructions": "Does the card in `candidates[0]` still have a realistic meld to join within `me.hand`?"
+    },
+    "candidate_1_helps_opponent": {
+      "type": "noul",
+      "instructions": "Would the opponent likely meld the card in `candidates[1]`, judged from `opponent.discarded` and `opponent.took_from_discard`?"
+    },
+    "candidate_1_still_useful": {
+      "type": "noul",
+      "instructions": "Does the card in `candidates[1]` still have a realistic meld to join within `me.hand`?"
+    },
+    "candidate_2_helps_opponent": {
+      "type": "noul",
+      "instructions": "Would the opponent likely meld the card in `candidates[2]`, judged from `opponent.discarded` and `opponent.took_from_discard`?"
+    },
+    "candidate_2_still_useful": {
+      "type": "noul",
+      "instructions": "Does the card in `candidates[2]` still have a realistic meld to join within `me.hand`?"
+    },
+    "candidate_3_helps_opponent": {
+      "type": "noul",
+      "instructions": "Would the opponent likely meld the card in `candidates[3]`, judged from `opponent.discarded` and `opponent.took_from_discard`?"
+    },
+    "candidate_3_still_useful": {
+      "type": "noul",
+      "instructions": "Does the card in `candidates[3]` still have a realistic meld to join within `me.hand`?"
+    },
+    "candidate_4_helps_opponent": {
+      "type": "noul",
+      "instructions": "Would the opponent likely meld the card in `candidates[4]`, judged from `opponent.discarded` and `opponent.took_from_discard`?"
+    },
+    "candidate_4_still_useful": {
+      "type": "noul",
+      "instructions": "Does the card in `candidates[4]` still have a realistic meld to join within `me.hand`?"
+    },
+    "candidate_5_helps_opponent": {
+      "type": "noul",
+      "instructions": "Would the opponent likely meld the card in `candidates[5]`, judged from `opponent.discarded` and `opponent.took_from_discard`?"
+    },
+    "candidate_5_still_useful": {
+      "type": "noul",
+      "instructions": "Does the card in `candidates[5]` still have a realistic meld to join within `me.hand`?"
+    },
+    "candidate_6_helps_opponent": {
+      "type": "noul",
+      "instructions": "Would the opponent likely meld the card in `candidates[6]`, judged from `opponent.discarded` and `opponent.took_from_discard`?"
+    },
+    "candidate_6_still_useful": {
+      "type": "noul",
+      "instructions": "Does the card in `candidates[6]` still have a realistic meld to join within `me.hand`?"
+    },
+    "candidate_7_helps_opponent": {
+      "type": "noul",
+      "instructions": "Would the opponent likely meld the card in `candidates[7]`, judged from `opponent.discarded` and `opponent.took_from_discard`?"
+    },
+    "candidate_7_still_useful": {
+      "type": "noul",
+      "instructions": "Does the card in `candidates[7]` still have a realistic meld to join within `me.hand`?"
+    },
+    "candidate_8_helps_opponent": {
+      "type": "noul",
+      "instructions": "Would the opponent likely meld the card in `candidates[8]`, judged from `opponent.discarded` and `opponent.took_from_discard`?"
+    },
+    "candidate_8_still_useful": {
+      "type": "noul",
+      "instructions": "Does the card in `candidates[8]` still have a realistic meld to join within `me.hand`?"
+    },
+    "candidate_9_helps_opponent": {
+      "type": "noul",
+      "instructions": "Would the opponent likely meld the card in `candidates[9]`, judged from `opponent.discarded` and `opponent.took_from_discard`?"
+    },
+    "candidate_9_still_useful": {
+      "type": "noul",
+      "instructions": "Does the card in `candidates[9]` still have a realistic meld to join within `me.hand`?"
+    },
+    "candidate_10_helps_opponent": {
+      "type": "noul",
+      "instructions": "Would the opponent likely meld the card in `candidates[10]`, judged from `opponent.discarded` and `opponent.took_from_discard`?"
+    },
+    "candidate_10_still_useful": {
+      "type": "noul",
+      "instructions": "Does the card in `candidates[10]` still have a realistic meld to join within `me.hand`?"
+    }
+  }
+}

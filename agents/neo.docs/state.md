@@ -1,22 +1,16 @@
 # Agent State
 
-## Current Task (2026-09-20) - Sprint "Jev at the table": ALL 8 PHASES DONE
+## Current Task (2026-09-20) - US-125 done, all 4 phases
 
-Shipped US-121..124 / D141-D146. New: src/botOffers.js, src/botThoughts.js,
-src/cardMotion.js, src/playerColors.js, tools/botRequests.mjs,
-src/components/ThoughtBubble.js, src/components/AddBot.js; state.js gained
-players[].role, gameConfig.playerLimit, dealtThisGame and a lastTouch
-stamp derived in reduce(). Browser suites: spectator/addbot/thoughts/
-motion (+ gin and uiActions/rtg updated).
-
-Two traps worth remembering:
-- A component that hides itself: assert getClientRects(), never
-  el.hidden - `display: flex` beats the hidden attribute.
-- position: fixed inside #zones is fixed to the ZOOM BOX, not the
-  viewport: an overlay must move to body (focus-zoom's precedent).
+New: tools/gin/playState.mjs (projection, 11 fixed slots),
+strategyFile.mjs (loader + checkInstruction + resolvePath),
+strategies/*.json (jev-balanced, jev-cagey), jevStrategy.mjs (project ->
+ask once -> act), strategyKinds.mjs (one lookup, both kinds).
+bot.step() branches once on strategy.kind; CLI and MCP both offer all
+six names. tests/helpers/ginFakeTable.mjs extracted (not copied).
 
 ## Next Steps
-Nothing assigned. Backlog in docs/BACKLOG.md.
+Nothing assigned. Live play + a bench are the next things (BACKLOG).
 
 ## Context
 
