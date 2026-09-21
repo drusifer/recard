@@ -47,9 +47,9 @@ export function listStrategies() {
 }
 
 /**
- * Loads and validates one strategy file.
+ * Loads and validates one strategy file (D150): a read step, a move
+ * step, and the confidence the file is willing to act on.
  * @param {string} name
- * @returns {{ name: string, description: string, questions: Record<string, object> }}
  */
 export function loadStrategy(name) {
   let raw;
@@ -59,9 +59,31 @@ export function loadStrategy(name) {
     throw new Error(`unknown gin strategy "${name}" - choose one of: ${listStrategies().join(', ')}`);
   }
   const strategy = JSON.parse(raw);
-  for (const [id, question] of Object.entries(strategy.questions ?? {})) {
-    const complaint = checkInstruction(question.instructions ?? '');
+  for (const [id, text] of everyInstruction(strategy)) {
+    const complaint = checkInstruction(text);
     if (complaint) throw new Error(`${name}.${id} ${complaint}`);
   }
-  return { name, description: strategy.description ?? '', questions: strategy.questions ?? {} };
+  return {
+    name,
+    description: strategy.description ?? '',
+    confidence_floor: strategy.confidence_floor ?? 0,
+    read: strategy.read ?? {},
+    move: strategy.move ?? { instructions: '', criteria: {} },
+  };
+}
+
+/** Every piece of prose the model will read, with a label for the
+ *  error message. Criteria count: an option's description shapes the
+ *  answer as much as the question does. */
+function* everyInstruction(strategy) {
+  for (const [id, question] of Object.entries(strategy.read ?? {})) {
+    yield [`read.${id}`, question.instructions ?? ''];
+    for (const [key, text] of Object.entries(question.criteria ?? {})) {
+      if (typeof text === 'string') yield [`read.${id}.criteria.${key}`, text];
+    }
+  }
+  yield ['move', strategy.move?.instructions ?? ''];
+  for (const [key, text] of Object.entries(strategy.move?.criteria ?? {})) {
+    yield [`move.criteria.${key}`, text];
+  }
 }

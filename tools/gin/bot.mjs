@@ -204,7 +204,11 @@ export class GinBot {
       : null;
     const jev = asked ? null : (this.#strategy.usesJev ? await askJev(this.#judge, obs, facts) : null);
     const { decision, trace } = asked
-      ? { decision: asked.decision, trace: [{ rule: 'discard_choice', fired: true, slot: asked.record.slot, distribution: asked.record.distribution }] }
+      ? { decision: asked.decision, trace: [
+        { rule: 'read', fired: true, threat: asked.record.judgments?.threat ?? null },
+        { rule: '__move__', fired: true, option: asked.record.option, confidence: asked.record.confidence,
+          distribution: asked.record.distribution, ...(asked.record.belowFloor ? { belowFloor: true } : {}) },
+      ] }
       : decide(this.#strategy, { obs, facts, jev });
     const actions = await this.#execute(decision, obs);
     const declared = decision.type === 'discard' && decision.declare !== 'none'

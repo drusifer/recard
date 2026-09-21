@@ -1,100 +1,114 @@
-// US-125/D147: playing Gin from a strategy FILE rather than a rule list.
+// US-126/D150: playing Gin as a read, then a move.
 //
-// The turn is: project the state (`playState.mjs`), send the file's
-// questions as they are written, and carry the answer out. There is no
-// ranking, no weighting and no rule table here - the move is the slot
-// Jev chose. Code's only authority is legality: a question about an
-// illegal move is never asked, and no answer can produce one.
+// Two requests per decision, because the second needs the first:
+//   1. READ  - how close is the opponent, and which card do they want?
+//   2. MOVE  - one Choice over the LEGAL moves, with the read in state.
+// Questions inside a request run in parallel and cannot see each other,
+// so a read that is meant to inform the move has to be its own call.
+//
+// Code keeps exactly two jobs: the arithmetic (in `playState.mjs`) and
+// legality - which options exist. There is no threshold and no rule
+// table here; an illegal move is simply not offered, so it cannot be
+// chosen at any confidence.
 
 import { buildPlayState } from './playState.mjs';
 
-/** Which questions apply to this turn's state. A question about a slot
- *  the state left empty would be a question about nothing, and one
- *  about an illegal move must not be asked at all. */
-export function questionsFor(strategy, state) {
+/** What this turn's legal moves are, as Choice options. The `criteria`
+ *  text comes from the strategy - that is where a play style lives. */
+export function moveOptions(strategy, state) {
+  const criteria = {};
   const filled = state.candidates.filter(Boolean).length;
-  const asked = {};
-  for (const [id, question] of Object.entries(strategy.questions)) {
-    if (id === 'knock_now' && !state.me.can_knock) continue;
-    if (id === 'take_upcard' && (state.me.phase !== 'draw' || !state.upcard)) continue;
-    if (question.type === 'choice') {
-      // A slot question is ONE question over the candidates, and its
-      // options are the slots this turn actually filled: the model
-      // cannot choose an option that is not offered, so it can never
-      // name a card the hand does not hold.
-      if (state.me.phase !== 'discard') continue;
-      asked[id] = { ...question, criteria: Object.fromEntries(
-        Object.entries(question.criteria).filter(([key]) => Number(key) < filled)) };
-      continue;
-    }
-    asked[id] = question;
+  if (state.me.phase === 'draw') {
+    if (state.upcard) criteria.take_upcard = strategy.move.criteria.take_upcard;
+    criteria.draw_stock = strategy.move.criteria.draw_stock;
+    return criteria;
   }
-  return asked;
+  for (let slot = 0; slot < filled; slot++) {
+    const where = `\`candidates[${slot}]\``;
+    criteria[`discard_${slot}`] = `${strategy.move.criteria.discard} (${where})`;
+    if (state.me.is_gin) criteria[`gin_${slot}`] = `${strategy.move.criteria.gin} (${where})`;
+    else if (state.me.can_knock) criteria[`knock_${slot}`] = `${strategy.move.criteria.knock} (${where})`;
+  }
+  return criteria;
 }
 
-/**
- * One decision: one request, one move.
- * @param {{ strategy: object, obs: object, facts: object, judge: { systemOne: Function } }} options
- */
-/**
- * The rule-list `GinJudgments` shape (threat + per-card helps), read out
- * of a question file's own answers. `null` when this turn asked neither.
- */
-export function judgmentsFrom(answers, facts) {
-  const threat = answers.opponent_is_close;
-  // One Choice, not one question per card: a Choice's DISTRIBUTION
-  // compares the competing options, so the probability on each slot is
-  // that card's "they want it" reading - the same number eleven Nouls
-  // used to produce, from one question.
+/** The read step's questions - asked as the file writes them. */
+export function readQuestions(strategy, state) {
+  if (state.me.phase !== 'discard') {
+    // Nothing to read about on a draw: there are no candidates yet.
+    const { opponent_is_close: close } = strategy.read;
+    return { opponent_is_close: close };
+  }
+  const filled = state.candidates.filter(Boolean).length;
+  return {
+    ...strategy.read,
+    opponent_wants: { ...strategy.read.opponent_wants, criteria: Object.fromEntries(
+      Object.entries(strategy.read.opponent_wants.criteria).filter(([key]) => Number(key) < filled)) },
+  };
+}
+
+/** The rule-list `GinJudgments` shape (D137), read out of the read
+ *  step - so record, summary and thought bubble see one shape. */
+export function judgmentsFrom(read, facts) {
   const helps = {};
-  for (const [slot, probability] of Object.entries(answers.opponent_wants?.probabilities ?? {})) {
+  for (const [slot, probability] of Object.entries(read.opponent_wants?.probabilities ?? {})) {
     const card = facts.discards?.[Number(slot)]?.card;
     if (card) helps[card.id] = probability;
   }
+  const threat = read.opponent_is_close;
   if (!threat && Object.keys(helps).length === 0) return null;
-  return {
-    threat: threat?.score ?? 0,
-    threatConfidence: threat?.confidence ?? 0,
-    helps,
-    model: 'jev',
-  };
+  return { threat: threat?.score ?? 0, threatConfidence: threat?.confidence ?? 0, helps, model: 'jev' };
 }
 
+/** What `option` means as a move. */
+function moveFor(option, facts) {
+  if (option === 'take_upcard') return { type: 'draw', source: 'discard' };
+  if (option === 'draw_stock') return { type: 'draw', source: 'stock' };
+  const [kind, slot] = option.split('_');
+  const chosen = facts.discards[Number(slot)] ?? facts.bestDiscard;
+  return { type: 'discard', cardId: chosen.card.id, declare: kind === 'discard' ? 'none' : kind };
+}
+
+/**
+ * One decision: read, then move.
+ * @param {{ strategy: object, obs: object, facts: object, judge: { systemOne: Function } }} options
+ */
 export async function decideByQuestions({ strategy, obs, facts, judge }) {
   const state = buildPlayState(obs, facts);
-  const questions = questionsFor(strategy, state);
-  const response = await judge.systemOne({ state, questions });
-  const answers = response.answers ?? {};
 
-  const record = {
-    strategy: strategy.name, phase: state.me.phase, model: response.model,
-    state, questions, answers, slot: null, distribution: null,
-    // The same typed shape a rule-list strategy produces (D137), mapped
-    // from this strategy's own answers - so `summaryLine`, the decision
-    // record and `<thought-bubble>` read one shape, not two. Found
-    // live: handing the raw answers over as `judgments` crashed the
-    // summary, which expects `threat`.
-    judgments: judgmentsFrom(answers, facts),
+  const readAnswers = (await judge.systemOne({ state, questions: readQuestions(strategy, state) })).answers ?? {};
+  // The read becomes STATE for the move - named fields, like everything
+  // else the questions refer to by path.
+  const withRead = {
+    ...state,
+    read: {
+      opponent_is_close: readAnswers.opponent_is_close?.score ?? null,
+      opponent_wants_slot: readAnswers.opponent_wants?.choice ?? null,
+    },
   };
 
-  if (state.me.phase === 'draw') {
-    // `take_upcard` is only asked when there IS an upcard, so a missing
-    // answer means stock - not a coin flip.
-    const takeUpcard = (answers.take_upcard?.noul ?? 0) > 0.5;
-    return { decision: { type: 'draw', source: takeUpcard ? 'discard' : 'stock' }, record };
-  }
+  const criteria = moveOptions(strategy, state);
+  const moveQuestion = { type: 'choice', instructions: strategy.move.instructions, criteria };
+  const response = await judge.systemOne({ state: withRead, questions: { __move__: moveQuestion } });
+  const answer = response.answers?.__move__;
 
-  const slot = Number(answers.discard_choice?.choice ?? 0);
-  record.slot = slot;
-  record.distribution = answers.discard_choice?.probabilities ?? null;
-  const chosen = facts.discards[slot] ?? facts.bestDiscard;
+  // Confidence-gated routing: the FILE says how sure is sure enough,
+  // and below it the bot plays the cheapest legal card rather than
+  // acting on a coin flip.
+  const floor = strategy.confidence_floor ?? 0;
+  const belowFloor = (answer?.confidence ?? 0) < floor;
+  const fallback = state.me.phase === 'draw' ? 'draw_stock' : 'discard_0';
+  const option = belowFloor || !answer?.choice || !(answer.choice in criteria) ? fallback : answer.choice;
 
-  // Declarations come from the FACTS for what is legal, and from Jev
-  // only for the judgment call: gin is not a matter of opinion, and a
-  // knock that is not legal is not on offer at any confidence.
-  let declare = 'none';
-  if (facts.isGin) declare = 'gin';
-  else if (facts.canKnock && (answers.knock_now?.noul ?? 0) > 0.5) declare = 'knock';
-
-  return { decision: { type: 'discard', cardId: chosen.card.id, declare }, record };
+  return {
+    decision: moveFor(option, facts),
+    record: {
+      strategy: strategy.name, phase: state.me.phase, model: response.model,
+      state: withRead, questions: { read: readQuestions(strategy, state), move: moveQuestion },
+      answers: { ...readAnswers, __move__: answer },
+      option, distribution: answer?.probabilities ?? null,
+      confidence: answer?.confidence ?? null, belowFloor,
+      judgments: judgmentsFrom(readAnswers, facts),
+    },
+  };
 }

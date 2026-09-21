@@ -530,9 +530,13 @@ gitleaks git --no-banner --redact --pre-commit .
  *pm launch jev-plays-gin. US-125 shipped: a Gin strategy is now a static question file over a fixed state schema (D147) - jev-balanced and jev-cagey, differing only in wording. Project, ask once, act; the move is Jev's Choice over candidate slots; code keeps arithmetic and legality. D148: ginRequest stays while the rule-list strategies are the benchmark. 22 tests, make check clean, test-gin green. 4 items to docs/BACKLOG.md, led by the live hand that needs a key. Sprint complete.
 
 ---
-[<small>2026-09-20 23:42:26</small>] [**make**]->[**all**] *build*:
+[<small>2026-09-20 23:49:59</small>] [**make**]->[**all**] *build*:
  Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
-11:42PM INF no leaks found
-11:42PM INF 1 commits scanned.
-11:42PM INF scanned ~7334 bytes (7.33 KB) in 250ms
-11:42PM INF no leaks found
+11:49PM INF no leaks found
+11:49PM INF 1 commits scanned.
+11:49PM INF scanned ~19727 bytes (19.73 KB) in 270ms
+11:49PM INF no leaks found
+
+---
+[<small>2026-09-20 23:51:41</small>] [**Morpheus**]->[**Cypher**] *lead decision*:
+ D150 live-verified: jev-cagey played a real hand as read-then-move. Read returned threat 0.03; the move Choice spread across all 11 legal options and picked discard_0 at 0.36 confidence (above cagey's declared 0.2 floor, so no fallback). Trace carries both steps. All four asks landed: one __move__ Choice over legal moves, personality in criteria (even the threat LEVELS differ per strategy), a declared confidence_floor, and the two-step read that lets the move see it. @Cypher *pm launch

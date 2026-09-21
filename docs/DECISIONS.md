@@ -70,6 +70,46 @@ D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rul
 
 ---
 
+### D150. A strategy is a read, then a move: two questions, personality in the criteria
+
+US-126, direct user direction ("I want to really lean on typesafe for
+all the player logic"). D147 left three separate questions deciding one
+thing - `take_upcard`, `knock_now`, `discard_choice` - with code
+thresholding two Nouls at 0.5 and picking the branch. That threshold
+was the last policy left in code. Replaced by four changes, all of them
+moving work from code into the strategy file:
+
+1. **One `__move__` Choice over the legal moves** (the function-calling
+   shape). Code enumerates what is legal this turn - take the upcard,
+   draw stock, discard slot N, knock with slot N, gin with slot N - and
+   the model picks one. Nothing is thresholded, and an illegal move is
+   not an option, so it cannot be chosen at any confidence.
+2. **Two steps, because the second needs the first.** A read step asks
+   how close the opponent is (Score) and which slot they want (Choice);
+   its answers go INTO the state of the move step. Questions in one
+   request cannot see each other, so a read that is meant to inform the
+   move has to be its own request - the one case the guidance says
+   warrants a second call.
+3. **Personality lives in `criteria`.** Both strategies ask the same
+   two questions; what differs is how each option is DESCRIBED. That is
+   where the model's probability mass is shaped, so it is where a play
+   style belongs - not in an ever-longer instruction sentence.
+4. **A declared confidence floor.** `confidence_floor` in the file: if
+   the move Choice comes back less certain than that, the bot plays the
+   cheapest legal card instead. The strategy sets its own tolerance as
+   a number, rather than code deciding what "unsure" means.
+
+Code keeps exactly two jobs, unchanged: the arithmetic (melds,
+deadwood, candidate costs) and legality (which options exist).
+
+**Rejected:** keeping the Noul thresholds (the 0.5 was policy in code,
+which is what this sprint removes); one request with the read alongside
+the move (they would run in parallel and the move could not use the
+read); a Score to decide knocking (a dial still needs a threshold -
+the move Choice removes the question instead).
+
+---
+
 ### D149. Telling a bot to leave is one more `data.kind`, not a new protocol
 
 Direct user request ("add a quit instruction to the protocol to tell
