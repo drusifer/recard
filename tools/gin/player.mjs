@@ -15,9 +15,8 @@ import { fileURLToPath, URL } from 'node:url';
 import { TypeSafeClient } from '@typesafe-ai/sdk';
 import { launchChromium, startStaticServer, joinTable } from '../../tests/harness/multiplayer.mjs';
 import { GinBot, summaryLine } from './bot.mjs';
-import { STRATEGIES } from './strategies.mjs';
 import { resolveStrategy, allStrategyNames } from './strategyKinds.mjs';
-import { pendingSpawnRequests, spawnRefusal, readyAnnouncement } from '../botRequests.mjs';
+import { pendingSpawnRequests, pendingQuits, spawnRefusal, readyAnnouncement } from '../botRequests.mjs';
 
 const SPAWN_POLL_MS = 1000;
 const RUNNER = fileURLToPath(new URL('../jevPlayer.mjs', import.meta.url));
@@ -68,17 +67,33 @@ function judgeFor(strategy) {
  * spawning real processes (the default spawns the runner for real).
  * @returns {{ stop: () => void, poll: () => Promise<void> }}
  */
-export function serveSpawnRequests({ peer, code, baseUrl, startBot = spawnRunner, pollMs = SPAWN_POLL_MS }) {
+export function serveSpawnRequests({ peer, code, baseUrl, name, startBot = spawnRunner, pollMs = SPAWN_POLL_MS }) {
   const handled = new Set();
   let running = true;
-  const answer = (requestId, data, text) => peer.say(text, { kind: 'spawn-bot-result', requestId, ...data });
+  let askedToLeave = false;
+  /** Every answer is a talk line carrying its own `kind` (D138) - the
+   *  kind is named at the call site so a reader is never relying on a
+   *  later spread to override an earlier default. */
+  const answer = (kind, requestId, data, text) => peer.say(text, { kind, requestId, ...data });
+
 
   const poll = async () => {
-    for (const request of pendingSpawnRequests(await peer.talk(), handled)) {
+    const talk = await peer.talk();
+    // Leaving is told on the same channel as everything else (D138):
+    // one more `data.kind`, no new message type. The bot says goodbye
+    // so the table knows it left on purpose, then stops between turns.
+    for (const request of pendingQuits(talk, handled, name)) {
       handled.add(request.requestId);
-      const refusal = spawnRefusal(request, { games: ['gin'], strategies: STRATEGIES, env: process.env });
+      askedToLeave = true;
+      await answer('quit-result', request.requestId, { ok: true }, 'Leaving the table - thanks for the game.');
+      process.stderr.write(`jev-player: asked to leave (${request.requestId}) - finishing this turn and stopping\n`);
+    }
+    for (const request of pendingSpawnRequests(talk, handled)) {
+      handled.add(request.requestId);
+      const refusal = spawnRefusal(request, { games: ['gin'], env: process.env, strategies: Object.fromEntries(
+        allStrategyNames().map((each) => [each, resolveStrategy(each)])) });
       const failure = refusal ?? await startBot({ ...request, code, baseUrl });
-      await answer(request.requestId, failure ? { ok: false, error: failure } : { ok: true },
+      await answer('spawn-bot-result', request.requestId, failure ? { ok: false, error: failure } : { ok: true },
         failure ? `Could not add a ${request.strategy} bot: ${failure}` : `Adding a ${request.strategy} bot - it is joining now.`);
       process.stderr.write(`jev-player: spawn request ${request.requestId} (${request.strategy}) - ${failure ?? 'started'}\n`);
     }
@@ -90,8 +105,8 @@ export function serveSpawnRequests({ peer, code, baseUrl, startBot = spawnRunner
       await new Promise((resolve) => setTimeout(resolve, pollMs));
     }
   };
-  loop().catch((error) => process.stderr.write(`jev-player: spawn watcher stopped: ${error.message}\n`));
-  return { stop: () => { running = false; }, poll };
+  loop().catch((error) => process.stderr.write(`jev-player: watcher stopped: ${error.message}\n`));
+  return { stop: () => { running = false; }, poll, wasAskedToLeave: () => askedToLeave };
 }
 
 /**
@@ -110,11 +125,13 @@ function spawnRunner({ game, strategy, code, baseUrl }) {
   });
 }
 
-async function playHands({ bot, hands, logFile }) {
+async function playHands({ bot, hands, logFile, shouldStop = () => false }) {
   let finished = 0;
   let isBetweenHands = false;
   while (finished < hands) {
-    const obs = await bot.waitForTurn({ timeoutMs: TURN_TIMEOUT_MS, pastHandOver: isBetweenHands });
+    if (shouldStop()) return 'asked to leave';
+    const obs = await bot.waitForTurn({ timeoutMs: TURN_TIMEOUT_MS, pastHandOver: isBetweenHands, shouldStop });
+    if (obs === null) return 'asked to leave';
     if (obs.phase === 'wait') continue; // still nobody's move after a long wait - keep waiting
     isBetweenHands = obs.phase === 'hand-over';
     if (isBetweenHands) {
@@ -164,13 +181,21 @@ export async function play(options) {
     // US-122: announce what this player can deal in, so the table can
     // offer "Add Jev bot" at all (D143 - the control's presence is
     // evidence a Jev player is running).
-    const ready = readyAnnouncement({ game: 'gin', strategies: STRATEGIES });
+    // Every strategy this player can actually start, both kinds (D147):
+    // the table's "Add Jev bot" list is built from this, so a question
+    // file left out of it is a strategy nobody can choose.
+    const ready = readyAnnouncement({ game: 'gin', strategies: Object.fromEntries(
+      allStrategyNames().map((each) => [each, resolveStrategy(each)])) });
     await peer.say(ready.text, ready.data);
-    const spawnWatcher = serveSpawnRequests({ peer, code: options.code, baseUrl: options.url ?? server.baseUrl });
+    const watcher = serveSpawnRequests({ peer, code: options.code, baseUrl: options.url ?? server.baseUrl, name });
     try {
-      await playHands({ bot: new GinBot({ peer, strategy, judge, firstPlayer: options.first }), hands, logFile });
+      const ending = await playHands({
+        bot: new GinBot({ peer, strategy, judge, firstPlayer: options.first }), hands, logFile,
+        shouldStop: watcher.wasAskedToLeave,
+      });
+      if (ending === 'asked to leave') process.stderr.write('jev-player: left the table cleanly\n');
     } finally {
-      spawnWatcher.stop();
+      watcher.stop();
     }
   } finally {
     await browser.close();

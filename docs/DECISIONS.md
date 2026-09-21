@@ -70,6 +70,35 @@ D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rul
 
 ---
 
+### D149. Telling a bot to leave is one more `data.kind`, not a new protocol
+
+Direct user request ("add a quit instruction to the protocol to tell
+the jev bots to shut down cleanly" / "not a new protocol - use webrtc").
+It rides the existing table-talk message on the one data channel
+(D138), exactly as `jev-ready` and `spawn-bot` already do:
+
+- **`{ kind: 'quit', requestId, target? }`** - no `target` means every
+  bot at the table; a `target` names one bot by the name it sits under.
+- **`{ kind: 'quit-result', requestId, ok }`** back, with a readable
+  line ("Leaving the table - thanks for the game."), so the table sees
+  that a bot left on purpose rather than crashed.
+
+**It stops BETWEEN turns.** `waitForTurn` takes a `shouldStop`
+predicate checked between polls, so a bot never abandons a draw without
+its discard, and the runner exits 0 with its browser closed and its
+decision log flushed.
+
+**An answer in the log does not excuse another bot** - unlike a spawn
+request, where one answer settles it. "Everyone leave" means everyone,
+so each bot tracks only what IT has answered.
+
+**Rejected:** a new message type on the channel (the user's own
+correction - talk `data` already carries every bot instruction);
+killing the process from outside (that is what "cleanly" rules out - no
+goodbye on the table, a half-played turn, and an unflushed log).
+
+---
+
 ### D148. `ginRequest()` stays while the rule-list strategies are the benchmark
 
 US-125, phase 4. The sprint plan said to delete `ginRequest()`'s

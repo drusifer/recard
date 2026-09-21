@@ -4,7 +4,7 @@
 // wiring that does spawn lives in `tools/gin/player.mjs`.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { pendingSpawnRequests, spawnRefusal, readyAnnouncement } from '../tools/botRequests.mjs';
+import { pendingSpawnRequests, pendingQuits, spawnRefusal, readyAnnouncement } from '../tools/botRequests.mjs';
 
 const entry = (seq, data, name = 'Alice') => ({ seq, at: seq, from: `k${seq}`, name, text: 't', data });
 const request = (seq, requestId, strategy = 'equilibrium') => entry(seq, { kind: 'spawn-bot', game: 'gin', strategy, requestId });
@@ -108,4 +108,63 @@ test('the same request is never answered twice', async () => {
   await watcher.poll();
   await watcher.poll();
   assert.equal(peer.said.length, 1);
+});
+
+// ---- Telling a bot to leave: same talk channel, one more `data.kind` ----
+
+const quit = (seq, requestId, target) => entry(seq, { kind: 'quit', requestId, ...(target ? { target } : {}) });
+
+test('a quit addressed to everyone is for this bot too', () => {
+  assert.deepEqual(pendingQuits([quit(1, 'q1')], new Set(), 'equilibrium'), [{ requestId: 'q1', target: null }]);
+});
+
+test('a quit addressed to another bot by name is not mine', () => {
+  assert.deepEqual(pendingQuits([quit(1, 'q1', 'defensive')], new Set(), 'equilibrium'), []);
+  assert.deepEqual(pendingQuits([quit(1, 'q1', 'equilibrium')], new Set(), 'equilibrium'), [{ requestId: 'q1', target: 'equilibrium' }]);
+});
+
+test('a quit this bot already answered is not pending again', () => {
+  assert.deepEqual(pendingQuits([quit(1, 'q1')], new Set(['q1']), 'equilibrium'), []);
+});
+
+test('an answered quit in the log is still mine to act on - leaving is not a shared job', () => {
+  // Unlike spawn-bot, another bot answering does NOT excuse this one:
+  // "everyone leave" means everyone.
+  const log = [quit(1, 'q1'), entry(2, { kind: 'quit-result', requestId: 'q1', ok: true }, 'defensive')];
+  assert.deepEqual(pendingQuits(log, new Set(), 'equilibrium'), [{ requestId: 'q1', target: null }]);
+});
+
+test('ordinary chat is not a quit', () => {
+  assert.deepEqual(pendingQuits([entry(1, undefined), entry(2, { kind: 'spawn-bot', requestId: 'r', strategy: 's' })], new Set(), 'x'), []);
+});
+
+test('a quit is answered on the same channel, and the bot then reports that it was asked to leave', async () => {
+  const peer = fakePeer([quit(1, 'q1')]);
+  const watcher = serveSpawnRequests({ peer, code: 'ABC123', baseUrl: 'http://x', name: 'equilibrium', startBot: async () => null });
+  watcher.stop();
+  assert.equal(watcher.wasAskedToLeave(), false, 'nothing asked yet');
+  await watcher.poll();
+  assert.equal(watcher.wasAskedToLeave(), true);
+  assert.equal(peer.said.at(-1).data.kind, 'quit-result');
+  assert.equal(peer.said.at(-1).data.ok, true);
+  assert.match(peer.said.at(-1).text, /Leaving the table/);
+});
+
+test('a quit for another bot is ignored, and this one plays on', async () => {
+  const peer = fakePeer([quit(1, 'q1', 'defensive')]);
+  const watcher = serveSpawnRequests({ peer, code: 'ABC123', baseUrl: 'http://x', name: 'equilibrium', startBot: async () => null });
+  watcher.stop();
+  await watcher.poll();
+  assert.equal(watcher.wasAskedToLeave(), false);
+  assert.deepEqual(peer.said, []);
+});
+
+test('the ready announcement offers BOTH kinds of strategy, or a question file is unchoosable', async () => {
+  const { allStrategyNames, resolveStrategy } = await import('../tools/gin/strategyKinds.mjs');
+  const { data } = readyAnnouncement({ game: 'gin', strategies: Object.fromEntries(
+    allStrategyNames().map((each) => [each, resolveStrategy(each)])) });
+  const offered = data.strategies.map((s) => s.name);
+  assert.ok(offered.includes('equilibrium'), 'a rule-list strategy');
+  assert.ok(offered.includes('jev-balanced'), 'a question-file strategy');
+  assert.ok(data.strategies.every((s) => s.description), 'each carries its own description (Gate 2)');
 });

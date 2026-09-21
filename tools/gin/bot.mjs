@@ -141,9 +141,15 @@ export class GinBot {
    * @param {{ timeoutMs: number, pastHandOver?: boolean }} options
    * @returns {Promise<GinObservation>}
    */
-  async waitForTurn({ timeoutMs, pastHandOver = false }) {
+  /**
+   * `shouldStop` is checked between polls, so a bot asked to leave
+   * stops BETWEEN turns rather than half-way through one - it never
+   * abandons a draw without its discard. Returns `null` when it stops.
+   */
+  async waitForTurn({ timeoutMs, pastHandOver = false, shouldStop = () => false }) {
     const deadline = Date.now() + timeoutMs;
     for (;;) {
+      if (shouldStop()) return null;
       const { obs } = await this.#observe();
       const isWaiting = obs.phase === 'wait' || (pastHandOver && obs.phase === 'hand-over');
       if (!isWaiting || Date.now() >= deadline) return obs;

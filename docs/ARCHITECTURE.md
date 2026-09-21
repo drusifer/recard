@@ -71,8 +71,9 @@ Two message classes travel over the one PeerJS data channel (D4):
 3. **Talk messages** (D138): a line anyone can say, host-stamped and
    relayed to everyone in one order. Never game state. Its optional
    `data` field is what bots speak through - a Jev player announces
-   itself and narrates every decision there (D142), and "add a Jev bot"
-   is a request/answer pair on the same channel (D143).
+   itself and narrates every decision there (D142), "add a Jev bot" is
+   a request/answer pair on the same channel (D143), and `quit` tells
+   a bot (or every bot) to finish its turn and leave cleanly (D149).
 
 **Who is at the table** (D141): one roster, `state.players[]`, where a
 record's `role` is `'player'` or `'spectator'` (absent reads as player).

@@ -32,6 +32,31 @@ export function pendingSpawnRequests(talk, handled) {
 }
 
 /**
+ * Quits in `talk` this bot still has to act on. Addressed either to
+ * everyone (no `target`) or to one bot by the name it sits under.
+ *
+ * Unlike a spawn request, an answer already in the log does NOT excuse
+ * this bot: "everyone leave" means everyone, and each bot answers for
+ * itself. Only its own `handled` set stops it acting twice.
+ * @param {{ data?: unknown }[]} talk
+ * @param {Set<string>} handled request ids this bot already answered
+ * @param {string} selfName the name this bot is seated under
+ * @returns {{ requestId: string, target: string|null }[]}
+ */
+export function pendingQuits(talk, handled, selfName) {
+  const mine = [];
+  const seen = new Set();
+  for (const { data } of talk) {
+    if (data?.kind !== 'quit' || !data.requestId) continue;
+    if (data.target && data.target !== selfName) continue;
+    if (handled.has(data.requestId) || seen.has(data.requestId)) continue;
+    seen.add(data.requestId);
+    mine.push({ requestId: data.requestId, target: data.target ?? null });
+  }
+  return mine;
+}
+
+/**
  * Why this request cannot be honoured, in words the requester will see
  * at the table - or `null` when it can. Checked HERE rather than left
  * to the child process, so the person who pressed the button gets the

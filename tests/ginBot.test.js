@@ -150,3 +150,20 @@ test('a knock still reads as a knock, and carries the decision record on the sam
   assert.ok(line.data.decision, 'the decision record rides along with the announcement');
   assert.equal(line.data.melds.length, 3, 'the knock details are still there');
 });
+
+test('a bot asked to leave stops BETWEEN turns, never half-way through one', async () => {
+  const table = new FakeTable({ mine: HEAVY, theirs: THEIRS, stock: STOCK });
+  const bot = new GinBot({ peer: table, strategy: knockEarly() });
+  let leave = false;
+  const shouldStop = () => leave;
+
+  // It is this bot's turn: asked to leave, it stops without acting.
+  leave = true;
+  assert.equal(await bot.waitForTurn({ timeoutMs: 1000, shouldStop }), null);
+  assert.equal(table.piles['hand:ME'].length, 10, 'it drew nothing on the way out');
+
+  // Not asked, it plays as usual.
+  leave = false;
+  const obs = await bot.waitForTurn({ timeoutMs: 1000, shouldStop });
+  assert.equal(obs.phase, 'draw');
+});
