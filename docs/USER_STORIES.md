@@ -3810,10 +3810,20 @@ an illegal move is caught by the same mechanism in every game.
    (`parseManaCost`, the Score panel) and arrive as state. Constraints
    judge TIMING and PERMISSION - "has a land already been played this
    turn", "is the Stack clear" - never sums.
-5. **The RtG constraint set covers one playable turn**: untap, draw,
-   one land per turn, cast only what the untapped lands cover, spells
-   to the Stack, pass. Enough to play a turn legally, not to referee
-   combat.
+5. **The RtG constraint set covers the FULL turn sequence** (user
+   direction): untap everything; draw; a main phase that plays at most
+   one land and casts only what the untapped lands cover, with spells
+   going to the Stack; combat - declare attackers, let the defender
+   declare blockers, resolve unblocked damage against the defender's
+   life (the Score panel the app already replicates); then end the
+   turn. Every step is a move the bot proposes and the constraints
+   judge, including "this creature may attack" and "this block is
+   legal".
+   Combat is where RtG's own text is thinnest ("Creatures attack, the
+   defender blocks, and unblocked damage comes off life"), so it is
+   also where AC6's Magic fallback does the most work - summoning
+   sickness, tapping to attack, and blocker assignment are all
+   conventions the text assumes rather than states.
 6. **Where RtG's own text is silent, Magic: the Gathering fills the
    gap** (user direction, "if necessary"). RtG is a Magic-shaped game
    described in three sentences, so a constraint may say so explicitly:
@@ -3832,9 +3842,10 @@ an illegal move is caught by the same mechanism in every game.
    because exact combinatorics beat a probability. A game declares
    constraints only where code does not already know the answer.
 
-**Out of scope:** combat (attacking, blocking, damage - the rules text
-itself says the players enforce it); the Stack's priority rules beyond
-"it is shared and resolves top-down"; teaching the bot to build a deck;
+**Out of scope:** the Stack's full priority and response rules beyond
+"it is shared and resolves top-down"; teaching the bot to build or
+choose a deck; refereeing the OPPONENT's moves (the bot judges what IT
+is about to do - Recard referees nothing, and neither does this);
 Gin adopting constraints.
 
 **Open for Gate 1:**
@@ -3846,6 +3857,11 @@ Gin adopting constraints.
   candidate? The first is a third request.
 - A constraint returns a probability, not a verdict. What counts as
   failing - a fixed 0.5, or a per-game floor like `confidence_floor`?
+- Combat needs the opponent to act between the bot's own steps
+  (attackers, then blocks, then damage). Does the bot drive its turn as
+  a sequence of decisions with waits between them - the shape
+  `waitForTurn` already has for Gin - or does each step re-enter the
+  same decide-and-verify loop? The second is simpler and slower.
 - How far to lean on Magic for the gaps: name it once in the game file
   (one line of state every constraint inherits), or per constraint
   where it is actually needed? The first is DRY; the second makes each
