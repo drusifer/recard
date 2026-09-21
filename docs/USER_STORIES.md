@@ -3824,23 +3824,43 @@ an illegal move is caught by the same mechanism in every game.
    also where AC6's Magic fallback does the most work - summoning
    sickness, tapping to attack, and blocker assignment are all
    conventions the text assumes rather than states.
-6. **Where RtG's own text is silent, Magic: the Gathering fills the
-   gap** (user direction, "if necessary"). RtG is a Magic-shaped game
-   described in three sentences, so a constraint may say so explicitly:
-   judge by `rules`, and where `rules` does not speak, by the ordinary
-   conventions of Magic: the Gathering, which this game follows. That
-   is a deliberate use of what the model already knows rather than a
-   licence to invent: RtG's own text WINS wherever it speaks, and the
-   places it differs - no ability text on any card, no keywords,
-   players enforce combat themselves - are stated in the state, not
-   left to be assumed.
-7. **Every check is in the decision record** - which constraints ran,
-   which passed, and what the bot did about a failure - so
-   `<thought-bubble>` (US-121) shows a rejected move and the rule that
-   rejected it, with no UI change.
-8. **Gin is unaffected**: its legality stays code-side (D147/D150),
-   because exact combinatorics beat a probability. A game declares
-   constraints only where code does not already know the answer.
+6. **The rules are written out in full, now, using Magic knowledge -
+   and never referenced at play time** (user direction: "don't
+   reference it, use it to help create the typesafe rules... you can
+   research it now, not during a game"). RtG's three sentences assume
+   conventions they never state; those get researched while AUTHORING
+   the constraint set and written into the game file as explicit,
+   auditable rules. At play time a question refers only to the stated
+   rules in `rules` - there is no "judge by Magic" licence, so play
+   never depends on what the model happens to remember.
+7. **The turn sequence is emergent, not coded.** One `__step__` Choice
+   asked repeatedly - "what next?" - whose options are the legal next
+   actions, over state carrying what has happened so far
+   (`turn.land_played`, tapped state, the Stack). No code walks
+   untap -> draw -> main -> combat -> end for any game.
+8. **Nothing counts the steps.** Every action consumes something - a
+   tapped land, the one land drop, a creature's untapped state - so
+   the option set shrinks as a turn proceeds, and the turn ends when
+   the only option left is to pass. Code's job is computing that
+   option set honestly from resources, not enforcing a budget.
+9. **The bot acts on what the table SAYS** (D138 table talk), not on a
+   priority signal Recard does not have: an announcement is what draws
+   it into blocking, responding, or taking damage.
+10. **A silent table gets asked.** When the state changes in a way that
+    might involve the bot and nobody said anything, the bot asks out
+    loud ("are you attacking?") and waits for an answer, rather than
+    guessing or freezing.
+11. **An unclear rule reading is asked, not guessed.** A constraint
+    returns a probability; when it comes back uncertain the bot does
+    not silently drop the move - it asks the table ("can I attack with
+    this?") and abides by the answer.
+12. **Every check is in the decision record** - which constraints ran,
+    which passed, what was asked out loud and what came back - so
+    `<thought-bubble>` (US-121) shows a rejected move and the rule that
+    rejected it, with no UI change.
+13. **Gin is unaffected**: its legality stays code-side (D147/D150),
+    because exact combinatorics beat a probability. A game declares
+    constraints only where code does not already know the answer.
 
 **Out of scope:** the Stack's full priority and response rules beyond
 "it is shared and resolves top-down"; teaching the bot to build or
@@ -3848,21 +3868,15 @@ choose a deck; refereeing the OPPONENT's moves (the bot judges what IT
 is about to do - Recard referees nothing, and neither does this);
 Gin adopting constraints.
 
-**Open for Gate 1:**
-- Verify the chosen move only, or all candidates at once? (Cheap either
-  way per the user; the first is fewer questions, the second gives the
-  move step a pre-filtered option set and may be simpler.)
-- Does a constraint failure feed back into the SAME turn's move step as
-  state ("these options were rejected, and why"), or just pick the next
-  candidate? The first is a third request.
-- A constraint returns a probability, not a verdict. What counts as
-  failing - a fixed 0.5, or a per-game floor like `confidence_floor`?
-- Combat needs the opponent to act between the bot's own steps
-  (attackers, then blocks, then damage). Does the bot drive its turn as
-  a sequence of decisions with waits between them - the shape
-  `waitForTurn` already has for Gin - or does each step re-enter the
-  same decide-and-verify loop? The second is simpler and slower.
-- How far to lean on Magic for the gaps: name it once in the game file
-  (one line of state every constraint inherits), or per constraint
-  where it is actually needed? The first is DRY; the second makes each
-  borrowed rule visible at the point it is used.
+**Gate 1 questions - all answered by the user, 2026-09-21:**
+- Constraints run against a PROPOSED move, and the flow is emergent
+  (`__step__`), so there is no separate pre-filter pass.
+- No step budget: resources terminate a turn (see AC8).
+- The bot acts on announcements; a silent table gets asked out loud.
+- An uncertain constraint is asked at the table, not thresholded.
+- Magic is used to AUTHOR the rules, never referenced at play time.
+
+**Still open for Morpheus:** whether the bot drives itself as one
+watch-and-decide loop (the shape `waitForTurn` already has) or as
+separate loops for "my turn" and "drawn in by an announcement".
+

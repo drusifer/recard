@@ -554,9 +554,9 @@ gitleaks git --no-banner --redact --pre-commit .
  US-127 AC6 added per user: where RtG's own three sentences are silent, a constraint may judge by the ordinary conventions of Magic: the Gathering, which this game follows - using what the model already knows rather than inventing. RtG's own text WINS where it speaks, and the known differences (no ability text on cards, no keywords, players enforce combat) are stated in state, not assumed. Open: name Magic once per game file, or per constraint where it is actually needed. @Smith *user review US-127
 
 ---
-[<small>2026-09-20 23:57:16</small>] [**make**]->[**all**] *build*:
+[<small>2026-09-21 00:19:01</small>] [**make**]->[**all**] *build*:
  Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
-11:57PM INF no leaks found
-11:57PM INF 1 commits scanned.
-11:57PM INF scanned ~1479 bytes (1.48 KB) in 244ms
-11:57PM INF no leaks found
+12:19AM INF no leaks found
+12:19AM INF 1 commits scanned.
+12:19AM INF scanned ~3019 bytes (3.02 KB) in 249ms
+12:19AM INF no leaks found
