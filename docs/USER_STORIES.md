@@ -3769,3 +3769,84 @@ benchmark to beat; any change to how state is replicated.
 - **Condition:** the decision record must carry the winning slot AND
   the Choice's distribution, or `<thought-bubble>` cannot explain why
   one card beat another.
+
+---
+
+## Sprint: rules as constraints, played on RtG (2026-09-21) — planned
+
+User direction: after D150 moved the player logic into the strategy
+file, "can the game rules be expressed as some kind of typesafe
+constraint?" - and "let's use rtg as a use case".
+
+Recard the Gathering is the right test precisely because the app knows
+its CARDS and nothing about its RULES. `tools/rtg/cardSchema.mjs` gives
+every card a structured `cost` (parsed to `cmc` + `colors`), `type`,
+and `power`/`toughness`; `src/rulesReference.js` gives the rules as
+three sentences of prose. Nowhere does any code know that a land may be
+played once a turn, or that a spell waits on the Stack.
+
+### US-127: A game's rules are a list of constraints, checked by Jev
+**As** someone who wants a bot to play a game nobody has written rules
+code for, **I want** each rule to be one named yes/no constraint over
+the table state, **so that** adding a game means writing sentences, and
+an illegal move is caught by the same mechanism in every game.
+
+**AC:**
+1. **A game file carries its rules as named constraints**, beside the
+   strategy's read and move steps (D150). Each is one Noul: a name, and
+   an instruction referring to state ONLY by path - the same rule the
+   loader already enforces for questions.
+2. **Constraints are checked against a PROPOSED move**, not asked in
+   the abstract: the move step proposes, and the constraint step judges
+   that proposal (the verify-and-escalate pattern). A move that fails
+   any constraint is not played.
+3. **Failing a constraint escalates, it does not crash**: the bot takes
+   its next-best option from the move Choice's own distribution and
+   re-checks, and if nothing passes it passes the turn and says so on
+   table talk. A bot that cannot find a legal move must never sit
+   silent (the US-125 lesson).
+4. **Arithmetic stays in code even here.** RtG's schema is structured,
+   so mana availability, converted cost and life totals are computed
+   (`parseManaCost`, the Score panel) and arrive as state. Constraints
+   judge TIMING and PERMISSION - "has a land already been played this
+   turn", "is the Stack clear" - never sums.
+5. **The RtG constraint set covers one playable turn**: untap, draw,
+   one land per turn, cast only what the untapped lands cover, spells
+   to the Stack, pass. Enough to play a turn legally, not to referee
+   combat.
+6. **Where RtG's own text is silent, Magic: the Gathering fills the
+   gap** (user direction, "if necessary"). RtG is a Magic-shaped game
+   described in three sentences, so a constraint may say so explicitly:
+   judge by `rules`, and where `rules` does not speak, by the ordinary
+   conventions of Magic: the Gathering, which this game follows. That
+   is a deliberate use of what the model already knows rather than a
+   licence to invent: RtG's own text WINS wherever it speaks, and the
+   places it differs - no ability text on any card, no keywords,
+   players enforce combat themselves - are stated in the state, not
+   left to be assumed.
+7. **Every check is in the decision record** - which constraints ran,
+   which passed, and what the bot did about a failure - so
+   `<thought-bubble>` (US-121) shows a rejected move and the rule that
+   rejected it, with no UI change.
+8. **Gin is unaffected**: its legality stays code-side (D147/D150),
+   because exact combinatorics beat a probability. A game declares
+   constraints only where code does not already know the answer.
+
+**Out of scope:** combat (attacking, blocking, damage - the rules text
+itself says the players enforce it); the Stack's priority rules beyond
+"it is shared and resolves top-down"; teaching the bot to build a deck;
+Gin adopting constraints.
+
+**Open for Gate 1:**
+- Verify the chosen move only, or all candidates at once? (Cheap either
+  way per the user; the first is fewer questions, the second gives the
+  move step a pre-filtered option set and may be simpler.)
+- Does a constraint failure feed back into the SAME turn's move step as
+  state ("these options were rejected, and why"), or just pick the next
+  candidate? The first is a third request.
+- A constraint returns a probability, not a verdict. What counts as
+  failing - a fixed 0.5, or a per-game floor like `confidence_floor`?
+- How far to lean on Magic for the gaps: name it once in the game file
+  (one line of state every constraint inherits), or per constraint
+  where it is actually needed? The first is DRY; the second makes each
+  borrowed rule visible at the point it is used.

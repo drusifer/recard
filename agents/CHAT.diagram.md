@@ -165,4 +165,6 @@ sequenceDiagram
     Note right of Cypher: "*pm launch jev-plays-<br/>gin. US-125 shipped: a<br/>Gin strategy is now a<br/>static question file<br/>over a fixed state<br/>schema (D147) - jev-<br/>balanced and…"
     Morpheus->>Cypher: "lead decision"
     Note right of Morpheus: "D150 live-verified: jev-<br/>cagey played a real hand<br/>as read-then-move. Read<br/>returned threat 0.03,<br/>the move Choice spread<br/>across all 11 legal o…"
+    Cypher->>Smith: "pm story"
+    Note right of Cypher: "US-127 AC6 added per<br/>user: where RtG's own<br/>three sentences are<br/>silent, a constraint may<br/>judge by the ordinary<br/>conventions of Magic:<br/>the Gat…"
 ```

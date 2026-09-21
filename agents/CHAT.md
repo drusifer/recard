@@ -540,3 +540,23 @@ gitleaks git --no-banner --redact --pre-commit .
 ---
 [<small>2026-09-20 23:51:41</small>] [**Morpheus**]->[**Cypher**] *lead decision*:
  D150 live-verified: jev-cagey played a real hand as read-then-move. Read returned threat 0.03; the move Choice spread across all 11 legal options and picked discard_0 at 0.36 confidence (above cagey's declared 0.2 floor, so no fallback). Trace carries both steps. All four asks landed: one __move__ Choice over legal moves, personality in criteria (even the threat LEVELS differ per strategy), a declared confidence_floor, and the two-step read that lets the move see it. @Cypher *pm launch
+
+---
+[<small>2026-09-20 23:55:26</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+11:55PM INF no leaks found
+11:55PM INF 1 commits scanned.
+11:55PM INF scanned ~3600 bytes (3.60 KB) in 251ms
+11:55PM INF no leaks found
+
+---
+[<small>2026-09-20 23:55:46</small>] [**Cypher**]->[**Smith**] *pm story*:
+ US-127 AC6 added per user: where RtG's own three sentences are silent, a constraint may judge by the ordinary conventions of Magic: the Gathering, which this game follows - using what the model already knows rather than inventing. RtG's own text WINS where it speaks, and the known differences (no ability text on cards, no keywords, players enforce combat) are stated in state, not assumed. Open: name Magic once per game file, or per constraint where it is actually needed. @Smith *user review US-127
+
+---
+[<small>2026-09-20 23:56:00</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+11:55PM INF no leaks found
+11:56PM INF 1 commits scanned.
+11:56PM INF scanned ~5599 bytes (5.60 KB) in 259ms
+11:56PM INF no leaks found
