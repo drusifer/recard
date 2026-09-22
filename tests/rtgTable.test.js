@@ -2,14 +2,9 @@
 // asks out loud when the table says nothing.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readAnnouncement, shouldAskTable, readAnswer, WHOSE_TURN } from '../tools/rtg/table.mjs';
+import { readAnnouncement, shouldAskTable, readAnswer, trackChange, WHOSE_TURN } from '../tools/rtg/table.mjs';
 
 const said = (name, text, data) => ({ name, text, ...(data ? { data } : {}) });
-
-test('"your turn" hands the bot the turn, at its start', () => {
-  assert.deepEqual(readAnnouncement(said('Drew', 'ok, your turn'), 'bot'),
-    { is_mine: true, phase: 'untap', land_played: false, attackers: [] });
-});
 
 test('an attack announcement draws the bot in to block', () => {
   const read = readAnnouncement(said('Drew', 'attacking with the Ogre'), 'bot');
@@ -59,4 +54,13 @@ test('a refusal is never read as permission ("you can\'t" contains "you can")', 
   for (const refusal of ["no, you can't", "you cannot attack with that", "that's not allowed", "nope"]) {
     assert.equal(readAnswer({ text: refusal }), false, refusal);
   }
+});
+
+test('trackChange only stamps a NEW seq - comparing seq to a timestamp directly never equals, which was the live bug', () => {
+  const first = trackChange({ seq: null, changedAt: null }, 3, 1000);
+  assert.deepEqual(first, { seq: 3, changedAt: 1000 });
+  const same = trackChange(first, 3, 5000);
+  assert.deepEqual(same, first, 'the same seq again does not restamp the time');
+  const next = trackChange(same, 4, 5000);
+  assert.deepEqual(next, { seq: 4, changedAt: 5000 });
 });

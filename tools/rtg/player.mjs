@@ -13,7 +13,8 @@ import { loadGame, RTG } from './gameFile.mjs';
 import { buildRtgState } from './playState.mjs';
 import { decideStep } from './decide.mjs';
 import { actionsFor } from './moves.mjs';
-import { readAnnouncement, readAnswer, shouldAskTable, WHOSE_TURN } from './table.mjs';
+import { readAnnouncement, readAnswer, shouldAskTable, trackChange, WHOSE_TURN } from './table.mjs';
+import { turnStatus } from './turnOrder.mjs';
 
 const POLL_MS = 1500;
 const SEAT_TIMEOUT_MS = 60_000;
@@ -45,10 +46,18 @@ async function loop({ peer, game, judge, name, options }) {
   const myId = await peer.myId();
   const turn = { is_mine: false, phase: 'unknown', land_played: false, attackers: [], arrivedThisTurn: [] };
   let seenTalk = 0;
-  let lastStateChangeAt = null;
+  let touchSeen = { seq: null, changedAt: null };
   let lastTalkAt = null;
   let pendingAnswer = null;
   const budgetOfSteps = Number(options.steps ?? 12); // a RUN limit, not a turn limit
+
+  // US-127 follow-up/D152: has THEIR turn ended, so mine can start? Not
+  // a phrase to match - a judgment over the board and table talk
+  // (turnOrder.mjs), re-asked only when either has moved since the last
+  // ask. Seeded from what already exists so joining mid-game does not
+  // spend a request on the empty table before anything has happened.
+  let checkedTalkTo = (await peer.talk()).length;
+  let checkedStateSeq = (await peer.view()).lastTouch?.seq ?? null;
 
   for (let taken = 0; taken < budgetOfSteps;) {
     const view = await peer.view();
@@ -60,9 +69,16 @@ async function loop({ peer, game, judge, name, options }) {
       if (heard) Object.assign(turn, heard);
     }
     seenTalk = talk.length;
-    if (view.lastTouch?.seq !== undefined && view.lastTouch.seq !== lastStateChangeAt) lastStateChangeAt = Date.now();
+    touchSeen = trackChange(touchSeen, view.lastTouch?.seq, Date.now());
 
-    if (shouldAskTable({ lastStateChangeAt, lastTalkAt, turnKnown: turn.phase !== 'unknown', now: Date.now() })) {
+    if (!turn.is_mine && (talk.length > checkedTalkTo || view.lastTouch?.seq !== checkedStateSeq)) {
+      checkedTalkTo = talk.length;
+      checkedStateSeq = view.lastTouch?.seq ?? checkedStateSeq;
+      const status = await turnStatus({ game, state: buildRtgState(view, myId, turn), talk, judge });
+      if (status.isOver) Object.assign(turn, { is_mine: true, phase: 'untap', land_played: false, attackers: [] });
+    }
+
+    if (shouldAskTable({ lastStateChangeAt: touchSeen.changedAt, lastTalkAt, turnKnown: turn.phase !== 'unknown', now: Date.now() })) {
       await peer.say(WHOSE_TURN);
       lastTalkAt = Date.now();
       continue;

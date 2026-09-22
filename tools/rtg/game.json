@@ -11,7 +11,9 @@
     "attacking": "Only untapped creatures without summoning sickness may attack. Attacking taps the creature. You choose which of your creatures attack; you attack the opponent, not their creatures.",
     "blocking": "The defending player may block each attacking creature with one untapped creature they control. A tapped creature cannot block. A creature that arrived this turn may still block.",
     "damage": "An attacking creature blocked by a creature deals its power to that blocker and takes the blocker's power in return; a creature that has taken damage equal to or greater than its toughness dies and goes to its owner's graveyard. An unblocked attacker deals its power to the defending player, who loses that much life.",
-    "priority": "Either player may respond while something is on the Stack. Recard does not track priority: players say what they are doing, and the table settles it."
+    "priority": "Either player may respond while something is on the Stack. Recard does not track priority: players say what they are doing, and the table settles it.",
+    "seating": "Turns pass clockwise. The player counter-clockwise from me is the one whose turn it currently is, if anyone's.",
+    "no_mechanical_signal": "Nothing about the board alone proves a turn has ended - a player may hold mana untapped for instants, and may choose not to attack at all. Work out what happened from the board as it stands now and what was said, in order."
   },
   "constraints": {
     "one_land_per_turn": {
@@ -33,6 +35,14 @@
     "timing_is_right": {
       "type": "noul",
       "instructions": "Given `rules.turn_sequence`, `rules.priority`, `turn.is_mine` and `turn.phase`, is this the right moment for the move in `proposed.what`?"
+    },
+    "attack_phase_complete": {
+      "type": "noul",
+      "instructions": "Given `rules.no_mechanical_signal`, the board in `me` and `opponent`, and `table_talk` in order, IF the counter-clockwise player declared an attack this turn, has it been resolved? Answer yes if no attack was declared at all - there is nothing pending."
+    },
+    "their_turn_is_over": {
+      "type": "noul",
+      "instructions": "Given `rules.seating`, `rules.no_mechanical_signal`, the board in `me` and `opponent`, `table_talk` in order, and the read on `attack_phase_complete` - has the counter-clockwise player's turn ended? Judge only from the board and what was said - never guess about something already visible."
     }
   },
   "step": {

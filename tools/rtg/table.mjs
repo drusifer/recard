@@ -11,9 +11,12 @@
  *  reads intent from what was said, not from a payload. */
 export function readAnnouncement(entry, me) {
   const text = (entry.text ?? '').toLowerCase();
-  const mine = entry.name === me;
-  if (mine) return null; // the bot's own narration is not news
-  if (/\byour turn\b|\bgo ahead\b|\bpass(ing|ed)? (the )?turn\b|\bover to you\b/.test(text)) return { is_mine: true, phase: 'untap', land_played: false, attackers: [] };
+  if (entry.name === me) return null; // the bot's own narration is not news
+  // "It is now my turn" stays a simple phrase match: it is the opponent
+  // announcing their OWN turn starting, which is exactly as explicit as
+  // a person can be. The reverse - has THEIR turn ended, so mine can
+  // start - is not something a phrase can settle (US-127 follow-up):
+  // that is `turnOrder.mjs`'s judgment over the board and this same log.
   if (/\bmy turn\b|\buntap|\bi draw\b/.test(text)) return { is_mine: false, phase: 'their-turn', attackers: [] };
   if (/\battack/.test(text)) return { is_mine: false, phase: 'combat', attackers: attackersIn(entry) };
   if (/\bno attack|\bdone\b|\bnothing\b/.test(text)) return { attackers: [] };
@@ -53,4 +56,18 @@ export function readAnswer(entry) {
   if (/\b(no|nope|nah|can't|cannot|don't|do not|not allowed|illegal|isn't|is not)\b/.test(text)) return false;
   if (/\b(yes|yep|yeah|sure|go ahead|you can|allowed|legal|fine)\b/.test(text)) return true;
   return null;
+}
+
+/**
+ * Turns a changing SEQUENCE (an id, a seq number - never a timestamp)
+ * into a "when did this last actually change" timestamp. Separated out
+ * because the naive version - comparing the new value straight against
+ * a stored timestamp - compares a small int to a large one and is
+ * never equal, so it "changes" every call. Found live (US-127 follow-
+ * up): `lastStateChangeAt` was reset every poll tick because it was
+ * being compared directly against `view.lastTouch.seq`.
+ */
+export function trackChange(seen, seq, now) {
+  if (seq === undefined || seq === seen.seq) return seen;
+  return { seq, changedAt: now };
 }

@@ -3880,3 +3880,121 @@ Gin adopting constraints.
 watch-and-decide loop (the shape `waitForTurn` already has) or as
 separate loops for "my turn" and "drawn in by an announcement".
 
+
+---
+
+## Sprint: One Jev-player domain model (2026-09-21) — Tier 2, planned
+
+Morpheus architecture, invoked directly by the user after building two
+game players (Gin, US-125/126/D147/D150; RtG, US-127/D151/D152) that
+turned out to share almost everything except the parts that are
+genuinely game-specific. User's own framing: "it looks like we're
+coding up A player instead of creating the abstractions we need for a
+general purpose TypeSafe player."
+
+### The evidence, not just the instinct
+
+Both players already reduce to the same five stages, done twice under
+different names:
+
+| Stage | Gin | RtG | Shared today? |
+|---|---|---|---|
+| Project the view into fixed state | `playState.mjs` `buildPlayState` | `playState.mjs` `buildRtgState` | No - two files, same shape |
+| Compute facts/legal options in code | `computeFacts`/candidate slots (`jevStrategy.moveOptions`) | `options.mjs` `legalOptions` | No |
+| Load a static question file, reject literals | `strategyFile.mjs` | `gameFile.mjs` **imports `checkInstruction` from `gin/strategyFile.mjs` already** | Half - one game reaches into the other's file |
+| Ask a Choice over legal options, described by the file | `jevStrategy.decideByQuestions` (read then move) | `decide.decideStep` (step then verify) | No - same idea, incompatible escalation policies |
+| Turn the decision into real actions + a talk line | `bot.mjs#execute` + `decisionTalk` | `moves.mjs actionsFor` | No |
+| Runner loop: join, refuse-if-spectator, observe/decide/act, quit (D149), add-bot (D143) | `gin/player.mjs` - has both | `rtg/player.mjs` - has **neither** | No, and RtG is missing real shipped features because of it |
+| Hear the table / ask when stuck | not used (Gin's turn is code-computable) | `table.mjs` (already game-agnostic in its own code) | Already effectively shared, just not promoted |
+
+The `gameFile.mjs` import and the missing quit/spawn support in RtG are
+not abstract arguments - they are a live duplication bug and a live
+feature gap, both already in the shipped code.
+
+### US-128: A shared Jev-player domain model, two games as adapters
+
+**As** someone adding a third game's Jev player, **I want** to write
+only the parts that are genuinely that game's own - how to read its
+board, what its legal moves are, how to carry one out - **so that**
+quitting cleanly, being added from the table, and the question-file
+discipline are not each game's problem to re-solve.
+
+**AC:**
+1. **`tools/jev/` holds everything game-agnostic**, promoted out of
+   `tools/gin/` where it does not belong:
+   - `strategyFile.mjs` (moved from `gin/`, `rtg/gameFile.mjs` becomes a
+     thin RtG-shaped wrapper or is retired entirely if the shapes
+     unify - AC3 decides which)
+   - `table.mjs` (moved from `rtg/` - already game-agnostic, RtG-only
+     by accident of where it was written)
+   - `runner.mjs` - the shared loop: join, refuse-if-spectator,
+     observe/decide/act/narrate, quit (D149) and add-bot (D143) ALWAYS
+     present, not opted into per game
+   - `botRequests.mjs` stays where it is (already shared, already
+     game-agnostic in its own right)
+2. **One `GameAdapter` contract**, implemented once per game:
+   ```
+   {
+     name: string,
+     loadStrategy(name) -> { read?, decide, verify?, confidence_floor? },
+     project(view, self, tracked) -> State,      // fixed schema, values only
+     legalOptions(state, tracked) -> Option[],    // the real constraint (D151)
+     actionsFor(move, state, ids) -> { actions, say, tracks },
+     turnStatus?(state, talk, judge) -> { isOver, unclear }  // OPTIONAL -
+       a game whose turn is code-computable (Gin) omits this; a game
+       whose turn is judged (RtG, D152) provides it
+   }
+   ```
+   Gin and RtG each become one adapter file plus their existing
+   strategy/game JSON - no behavioural change to either.
+3. **One decision orchestrator** unifying `decideByQuestions` (Gin) and
+   `decideStep` (RtG): an optional `read` stage (Nouls/Scores merged
+   into state before the choice - Gin has this, RtG's `turnStatus` is
+   the same idea run continuously rather than per-decision), the
+   `decide` Choice over `legalOptions`, an optional `verify` stage
+   (RtG's constraints; Gin doesn't need one today but the interface
+   must not assume every game skips it), and ONE escalation policy
+   interface supporting both of Gin's confidence-floor-fallback and
+   RtG's ask-the-table, as configuration - not two hardcoded behaviors.
+4. **Every adapter gets D143/D149 for free** by construction - the
+   shared runner wires `serveSpawnRequests`/`pendingQuits` unconditionally,
+   so RtG's current gap closes as a SIDE EFFECT of the refactor, not a
+   separate fix.
+5. **No behavioural regression.** Every existing Gin and RtG test still
+   describes real behavior after the move; a test that only proved
+   "this file has this shape" is deleted rather than ported if the
+   shape no longer exists (no-back-compat).
+6. **A third game is the proof.** Before calling this done, sketch (not
+   necessarily ship) what a third game's adapter would need to provide -
+   Hearts is the natural pick, since its rules are already three
+   sentences in `rulesReference.js`, same starting position RtG had.
+
+**Out of scope:** actually building a third game's player; changing
+Gin's or RtG's own strategy/game file CONTENT (only where the files
+live moves, in AC1); the diff-tracker question for a hypothetical
+future non-visible-board game (D152 already covers why RtG doesn't
+need one; a game that does is a future adapter's problem, not this
+refactor's).
+
+### Live evidence this is not a hypothetical: a stall found while wiring D152
+
+While proving D152 (turn-order judgment) at a real table, the bot asked
+"whose turn is it," was told directly "it's your turn, go ahead," and
+then sat forever - not wrongly claiming the turn, but never resolving
+the ambiguity either. Root cause: `their_turn_is_over` came back a
+genuinely unconvincing 0.34, and `table.mjs`'s `shouldAskTable` treats
+"somebody spoke since the last change" as settled, with no way to
+re-ask when what was said did not actually convince the judgment.
+
+That is the SAME problem `decide.mjs`'s constraint verification already
+solved for move legality - ask again when a Noul is unconvincing, abide
+by the answer - solved a second time, worse, because it was written
+separately. This is now AC3's concrete justification: one escalation
+policy, used everywhere a Noul comes back unconvinced, not one for
+moves and a weaker one for turn detection. Not hand-patched here on
+purpose - patching it would be writing a THIRD bespoke version instead
+of the one this sprint exists to build.
+
+**Tier 2 fast-track** (bob-protocol standing rule #10): this document
+carries both the story and the architecture in one pass. Smith reviews
+both together; Mouse plans phases directly from this.

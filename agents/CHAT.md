@@ -718,9 +718,9 @@ gitleaks git --no-banner --redact --pre-commit .
  Oracle retro: D151 recorded as decided; ARCHITECTURE and lessons updated at close. Gap: docs/ has no RtG bot page - the game file is self-documenting, but how to RUN one lives only in a comment at the top of player.mjs. Filed.
 
 ---
-[<small>2026-09-21 18:25:28</small>] [**make**]->[**all**] *build*:
+[<small>2026-09-21 21:24:21</small>] [**make**]->[**all**] *build*:
  Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
-6:25PM INF no leaks found
-6:25PM INF 1 commits scanned.
-6:25PM INF scanned ~25398 bytes (25.40 KB) in 257ms
-6:25PM INF no leaks found
+gitleaks git --no-banner --redact --pre-commit .
+9:24PM INF 1 commits scanned.
+9:24PM INF scanned ~13551 bytes (13.55 KB) in 253ms
+9:24PM INF no leaks found

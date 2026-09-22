@@ -70,6 +70,49 @@ D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rul
 
 ---
 
+### D152. Whose turn it is: judged from the board and table talk, never tracked or asked
+
+US-127 follow-up, direct user correction of two draft designs in a row.
+The first draft gated "their turn is over" on mechanical facts - played
+a land, completed the attack phase, has untapped mana - as hard
+requirements. Both middle two were wrong: attacking is optional, so an
+unattacked turn is not an incomplete one, and holding mana untapped for
+instants is normal play, not evidence of anything. The second draft
+proposed a diff-based `action_log`, mirroring Gin's `observe.mjs`
+tracker - also wrong, because RtG's board is fully permissive and
+already visible (D82-D85): there is nothing to reconstruct that is not
+already sitting in the replicated state.
+
+The design that survived: **two named Nouls** (`attack_phase_complete`,
+`their_turn_is_over`) in `tools/rtg/game.json`, judging the LIVE board
+(`me`/`opponent`, already real data) plus the ordered table-talk log
+together - "the cards are already out; table talk works out the
+sequence between them" (the user's own words). No tracker, no event
+log, no diff.
+
+**What the bot may never do:** ask a player something the board already
+shows. Escalating to a direct "are you done?" (`decide.mjs`'s `ask`)
+stays reserved for when `their_turn_is_over` itself comes back
+unconvinced - never as a stand-in for checking state.
+
+**In the player loop:** the judgment re-runs only when the board or the
+talk log has moved since the last check, seeded from what already
+exists at join time so a mid-game join costs no request on an empty
+table. The opposite transition - hearing the OPPONENT announce their
+own turn starting ("my turn", "I draw") - stays a plain phrase match:
+it is exactly as explicit as a person can be, and turning it into a
+third Noul was not asked for and would add a request to already-clear
+information.
+
+**Rejected:** mechanical gates on optional/discretionary game state
+(attacking, holding mana); a diff-tracked action log (nothing to
+reconstruct when the board is already visible); asking the table about
+board facts (that is what state.js already replicates); Noul-ifying
+the "my turn" phrase match (adds a request where a phrase is already
+unambiguous - filed as a "not yet" for symmetry, not "no").
+
+---
+
 ### D151. A game is a rules file; the turn is emergent; the table is asked
 
 US-127. RtG's rules live in `tools/rtg/game.json` beside the Gin
