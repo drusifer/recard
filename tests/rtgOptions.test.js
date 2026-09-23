@@ -2,7 +2,7 @@
 // are spent, and ends at "pass" - no budget, no counter.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { legalOptions, onlyPassing } from '../tools/rtg/options.mjs';
+import { legalOptions, isOnlyPassing } from '../tools/rtg/options.mjs';
 
 const base = (over = {}) => ({
   me: {
@@ -57,11 +57,16 @@ test('the turn ends by running out of resources, not by a counter', () => {
     turn: { land_played: true },
   });
   assert.deepEqual(ids(spent), ['pass']);
-  assert.equal(onlyPassing(legalOptions(spent)), true);
+  assert.equal(isOnlyPassing(legalOptions(spent)), true);
 });
 
 test('passing is always offered, so the bot is never cornered', () => {
   for (const phase of ['untap', 'draw', 'main', 'combat', 'unknown']) {
     assert.ok(ids(base({ turn: { phase } })).includes('pass'), phase);
   }
+});
+
+test('main phase offers every land drop before any spell, whatever the hand order', () => {
+  const hand = [card('Bear', 'Creature', '{G}', 1), card('Forest', 'Land'), card('Wolf', 'Creature', '{G}', 1), card('Swamp', 'Land')];
+  assert.deepEqual(ids(base({ me: { hand } })), ['play_land:Forest', 'play_land:Swamp', 'cast:Bear', 'cast:Wolf', 'pass']);
 });

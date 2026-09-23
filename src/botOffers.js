@@ -6,8 +6,12 @@
  * Pure: the talk log and the roster in, what to offer out.
  */
 
-/** @typedef {{ name: string, description: string }} OfferedStrategy */
-/** @typedef {{ from: string, name: string, games: string[], strategies: OfferedStrategy[] }} BotOffer */
+/**
+@typedef {{ name: string, description: string }} OfferedStrategy
+*/
+/**
+@typedef {{ from: string, name: string, games: string[], strategies: OfferedStrategy[] }} BotOffer
+*/
 
 /**
  * The live offers: the newest `jev-ready` from each sender that is
@@ -30,7 +34,7 @@ export function botOffers(talk, players) {
       strategies: (data.strategies ?? []).filter((s) => s?.name),
     });
   }
-  return [...bySender.values()].filter((offer) => offer.strategies.length > 0);
+  return bySender.values().filter((offer) => offer.strategies.length > 0).toArray();
 }
 
 /**
@@ -40,9 +44,9 @@ export function botOffers(talk, players) {
  * @returns {{ ok: boolean, error?: string }|null}
  */
 export function spawnResult(talk, requestId) {
-  for (const { data } of [...talk].reverse()) {
+  for (const { data } of talk.toReversed()) {
     if (data?.kind === 'spawn-bot-result' && data.requestId === requestId) {
-      return { ok: data.ok === true, ...(data.error ? { error: data.error } : {}) };
+      return { ok: data.ok === true, ...(data.error && { error: data.error }) };
     }
   }
   return null;

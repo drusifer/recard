@@ -21,7 +21,6 @@ const MAX_HEIGHT = 420;
 export class ThoughtBubbleElement extends HTMLElement {
   #summary = null;
   #panel = null;
-  #decisions = [];
   #open = false;
   #onDocumentClick = null;
 
@@ -56,7 +55,9 @@ export class ThoughtBubbleElement extends HTMLElement {
     this.#onDocumentClick = null;
   }
 
-  /** Opens or closes, placing the panel so it stays on screen. */
+  /**
+  Opens or closes, placing the panel so it stays on screen.
+  */
   toggle(open) {
     this.#open = open;
     this.#panel.hidden = !open;
@@ -90,7 +91,7 @@ export class ThoughtBubbleElement extends HTMLElement {
     const height = Math.min(MAX_HEIGHT, this.#panel.getBoundingClientRect().height || MAX_HEIGHT);
     // Same clamp the focus-zoom overlay uses, so a bubble on a seat at
     // the edge of the table stays fully on screen (D142).
-    const { left, top } = clampOverlayPosition(rect, { width: WIDTH, height }, { width: innerWidth, height: innerHeight });
+    const { left, top } = clampOverlayPosition(rect, { width: WIDTH, height }, { width: globalThis.innerWidth, height: globalThis.innerHeight });
     this.#panel.style.left = `${left}px`;
     this.#panel.style.top = `${top}px`;
   }
@@ -100,7 +101,6 @@ export class ThoughtBubbleElement extends HTMLElement {
    */
   render({ decisions = [], open = false } = {}) {
     if (!this.#summary) this.connectedCallback();
-    this.#decisions = decisions;
     const latest = decisions.at(-1);
     this.hidden = !latest; // nothing decided yet, nothing to show (AC6)
     if (!latest) {
@@ -130,14 +130,18 @@ function entryElement(decision) {
   item.append(line('thought-move', `${decision.text} — hand ${decision.handNumber ?? '?'}, ${decision.strategy ?? 'bot'}`));
 
   const fired = decision.trace?.find((step) => step.fired);
-  if (fired) item.append(line('thought-rule', `Rule: ${fired.rule}${fired.why ? ` — ${fired.why}` : ''}`));
+  if (fired) {
+    const why = fired.why ? ` — ${fired.why}` : '';
+    item.append(line('thought-rule', `Rule: ${fired.rule}${why}`));
+  }
   const considered = decision.trace?.filter((step) => !step.fired).map((step) => step.rule) ?? [];
-  if (considered.length) item.append(line('thought-considered', `Also weighed: ${considered.join(', ')}`));
+  if (considered.length > 0) item.append(line('thought-considered', `Also weighed: ${considered.join(', ')}`));
 
   if (decision.judgments) {
     const { threat, helps } = decision.judgments;
     item.append(line('thought-jev', `Jev: opponent threat ${Number(threat).toFixed(1)}`));
-    for (const [card, score] of Object.entries(helps ?? {})) {
+    const helped = Object.entries(helps ?? {});
+    for (const [card, score] of helped) {
       item.append(line('thought-jev-help', `  ${card} helps them: ${Number(score).toFixed(2)}`));
     }
   }

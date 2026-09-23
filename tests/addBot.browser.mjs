@@ -21,12 +21,12 @@ before(async () => {
 });
 
 after(async () => {
-  for (const close of fixture.closers.reverse()) await close();
+  for (const close of fixture.closers.toReversed()) await close();
   await fixture.browser?.close();
   await fixture.server?.close();
 });
 
-const controlHidden = () => fixture.hosted.host.page.$eval('add-bot', (el) => el.hidden);
+const controlHidden = () => fixture.hosted.host.page.$eval('add-bot', (element) => element.hidden);
 
 test('with no Jev player at the table, there is nothing to add and the control is hidden', async () => {
   assert.equal(await controlHidden(), true);

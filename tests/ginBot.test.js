@@ -125,7 +125,7 @@ test('a discard says which card, by name', async () => {
   await bot.step();
 
   assert.equal(table.talk.length, 1);
-  assert.match(table.talk[0].text, /^Discarded [0-9AJQK]+[\u2660\u2663\u2665\u2666]$/);
+  assert.match(table.talk[0].text, /^Discarded [0-9AJQK]+[\u{2660}\u{2663}\u{2665}\u{2666}]$/u);
   assert.equal(table.talk[0].data.decision.type, 'discard');
 });
 
@@ -155,27 +155,27 @@ test('a knock still reads as a knock, and carries the decision record on the sam
 test('a bot asked to leave stops BETWEEN turns, never half-way through one', async () => {
   const table = new FakeTable({ mine: HEAVY, theirs: THEIRS, stock: STOCK });
   const bot = new GinBot({ peer: table, strategy: knockEarly() });
-  let leave = false;
-  const shouldStop = () => leave;
+  let isLeave = false;
+  const shouldStop = () => isLeave;
 
   // It is this bot's turn: asked to leave, it stops without acting.
-  leave = true;
+  isLeave = true;
   assert.equal(await bot.nextMove({ shouldStop }), 'done');
   assert.equal(table.piles['hand:ME'].length, 10, 'it drew nothing on the way out');
 
   // Not asked, it plays as usual.
-  leave = false;
+  isLeave = false;
   assert.equal(await bot.nextMove({ shouldStop }), 'move');
 });
 
 test('asked to leave AFTER drawing, it still discards first - a turn is draw and discard (C4)', async () => {
   const table = new FakeTable({ mine: HEAVY, theirs: THEIRS, stock: STOCK });
   const bot = new GinBot({ peer: table, strategy: knockEarly() });
-  let leave = false;
-  const shouldStop = () => leave;
+  let isLeave = false;
+  const shouldStop = () => isLeave;
   assert.equal(await bot.nextMove({ shouldStop }), 'move');
   await bot.step(); // drew: 11 cards
-  leave = true;
+  isLeave = true;
   assert.equal(await bot.nextMove({ shouldStop }), 'move', 'the discard is still owed');
   await bot.step();
   assert.equal(table.piles['hand:ME'].length, 10, 'it never walks away holding 11 cards');

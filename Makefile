@@ -34,7 +34,7 @@ help:
 	@echo "  cards        compile content/rtg YAML -> src/decks/rtg/cards.json"
 	@echo "  art-gen      paint card art via the codex CLI (~50 min, resumable)"
 	@echo "  art          pack generated art into assets/cards/rtg/*.webp"
-	@echo "  check        cards + test + lint-decks + secrets  (full gate)"
+	@echo "  check        cards + test + lint + lint-decks + secrets  (full gate)"
 	@echo "  dev          dev server"
 	@echo "  build-standalone  bundle everything into dist/recard-standalone.html (runs via file://)"
 	@echo "  dist         gather index.html/style.css/src/assets into dist/ for a static host upload"
@@ -177,7 +177,7 @@ art:
 # `lint-decks` IS included: it carries no baseline debt, so it can and
 # must stay at exit 0 - an unbalanced deck is a real failure, not a
 # tolerated one.
-check: cards test lint-decks secrets
+check: cards test lint lint-decks secrets
 
 dev:
 	npm run dev

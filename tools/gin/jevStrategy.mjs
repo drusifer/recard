@@ -34,7 +34,9 @@ export function moveOptions(strategy, state) {
   return criteria;
 }
 
-/** The read step's questions - asked as the file writes them. */
+/**
+The read step's questions - asked as the file writes them.
+*/
 export function readQuestions(strategy, state) {
   if (state.me.phase !== 'discard') {
     // Nothing to read about on a draw: there are no candidates yet.
@@ -53,7 +55,8 @@ export function readQuestions(strategy, state) {
  *  step - so record, summary and thought bubble see one shape. */
 export function judgmentsFrom(read, facts) {
   const helps = {};
-  for (const [slot, probability] of Object.entries(read.opponent_wants?.probabilities ?? {})) {
+  const wanted = Object.entries(read.opponent_wants?.probabilities ?? {});
+  for (const [slot, probability] of wanted) {
     const card = facts.discards?.[Number(slot)]?.card;
     if (card) helps[card.id] = probability;
   }
@@ -62,11 +65,13 @@ export function judgmentsFrom(read, facts) {
   return { threat: threat?.score ?? 0, threatConfidence: threat?.confidence ?? 0, helps, model: 'jev' };
 }
 
-/** What `option` means as a move. */
+/**
+What `option` means as a move.
+*/
 function moveFor(option, facts) {
   if (option === 'take_upcard') return { type: 'draw', source: 'discard' };
   if (option === 'draw_stock') return { type: 'draw', source: 'stock' };
-  const [kind, slot] = option.split('_');
+  const [kind, slot] = option.split('_', 2);
   const chosen = facts.discards[Number(slot)] ?? facts.bestDiscard;
   return { type: 'discard', cardId: chosen.card.id, declare: kind === 'discard' ? 'none' : kind };
 }

@@ -319,4 +319,11 @@ sequenceDiagram
     Note right of Cypher: "Cypher retro: AC2's<br/>contract sketch missed<br/>that Gin still ships<br/>D137 rule-list<br/>strategies. Smith caught<br/>it at the gate (C1), and<br/>D153 narro…"
     Cypher->>All: "pm launch"
     Note right of Cypher: "*pm launch US-128 Jev<br/>player model. tools/jev/<br/>holds everything game-<br/>agnostic, Gin and RtG<br/>are adapters, RtG now<br/>answers Add Jev bot and<br/>Qu…"
+    Note over User,Oracle: 📅 2026-09-23
+    User->>All: "request"
+    Note right of User: "add lint to make check<br/>and fix the lint debt"
+    Neo->>All: "swe impl"
+    Note right of Neo: "Neo on it: add lint to<br/>'make check', then clear<br/>the debt. Autofix first,<br/>run tests, then the hand<br/>fixes, rule by rule."
+    Neo->>All: "swe done"
+    Note right of Neo: "Lint is now part of<br/>'make check', and the<br/>debt is cleared: 144<br/>ESLint errors and 1<br/>stylelint error down to<br/>0, with no rule<br/>disabled. The no…"
 ```

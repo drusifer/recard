@@ -1,5 +1,17 @@
 # Agent State
 
+## Current Task (2026-09-23) - lint in `make check` + lint debt: DONE
+
+check = cards test lint lint-decks secrets (help text updated). 144 eslint
++ 1 stylelint -> 0: autofix (60), then by hand. Non-mechanical: ui.js
+renderRosterEntry split (rosterLabel, scoreButton); rtg/options.mjs
+legalOptions -> MY_PHASE map + defending() (order kept: lands before
+spells, now a test); onlyPassing -> isOnlyPassing; ThoughtBubble dead
+#decisions removed; ginJevPlayer dead early-return -> assertion; unused
+judgmentsFrom import removed. No eslint rule disabled.
+Verified: make check (1088), test-thoughts/spectator/addbot/motion/gin/
+jev-runner green. Gap (pre-existing): no test clicks score +/- buttons.
+
 ## Current Task (2026-09-22) - US-128 Phase 6 DONE (6 of 6)
 
 T6.2 done as a REPEATABLE browser test, not a hand-driven probe:

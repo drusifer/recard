@@ -15,7 +15,7 @@ test('a spawn request in the log is pending', () => {
 });
 
 test('plain chat and other structured lines are not requests', () => {
-  const log = [entry(1, undefined), entry(2, { kind: 'jev-ready' }), entry(3, { kind: 'knock' })];
+  const log = [entry(1), entry(2, { kind: 'jev-ready' }), entry(3, { kind: 'knock' })];
   assert.deepEqual(pendingSpawnRequests(log, new Set()), []);
 });
 
@@ -75,10 +75,10 @@ function fakePeer(talk) {
 test('a good request spawns one bot against the same table and says so', async () => {
   const peer = fakePeer([request(1, 'r1', 'knock-early')]);
   const started = [];
-  const watcher = serveSpawnRequests({ ...gin, peer, code: 'ABC123', baseUrl: 'http://x', startBot: async (r) => { started.push(r); return null; } });
+  const watcher = serveSpawnRequests({ ...gin, peer, code: 'ABC123', baseUrl: 'https://x', startBot: async (r) => { started.push(r); return null; } });
   watcher.stop();
   await watcher.poll();
-  assert.deepEqual(started, [{ requestId: 'r1', game: 'gin', strategy: 'knock-early', code: 'ABC123', baseUrl: 'http://x' }]);
+  assert.deepEqual(started, [{ requestId: 'r1', game: 'gin', strategy: 'knock-early', code: 'ABC123', baseUrl: 'https://x' }]);
   assert.equal(peer.said.at(-1).data.ok, true);
   assert.match(peer.said.at(-1).text, /knock-early/);
 });
@@ -86,7 +86,7 @@ test('a good request spawns one bot against the same table and says so', async (
 test('an impossible request is refused in words, and nothing is spawned', async () => {
   const peer = fakePeer([request(1, 'r1', 'no-such-strategy')]);
   let spawned = 0;
-  const watcher = serveSpawnRequests({ ...gin, peer, code: 'ABC123', baseUrl: 'http://x', startBot: async () => { spawned += 1; return null; } });
+  const watcher = serveSpawnRequests({ ...gin, peer, code: 'ABC123', baseUrl: 'https://x', startBot: async () => { spawned += 1; return null; } });
   watcher.stop();
   await watcher.poll();
   assert.equal(spawned, 0);
@@ -97,7 +97,7 @@ test('an impossible request is refused in words, and nothing is spawned', async 
 
 test('a failure to start is reported with its reason, not swallowed', async () => {
   const peer = fakePeer([request(1, 'r1', 'knock-early')]);
-  const watcher = serveSpawnRequests({ ...gin, peer, code: 'ABC123', baseUrl: 'http://x', startBot: async () => 'node is missing' });
+  const watcher = serveSpawnRequests({ ...gin, peer, code: 'ABC123', baseUrl: 'https://x', startBot: async () => 'node is missing' });
   watcher.stop();
   await watcher.poll();
   assert.equal(peer.said.at(-1).data.ok, false);
@@ -106,7 +106,7 @@ test('a failure to start is reported with its reason, not swallowed', async () =
 
 test('the same request is never answered twice', async () => {
   const peer = fakePeer([request(1, 'r1', 'knock-early')]);
-  const watcher = serveSpawnRequests({ ...gin, peer, code: 'ABC123', baseUrl: 'http://x', startBot: async () => null });
+  const watcher = serveSpawnRequests({ ...gin, peer, code: 'ABC123', baseUrl: 'https://x', startBot: async () => null });
   watcher.stop();
   await watcher.poll();
   await watcher.poll();
@@ -115,7 +115,7 @@ test('the same request is never answered twice', async () => {
 
 // ---- Telling a bot to leave: same talk channel, one more `data.kind` ----
 
-const quit = (seq, requestId, target) => entry(seq, { kind: 'quit', requestId, ...(target ? { target } : {}) });
+const quit = (seq, requestId, target) => entry(seq, { kind: 'quit', requestId, ...(target && { target }) });
 
 test('a quit addressed to everyone is for this bot too', () => {
   assert.deepEqual(pendingQuits([quit(1, 'q1')], new Set(), 'equilibrium'), [{ requestId: 'q1', target: null }]);
@@ -138,12 +138,12 @@ test('an answered quit in the log is still mine to act on - leaving is not a sha
 });
 
 test('ordinary chat is not a quit', () => {
-  assert.deepEqual(pendingQuits([entry(1, undefined), entry(2, { kind: 'spawn-bot', requestId: 'r', strategy: 's' })], new Set(), 'x'), []);
+  assert.deepEqual(pendingQuits([entry(1), entry(2, { kind: 'spawn-bot', requestId: 'r', strategy: 's' })], new Set(), 'x'), []);
 });
 
 test('a quit is answered on the same channel, and the bot then reports that it was asked to leave', async () => {
   const peer = fakePeer([quit(1, 'q1')]);
-  const watcher = serveSpawnRequests({ ...gin, peer, code: 'ABC123', baseUrl: 'http://x', name: 'equilibrium', startBot: async () => null });
+  const watcher = serveSpawnRequests({ ...gin, peer, code: 'ABC123', baseUrl: 'https://x', name: 'equilibrium', startBot: async () => null });
   watcher.stop();
   assert.equal(watcher.wasAskedToLeave(), false, 'nothing asked yet');
   await watcher.poll();
@@ -156,7 +156,7 @@ test('a quit is answered on the same channel, and the bot then reports that it w
 
 test('a quit for another bot is ignored, and this one plays on', async () => {
   const peer = fakePeer([quit(1, 'q1', 'defensive')]);
-  const watcher = serveSpawnRequests({ ...gin, peer, code: 'ABC123', baseUrl: 'http://x', name: 'equilibrium', startBot: async () => null });
+  const watcher = serveSpawnRequests({ ...gin, peer, code: 'ABC123', baseUrl: 'https://x', name: 'equilibrium', startBot: async () => null });
   watcher.stop();
   await watcher.poll();
   assert.equal(watcher.wasAskedToLeave(), false);
@@ -167,8 +167,8 @@ test('the ready announcement offers BOTH kinds of strategy, or a question file i
   const { allStrategyNames, resolveStrategy } = await import('../tools/gin/strategyKinds.mjs');
   const { data } = readyAnnouncement({ game: 'gin', strategies: Object.fromEntries(
     allStrategyNames().map((each) => [each, resolveStrategy(each)])) });
-  const offered = data.strategies.map((s) => s.name);
-  assert.ok(offered.includes('equilibrium'), 'a rule-list strategy');
-  assert.ok(offered.includes('jev-balanced'), 'a question-file strategy');
+  const offered = new Set(data.strategies.map((s) => s.name));
+  assert.ok(offered.has('equilibrium'), 'a rule-list strategy');
+  assert.ok(offered.has('jev-balanced'), 'a question-file strategy');
   assert.ok(data.strategies.every((s) => s.description), 'each carries its own description (Gate 2)');
 });

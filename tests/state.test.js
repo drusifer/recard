@@ -3795,7 +3795,7 @@ test('US-123: rearranging a pile in place is a touch - the cards that changed po
   assert.equal(sorted.lastTouch.by, 'p1');
   // K moved from the front to the back and the 2s swapped past it; 'b'
   // happens to stay at index 1, so it is NOT reported as touched.
-  assert.deepEqual(sorted.lastTouch.pileableIds.sort(), ['a', 'c']);
+  assert.deepEqual(sorted.lastTouch.pileableIds.toSorted(), ['a', 'c']);
 });
 
 test('US-124: dealing NO cards does not start the game - a table being set up still seats people', () => {

@@ -20,7 +20,7 @@ before(async () => {
 });
 
 after(async () => {
-  for (const close of fixture.closers.reverse()) await close();
+  for (const close of fixture.closers.toReversed()) await close();
   await fixture.browser?.close();
   await fixture.server?.close();
 });
@@ -93,7 +93,7 @@ test('US-124 AC2: a host can hold the table without taking a seat, so two others
     assert.equal(dealt.myHand.length, 0, 'the spectating host is not dealt to');
     assert.equal(dealt.piles.some((p) => p.kind === 'hand' && p.ownerId === hostId), false);
   } finally {
-    for (const guest of guests.reverse()) await guest.close();
+    for (const guest of guests.toReversed()) await guest.close();
     await hosted.close();
     await browser.close();
     await server.close();

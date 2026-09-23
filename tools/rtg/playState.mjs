@@ -21,7 +21,7 @@ const describe = (card) => ({
   cost: card.cost ?? '',
   cmc: card.cmc ?? parseManaCost(card.cost ?? '').cmc,
   colors: card.colors ?? [],
-  ...(card.power === undefined ? {} : { power: card.power, toughness: card.toughness }),
+  ...(card.power !== undefined && { power: card.power, toughness: card.toughness }),
   tapped: card.orientation === TAPPED,
 });
 
@@ -36,7 +36,9 @@ export function manaAvailable(lands) {
   return { total: untapped.length, by_color: byColor };
 }
 
-/** Whether `mana` covers `cost` - generic pips first, then coloured. */
+/**
+Whether `mana` covers `cost` - generic pips first, then coloured.
+*/
 export function canPay(cost, mana) {
   const { cmc, symbols } = parseManaCost(cost ?? '');
   if (cmc > mana.total) return false;
@@ -57,28 +59,28 @@ const pileOf = (view, kind, ownerId) => view.piles.find((pile) => pile.kind === 
  */
 export function buildRtgState(view, myId, turn) {
   const opponentId = view.players.find((player) => player.id !== myId)?.id ?? null;
-  const myLands = [...pileOf(view, 'lands', myId), ...pileOf(view, 'battlefield', myId).filter((c) => isLand(c))].map(describe);
-  const myBattlefield = pileOf(view, 'battlefield', myId).map(describe).filter((c) => !isLand(c));
+  const myLands = [...pileOf(view, 'lands', myId), ...pileOf(view, 'battlefield', myId).filter((c) => isLand(c))].map((card) => describe(card));
+  const myBattlefield = pileOf(view, 'battlefield', myId).map((card) => describe(card)).filter((c) => !isLand(c));
   const mana = manaAvailable(myLands);
 
   return {
     me: {
-      hand: view.myHand.map(describe),
+      hand: view.myHand.map((card) => describe(card)),
       battlefield: myBattlefield,
       lands: myLands,
       untapped_lands: mana,
-      graveyard: pileOf(view, 'discard', myId).map(describe),
-      exile: pileOf(view, 'exile', myId).map(describe),
+      graveyard: pileOf(view, 'discard', myId).map((card) => describe(card)),
+      exile: pileOf(view, 'exile', myId).map((card) => describe(card)),
       life: view.scores?.[myId] ?? null,
     },
     opponent: {
       hand_size: view.otherHandCounts?.[opponentId] ?? 0,
-      battlefield: pileOf(view, 'battlefield', opponentId).map(describe),
-      lands: pileOf(view, 'lands', opponentId).map(describe),
-      graveyard: pileOf(view, 'discard', opponentId).map(describe),
+      battlefield: pileOf(view, 'battlefield', opponentId).map((card) => describe(card)),
+      lands: pileOf(view, 'lands', opponentId).map((card) => describe(card)),
+      graveyard: pileOf(view, 'discard', opponentId).map((card) => describe(card)),
       life: opponentId ? view.scores?.[opponentId] ?? null : null,
     },
-    stack: pileOf(view, 'stack', null).map(describe),
+    stack: pileOf(view, 'stack', null).map((card) => describe(card)),
     turn: {
       is_mine: turn.is_mine === true,
       phase: turn.phase ?? 'unknown',

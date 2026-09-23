@@ -8,13 +8,13 @@ import { buildPlayState, CANDIDATE_SLOTS, PLAY_STATE_FIELDS } from '../tools/gin
 import { computeFacts } from '../tools/gin/rules.mjs';
 import { EXAMPLES } from '../tools/gin/exampleStates.mjs';
 
-const discardExample = EXAMPLES.find((e) => e.obs.phase === 'discard') ?? EXAMPLES[0];
+const discardExample = EXAMPLES.find((example) => example.obs.phase === 'discard') ?? EXAMPLES[0];
 const stateFor = (obs) => buildPlayState(obs, computeFacts(obs));
 
 test('the same field names appear every turn, whatever the phase or hand', () => {
   for (const { obs } of EXAMPLES) {
     const state = buildPlayState(obs, computeFacts(obs));
-    assert.deepEqual(Object.keys(state).sort(), [...PLAY_STATE_FIELDS].sort(), `phase ${obs.phase}`);
+    assert.deepEqual(Object.keys(state).toSorted(), [...PLAY_STATE_FIELDS].toSorted(), `phase ${obs.phase}`);
   }
 });
 
@@ -61,7 +61,7 @@ test('cards read as names, so a path reference resolves to something a person ca
 });
 
 test('the phase decides which options exist, so an illegal move is never offered', () => {
-  const drawObs = EXAMPLES.find((e) => e.obs.phase === 'draw')?.obs;
+  const drawObs = EXAMPLES.find((example) => example.obs.phase === 'draw')?.obs;
   if (drawObs) {
     const state = buildPlayState(drawObs, computeFacts(drawObs));
     assert.equal(state.me.phase, 'draw');

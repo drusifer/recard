@@ -34,14 +34,14 @@ before(async () => {
     await joined.peer.waitForView(() => globalThis.__recardHarness.view().players.some((p) => p.id === globalThis.__recardHarness.myId()));
     fixture.bots = [...(fixture.bots ?? []), joined.peer];
   }
-  [fixture.bot] = fixture.bots;
+  fixture.bot = fixture.bots[0];
   await fixture.hosted.host.page.fill('#cards-per-player', '10');
   await fixture.hosted.host.page.click('#deal-btn');
   await fixture.hosted.host.page.waitForSelector('#screen-game:not([hidden])');
 });
 
 after(async () => {
-  for (const close of fixture.closers.reverse()) await close();
+  for (const close of fixture.closers.toReversed()) await close();
   await fixture.browser?.close();
   await fixture.server?.close();
 });
@@ -63,7 +63,7 @@ test('a bot with no decisions yet shows no bubble', async () => {
 test('each decision collapses to the move in a few words on that bot\'s seat', async () => {
   await fixture.bot.say('Drew from stock', decision());
   await hostPage().waitForFunction(() => document.querySelector('.table-surface thought-bubble:not([hidden]) .thought-summary'));
-  assert.match(await hostPage().$eval(`${TABLE} .thought-summary`, (el) => el.textContent), /Drew from stock/);
+  assert.match(await hostPage().$eval(`${TABLE} .thought-summary`, (element) => element.textContent), /Drew from stock/);
 
   await fixture.bot.say('Discarded 9♣', decision({ decision: { type: 'discard', cardId: 'x' }, phase: 'discard' }));
   await hostPage().waitForFunction(() => document.querySelector('.table-surface .thought-summary')?.textContent.includes('Discarded'));
@@ -75,7 +75,7 @@ test('clicking it opens the history: every decision, the rule that fired, and Je
   assert.equal(await visible('.thought-panel'), 1, 'exactly one history is on screen, and it really is on screen');
   const entries = await hostPage().$$eval('.thought-entry', (nodes) => nodes.length);
   assert.equal(entries, 2, 'both decisions are in the history, scrolled back through');
-  const text = await hostPage().$eval('.thought-panel', (el) => el.textContent);
+  const text = await hostPage().$eval('.thought-panel', (element) => element.textContent);
   assert.match(text, /Rule: drawStock/);
   assert.match(text, /Also weighed: takeUpcardIfMelds/);
   assert.match(text, /opponent threat 2\.4/);
@@ -83,8 +83,8 @@ test('clicking it opens the history: every decision, the rule that fired, and Je
 });
 
 test('it stays open when the pointer leaves it - the Gate 1 condition (a scrolling history must not close under the pointer)', async () => {
-  await hostPage().$eval(`${TABLE} thought-bubble`, (el) => {
-    el.dispatchEvent(new PointerEvent('pointerleave', { bubbles: true }));
+  await hostPage().$eval(`${TABLE} thought-bubble`, (element) => {
+    element.dispatchEvent(new PointerEvent('pointerleave', { bubbles: true }));
     document.querySelector('.thought-panel').dispatchEvent(new PointerEvent('pointerleave', { bubbles: true }));
   });
   await hostPage().mouse.move(5, 5);
@@ -92,10 +92,10 @@ test('it stays open when the pointer leaves it - the Gate 1 condition (a scrolli
 });
 
 test('scrolling inside the history does not close it, but a click outside does', async () => {
-  await hostPage().$eval('.thought-panel', (el) => { el.scrollTop = 10; el.click(); });
+  await hostPage().$eval('.thought-panel', (element) => { element.scrollTop = 10; element.click(); });
   assert.equal(await visible('.thought-panel'), 1);
 
-  await hostPage().$eval('body', (el) => el.click());
+  await hostPage().$eval('body', (element) => element.click());
   await hostPage().waitForFunction(() => {
     const panel = document.querySelector('.thought-panel');
     return panel && panel.getClientRects().length === 0;
@@ -115,10 +115,10 @@ test('a second bot keeps its own history on its own seat', async () => {
 test('the open history stays fully on screen, even from a seat near the edge', async () => {
   await hostPage().click(`${TABLE} .thought-summary`);
   await hostPage().waitForSelector('body > .thought-panel:not([hidden])');
-  const fits = await hostPage().$eval('.thought-panel', (el) => {
-    const box = el.getBoundingClientRect();
-    return { top: box.top >= 0, left: box.left >= 0, bottom: box.bottom <= innerHeight + 0.5, right: box.right <= innerWidth + 0.5 };
+  const fits = await hostPage().$eval('.thought-panel', (element) => {
+    const box = element.getBoundingClientRect();
+    return { top: box.top >= 0, left: box.left >= 0, bottom: box.bottom <= globalThis.innerHeight + 0.5, right: box.right <= globalThis.innerWidth + 0.5 };
   });
   assert.deepEqual(fits, { top: true, left: true, bottom: true, right: true });
-  await hostPage().$eval('body', (el) => el.click());
+  await hostPage().$eval('body', (element) => element.click());
 });

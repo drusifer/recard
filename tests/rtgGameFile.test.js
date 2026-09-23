@@ -24,10 +24,12 @@ test('a constraint names a rule, so a rejected move can say which rule rejected 
 });
 
 test('every `rules.x` a constraint cites actually exists', () => {
+  const stated = new Set(Object.keys(game.rules));
   for (const [name, constraint] of Object.entries(game.constraints)) {
-    for (const cited of constraint.instructions.match(/`rules\.([a-z_]+)`/g) ?? []) {
+    const citations = constraint.instructions.match(/`rules\.([a-z_]+)`/g) ?? [];
+    for (const cited of citations) {
       const key = cited.replaceAll('`', '').replace('rules.', '');
-      assert.ok(key in game.rules, `${name} cites rules.${key}, which is not in the file`);
+      assert.ok(stated.has(key), `${name} cites rules.${key}, which is not in the file`);
     }
   }
 });
@@ -41,7 +43,7 @@ test('constraint names read as rules, not as checks (Smith, Gate 2)', () => {
 
 test('no constraint carries a card name or a number - those live in state', () => {
   for (const [name, constraint] of Object.entries(game.constraints)) {
-    assert.equal(checkInstruction(constraint.instructions), null, `${name}`);
+    assert.equal(checkInstruction(constraint.instructions), null, name);
   }
   assert.equal(checkInstruction(game.step.instructions), null, 'the step question');
   for (const [option, text] of Object.entries(game.step.criteria)) {

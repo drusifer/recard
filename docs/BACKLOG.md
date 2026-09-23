@@ -244,10 +244,6 @@ superseded:
   `checkInstruction` itself, not the loader. Fix by repointing that
   test, not by adding one; Gin's loader reads by name from a fixed
   directory, which is why it was deferred.
-- **`make lint` has 165 errors and `make check` does not run it**
-  (Neo, US-128 P1). The debt accumulated across the 09-19..09-21 Jev
-  sprints because every "check PASSED" excluded lint. Needs a user
-  call: add `lint` to `check`, plus one lint-debt pass.
 
 ## From the US-128 retro (2026-09-22)
 

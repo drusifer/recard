@@ -35,7 +35,7 @@ export function stepQuestion(game, options) {
     type: 'choice',
     instructions: game.step.instructions,
     criteria: Object.fromEntries(options.map((option) => {
-      const described = game.step.criteria[option.id.split(':')[0]] ?? option.what;
+      const described = game.step.criteria[option.id.split(':', 1)[0]] ?? option.what;
       return [option.id, option.card ? `${described} (\`${option.card}\`)` : described];
     })),
   };

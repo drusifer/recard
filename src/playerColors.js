@@ -23,7 +23,7 @@ export const PLAYER_COLORS = [
  * @param {number} index
  */
 export function colorForIndex(index) {
-  if (!Number.isInteger(index) || index < 0) return PLAYER_COLORS[0];
+  if (!Number.isSafeInteger(index) || index < 0) return PLAYER_COLORS[0];
   return PLAYER_COLORS[index % PLAYER_COLORS.length];
 }
 

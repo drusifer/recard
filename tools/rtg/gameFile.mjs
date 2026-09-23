@@ -13,12 +13,14 @@
 // move" has to have an answer.
 
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, URL } from 'node:url';
 import { rejectLiterals } from '../jev/strategyFile.mjs';
 
-export const RTG = fileURLToPath(new URL('./game.json', import.meta.url));
+export const RTG = fileURLToPath(new URL('game.json', import.meta.url));
 
-/** @param {string} path a game file */
+/**
+@param {string} path a game file
+*/
 export function loadGame(path) {
   const game = JSON.parse(readFileSync(path, 'utf8'));
   rejectLiterals([
@@ -26,10 +28,13 @@ export function loadGame(path) {
     ['step', game.step?.instructions ?? ''],
     ...Object.entries(game.step?.criteria ?? {}).map(([name, text]) => [`step.criteria.${name}`, text]),
   ]);
-  for (const [name, constraint] of Object.entries(game.constraints ?? {})) {
-    for (const cited of constraint.instructions.match(/`rules\.([a-z_]+)`/g) ?? []) {
+  const constraints = Object.entries(game.constraints ?? {});
+  const stated = new Set(Object.keys(game.rules ?? {}));
+  for (const [name, constraint] of constraints) {
+    const citations = constraint.instructions.match(/`rules\.([a-z_]+)`/g) ?? [];
+    for (const cited of citations) {
       const key = cited.replaceAll('`', '').replace('rules.', '');
-      if (!(key in (game.rules ?? {}))) throw new Error(`constraints.${name} cites rules.${key}, which this game does not state`);
+      if (!stated.has(key)) throw new Error(`constraints.${name} cites rules.${key}, which this game does not state`);
     }
   }
   return game;

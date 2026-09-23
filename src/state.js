@@ -895,12 +895,12 @@ const ACTIONS = {
     const existing = state.players.find((p) => p.id === action.playerId);
     const seatLimit = state.gameConfig?.playerLimit;
     const seatsTaken = state.players.filter((p) => p.role !== 'spectator' && p.id !== action.playerId).length;
-    const tableClosed = (seatLimit !== undefined && seatsTaken >= seatLimit) || state.dealtThisGame === true;
+    const isTableClosed = (seatLimit !== undefined && seatsTaken >= seatLimit) || state.dealtThisGame === true;
     // A rejoining person keeps whatever they already were - a full or
     // started table must never demote someone who already has a seat.
     const isSpectator = existing
       ? existing.role === 'spectator'
-      : action.role === 'spectator' || tableClosed;
+      : action.role === 'spectator' || isTableClosed;
     const perPlayerPiles = alreadyJoined || isSpectator
       ? []
       : (state.gameConfig?.piles ?? [])
@@ -2311,9 +2311,11 @@ export function assertCardsConserved(before, after, actionType) {
 function placementsOf(state) {
   const placements = new Map();
   const membership = new Map();
-  for (const pile of state.piles ?? []) {
+  const piles = state.piles ?? [];
+  for (const pile of piles) {
     const ids = [];
-    for (const [index, pileable] of (pile.cards ?? []).entries()) {
+    const cards = pile.cards ?? [];
+    for (const [index, pileable] of cards.entries()) {
       placements.set(pileable.id, { pileId: pile.id, index, faceUp: pileable.faceUp, rotation: pileable.rotation ?? 0 });
       ids.push(pileable.id);
     }
@@ -2337,9 +2339,9 @@ function stampTouch(before, after, action) {
     // Same pile, same state: order only counts as a touch when the
     // pile's membership did NOT change - otherwise every card after a
     // removed one would "move" just by closing the gap behind it.
-    const settled = was.membership.get(place.pileId) !== undefined
+    const isSettled = was.membership.get(place.pileId) !== undefined
       && was.membership.get(place.pileId).split(',').length === now.membership.get(place.pileId).split(',').length;
-    if (settled && previous.index !== place.index) touched.push(id);
+    if (isSettled && previous.index !== place.index) touched.push(id);
   }
   if (touched.length === 0) return after;
   const seq = (before.lastTouch?.seq ?? 0) + 1;

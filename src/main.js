@@ -623,7 +623,7 @@ let expectedPlayers = 0;
 // US-124: the role this client ASKED for on the join screen; compared
 // against the role the host actually gave it, to explain a downgrade.
 let requestedRole = 'player';
-let forcedSpectatorNoticed = false;
+let isForcedSpectatorNoticed = false;
 
 /**
  * US-45/D33: who a restored table is still waiting for. Only players who
@@ -1301,7 +1301,7 @@ function renderAddBot() {
       status = `Could not add a ${myBotRequest.strategy} bot: ${result.error ?? 'the Jev player refused'}`;
       myBotRequest = null;
     } else {
-      status = `Asking ${myBotRequest.by} for a ${myBotRequest.strategy} bot\u2026`;
+      status = `Asking ${myBotRequest.by} for a ${myBotRequest.strategy} bot\u{2026}`;
     }
   }
   control.render({ offer: offer ?? null, status });
@@ -2640,14 +2640,15 @@ function noticeNewGameIfPresetChanged(view) {
  * and repeating the banner would bury whatever else happens next.
  */
 function noticeForcedSpectator(view) {
-  if (forcedSpectatorNoticed || requestedRole !== 'player') return;
+  if (isForcedSpectatorNoticed || requestedRole !== 'player') return;
   const me = view.players?.find((p) => p.id === myId);
   if (me?.role !== 'spectator') return;
-  forcedSpectatorNoticed = true;
+  isForcedSpectatorNoticed = true;
   const limit = view.gameConfig?.playerLimit;
+  const players = limit ? ` (${limit} players)` : '';
   const message = view.dealtThisGame
-    ? "The game has already started \u2014 you've joined as a spectator."
-    : `The game is full${limit ? ` (${limit} players)` : ''} \u2014 you've joined as a spectator.`;
+    ? "The game has already started \u{2014} you've joined as a spectator."
+    : `The game is full${players} \u{2014} you've joined as a spectator.`;
   renderBanner(bannerElement, message, { tone: 'info' });
 }
 

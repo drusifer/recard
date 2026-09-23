@@ -5,6 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { URL } from 'node:url';
 import { loadStrategy, listStrategies } from '../tools/gin/strategyFile.mjs';
 import { checkInstruction, resolvePath } from '../tools/jev/strategyFile.mjs';
 import { buildPlayState, CANDIDATE_SLOTS } from '../tools/gin/playState.mjs';
@@ -12,7 +13,7 @@ import { computeFacts } from '../tools/gin/rules.mjs';
 import { EXAMPLES } from '../tools/gin/exampleStates.mjs';
 
 const sampleState = () => {
-  const { obs } = EXAMPLES.find((e) => e.obs.phase === 'discard') ?? EXAMPLES[0];
+  const { obs } = EXAMPLES.find((example) => example.obs.phase === 'discard') ?? EXAMPLES[0];
   return buildPlayState(obs, computeFacts(obs));
 };
 const prose = (strategy) => [
@@ -33,8 +34,8 @@ test('every shipped strategy loads, and there is more than one', () => {
 
 test('two strategies ask the same questions and differ in how they describe the options', () => {
   const [first, second] = listStrategies().map((name) => loadStrategy(name));
-  assert.deepEqual(Object.keys(first.read).sort(), Object.keys(second.read).sort());
-  assert.deepEqual(Object.keys(first.move.criteria).sort(), Object.keys(second.move.criteria).sort());
+  assert.deepEqual(Object.keys(first.read).toSorted(), Object.keys(second.read).toSorted());
+  assert.deepEqual(Object.keys(first.move.criteria).toSorted(), Object.keys(second.move.criteria).toSorted());
   assert.notDeepEqual(first.move.criteria, second.move.criteria, 'two strategies describing options identically are one strategy');
 });
 
@@ -52,8 +53,10 @@ test('an OPTION description is held to the same rule as an instruction', () => {
 test('every path in every shipped strategy resolves against a real projected state', () => {
   const state = { ...sampleState(), read: { opponent_is_close: 2, opponent_wants_slot: '0' } };
   for (const name of listStrategies()) {
-    for (const text of prose(loadStrategy(name))) {
-      for (const backticked of text.match(/`([^`]+)`/g) ?? []) {
+    const texts = prose(loadStrategy(name));
+    for (const text of texts) {
+      const paths = text.match(/`([^`]+)`/g) ?? [];
+      for (const backticked of paths) {
         const path = backticked.replaceAll('`', '');
         assert.notEqual(resolvePath(state, path), undefined, `${name} refers to ${path}, which is not in the state`);
       }

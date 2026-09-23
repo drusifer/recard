@@ -58,8 +58,8 @@ export async function startStaticServer(port) {
  * motion passes `{ motion: true }`.
  */
 export async function launchChromium({ motion = false } = {}) {
-  const args = ['--no-sandbox'];
-  const launched = await launchAnyChromium(args);
+  const arguments_ = ['--no-sandbox'];
+  const launched = await launchAnyChromium(arguments_);
   if (motion) return launched;
   // Reduced motion has to be set per CONTEXT - Chromium's
   // `--force-prefers-reduced-motion` flag does NOT reach `matchMedia`
@@ -71,13 +71,13 @@ export async function launchChromium({ motion = false } = {}) {
   return launched;
 }
 
-async function launchAnyChromium(args) {
+async function launchAnyChromium(arguments_) {
   try {
-    return await chromium.launch({ args });
+    return await chromium.launch({ args: arguments_ });
   } catch (error) {
     for (const executablePath of SYSTEM_CHROMIUM_PATHS) {
       try {
-        return await chromium.launch({ executablePath, args });
+        return await chromium.launch({ executablePath, args: arguments_ });
       } catch { /* try the next candidate */ }
     }
     throw error;

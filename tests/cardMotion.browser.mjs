@@ -41,6 +41,7 @@ test('a deal glows on every screen, all its cards as one touch', async () => {
 test('the glow fades on its own, with nothing to click', async () => {
   const { host } = fixture.table;
   await host.page.waitForFunction(() => document.querySelectorAll('.just-touched').length === 0, undefined, { timeout: 5000 });
+  assert.equal(await host.page.$$eval('.just-touched', (lit) => lit.length), 0);
 });
 
 test("someone else's move glows on my screen, in their colour, and the card travels", async () => {
@@ -52,8 +53,8 @@ test("someone else's move glows on my screen, in their colour, and the card trav
   await alice.act({ type: 'MOVE', pileableId: card.id, toPileId: 'table' });
 
   // the HOST (who did not move it) sees it lit, in Alice's own colour
-  await host.page.waitForFunction((id) => document.querySelector(`[data-pileable-id="${id}"]`)?.classList.contains('just-touched'), card.id);
-  const color = await host.page.$eval(`[data-pileable-id="${card.id}"]`, (el) => el.style.getPropertyValue('--touch-color'));
+  await host.page.waitForFunction((id) => document.querySelector(`[data-pileable-id="${CSS.escape(id)}"]`)?.classList.contains('just-touched'), card.id);
+  const color = await host.page.$eval(`[data-pileable-id="${card.id}"]`, (element) => element.style.getPropertyValue('--touch-color'));
   assert.match(color, /^#[0-9a-f]{6}$/i, 'tinted by who moved it');
 
   const hostColorForAlice = await host.page.evaluate(async (id) => {
@@ -63,7 +64,7 @@ test("someone else's move glows on my screen, in their colour, and the card trav
   assert.equal(color, hostColorForAlice, "it is the mover's colour, not the viewer's");
 
   // and every peer agrees on the colour, because it comes off the roster
-  const aliceSeesColor = await alice.page.$eval(`[data-pileable-id="${card.id}"]`, (el) => el.style.getPropertyValue('--touch-color'));
+  const aliceSeesColor = await alice.page.$eval(`[data-pileable-id="${card.id}"]`, (element) => element.style.getPropertyValue('--touch-color'));
   assert.equal(aliceSeesColor, color);
 });
 
@@ -77,10 +78,10 @@ test('a face-down card glows as a back - the animation never turns it over (AC6)
   // backs and must keep seeing backs while they glow. (Card IDS already
   // travel in every view, D84 - what privacy means here is the FACE.)
   await alice.act({ type: 'SORT_PILE', pileId: `hand:${aliceId}`, by: 'rank' });
-  await host.page.waitForFunction((id) => document.querySelector(`[data-pileable-id="${id}"]`), card.id);
-  const asSeenByHost = await host.page.$eval(`[data-pileable-id="${card.id}"]`, (el) => ({
-    back: el.classList.contains('card-back') || !!el.querySelector('.card-back'),
-    text: el.textContent,
+  await host.page.waitForFunction((id) => document.querySelector(`[data-pileable-id="${CSS.escape(id)}"]`), card.id);
+  const asSeenByHost = await host.page.$eval(`[data-pileable-id="${card.id}"]`, (element) => ({
+    back: element.classList.contains('card-back') || !!element.querySelector('.card-back'),
+    text: element.textContent,
   }));
   assert.equal(asSeenByHost.back, true, 'still a back');
   // A back renders as the card-back glyph and nothing else - no rank,

@@ -22,45 +22,50 @@ const isCreature = (card) => /creature/i.test(card.type ?? '');
  * @returns {{ id: string, what: string, card?: string }[]}
  */
 export function legalOptions(state, tracked = {}) {
-  const options = [];
-  const arrived = new Set(tracked.arrivedThisTurn ?? []);
-  const mine = state.turn.is_mine;
-
-  if (mine && state.turn.phase === 'untap') options.push({ id: 'untap_all', what: 'untap everything I control' });
-  if (mine && state.turn.phase === 'draw') options.push({ id: 'draw', what: 'draw a card for the turn' });
-
-  if (mine && state.turn.phase === 'main') {
-    if (!state.turn.land_played) {
-      for (const card of state.me.hand.filter((each) => isLand(each))) {
-        options.push({ id: `play_land:${card.card}`, what: 'put a land onto the battlefield', card: card.card });
-      }
-    }
-    for (const card of state.me.hand.filter((each) => !isLand(each))) {
-      if (canPay(card.cost, state.me.untapped_lands)) {
-        options.push({ id: `cast:${card.card}`, what: 'cast a spell from my hand', card: card.card });
-      }
-    }
-  }
-
-  if (mine && state.turn.phase === 'combat') {
-    for (const card of state.me.battlefield.filter((each) => isCreature(each) && !each.tapped && !arrived.has(each.card))) {
-      options.push({ id: `attack:${card.card}`, what: 'attack with a creature', card: card.card });
-    }
-  }
-
-  // Being drawn in on the opponent's turn: blocks and damage.
-  if (!mine && state.turn.attackers.length > 0) {
-    for (const card of state.me.battlefield.filter((each) => isCreature(each) && !each.tapped)) {
-      options.push({ id: `block:${card.card}`, what: 'block an attacking creature', card: card.card });
-    }
-    options.push({ id: 'take_damage', what: 'take the damage that got through' });
-  }
-
+  const arrived = new Set(tracked.arrivedThisTurn);
+  const options = state.turn.is_mine
+    ? (MY_PHASE[state.turn.phase]?.(state, arrived) ?? [])
+    : defending(state);
   // Always available, and the only thing left once resources are spent.
   options.push({ id: 'pass', what: 'do nothing further' });
   return options;
 }
 
+const option = (id, what, card) => ({ id: card ? `${id}:${card.card}` : id, what, ...(card && { card: card.card }) });
+
+/**
+ * What each phase of MY turn offers - the phase picks, no branching.
+ */
+const MY_PHASE = {
+  untap: () => [option('untap_all', 'untap everything I control')],
+  draw: () => [option('draw', 'draw a card for the turn')],
+  main(state) {
+    // Land drops first, then spells - the order the Choice lists them.
+    const lands = state.turn.land_played ? [] : state.me.hand.filter((card) => isLand(card));
+    const spells = state.me.hand.filter((card) => !isLand(card) && canPay(card.cost, state.me.untapped_lands));
+    return [
+      ...lands.map((card) => option('play_land', 'put a land onto the battlefield', card)),
+      ...spells.map((card) => option('cast', 'cast a spell from my hand', card)),
+    ];
+  },
+  combat(state, arrived) {
+    const ready = state.me.battlefield.filter((each) => isCreature(each) && !each.tapped && !arrived.has(each.card));
+    return ready.map((card) => option('attack', 'attack with a creature', card));
+  },
+};
+
+/**
+ * Being drawn in on the opponent's turn: blocks and damage.
+ */
+function defending(state) {
+  if (state.turn.attackers.length === 0) return [];
+  const blockers = state.me.battlefield.filter((each) => isCreature(each) && !each.tapped);
+  return [
+    ...blockers.map((card) => option('block', 'block an attacking creature', card)),
+    option('take_damage', 'take the damage that got through'),
+  ];
+}
+
 /** True when nothing is left but passing - the turn has run out of
  *  resources on its own, with nothing counting steps. */
-export const onlyPassing = (options) => options.length === 1 && options[0].id === 'pass';
+export const isOnlyPassing = (options) => options.length === 1 && options[0].id === 'pass';

@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildRtgState, manaAvailable, canPay } from '../tools/rtg/playState.mjs';
 
-const land = (id, colors, tapped = false) => ({ id, name: id, type: 'Land', cost: '', cmc: 0, colors, ...(tapped ? { orientation: 'landscape' } : {}) });
+const land = (id, colors, isTapped = false) => ({ id, name: id, type: 'Land', cost: '', cmc: 0, colors, ...(isTapped && { orientation: 'landscape' }) });
 const creature = (id, cost, cmc, colors, extra = {}) => ({ id, name: id, type: 'Creature', cost, cmc, colors, power: 2, toughness: 2, ...extra });
 
 const view = {

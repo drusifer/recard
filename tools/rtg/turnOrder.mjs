@@ -24,7 +24,8 @@ export async function turnStatus({ game, state, talk, judge, unsure = UNSURE }) 
     attack_phase_complete: game.constraints.attack_phase_complete,
     their_turn_is_over: game.constraints.their_turn_is_over,
   };
-  const answers = (await judge.systemOne({ state: withTalk, questions })).answers ?? {};
+  const response = await judge.systemOne({ state: withTalk, questions });
+  const answers = response.answers ?? {};
   const over = answers.their_turn_is_over?.noul ?? 0;
   const reading = verdictOf(over, unsure);
   return {

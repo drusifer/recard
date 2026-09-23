@@ -56,14 +56,13 @@ function factsSummary(facts) {
 export function decisionTalk(record, announcement) {
   const { decision } = record;
   const thrown = decision.type === 'discard' && record.observation.hand.find((card) => card.id === decision.cardId);
-  const text = decision.type === 'draw'
-    ? `Drew from ${decision.source === 'discard' ? 'the discard pile' : 'stock'}`
-    : `Discarded ${short(thrown)}`;
+  const source = decision.source === 'discard' ? 'the discard pile' : 'stock';
+  const text = decision.type === 'draw' ? `Drew from ${source}` : `Discarded ${short(thrown)}`;
   return {
     text: announcement?.text ?? text,
     data: {
       kind: 'bot-decision',
-      ...(announcement?.data ?? {}),
+      ...announcement?.data,
       strategy: record.strategy, iteration: record.iteration, handNumber: record.handNumber,
       phase: record.phase, decision, actions: record.actions,
       trace: record.trace, judgments: record.judgments, facts: record.facts,
@@ -229,12 +228,12 @@ export class GinBot {
     const asked = this.#strategy.kind === 'questions'
       ? await decideByQuestions({ strategy: this.#strategy, obs, facts, judge: this.#judge })
       : null;
-    const jev = asked ? null : (this.#strategy.usesJev ? await askJev(this.#judge, obs, facts) : null);
+    const jev = !asked && this.#strategy.usesJev ? await askJev(this.#judge, obs, facts) : null;
     const { decision, trace } = asked
       ? { decision: asked.decision, trace: [
         { rule: 'read', fired: true, threat: asked.record.judgments?.threat ?? null },
         { rule: '__move__', fired: true, option: asked.record.option, confidence: asked.record.confidence,
-          distribution: asked.record.distribution, ...(asked.record.belowFloor ? { belowFloor: true } : {}) },
+          distribution: asked.record.distribution, ...(asked.record.belowFloor && { belowFloor: true }) },
       ] }
       : decide(this.#strategy, { obs, facts, jev });
     const actions = await this.#execute(decision, obs);

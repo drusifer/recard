@@ -3,7 +3,7 @@
 // no threshold, no rule table, and an illegal move is never an option.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { decideByQuestions, moveOptions, readQuestions, judgmentsFrom } from '../tools/gin/jevStrategy.mjs';
+import { decideByQuestions, moveOptions, readQuestions } from '../tools/gin/jevStrategy.mjs';
 import { loadStrategy } from '../tools/gin/strategyFile.mjs';
 import { buildPlayState } from '../tools/gin/playState.mjs';
 import { computeFacts } from '../tools/gin/rules.mjs';
@@ -13,10 +13,12 @@ import { resolveStrategy } from '../tools/gin/strategyKinds.mjs';
 import { FakeTable } from './helpers/ginFakeTable.mjs';
 
 const strategy = loadStrategy('jev-balanced');
-const discardObs = (EXAMPLES.find((e) => e.obs.phase === 'discard') ?? EXAMPLES[0]).obs;
-const drawObs = EXAMPLES.find((e) => e.obs.phase === 'draw')?.obs;
+const discardObs = (EXAMPLES.find((example) => example.obs.phase === 'discard') ?? EXAMPLES[0]).obs;
+const drawObs = EXAMPLES.find((example) => example.obs.phase === 'draw')?.obs;
 
-/** Answers each request in turn, and records what it was asked. */
+/**
+Answers each request in turn, and records what it was asked.
+*/
 function scriptedJudge(...responses) {
   const seen = [];
   return {
@@ -74,7 +76,7 @@ test('gin replaces knock as the option when the hand is gin', () => {
 });
 
 test('a draw turn offers the upcard only when there is one', () => {
-  if (!drawObs) return;
+  assert.ok(drawObs, 'the examples include a draw turn');
   const facts = computeFacts(drawObs);
   const state = buildPlayState(drawObs, facts);
   const options = moveOptions(strategy, state);

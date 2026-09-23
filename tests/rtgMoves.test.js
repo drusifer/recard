@@ -15,7 +15,7 @@ const state = {
 
 test('untapping rotates only what is tapped, and says so', () => {
   const { actions, say } = actionsFor({ id: 'untap_all' }, state, ids);
-  assert.deepEqual(actions.map((a) => a.pileableId).sort(), ['l1', 'w1']);
+  assert.deepEqual(actions.map((a) => a.pileableId).toSorted(), ['l1', 'w1']);
   assert.ok(actions.every((a) => a.type === 'ROTATE'));
   assert.match(say, /untapping/i);
 });

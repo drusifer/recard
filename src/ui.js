@@ -2537,6 +2537,27 @@ function renderMiniHand(container, count) {
  * info keeps both 44px targets inside the card and makes the seat
  * wider-than-taller, which is what the table has room for.
  */
+/**
+ * The words on a roster entry: name, connection, and whatever else is
+ * true of this player right now.
+ */
+function rosterLabel(p, { movingIds, myId, seated, isSpectator }) {
+  const count = typeof p.handCount === 'number' ? ` (${p.handCount} cards)` : '';
+  const moving = movingIds?.has(p.id) ? ' \u{270B} organizing hand' : '';
+  const youTag = seated && p.id === myId ? ' \u{1F9D1} You' : '';
+  const spectatorTag = isSpectator ? ' \u{1F440} spectating' : '';
+  return `${p.name} - ${p.connection}${count}${moving}${youTag}${spectatorTag}`;
+}
+
+function scoreButton(text, onClick) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'score-btn';
+  button.textContent = text;
+  button.addEventListener('click', onClick);
+  return button;
+}
+
 function renderRosterEntry(container, p, index, players, { movingIds, scores, onAdjustScore, myId, seated } = {}) {
   const li = document.createElement('li');
   li.className = `roster-player roster-${p.connection}`;
@@ -2551,14 +2572,9 @@ function renderRosterEntry(container, p, index, players, { movingIds, scores, on
     li.classList.add('seat');
     if (p.id === myId) li.classList.add('seat-you');
   }
-  const count = typeof p.handCount === 'number' ? ` (${p.handCount} cards)` : '';
-  const moving = movingIds?.has(p.id) ? ' \u{270B} organizing hand' : '';
-  const youTag = seated && p.id === myId ? ' \u{1F9D1} You' : '';
-  const spectatorTag = isSpectator ? ' \u{1F440} spectating' : '';
-
   const info = document.createElement('span');
   info.className = 'seat-info';
-  info.append(`${p.name} - ${p.connection}${count}${moving}${youTag}${spectatorTag}`);
+  info.append(rosterLabel(p, { movingIds, myId, seated, isSpectator }));
 
   if (p.id !== myId && typeof p.handCount === 'number') {
     const miniHandElement = document.createElement('div');
@@ -2575,19 +2591,7 @@ function renderRosterEntry(container, p, index, players, { movingIds, scores, on
   }
 
   if (hasScore && onAdjustScore) {
-    const minusButton = document.createElement('button');
-    minusButton.type = 'button';
-    minusButton.className = 'score-btn';
-    minusButton.textContent = '-';
-    minusButton.addEventListener('click', () => onAdjustScore(p.id, -1));
-
-    const plusButton = document.createElement('button');
-    plusButton.type = 'button';
-    plusButton.className = 'score-btn';
-    plusButton.textContent = '+';
-    plusButton.addEventListener('click', () => onAdjustScore(p.id, 1));
-
-    li.append(minusButton, info, plusButton);
+    li.append(scoreButton('-', () => onAdjustScore(p.id, -1)), info, scoreButton('+', () => onAdjustScore(p.id, 1)));
   } else {
     li.append(info);
   }
@@ -2601,8 +2605,8 @@ export function renderRoster(container, players, options = {}) {
   // ring - seat index and angle are computed against the SEATED players
   // only, and a spectator is drawn as a plain row instead.
   const seatedPlayers = players.filter((p) => p.role !== 'spectator');
-  for (const p of players.filter((entry) => entry.role === 'spectator')) {
-    if (p.id === options.hideId) continue;
+  for (const p of players) {
+    if (p.role !== 'spectator' || p.id === options.hideId) continue;
     renderRosterEntry(container, p, 0, seatedPlayers, { ...options, seated: false });
   }
   for (const [index, p] of seatedPlayers.entries()) {

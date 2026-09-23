@@ -21,7 +21,7 @@ test('sub-pixel drift is not motion', () => {
 
 test('every card of a deal travels in the same pass, so they move together', () => {
   const moved = travels(at([['a', 0, 0], ['b', 0, 0], ['c', 0, 0]]), at([['a', 10, 0], ['b', 20, 0], ['c', 30, 0]]));
-  assert.deepEqual([...moved.keys()], ['a', 'b', 'c']);
+  assert.deepEqual(moved.keys().toArray(), ['a', 'b', 'c']);
 });
 
 test('a card that was not on screen before has nowhere to travel from - it just appears', () => {

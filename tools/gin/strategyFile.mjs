@@ -6,12 +6,14 @@
 
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, URL } from 'node:url';
 import { rejectLiterals } from '../jev/strategyFile.mjs';
 
-const DIR = fileURLToPath(new URL('./strategies', import.meta.url));
+const DIR = fileURLToPath(new URL('strategies', import.meta.url));
 
-/** The strategy names that ship, in file order. */
+/**
+The strategy names that ship, in file order.
+*/
 export function listStrategies() {
   return readdirSync(DIR).filter((file) => file.endsWith('.json')).map((file) => file.replace(/\.json$/, ''));
 }
@@ -43,14 +45,17 @@ export function loadStrategy(name) {
  *  error message. Criteria count: an option's description shapes the
  *  answer as much as the question does. */
 function* everyInstruction(strategy) {
-  for (const [id, question] of Object.entries(strategy.read ?? {})) {
+  const reads = Object.entries(strategy.read ?? {});
+  for (const [id, question] of reads) {
     yield [`read.${id}`, question.instructions ?? ''];
-    for (const [key, text] of Object.entries(question.criteria ?? {})) {
+    const criteria = Object.entries(question.criteria ?? {});
+    for (const [key, text] of criteria) {
       if (typeof text === 'string') yield [`read.${id}.criteria.${key}`, text];
     }
   }
   yield ['move', strategy.move?.instructions ?? ''];
-  for (const [key, text] of Object.entries(strategy.move?.criteria ?? {})) {
+  const moveCriteria = Object.entries(strategy.move?.criteria ?? {});
+  for (const [key, text] of moveCriteria) {
     yield [`move.criteria.${key}`, text];
   }
 }

@@ -10,10 +10,10 @@ const game = loadGame(RTG);
 const state = { me: { life: 20 }, opponent: { life: 20 } };
 const talk = [{ name: 'Drew', text: 'passing to you' }];
 
-const judgeOf = (answers) => ({
-  seen: [],
-  async systemOne(request) { this.seen.push(request); return { model: 'scripted', answers }; },
-});
+const judgeOf = (answers) => {
+  const seen = [];
+  return { seen, async systemOne(request) { seen.push(request); return { model: 'scripted', answers }; } };
+};
 const noul = (value) => ({ type: 'noul', noul: value });
 
 test('a confident yes says the turn is over', async () => {

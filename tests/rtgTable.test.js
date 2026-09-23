@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readAnnouncement, TURN_QUESTION } from '../tools/rtg/table.mjs';
 import { readAnswer } from '../tools/jev/table.mjs';
 
-const said = (name, text, data) => ({ name, text, ...(data ? { data } : {}) });
+const said = (name, text, data) => ({ name, text, ...(data && { data }) });
 
 test('an attack announcement draws the bot in to block', () => {
   const read = readAnnouncement(said('Drew', 'attacking with the Ogre'), 'bot');

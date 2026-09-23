@@ -11,7 +11,7 @@ const decision = (seq, from, text, extra = {}) => ({
 test('a bot\'s decisions come back in order, under its own name', () => {
   const talk = [decision(1, 'k1', 'Drew from stock'), { seq: 2, from: 'k2', name: 'Alice', text: 'hi there' }, decision(3, 'k1', 'Discarded 9♣')];
   const bySpeaker = decisionsBySpeaker(talk);
-  assert.deepEqual([...bySpeaker.keys()], ['k1']);
+  assert.deepEqual(bySpeaker.keys().toArray(), ['k1']);
   assert.deepEqual(bySpeaker.get('k1').decisions.map((d) => d.text), ['Drew from stock', 'Discarded 9♣']);
   assert.equal(bySpeaker.get('k1').name, 'k1');
 });
@@ -30,7 +30,7 @@ test('the collapsed bubble shows the latest move, or nothing at all before the f
   const { decisions } = decisionsBySpeaker([decision(1, 'k1', 'Drew from stock'), decision(2, 'k1', 'Discarded 9♣')]).get('k1');
   assert.equal(latestThought(decisions), 'Discarded 9♣');
   assert.equal(latestThought([]), null);
-  assert.equal(latestThought(undefined), null);
+  assert.equal(latestThought(), null);
 });
 
 test('the full record travels with each entry, for the expanded view', () => {

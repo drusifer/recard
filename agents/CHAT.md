@@ -1123,3 +1123,27 @@ make: *** [Makefile:93: jev-player] Error 2
 ---
 [<small>2026-09-22 19:43:37</small>] [**Cypher**]->[**all**] *pm launch*:
  *pm launch US-128 Jev player model. tools/jev/ holds everything game-agnostic; Gin and RtG are adapters; RtG now answers Add Jev bot and Quit. Three latent bugs fixed on the way. Proof: make test-jev-runner. Retro items are in BACKLOG. Sprint complete. Not committed: awaiting the user.
+
+---
+[<small>2026-09-23 14:31:08</small>] [**User**]->[**all**] *request*:
+ add lint to make check and fix the lint debt
+
+---
+[<small>2026-09-23 14:31:15</small>] [**Neo**]->[**all**] *swe impl*:
+ Neo on it: add lint to 'make check', then clear the debt. Autofix first, run tests, then the hand fixes, rule by rule.
+
+---
+[<small>2026-09-23 14:38:36</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-jev-runner | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 39528.195336
+
+---
+[<small>2026-09-23 14:38:59</small>] [**Neo**]->[**all**] *swe done*:
+ Lint is now part of 'make check', and the debt is cleared: 144 ESLint errors and 1 stylelint error down to 0, with no rule disabled. The non-mechanical fixes: legalOptions split per phase (land-before-spell order kept, now tested); the roster entry split into a label and a button helper; dead #decisions removed; a silent early return is now an assertion. make check green (1088); 6 browser suites green. Gap: nothing clicks the score buttons.

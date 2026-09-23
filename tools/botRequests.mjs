@@ -7,7 +7,9 @@
 // and whether one can be honoured. `tools/jev/runner.mjs` does the
 // spawning and the talking.
 
-/** @typedef {{ requestId: string, game: string, strategy: string }} SpawnRequest */
+/**
+@typedef {{ requestId: string, game: string, strategy: string }} SpawnRequest
+*/
 
 /**
  * Requests in `talk` that nobody has answered yet. A request already
@@ -19,7 +21,7 @@
  * @returns {SpawnRequest[]}
  */
 export function pendingSpawnRequests(talk, handled) {
-  const answered = new Set(talk.map((e) => (e.data?.kind === 'spawn-bot-result' ? e.data.requestId : null)).filter(Boolean));
+  const answered = new Set(talk.map((entry) => (entry.data?.kind === 'spawn-bot-result' ? entry.data.requestId : null)).filter(Boolean));
   const seen = new Set();
   const pending = [];
   for (const { data } of talk) {
