@@ -2089,3 +2089,71 @@ stuck.
 
 ## Phase 6 — A real turn
 - [x] T6.1 Play a turn at a hosted RtG table, recorded
+
+---
+
+# Sprint: Jev player model (US-128) — 2026-09-22 — SHIPPED
+
+Story + architecture: `docs/USER_STORIES.md` US-128 (Tier 2). Gate:
+Smith 2026-09-22, APPROVED with 4 blocking conditions (C1-C4 below).
+Standing rules: no behaviour change to either game, no back-compat
+shims (moved files leave no re-export behind), tests move with the code
+they prove; a test that only proved a file's shape is deleted.
+
+**Before Phase 1 — Morpheus, in plan review: DONE.** Recorded D153, the
+`GameAdapter` contract as it will actually be built. It settles C1 (the
+form Gin's rule-list strategies take) and C2 (the name and shape of the
+one required "is it my move?" hook). Phases 3-5 build against D153, not
+against the story's sketch.
+
+## Phase 1 — Promote what is already game-agnostic (AC1)
+- [x] T1.1 `tools/jev/strategyFile.mjs`: `checkInstruction`,
+      `resolvePath`, and a loader taking its directory; Gin's loader and
+      `rtg/gameFile.mjs` use it (the cross-game import goes away)
+- [x] T1.2 `tools/jev/table.mjs`: `readAnswer`, `shouldAskTable`,
+      `trackChange`. `readAnnouncement` stays in `rtg/`, since it reads
+      RtG words ("attack", "untap")
+
+## Phase 2 — One escalation policy (AC3, C3)
+- [x] T2.1 `tools/jev/escalate.mjs`: one function deciding a Noul or
+      Choice as settled, blocked or unconvinced. What happens on
+      unconvinced is configuration: `ask-table` (RtG) or
+      `floor-fallback` (Gin)
+- [x] T2.2 RtG constraint verification and Gin's confidence floor both
+      go through it; the existing RtG decide and Gin Jev-player tests
+      stay green unchanged
+
+## Phase 3 — One decision orchestrator (AC3)
+- [x] T3.1 `tools/jev/decide.mjs`: optional `read`, then the Choice
+      over the adapter's legal options, then optional `verify`, with
+      escalation from Phase 2
+- [x] T3.2 `gin/jevStrategy.decideByQuestions` and `rtg/decide.decideStep`
+      become calls to it; dead code in either goes
+
+## Phase 4 — The shared runner, Gin as its first adapter (AC1, AC2, AC4, C1, C4)
+- [x] T4.1 `tools/jev/runner.mjs`: join, refuse a spectator seat,
+      announce jev-ready, serve spawn/quit ALWAYS (moved from
+      `gin/player.mjs`), loop on the adapter's turn hook, stop at a
+      decision boundary and say so
+- [x] T4.2 `tools/gin/adapter.mjs` + `GinBot` gains `nextMove` (D153:
+      GinBot IS Gin's seat): rule-list AND question-file strategies
+      both play (C1); `gin/player.mjs` is deleted;
+      `jevPlayer.mjs` maps games to adapters; MCP `gin_turn` still works
+
+## Phase 5 — RtG as the second adapter (AC2, AC4, C2, C3)
+- [x] T5.1 `tools/rtg/adapter.mjs` + an RtG seat: `nextMove` is D152's judgment,
+      and escalation is ONE yes/no question (not `WHOSE_TURN`);
+      `rtg/player.mjs` is deleted. RtG now answers Add Jev bot and Quit
+- [x] T5.2 Regression test, the live stall: an unconvinced turn judgment,
+      then "it's your turn, go ahead", and the bot takes its turn
+
+## Phase 6 — Proof (AC5, AC6)
+- [x] T6.1 Hearts sketch in D153: one line per adapter method (AC6).
+      Done by Morpheus in plan review, as proof of the contract BEFORE
+      building against it
+- [x] T6.2 Live at a hosted table (TYPESAFE_API_KEY is set this
+      session): an RtG bot offers Add Jev bot, spawns a second bot, and
+      quits cleanly; a Gin rule-list bot still plays a hand
+      Done as a REPEATABLE test, `bobp make test-jev-runner`
+      (tests/jevRunner.browser.mjs): real CLI, real table. Gin covers one
+      turn through the runner; a full hand stays `test-gin`'s (GinBot)

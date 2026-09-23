@@ -5,7 +5,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { loadStrategy, listStrategies, checkInstruction, resolvePath } from '../tools/gin/strategyFile.mjs';
+import { loadStrategy, listStrategies } from '../tools/gin/strategyFile.mjs';
+import { checkInstruction, resolvePath } from '../tools/jev/strategyFile.mjs';
 import { buildPlayState, CANDIDATE_SLOTS } from '../tools/gin/playState.mjs';
 import { computeFacts } from '../tools/gin/rules.mjs';
 import { EXAMPLES } from '../tools/gin/exampleStates.mjs';
@@ -35,16 +36,6 @@ test('two strategies ask the same questions and differ in how they describe the 
   assert.deepEqual(Object.keys(first.read).sort(), Object.keys(second.read).sort());
   assert.deepEqual(Object.keys(first.move.criteria).sort(), Object.keys(second.move.criteria).sort());
   assert.notDeepEqual(first.move.criteria, second.move.criteria, 'two strategies describing options identically are one strategy');
-});
-
-test('an instruction naming a card is rejected - the card belongs in state', () => {
-  assert.match(checkInstruction('Should I discard the 5 of hearts?'), /card/i);
-  assert.equal(checkInstruction('Would the opponent likely meld `candidates[0].card`?'), null);
-});
-
-test('an instruction carrying a number is rejected - the number belongs in state', () => {
-  assert.match(checkInstruction('I can knock at 10 or fewer deadwood. Should I?'), /number/i);
-  assert.equal(checkInstruction('Given `rules.knock_limit` and `me.deadwood`, should I knock?'), null);
 });
 
 test('an OPTION description is held to the same rule as an instruction', () => {

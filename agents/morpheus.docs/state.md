@@ -1,5 +1,34 @@
 # Agent State
 
+## Current Task (2026-09-22) - US-128 sprint plan: APPROVED, D153 recorded (100%)
+
+Tier 2 sprint "Jev player model". D153 (docs/DECISIONS.md) narrows the
+story's AC2 sketch: runner (tools/jev/runner.mjs) + per-game Seat
+{ nextMove({shouldStop}) -> 'move'|'wait'|'done' REQUIRED, step() }.
+Adapter = { game, strategies(), checkOptions(options), sit({peer,strategy,judge,options}) }.
+GinBot IS Gin's seat (gains nextMove from waitForTurn); MCP gin_turn
+untouched. rtg/player.mjs + gin/player.mjs deleted in P4/P5; jevPlayer's
+rtg special case goes. tools/jev/escalate.mjs: floorFallback | askTable
+("Is it my turn now?" yes/no, C3). tools/jev/decide.mjs orchestrator.
+Hearts sketch in D153 (T6.1 done). Mouse's 6-phase plan approved as-is.
+
+P1 review PASSED 2026-09-22 (nit: gameFile.mjs comment wrap -> Neo in P2).
+Backlogged: loader-rejection test gap; lint debt (165, check lacks lint).
+P2 review PASSED: directive P3 - decide.mjs takes `escalation` as a
+parameter (policy chosen by the game, not built inline).
+P3 review PASSED (note: askTable+floor>0 would ask choice.instructions aloud - YAGNI).
+P4 review PASSED; D153 amended (summaryLine, sit name/log, Gin mid-turn quit fix).
+P5 MUST delete jevPlayer's `game.play ?` branch.
+P5 review PASSED; D153 amended (quiet ask = yes/no, askPeer bug, re-ask loop, Makefile).
+P6 review PASSED - all 6 phases reviewed; handed to Oracle groom.
+
+## Next Steps
+Sprint retro (Morpheus): D153 held? what to revisit.
+(old) *lead review each phase after Trin's UAT. Watch for: re-export shims
+left at old paths (forbidden); project/legalOptions/actionsFor leaking
+into runner.mjs (D153 says the runner never calls them); quit checked
+only between steps (C4).
+
 ## Current Task (2026-09-19) - Sprint "Jev at the table": architecture DONE
 
 US-121..124 (Smith Gate 1 approved w/ 4 conditions, docs/USER_STORIES.md).

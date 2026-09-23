@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadGame, RTG } from '../tools/rtg/gameFile.mjs';
-import { checkInstruction } from '../tools/gin/strategyFile.mjs';
+import { checkInstruction } from '../tools/jev/strategyFile.mjs';
 
 const game = loadGame(RTG);
 

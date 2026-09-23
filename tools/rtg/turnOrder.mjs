@@ -11,12 +11,14 @@
 // reserved for when THIS comes back unconvinced - never for checking
 // something the board already shows.
 
+import { verdictOf, UNSURE } from '../jev/escalate.mjs';
+
 /**
  * @param {{ game: object, state: object, talk: {name: string, text: string}[],
  *   judge: { systemOne: Function }, unsure?: number }} input
  * @returns {Promise<{ isOver: boolean, unclear: boolean, checks: object }>}
  */
-export async function turnStatus({ game, state, talk, judge, unsure = 0.35 }) {
+export async function turnStatus({ game, state, talk, judge, unsure = UNSURE }) {
   const withTalk = { ...state, table_talk: talk.map(({ name, text }) => ({ name, text })) };
   const questions = {
     attack_phase_complete: game.constraints.attack_phase_complete,
@@ -24,9 +26,10 @@ export async function turnStatus({ game, state, talk, judge, unsure = 0.35 }) {
   };
   const answers = (await judge.systemOne({ state: withTalk, questions })).answers ?? {};
   const over = answers.their_turn_is_over?.noul ?? 0;
+  const reading = verdictOf(over, unsure);
   return {
-    isOver: over >= 1 - unsure,
-    unclear: over > unsure && over < 1 - unsure,
+    isOver: reading === 'yes',
+    unclear: reading === 'unsure',
     checks: {
       attack_phase_complete: answers.attack_phase_complete?.noul ?? null,
       their_turn_is_over: over,

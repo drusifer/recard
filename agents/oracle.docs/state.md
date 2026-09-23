@@ -1,5 +1,18 @@
 # Agent State
 
+## Current Task (2026-09-22) - US-128 groom DONE
+
+ARCHITECTURE.md module map: tools/jev/* (runner, decide, escalate,
+strategyFile, table), gin/rtg adapters, RtgSeat; both player.mjs removed.
+D153 already carries phase amendments (P4, P5). lessons.md: 5 US-128 lessons.
+BACKLOG: RtG-run-doc path updated; "nothing authorises whose turn" narrowed;
+2 new items from P1 (loader-rejection test gap, lint debt/check lacks lint).
+NOT run: `bobp chat-report --moniker SPRINT_JEV_PLAYER_MODEL` - project
+convention is on user request (Mouse state, US-120).
+
+## Next Steps
+Retro (Oracle): doc gaps. On user request: chat-report archive.
+
 ## Current Task (2026-09-19) - US-120 groom: DONE
 
 DECISIONS +D139 (Gin tableSpread/wider zone), +D140 (gitleaks), index lines,

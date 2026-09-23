@@ -1,5 +1,53 @@
 # Agent State
 
+## Current Task (2026-09-22) - US-128 Phase 6 UAT: PASSED (sprint QA done)
+
+test-jev-runner: spawn handling disabled -> only RtG AC4 test fails; Gin
+green. Sprint gates green: 1087 unit, test-gin, test-harness-mcp,
+test-jev-runner (3/3 x3).
+
+## Previous - US-128 Phase 5 UAT: PASSED
+
+askPeer deafened -> stall + escalation + askPeer tests fail; re-seed removed
+-> no-nag test fails. 1087 green.
+
+## Previous - US-128 Phase 4 UAT: PASSED
+
+C4 regression proven (old stop check -> 1 exact fail). test-gin 1/1,
+test-harness-mcp 12/12 (gin_turn knock-early = C1 via MCP). 1078 unit.
+
+## Previous - US-128 Phase 3 UAT: PASSED
+
+Broke jev/decide.mjs offered-option guard -> Gin illegal-knock + RtG
+not-offered tests failed (both games route through it).
+
+## Previous - US-128 Phase 2 UAT: PASSED
+
+Broke escalate.mjs at source -> existing RtG ask test + Gin floor test
+failed (wiring real). Old tests byte-identical to HEAD.
+
+## Previous - US-128 Phase 1 UAT: PASSED
+
+Move to tools/jev/ verified: test titles diffed vs HEAD (none lost, +2),
+rejectLiterals proven by disabling its throw via the real suite (1 fail).
+Finding (pre-existing): no test drives a LOADER (gin loadStrategy /
+rtg loadGame) into rejecting a literal - the "OPTION description" test
+calls checkInstruction directly. Proposed repointing it, not adding one.
+
+## Next Steps
+Sprint retro (Trin): coverage/regressions caught.
+(old) Phase 5 UAT: RtG seat - stall regression (unconvinced -> 'Is it my turn
+now?' -> 'it's your turn, go ahead' -> bot moves); RtG answers quit/add-bot
+via runner; run test-rtg (rtgPlaythrough.browser) once.
+(old) Phase 4 UAT: runner - spawn/quit ALWAYS wired (break it, botRequests
+test must fail); quit only between steps (C4); rule-list Gin still plays
+(C1); MCP gin_turn unaffected (test-harness-mcp).
+(old) Phase 3 UAT: orchestrator - decideByQuestions/decideStep records must
+keep their shape (ginBot/rtgDecide tests unchanged).
+(old) Phase 2 UAT: escalate.mjs - prove floorFallback and askTable each by
+disabling the real branch; RtG decide + Gin jev tests must stay green
+UNCHANGED (T2.2 says so).
+
 ## Current Task (2026-09-20) - Sprint "Jev at the table": phases 1-3 UAT PASSED
 
 Each phase mutation-proved before passing: P1 `seatedPlayers()` ->

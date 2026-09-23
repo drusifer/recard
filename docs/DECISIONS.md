@@ -70,6 +70,129 @@ D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rul
 
 ---
 
+### D153. A Jev player is a runner plus a seat: the game owns "is it my move?" and "one step"
+
+US-128, Tier 2, written in sprint-plan review to settle Smith's gate
+conditions C1 and C2 before any code moves. This NARROWS the contract
+sketched in the story's AC2. The pieces the sketch names (`project`,
+`legalOptions`, `actionsFor`) all survive as each game's own exports,
+used by the shared decision orchestrator. The runner itself never calls
+them.
+
+**Why the sketch narrows.** A runner-level pipeline of project, then
+options, then Choice, then act has no room for Gin's D137 rule-list
+strategies. They never build a Choice. They run ordered rules over
+`computeFacts`. D148 keeps them as the benchmark, the Add Jev bot list
+offers them, and the MCP `gin_turn` tool plays them (Smith C1). Forcing
+them through a Choice would be a behaviour change this story rules out.
+So the seam sits one level up: at "one decision, made and carried out".
+
+**The contract** (`tools/jev/runner.mjs` consumes it; one file per game):
+
+```
+GameAdapter {
+  game: string,                                  // 'gin', 'rtg'
+  strategies() -> Record<name, { name, description, usesJev }>,
+                  // feeds jev-ready, spawnRefusal, and the CLI's "unknown strategy" message
+  checkOptions(options) -> void,                 // throws UsageError (HANDS/FIRST, DECK/STEPS)
+  sit({ peer, strategy, judge, options, name, log }) -> Seat | Promise<Seat>,
+  summaryLine(record) -> string,                 // the readable stderr line per step
+}
+Seat {
+  nextMove({ shouldStop }) -> 'move' | 'wait' | 'done',   // C2: REQUIRED
+  step() -> record,             // one decision: observe, decide, act, and say it on table talk
+}
+```
+
+- **`nextMove` is the one required "is it my move?" hook (C2).** Gin
+  answers it in code: the `GinTracker` phase, and `done` once HANDS are
+  finished. RtG answers by judgment: D152's `their_turn_is_over`, plus
+  announcements, plus the shared escalation below; `done` when the STEPS
+  budget runs out. A game can never omit it, so the runner never
+  guesses.
+- **The runner owns everything that is not the game**: serve or join,
+  refuse a spectator seat, say `jev-ready` (from `strategies()`), and
+  serve spawn and quit requests unconditionally (D143/D149). Then it
+  loops `nextMove`, then `step`, and checks quits only BETWEEN steps.
+  That boundary is C4: a quit never lands half-way through a decision,
+  and the goodbye line says it is leaving after the current step.
+- **`GinBot` becomes Gin's seat, in place** (`gin/bot.mjs`): it gains
+  `nextMove` (today's `waitForTurn` logic), and its `step()` is
+  unchanged. The MCP `gin_turn` tool keeps calling `step()` directly.
+  `gin/player.mjs` and `rtg/player.mjs` are deleted, and so is the RtG
+  special case in `jevPlayer.mjs`: `rules` is simply RtG's only entry in
+  `strategies()`.
+
+**Amended in Phase 4 review:** `summaryLine` joined the adapter (how a
+step reads to a person is the game's own business), and `sit` receives
+the seated `name` and a `log` line-writer. `GinBot.waitForTurn` stays
+public, because MCP `gin_turn` waits with its own bound. Also found and
+fixed in Phase 4: Gin honoured a quit BETWEEN its draw and its discard,
+leaving 11 cards in hand. The stop is now honoured only at a turn
+boundary.
+
+**Amended in Phase 5 review:** the quiet-table question (US-127 AC10)
+became the same yes/no `TURN_QUESTION` as the escalation. That drops
+"is anything attacking me?", because attacks are announced and
+`readAnnouncement` hears them. Two latent RtG bugs were found and fixed:
+(1) RtG's `ask` parked a resolver that only its own blocked main loop
+could fill, so no reply was ever heard, and every question timed out as
+"nobody answered". `tools/jev/table.mjs` `askPeer` now listens itself.
+(2) The seat's own question and answer re-triggered an unsure turn
+judgment, which would have asked forever. The `jev-player` make target
+now forwards `DECK`/`STEPS`, which RtG's usage line had documented but
+never passed.
+
+**One escalation policy** (`tools/jev/escalate.mjs`, AC3/C3). Every
+Noul or Choice that comes back unconvinced goes through one function.
+What happens next is configuration, not code:
+- `floorFallback({ floor, fallback })`: below the file's confidence
+  floor, play the stated fallback (Gin, today's behaviour).
+- `askTable({ ask, unsure })`: put ONE yes/no question to the table and
+  abide by the answer. `readAnswer` reads it, negations first. No answer
+  means no.
+RtG uses `askTable` in two places: constraint verification (today) and
+`nextMove` (new). The question for `nextMove` is "Is it my turn now?",
+not `WHOSE_TURN`, which asks two open questions that `readAnswer`
+cannot read (C3). A clear yes settles the turn with no second ask. That
+fixes the live stall: 0.34, then "it's your turn, go ahead", and the
+bot plays.
+
+**One orchestrator** (`tools/jev/decide.mjs`): optional `read` (merged
+into state), then the Choice over the options the game supplies, then
+optional `verify` (the questions that apply to the pick), with
+escalation from the policy above. Gin's `decideByQuestions` and RtG's
+`decideStep` become calls to it.
+
+**AC6, a third game against this contract (Hearts, sketched, not
+built):**
+- `strategies()`: question files in `tools/hearts/strategies/`, the Gin
+  pattern.
+- `checkOptions`: HANDS.
+- `nextMove`: code, like Gin. The trick in progress and seat order are
+  in the view: it is my move when the cards on the trick equal my
+  offset from the leader. Passing three cards is a phase, also
+  code-computable. No judgment and no escalation needed.
+- `step`: project the hand, the trick so far, whether hearts are
+  broken, and points taken. The legal options are code: follow suit if
+  able, hearts not led until broken, the two of clubs opens. The Choice
+  goes over those. There is no `verify`, because every Hearts rule is
+  computable. Escalation is `floorFallback` (the lowest legal card).
+  The act is MOVE a card to the trick pile, and it is said on table
+  talk.
+- **What Hearts would add that neither game has:** four seats, so the
+  trick winner and the next leader come from seat order. That is game
+  code inside `nextMove`. The contract does not change.
+
+**Rejected:** the sketch's runner-level `project`/`legalOptions`/
+`actionsFor` pipeline (it excludes the rule-list strategies, C1);
+keeping `turnStatus` optional (the runner would be left guessing, C2);
+two escalation paths, one for moves and one for turns (that is what
+produced the stall); a compatibility re-export at `gin/strategyFile.mjs`
+or `rtg/table.mjs` (standing no-shims rule).
+
+---
+
 ### D152. Whose turn it is: judged from the board and table talk, never tracked or asked
 
 US-127 follow-up, direct user correction of two draft designs in a row.

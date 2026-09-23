@@ -3998,3 +3998,57 @@ of the one this sprint exists to build.
 **Tier 2 fast-track** (bob-protocol standing rule #10): this document
 carries both the story and the architecture in one pass. Smith reviews
 both together; Mouse plans phases directly from this.
+
+### Gate (Smith, 2026-09-22): APPROVED with 5 conditions
+
+Story and architecture reviewed together (Tier 2), against the shipped
+code rather than the table above alone. The direction is right: RtG
+missing quit and add-bot is a real gap a player feels, and one
+escalation policy removes the stall a person has already sat through.
+Conditions 1-4 are BLOCKING and are part of the AC. Condition 5 is not.
+
+1. **The contract must carry Gin's rule-list strategies too (AC2, AC5).**
+   `resolveStrategy` still offers the D137 rule lists beside the
+   question files (D148 keeps them until the bench retires them), and
+   the MCP `gin_turn` tool plays them. A `loadStrategy` that returns only
+   `{ read?, decide, verify? }` Jev stages has nowhere for them. They
+   must come out of `resolveStrategy` unchanged and still play, whether
+   as an adapter-owned decider or some other form (Morpheus decides
+   which). Dropping them would be a behaviour change this story rules
+   out in its own Out of scope. Heuristic #4: every strategy the Add Jev
+   bot list offers today stays playable.
+2. **"Is it my move?" is part of the contract, not an optional RtG
+   extra (AC2).** Gin knows its turn from snapshots (`GinTracker`,
+   `waitForTurn`). RtG judges it (D152). The shared runner cannot run
+   observe/decide/act without asking one of them. Name ONE adapter hook
+   for it, which Gin answers in code and RtG answers by judgment plus
+   escalation. Keeping `turnStatus` optional with nothing in its place
+   leaves the runner guessing, which is how an agent ends up silently
+   stuck (Heuristic #1).
+3. **The escalation question must be one the parser can read (AC3).**
+   Ask-and-abide means the bot keeps whatever answer it is given, and
+   `readAnswer` reads only yes/no. RtG's current `WHOSE_TURN` ("whose
+   turn is it, and is anything attacking me?") is two open questions at
+   once, so an honest answer like "mine, and no" matches neither word
+   list and reads as "no answer". An escalation asks ONE yes/no question
+   in plain words (for example "Is it my turn now?"), and a clear answer
+   settles it without a re-ask. The live stall is the acceptance test:
+   told "it's your turn, go ahead" after an unconvinced judgment, the
+   bot takes its turn. Heuristic #2 (Match between system and the real
+   world): people answer the question they are asked.
+4. **Quitting is honest about when (AC4).** Gin stops between turns
+   and never abandons a draw without its discard. The shared runner
+   stops at a decision boundary, and its goodbye line says so. RtG
+   gains quit through this refactor, and an RtG turn has several
+   decisions, so "leaving now" must not happen with a spell half-moved.
+   Heuristic #3 (User control and freedom): the person who pressed Quit
+   gets what they asked for, and nothing is left dangling on the table.
+5. **Non-blocking: RtG leaves silently when its step budget runs out.**
+   The bot writes to stderr and closes its browser. The table sees a
+   disconnect and never hears a word, where a Quit gets a goodbye.
+   Filed, not required: whether a budget exit should say goodbye is the
+   user's call (standing rule: no unprompted special cases).
+
+AC6 (the Hearts sketch) needs a home to be checkable. It goes in
+`docs/DECISIONS.md` under this sprint's decision: one line per adapter
+method, with Hearts' answer to each.

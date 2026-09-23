@@ -117,24 +117,40 @@ src/presets.js           static game-preset definitions (deck lists, table layou
 src/rulesReference.js    static in-app rules-reference content
 src/hostSettings.js      host's own sticky pre-game settings (deck/preset choice)
 
-tools/botRequests.mjs    pure: unanswered "add a bot" requests + refusals
-tools/gin/               the Gin bot core, strategies and the runner (D137)
+tools/jevPlayer.mjs      the `make jev-player` CLI: GAME -> that game's adapter,
+                          handed to the shared runner (D153)
+tools/jev/               everything a Jev player needs that is not a game (D153)
+tools/jev/runner.mjs     join, refuse a spectator seat, announce jev-ready,
+                          serve add-bot + quit ALWAYS, play the game's Seat
+                          (`nextMove` -> move|wait|done, then `step`)
+tools/jev/decide.mjs     one decision: read? -> Choice over the offered
+                          options -> verify?, escalation passed in
+tools/jev/escalate.mjs   verdictOf (yes|no|unsure) + the two policies:
+                          askTable (RtG) and floorFallback (Gin)
+tools/jev/strategyFile.mjs  the question-file rule: prose refers to state by
+                          path, never a card name or number (D147)
+tools/jev/table.mjs      hearing the table: yes/no answers, a quiet table,
+                          askPeer (asks AND listens for the reply)
+tools/botRequests.mjs    pure: unanswered "add a bot" / "leave" requests
+tools/gin/adapter.mjs    Gin as a game: its strategies, options, seat
+tools/gin/bot.mjs        GinBot - Gin's Seat, also driven by MCP `gin_turn`
 tools/gin/playState.mjs  projects the replicated view into the fixed state
                           schema a question file refers to by path (D147)
-tools/gin/strategyFile.mjs  loads a question-file strategy; rejects any
-                          instruction carrying a card name or a number
+tools/gin/strategyFile.mjs  where Gin keeps its strategies, which parts are prose
 tools/gin/strategies/    question-file strategies, static JSON (D147)
-tools/gin/jevStrategy.mjs  project, ask once, act - no rule list (D147)
+tools/gin/jevStrategy.mjs  Gin's read + move, mapped onto jev/decide.mjs
 tools/gin/strategyKinds.mjs  one lookup resolving a name to either kind
+tools/rtg/adapter.mjs    RtG as a game: `rules`, STEPS/DECK, its seat
+tools/rtg/seat.mjs       RtgSeat: judge the turn (D152), ask ONE yes/no when
+                          unsure or quiet, then step
 tools/rtg/game.json      RtG's rules written out in full + the named
                           constraints that judge a proposed move (D151)
 tools/rtg/gameFile.mjs   loads a game file; a constraint must cite a
                           rule the game actually states
 tools/rtg/playState.mjs  the RtG projection; mana and costs in CODE
 tools/rtg/options.mjs    the legal next actions, from resources
-tools/rtg/decide.mjs     ask what next, check it against the rules, act
-tools/rtg/table.mjs      hearing the table: announcements, asking, answers
-tools/rtg/player.mjs     the RtG runner (`make jev-player GAME=rtg`)
+tools/rtg/decide.mjs     RtG's step + constraints, mapped onto jev/decide.mjs
+tools/rtg/table.mjs      RtG's own words: announcements, TURN_QUESTION
 
 src/pileables/           the Pileable -> Stackable -> Card/Chip/Token hierarchy
 src/piles/               the Pile -> Stack (+ every derived pile KIND) hierarchy

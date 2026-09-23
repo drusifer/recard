@@ -1,5 +1,20 @@
 # Agent State
 
+## Current Task (2026-09-22) - Sprint "Jev player model" (US-128) planned (100%)
+
+Tier 2. 6 phases x 2 tasks in root task.md "Sprint: Jev player model":
+P1 promote strategyFile/table to tools/jev; P2 escalate.mjs (one policy,
+ask-table | floor-fallback); P3 tools/jev/decide.mjs orchestrator;
+P4 runner.mjs + gin/adapter.mjs (delete gin/player.mjs); P5 rtg/adapter.mjs
+(delete rtg/player.mjs, yes/no turn escalation, stall regression test);
+P6 Hearts sketch in D153 + live check (TYPESAFE_API_KEY IS set).
+Smith conditions: C1 rule-lists -> P4, C2 turn hook -> D153+P5,
+C3 yes/no escalation -> P2+P5, C4 quit boundary -> P4.
+Pending before P1: Morpheus records D153 (the real GameAdapter contract).
+
+## Next Steps
+Track phase closes in task.md as Neo/Trin/Morpheus finish each one.
+
 ## Current Task (2026-09-19) - Sprint "Jev at the table" planned
 
 8 phases in task.md (US-121..124, D141-D144), 2-3 tasks each:

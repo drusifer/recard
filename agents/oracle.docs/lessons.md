@@ -639,3 +639,32 @@ This file contains critical lessons and rules derived from past errors, technica
   rejected a step budget ("the budget is inherent in mana cost"), and
   they were right: the option set shrank to `pass` on its own in live
   play, one step after the land drop was spent.
+
+## Sprint "Jev player model" (2026-09-22): US-128, D153
+
+- **Moving code across a seam is when latent bugs surface.** Three were
+  found this sprint, and none was a regression. Each surfaced because
+  the seam forced a question the old code never had to answer. Who
+  decides when leaving is safe? Gin honoured a quit between its draw and
+  its discard. Who reads the talk while a question waits? Nobody did, so
+  RtG's `ask` could never hear a reply. Is the bot's own exchange new
+  information? It re-triggered an unsure judgment forever. Name the
+  owner of each such question in the contract (D153's `nextMove`,
+  `askPeer`).
+- **A question the parser cannot read is a silent failure.** "Whose
+  turn is it, and is anything attacking me?" invites answers that
+  `readAnswer` reads as nothing, so the bot looked diligent and learned
+  nothing. Ask what you can parse: one yes/no.
+- **The bot's own words are never news - twice now.** US-127 kept its
+  narration out of `readAnnouncement`; US-128 had to keep its own
+  question and answer out of "has the talk moved?". Any "something
+  changed" check must exclude the bot's own lines.
+- **A gate that doesn't run a check still says PASSED about it.**
+  `make check` never ran `lint`, so 165 errors built up behind green
+  builds across three sprints. Backlogged for a user call.
+- **A proof test must be able to fail on the wiring, not only on its
+  own shape.** Each phase disabled the real code at its source (the
+  escalation, the offered-option guard, add-bot handling) and watched an
+  EXISTING test fail, which is what showed the code really went through
+  the new module.
+

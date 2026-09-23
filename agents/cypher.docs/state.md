@@ -1,5 +1,19 @@
 # Agent State
 
+## Current Task (2026-09-22) - US-128 LAUNCHED
+
+"Jev player model": tools/jev/ (runner, decide, escalate, strategyFile,
+table) + Gin and RtG as adapters (D153). RtG gained add-bot + quit by
+construction. Found and fixed: the Gin mid-turn quit, RtG's ask that
+never heard replies, and an endless re-ask. The live stall is now a test.
+Proof: `bobp make test-jev-runner` (real CLI at a real table).
+Story quality: AC2's sketch was narrowed by D153 (rule-lists had no
+home). The story should have named the rule-list strategies in scope.
+
+## Next Steps
+BACKLOG "From the US-128 retro" + P1 items (lint debt: needs user call).
+Not done: commit/push (not requested), chat-report archive (on request).
+
 ## Current Task (2026-09-20) - US-125 LAUNCHED
 
 "Jev plays Gin" shipped. A Gin strategy is now a static question file

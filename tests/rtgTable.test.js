@@ -2,7 +2,8 @@
 // asks out loud when the table says nothing.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readAnnouncement, shouldAskTable, readAnswer, trackChange, WHOSE_TURN } from '../tools/rtg/table.mjs';
+import { readAnnouncement, TURN_QUESTION } from '../tools/rtg/table.mjs';
+import { readAnswer } from '../tools/jev/table.mjs';
 
 const said = (name, text, data) => ({ name, text, ...(data ? { data } : {}) });
 
@@ -25,42 +26,9 @@ test('ordinary chat says nothing about the turn', () => {
   assert.equal(readAnnouncement(said('Drew', 'nice draw'), 'bot'), null);
 });
 
-test('a quiet table with a changed state gets asked - but only after a wait', () => {
-  const base = { lastStateChangeAt: 1000, lastTalkAt: null, turnKnown: false, quietMs: 8000 };
-  assert.equal(shouldAskTable({ ...base, now: 3000 }), false, 'not immediately - people are slower than state');
-  assert.equal(shouldAskTable({ ...base, now: 9500 }), true);
-});
-
-test('no question when the bot already knows whose turn it is', () => {
-  assert.equal(shouldAskTable({ lastStateChangeAt: 1000, lastTalkAt: null, turnKnown: true, now: 99999 }), false);
-});
-
-test('no question when somebody already spoke after the change', () => {
-  assert.equal(shouldAskTable({ lastStateChangeAt: 1000, lastTalkAt: 1200, turnKnown: false, now: 99999 }), false);
-});
-
-test('the question is plain words a person can answer', () => {
-  assert.match(WHOSE_TURN, /whose turn/i);
-  assert.match(WHOSE_TURN, /attacking/i);
-});
-
-test('a yes is a yes, a no is a no, and anything else settles nothing', () => {
-  assert.equal(readAnswer(said('Drew', 'yes go ahead')), true);
-  assert.equal(readAnswer(said('Drew', "no, you can't")), false);
-  assert.equal(readAnswer(said('Drew', 'hmm')), null, 'unsettled is not a no');
-});
-
-test('a refusal is never read as permission ("you can\'t" contains "you can")', () => {
-  for (const refusal of ["no, you can't", "you cannot attack with that", "that's not allowed", "nope"]) {
-    assert.equal(readAnswer({ text: refusal }), false, refusal);
-  }
-});
-
-test('trackChange only stamps a NEW seq - comparing seq to a timestamp directly never equals, which was the live bug', () => {
-  const first = trackChange({ seq: null, changedAt: null }, 3, 1000);
-  assert.deepEqual(first, { seq: 3, changedAt: 1000 });
-  const same = trackChange(first, 3, 5000);
-  assert.deepEqual(same, first, 'the same seq again does not restamp the time');
-  const next = trackChange(same, 4, 5000);
-  assert.deepEqual(next, { seq: 4, changedAt: 5000 });
+test('the turn question is ONE yes/no, and the answers people actually give are read (C3)', () => {
+  assert.match(TURN_QUESTION, /^Is it my turn now\?$/);
+  assert.equal(readAnswer({ text: "it's your turn, go ahead" }), true, 'the live stall\'s answer');
+  assert.equal(readAnswer({ text: 'yes' }), true);
+  assert.equal(readAnswer({ text: 'no, not yet' }), false);
 });

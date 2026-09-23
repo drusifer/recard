@@ -17,6 +17,7 @@
     "test:motion": "node --test tests/cardMotion.browser.mjs",
     "test:harness-mcp": "node --test tests/harnessMcp.browser.mjs",
     "test:gin": "node --test tests/ginBot.browser.mjs",
+    "test:jev-runner": "node --test tests/jevRunner.browser.mjs",
     "jev-player": "node tools/jevPlayer.mjs",
     "harness-mcp": "node tools/mcp/harnessServer.mjs",
     "dev": "node tools/devserver.mjs",

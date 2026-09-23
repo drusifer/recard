@@ -724,3 +724,402 @@ gitleaks git --no-banner --redact --pre-commit .
 9:24PM INF 1 commits scanned.
 9:24PM INF scanned ~13551 bytes (13.55 KB) in 253ms
 9:24PM INF no leaks found
+
+---
+[<small>2026-09-22 19:12:07</small>] [**User**]->[**all**] *request*:
+ /sprint jev player model using bob-protocol
+
+---
+[<small>2026-09-22 19:12:07</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make help | /home/drusifer/Projects/recard/build/build.out
+check-decisions  verify docs/DECISIONS.md's modern section is newest-first, no duplicate D-numbers
+check-story-numbers  verify docs/USER_STORIES.md has no duplicate US-numbers
+
+---
+[<small>2026-09-22 19:13:32</small>] [**Smith**]->[**all**] *user init*:
+ Smith online. Loaded state (stale: last entry predates US-127). Task: Tier 2 gate on US-128 (shared Jev-player model), story and architecture together, per the story's own fast-track note. Reviewing against the shipped Gin/RtG code, not the spec alone.
+
+---
+[<small>2026-09-22 19:13:55</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-story-numbers | /home/drusifer/Projects/recard/build/build.out
+node tools/checkStoryNumbers.mjs
+Checked 88 story headings in docs/USER_STORIES.md.
+No duplicate story numbers. Clean.
+
+---
+[<small>2026-09-22 19:14:00</small>] [**Smith**]->[**Mouse**] *user approve*:
+ *user approve US-128, 4 BLOCKING conditions: (1) Gin's D137 rule-list strategies stay playable through the contract (MCP gin_turn uses them); (2) 'is it my move?' is one REQUIRED adapter hook, not an optional turnStatus; (3) escalation asks ONE yes/no question readAnswer can parse, not WHOSE_TURN's two open questions; (4) quit stops at a decision boundary and says so. Non-blocking: RtG budget exit is silent. Full text: USER_STORIES.md US-128 Gate.
+
+---
+[<small>2026-09-22 19:14:08</small>] [**Smith**]->[**Mouse**] *handoff*:
+ Gate done, state saved. @Mouse *sm plan sprint US-128: phases of 1-3 tasks into root task.md, conditions 1-4 must each land in a named phase.
+
+---
+[<small>2026-09-22 19:14:18</small>] [**Mouse**]->[**all**] *sm init*:
+ Mouse online. State is stale (last plan: 'Jev at the table'). Planning US-128 from the story plus Smith's 4 conditions.
+
+---
+[<small>2026-09-22 19:14:46</small>] [**Mouse**]->[**all**] *sm decision*:
+ Sprint planned: 6 phases, 2 tasks each, task.md 'Sprint: Jev player model'. Boundaries: move the code first (P1), then the escalation policy (P2) BEFORE the orchestrator (P3) that uses it; runner+Gin (P4) before RtG (P5), so the runner is proven on the game that already has quit/add-bot before RtG gains them. C1-C4 each sit in a named phase. Rejected: one big 'move to tools/jev' phase, which would put 10+ files in one diff.
+
+---
+[<small>2026-09-22 19:14:53</small>] [**Mouse**]->[**Morpheus**] *sm handoff*:
+ State saved. @Morpheus *lead review sprint plan US-128, and record D153 (the real GameAdapter contract: C1 rule-list form, C2 turn-hook name) before Phase 1.
+
+---
+[<small>2026-09-22 19:15:53</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
+No duplicate decision numbers, and the modern section is newest-first. Clean.
+
+---
+[<small>2026-09-22 19:16:08</small>] [**Morpheus**]->[**all**] *lead decision*:
+ D153: Jev player = shared runner + per-game Seat {nextMove (REQUIRED, C2), step}. GinBot IS Gin's seat, so rule-lists and MCP gin_turn keep working (C1). Rejected the story's runner-level project/options/act pipeline: it has no room for rule-lists. One escalate.mjs: floorFallback or askTable, which asks 'Is it my turn now?' (C3). Hearts sketch included. Full text: DECISIONS.md D153.
+
+---
+[<small>2026-09-22 19:16:17</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Sprint plan approved: phase boundaries match D153. State saved. @Neo *swe impl phase-1 (US-128: promote strategyFile + generic table helpers into tools/jev/, no shims).
+
+---
+[<small>2026-09-22 19:16:30</small>] [**Neo**]->[**all**] *swe init*:
+ Neo online, *swe impl phase-1 (US-128): tools/jev/strategyFile.mjs + tools/jev/table.mjs. TDD: move the tests to the new paths first, watch them fail, then move the code.
+
+---
+[<small>2026-09-22 19:19:36</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make lint | /home/drusifer/Projects/recard/build/build.out
+
+✖ 165 problems (165 errors, 0 warnings)
+68 errors and 0 warnings potentially fixable with the `--fix` option.
+
+
+---
+[<small>2026-09-22 19:20:25</small>] [**Neo**]->[**Mouse**] *swe finding*:
+ FINDING, not fixed in P1: 'bobp make lint' fails with 165 errors across ~40 files (src/, tests/, tools/), most from the 09-19..21 Jev sprints. Cause: 'make check' = cards+test+lint-decks+secrets, NO lint, so every 'check PASSED' since hid it. Plugins are unchanged since Aug. Kept out of US-128 so the refactor diff stays reviewable; P1's new files are eslint-clean. Needs a user call: add lint to check, and a lint-debt pass.
+
+---
+[<small>2026-09-22 19:20:25</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 1 impl complete: tools/jev/strategyFile.mjs (checkInstruction, rejectLiterals, resolvePath) + tools/jev/table.mjs (shouldAskTable, readAnswer, trackChange); rtg->gin import gone; no shims; tests moved to jevStrategyFile/jevTable. Unit 1063 green. Decided not to add a generic dir-loader (T1.1): the two loaders share only the literal check. @Trin *qa uat phase-1
+
+---
+[<small>2026-09-22 19:20:32</small>] [**Trin**]->[**all**] *qa init*:
+ Trin online, *qa uat phase-1 (US-128). Checking: no test lost in the move, moved guards still bite (mutation), no re-export at old paths.
+
+---
+[<small>2026-09-22 19:21:20</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 1063
+ℹ suites 0
+ℹ pass 1063
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4980.613477
+
+---
+[<small>2026-09-22 19:21:28</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 1 PASSED. No test title lost in the move (diffed against HEAD); +2 new. rejectLiterals proven by disabling its throw: 1 test fails. FINDING (pre-existing, not a regression): nothing proves either LOADER rejects a literal. Gin's 'an OPTION description is held to the same rule' only calls checkInstruction. Proposal: point that one test at the loader, not a new test. Morpheus's call. @Morpheus *lead review phase-1
+
+---
+[<small>2026-09-22 19:21:50</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 1 review PASSED, 1 nit: gameFile.mjs header comment line not re-wrapped; Neo folds it into P2. Trin's loader-rejection gap: DEFERRED to BACKLOG, not fixed here. Testing Gin's loader on a bad file needs a test-only dir parameter, which is not worth it for a pre-existing gap. Rejected: adding it in this sprint (prune, don't pad). @Neo *swe impl phase-2
+
+---
+[<small>2026-09-22 19:22:05</small>] [**Neo**]->[**all**] *swe impl*:
+ Neo on phase-2 (US-128): tools/jev/escalate.mjs, one shape for every unconvinced judgment: verdictOf(noul) -> yes|no|unsure, and policy.resolve(question) -> {accepted, answered, why}, with askTable(ask) or floorFallback(). Tests first.
+
+---
+[<small>2026-09-22 19:22:53</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 1068
+ℹ suites 0
+ℹ pass 1068
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5024.911575
+
+---
+[<small>2026-09-22 19:23:13</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 2 impl complete: tools/jev/escalate.mjs, verdictOf (yes|no|unsure) + askTable(ask) | floorFallback(), both resolving to {accepted, answered, why}. RtG constraint check, RtG turnStatus and Gin's floor all use it; existing rtgDecide/ginJevPlayer/rtgTurnOrder tests UNCHANGED and green (1068). P1 nit fixed. @Trin *qa uat phase-2
+
+---
+[<small>2026-09-22 19:23:18</small>] [**Trin**]->[**all**] *qa uat*:
+ Trin on *qa uat phase-2. Checking: the 3 existing test files are byte-identical to HEAD, and each call site really goes through escalate.mjs (break the policy, watch the real suite fail).
+
+---
+[<small>2026-09-22 19:23:33</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 1068
+ℹ suites 0
+ℹ pass 1068
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4970.438414
+
+---
+[<small>2026-09-22 19:23:42</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 2 PASSED. Existing rtgDecide/ginJevPlayer/rtgTurnOrder tests byte-identical to HEAD and green. Wiring proven at the source: breaking escalate.mjs (askTable refuses a yes, floorFallback accepts) fails the EXISTING RtG 'asked at the table' and Gin 'below the floor' tests, not just the new unit tests. Restored: 1068 green. @Morpheus *lead review phase-2
+
+---
+[<small>2026-09-22 19:23:54</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 2 review PASSED. Directive for P3: the policy is still constructed INLINE per game (Gin's floorFallback().resolve() is a constant false where it sits). AC3 wants it as configuration, so tools/jev/decide.mjs takes 'escalation' as a parameter and the game passes it in. Rejected: a policy-by-name string lookup, which is a second registry for two functions. @Neo *swe impl phase-3
+
+---
+[<small>2026-09-22 19:24:10</small>] [**Neo**]->[**all**] *swe impl*:
+ Neo on phase-3 (US-128): tools/jev/decide.mjs, read? -> Choice -> verify?, escalation passed IN (Morpheus P2 directive). Gin and RtG keep their record shapes so existing tests stay unchanged.
+
+---
+[<small>2026-09-22 19:25:50</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 1075
+ℹ suites 0
+ℹ pass 1075
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5008.196337
+
+---
+[<small>2026-09-22 19:25:59</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 3 impl complete: tools/jev/decide.mjs (read? -> Choice over offered options -> verify?, escalation passed IN per Morpheus). Gin passes floorFallback, RtG passes askTable(ask). decideByQuestions and decideStep are thin mappers onto it; rtgDecide/ginJevPlayer/ginBot tests byte-identical to HEAD. 1075 green, new files eslint-clean. @Trin *qa uat phase-3
+
+---
+[<small>2026-09-22 19:26:05</small>] [**Trin**]->[**all**] *qa uat*:
+ Trin on *qa uat phase-3. Breaking the orchestrator's offered-option guard at its source; the EXISTING Gin/RtG tests must catch it, proving both games decide through tools/jev/decide.mjs.
+
+---
+[<small>2026-09-22 19:26:16</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 1075
+ℹ suites 0
+ℹ pass 1075
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5074.453359
+
+---
+[<small>2026-09-22 19:26:27</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 3 PASSED. Broke the offered-option guard in tools/jev/decide.mjs only: EXISTING tests in both games failed (Gin 'an illegal knock is not an option...', RtG 'an answer naming an option that was not offered...'), plus the new unit test. So both games really decide through the orchestrator. Restored: 1075 green. @Morpheus *lead review phase-3
+
+---
+[<small>2026-09-22 19:26:37</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 3 review PASSED. Non-blocking: under a floor, decide() escalates with choice.instructions as the question. Harmless for floorFallback (asks nobody), but askTable + floor>0 would read a whole prompt aloud at the table. No game combines them today; not adding a 'floor question' param until one does (YAGNI). @Neo *swe impl phase-4
+
+---
+[<small>2026-09-22 19:26:42</small>] [**Neo**]->[**all**] *swe impl*:
+ Neo on phase-4 (US-128): tools/jev/runner.mjs + tools/gin/adapter.mjs; GinBot gains nextMove; gin/player.mjs goes. Reading the tests that pin the current runner first.
+
+---
+[<small>2026-09-22 19:30:08</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 1078
+ℹ suites 0
+ℹ pass 1078
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5345.12696
+
+---
+[<small>2026-09-22 19:30:19</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 4 impl complete: tools/jev/runner.mjs (run, playSeat, serveSpawnRequests, GOODBYE) + tools/gin/adapter.mjs; GinBot.nextMove; gin/player.mjs deleted. FOUND AND FIXED a latent Gin bug: a quit between draw and discard left the bot holding 11 cards (waitForTurn honoured stop mid-turn). Regression test added. Kept waitForTurn public: MCP gin_turn uses it. 1078 green. @Trin *qa uat phase-4
+
+---
+[<small>2026-09-22 19:30:27</small>] [**Trin**]->[**all**] *qa uat*:
+ Trin on *qa uat phase-4: revert the mid-turn fix to prove the C4 regression test, then the two browser gates this phase touches: test-gin (GinBot over real WebRTC) and test-harness-mcp (gin_turn calls waitForTurn).
+
+---
+[<small>2026-09-22 19:30:55</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-harness-mcp | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8603.855027
+
+---
+[<small>2026-09-22 19:31:06</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 4 PASSED. C4 regression proven: restoring the old stop check fails exactly 'asked to leave AFTER drawing, it still discards first'. test-gin 1/1 over real WebRTC; test-harness-mcp 12/12, incl. gin_turn with rule-list knock-early (C1 on the MCP path). CLI usage tests run through the new runner and stay green. 1078 unit green. @Morpheus *lead review phase-4
+
+---
+[<small>2026-09-22 19:31:20</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
+No duplicate decision numbers, and the modern section is newest-first. Clean.
+
+---
+[<small>2026-09-22 19:31:20</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 4 review PASSED. D153 amended in place: the adapter gains summaryLine, and sit gets name+log. waitForTurn stays public for MCP. The Gin mid-turn quit fix is recorded there too. Must-do for P5: delete jevPlayer's temporary 'game.play ?' branch with rtg/player.mjs; no second path survives the sprint. @Neo *swe impl phase-5
+
+---
+[<small>2026-09-22 19:32:05</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
+No duplicate decision numbers, and the modern section is newest-first. Clean.
+
+---
+[<small>2026-09-22 19:32:41</small>] [**Neo**]->[**all**] *swe finding*:
+ Neo on phase-5. FOUND a latent RtG bug before writing code: rtg/player.mjs's askTable parks its resolver for the main loop to fill, but the loop is blocked awaiting the decision that asked. So every table question times out as 'nobody answered' after 20s. Fix: tools/jev/table.mjs askPeer listens to talk itself while waiting. Tests first.
+
+---
+[<small>2026-09-22 19:35:13</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 1087
+ℹ suites 0
+ℹ pass 1087
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5251.681325
+
+---
+[<small>2026-09-22 19:35:26</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 5 impl complete: tools/rtg/seat.mjs + adapter.mjs; rtg/player.mjs deleted, so jevPlayer has ONE path. TURN_QUESTION 'Is it my turn now?' replaces WHOSE_TURN for both the unsure judgment and the quiet table (C3). Stall regression test passes. Also fixed: (a) RtG's ask could never hear a reply, now askPeer; (b) its own question re-triggered the unsure judgment, an endless-ask loop caught in TDD. Makefile forwards DECK/STEPS. 1087 green. @Trin *qa uat phase-5
+
+---
+[<small>2026-09-22 19:35:34</small>] [**Trin**]->[**all**] *qa uat*:
+ Trin on *qa uat phase-5: break askPeer's listening, then the checkedTalkTo re-seed; the stall and no-nag tests must each catch its own break.
+
+---
+[<small>2026-09-22 19:35:52</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 1087
+ℹ suites 0
+ℹ pass 1087
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5399.82391
+
+---
+[<small>2026-09-22 19:35:59</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 5 PASSED. askPeer deafened at source: THE STALL, the unsure-escalation test and both askPeer tests fail. Re-seed of checkedTalkTo removed: exactly the 'does not keep asking' test fails. Restored: 1087 green. C3 met: one yes/no, abided by, and the live stall is now a repeatable test. @Morpheus *lead review phase-5
+
+---
+[<small>2026-09-22 19:36:16</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
+No duplicate decision numbers, and the modern section is newest-first. Clean.
+
+---
+[<small>2026-09-22 19:36:16</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 5 review PASSED. The D153 boundary holds: tools/jev/ names no game, no shims at old paths, both player.mjs files gone, the CLI has one path. D153 amended with the P5 facts (the quiet-table ask is the same yes/no, the two RtG ask bugs, Makefile DECK/STEPS). @Neo *swe impl phase-6: T6.2 live check at a hosted table.
+
+---
+[<small>2026-09-22 19:36:27</small>] [**Neo**]->[**all**] *swe impl*:
+ Neo on phase-6 T6.2. Per the standing no-one-off-verification rule, checking whether the live proof can be a repeatable browser test before driving a table by hand.
+
+---
+[<small>2026-09-22 19:39:17</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-jev-runner | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 39263.510283
+
+---
+[<small>2026-09-22 19:39:29</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 6 impl complete. T6.2 is a REPEATABLE browser test, not a one-off probe: tests/jevRunner.browser.mjs (make test-jev-runner) runs the real CLI at a hosted table. Gin knock-early offers both kinds and draws+discards after a real deal (C1). Quit before deal gives GOODBYE and exit 0 (C4). RtG answers add-bot and quit (AC4, live Jev). 3/3 on 3 runs. Scope note: one Gin TURN, not a full hand. @Trin *qa uat phase-6
+
+---
+[<small>2026-09-22 19:39:38</small>] [**Trin**]->[**all**] *qa uat*:
+ Trin on *qa uat phase-6: disabling the runner's spawn handling at source; the RtG browser test must fail (AC4 proven through the runner, not by the test's own shape).
+
+---
+[<small>2026-09-22 19:41:24</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make test-jev-runner | /home/drusifer/Projects/recard/build/build.out
+generatedMessage: false,
+code: 'ERR_ASSERTION',
+actual: undefined,
+expected: undefined,
+operator: 'fail',
+diff: 'simple'
+}
+
+---
+[<small>2026-09-22 19:41:33</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 6 PASSED. With the runner's spawn handling disabled at source, exactly the RtG test fails (after 94s) while both Gin tests stay green. The AC4 test proves the wiring, not its own shape. Runner restored byte-identical; 3/3 on 3 prior runs. Sprint-level: 1087 unit, test-gin, test-harness-mcp, test-jev-runner all green. @Morpheus *lead review phase-6
+
+---
+[<small>2026-09-22 19:41:42</small>] [**Morpheus**]->[**Oracle**] *lead handoff*:
+ Phase 6 review PASSED, all phases reviewed. Accepted: the live proof covers one Gin TURN through the runner, not a full hand; hands are GinBot's and test-gin covers them. Rejected: a full-hand browser test, which duplicates test-gin at 10x the runtime. 12/12 tasks done. @Oracle *ora groom
+
+---
+[<small>2026-09-22 19:42:01</small>] [**Oracle**]->[**all**] *ora init*:
+ Oracle online, *ora groom US-128: ARCHITECTURE module map, lessons, backlog check, then the sprint chat report.
+
+---
+[<small>2026-09-22 19:42:21</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-story-numbers | /home/drusifer/Projects/recard/build/build.out
+node tools/checkStoryNumbers.mjs
+Checked 88 story headings in docs/USER_STORIES.md.
+No duplicate story numbers. Clean.
+
+---
+[<small>2026-09-22 19:42:30</small>] [**Oracle**]->[**Smith**] *ora handoff*:
+ Docs groomed: ARCHITECTURE module map now shows tools/jev/ + both adapters + RtgSeat; D153 carries its P4/P5 amendments; lessons.md +5 (the seam surfaced 3 latent bugs, parse what you ask, own words are never news, a gate that doesn't lint says PASSED, proofs must fail on wiring). Chat-report archive NOT run: on user request per convention. @Smith *user test jev-player-model
+
+---
+[<small>2026-09-22 19:42:38</small>] [**Smith**]->[**all**] *user test*:
+ Smith on *user test jev-player-model: running the CLI a person actually types, error paths included; C1-C4 live proof is test-jev-runner (Trin).
+
+---
+[<small>2026-09-22 19:42:41</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make jev-player | /home/drusifer/Projects/recard/build/build.out
+make: *** [Makefile:93: jev-player] Error 2
+> jev-player
+> node tools/jevPlayer.mjs --game chess --strategy x --code ABC123 --first bot --hands 1
+
+
+---
+[<small>2026-09-22 19:42:59</small>] [**Smith**]->[**all**] *user approve*:
+ *user approve US-128 user test. CLI mistakes are consistent and constructive (#4/#9): unknown game/strategy list the choices; STEPS/HANDS name the range; RtG STEPS used to be dropped or become NaN. C1-C4 have repeatable live proof (test-jev-runner). Findings, non-blocking, NOT fixed: (1) join line says 'another rtg bot', an internal id, where people read the game's name (#2); (2) C5: a budget exit is still silent at the table (user's call). @all *sprint retro
+
+---
+[<small>2026-09-22 19:43:12</small>] [**Neo**]->[**Cypher**] *retro*:
+ Neo retro: 6 phases, zero fix loops, but TDD earned its keep twice. My own seat test caught an endless-ask loop (the bot's question re-triggered its judgment). A wrong test premise (the scripted judge picks pass) read as a bug for a minute, the third sprint running. Tech debt left: RtG applyTracks has a dead pass-to-combat line, ported faithfully, not fixed. Backlog: that line.
+
+---
+[<small>2026-09-22 19:43:12</small>] [**Trin**]->[**Cypher**] *retro*:
+ Trin retro: +31 unit tests (1063 to 1087 net, after moves), 1 new browser file. Every phase proved its wiring by breaking the real code at the source and watching an EXISTING test fail, never a hand-rolled mutation loop. Regressions caught: the Gin mid-turn quit and RtG's unheard ask, both latent and both now tested. Gap: no loader-rejection test (backlogged).
+
+---
+[<small>2026-09-22 19:43:12</small>] [**Morpheus**]->[**Cypher**] *retro*:
+ Morpheus retro: D153 held; narrowing the story's AC2 sketch was right, because the seam belongs at 'one decision', not 'project, options, act', or the rule-lists had nowhere to live. Revisit: jevPlayer loads adapters by a GAMES map in the CLI, fine at two games; a third game should make it data. D153 needed two in-place amendments, P4 and P5, which is normal for a contract written before the code.
+
+---
+[<small>2026-09-22 19:43:12</small>] [**Oracle**]->[**Cypher**] *retro*:
+ Oracle retro: ARCHITECTURE map current, D153 amended as it changed rather than at close, lessons +5. Gaps: still no doc page on RUNNING a Jev bot (backlog, path fixed); the sprint chat archive is not run (on user request). The via index has no entries for tools/**/*.mjs, so every symbol lookup this sprint fell back to grep. Worth fixing the index config.
+
+---
+[<small>2026-09-22 19:43:12</small>] [**Mouse**]->[**Cypher**] *retro*:
+ Mouse retro: 6 phases x 2 tasks, closed in order, no re-plan; T6.1 (Hearts sketch) moved into D153 at plan review, which proved the contract BEFORE building on it. P4 was the heavy phase (runner + adapter + a bug fix) and still closed in one pass. Blocker surfaced, not hidden: lint debt (165) needs a user call.
+
+---
+[<small>2026-09-22 19:43:12</small>] [**Smith**]->[**Cypher**] *retro*:
+ Smith retro: all 4 gate conditions landed in named phases and have repeatable proof. C3 changed the most: the bot now asks what it can parse. Open to the user: the budget exit is silent at the table (C5), and join lines say 'rtg'/'gin' where people read the game's name.
+
+---
+[<small>2026-09-22 19:43:20</small>] [**Trin**]->[**Cypher**] *retro fix*:
+ Correction to my retro: unit tests went 1063 to 1087, +24 net, not +31. The move re-homed 8 tests without adding any.
+
+---
+[<small>2026-09-22 19:43:37</small>] [**Cypher**]->[**all**] *retro*:
+ Cypher retro: AC2's contract sketch missed that Gin still ships D137 rule-list strategies. Smith caught it at the gate (C1), and D153 narrowed the seam. A story touching a game's players should list every strategy kind in scope. AC6 (Hearts) was the right proof: done BEFORE building, it tested the contract, not the code.
+
+---
+[<small>2026-09-22 19:43:37</small>] [**Cypher**]->[**all**] *pm launch*:
+ *pm launch US-128 Jev player model. tools/jev/ holds everything game-agnostic; Gin and RtG are adapters; RtG now answers Add Jev bot and Quit. Three latent bugs fixed on the way. Proof: make test-jev-runner. Retro items are in BACKLOG. Sprint complete. Not committed: awaiting the user.

@@ -7,7 +7,7 @@
 #
 # Adding a task: add the npm script first, then a one-line target here.
 
-.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-tablezoom test-focuszoom test-multiplayer test-harness-mcp test-gin jev-player secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers
+.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-tablezoom test-focuszoom test-multiplayer test-harness-mcp test-gin test-jev-runner jev-player secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers
 
 help:
 	@echo "Recard targets (all front npm scripts):"
@@ -21,7 +21,8 @@ help:
 	@echo "  test-multiplayer  host + 2 guests driven over the real protocol (US-118 harness)"
 	@echo "  test-harness-mcp  the harness MCP server over its real stdio transport (US-119)"
 	@echo "  test-gin      a Gin bot joins a hosted table, draws and knocks out loud (US-120)"
-	@echo "  jev-player    GAME=gin STRATEGY=<name> CODE=<table code> [FIRST=bot|opponent] [HANDS=1]: a Jev player joins your table (US-120)"
+	@echo "  test-jev-runner  the real jev-player CLI at a hosted table: moves, add-bot, quit (US-128)"
+	@echo "  jev-player    GAME=gin|rtg STRATEGY=<name> CODE=<table code> [FIRST=bot|opponent] [HANDS=1] [DECK=<pile id>] [STEPS=12]: a Jev player joins your table (US-120, US-128)"
 	@echo "  secrets      gitleaks: every commit + uncommitted changes to tracked files"
 	@echo "  hooks        install the gitleaks pre-commit hook (.githooks/)"
 	@echo "  lint         style + design + js"
@@ -82,10 +83,14 @@ test-harness-mcp:
 test-gin:
 	npm run test:gin
 
+# US-128: the real jev-player CLI at a hosted table (Gin always; RtG with TYPESAFE_API_KEY)
+test-jev-runner:
+	npm run test:jev-runner
+
 # US-120: a Jev player joins the table CODE you are hosting, playing GAME
 # (gin) with strategy STRATEGY. Jev strategies need TYPESAFE_API_KEY.
 jev-player:
-	npm run jev-player -- --game '$(GAME)' --strategy '$(STRATEGY)' --code '$(CODE)' --first '$(or $(FIRST),bot)' --hands '$(or $(HANDS),1)'
+	npm run jev-player -- --game '$(GAME)' --strategy '$(STRATEGY)' --code '$(CODE)' --first '$(or $(FIRST),bot)' --hands '$(or $(HANDS),1)' $(if $(DECK),--deck '$(DECK)') $(if $(STEPS),--steps '$(STEPS)')
 
 # Secret scan (direct user request, 2026-09-19 - the Jev players read
 # TYPESAFE_API_KEY from the environment, and it must never land in a

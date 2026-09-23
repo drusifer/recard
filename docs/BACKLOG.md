@@ -25,10 +25,13 @@ or a live-verification session) versus being pickable directly.
 - **Nothing authorises whose turn it is** (Morpheus, US-127 retro): the
   bot tracks turn and phase from table talk, which is the one piece of
   state with no authority behind it. If two players disagree, nothing
-  resolves it today.
+  resolves it today. US-128 narrowed it: when the bot is unsure it now
+  asks ONE yes/no and abides by the answer, so a person at the table is
+  the authority. A real disagreement between two people is still open.
 - **No doc page for running an RtG bot** (Oracle, US-127 retro): the
   game file documents the rules, but how to RUN one lives only in a
-  comment at the top of `tools/rtg/player.mjs`.
+  comment at the top of `tools/rtg/adapter.mjs` (was `rtg/player.mjs`,
+  retired by US-128).
 - **RtG combat is unplayed** (US-127): attacking, blocking and damage
   are implemented and unit-tested, but no live table has been through a
   combat step - the live run ended at "pass" with one land down.
@@ -233,3 +236,33 @@ superseded:
 - ~~**Check story-number uniqueness**~~ — shipped
   (`tools/checkStoryNumbers.mjs`, 2026-09-12).
 - ~~**Focus-zoom/context-menu stuck-open bug**~~ — fixed 2026-09-17.
+
+- **No test proves a Jev loader rejects a literal** (Trin, US-128 P1
+  UAT). `rejectLiterals` is tested directly, but removing its call from
+  Gin's `loadStrategy` or RtG's `loadGame` fails nothing. Gin's
+  "an OPTION description is held to the same rule" test calls
+  `checkInstruction` itself, not the loader. Fix by repointing that
+  test, not by adding one; Gin's loader reads by name from a fixed
+  directory, which is why it was deferred.
+- **`make lint` has 165 errors and `make check` does not run it**
+  (Neo, US-128 P1). The debt accumulated across the 09-19..09-21 Jev
+  sprints because every "check PASSED" excluded lint. Needs a user
+  call: add `lint` to `check`, plus one lint-debt pass.
+
+## From the US-128 retro (2026-09-22)
+
+- **A Jev bot's budget exit is silent at the table** (Smith C5, US-128
+  gate): a bot asked to leave says goodbye, but one whose STEPS or HANDS
+  run out only writes to stderr and disconnects. The user's call whether
+  it should say goodbye too.
+- **Join lines name the game by its internal id** (Smith, US-128 test):
+  "I can deal in another rtg bot" - a person reads "Recard the
+  Gathering". Same for "gin". Heuristic #2.
+- **RtG `applyTracks` has a dead line** (Neo, US-128): `pass` returns no
+  `tracks`, so "after pass, phase becomes combat" never runs. Ported
+  faithfully, not fixed - either delete it or make pass track a phase.
+- **The via index has no entries for `tools/**/*.mjs`** (Oracle, US-128):
+  every symbol lookup this sprint fell back to grep.
+- **A third game should make jevPlayer's GAMES map data** (Morpheus,
+  US-128): fine at two games, a smell at three.
+

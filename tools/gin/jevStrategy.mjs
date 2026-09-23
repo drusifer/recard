@@ -12,6 +12,8 @@
 // chosen at any confidence.
 
 import { buildPlayState } from './playState.mjs';
+import { floorFallback } from '../jev/escalate.mjs';
+import { decide } from '../jev/decide.mjs';
 
 /** What this turn's legal moves are, as Choice options. The `criteria`
  *  text comes from the strategy - that is where a play style lives. */
@@ -69,46 +71,41 @@ function moveFor(option, facts) {
   return { type: 'discard', cardId: chosen.card.id, declare: kind === 'discard' ? 'none' : kind };
 }
 
+/** Gin's escalation policy (D153): below the file's floor, play the
+ *  cheapest legal card rather than act on a coin flip - nobody at a
+ *  Gin table is asked. */
+const ESCALATION = floorFallback();
+
 /**
- * One decision: read, then move.
+ * One decision: read, then move (`tools/jev/decide.mjs`).
  * @param {{ strategy: object, obs: object, facts: object, judge: { systemOne: Function } }} options
  */
 export async function decideByQuestions({ strategy, obs, facts, judge }) {
   const state = buildPlayState(obs, facts);
-
-  const readAnswers = (await judge.systemOne({ state, questions: readQuestions(strategy, state) })).answers ?? {};
-  // The read becomes STATE for the move - named fields, like everything
-  // else the questions refer to by path.
-  const withRead = {
-    ...state,
-    read: {
-      opponent_is_close: readAnswers.opponent_is_close?.score ?? null,
-      opponent_wants_slot: readAnswers.opponent_wants?.choice ?? null,
-    },
-  };
-
-  const criteria = moveOptions(strategy, state);
-  const moveQuestion = { type: 'choice', instructions: strategy.move.instructions, criteria };
-  const response = await judge.systemOne({ state: withRead, questions: { __move__: moveQuestion } });
-  const answer = response.answers?.__move__;
-
-  // Confidence-gated routing: the FILE says how sure is sure enough,
-  // and below it the bot plays the cheapest legal card rather than
-  // acting on a coin flip.
-  const floor = strategy.confidence_floor ?? 0;
-  const belowFloor = (answer?.confidence ?? 0) < floor;
-  const fallback = state.me.phase === 'draw' ? 'draw_stock' : 'discard_0';
-  const option = belowFloor || !answer?.choice || !(answer.choice in criteria) ? fallback : answer.choice;
+  const questions = readQuestions(strategy, state);
+  const result = await decide({
+    judge, state,
+    // The read becomes STATE for the move - named fields, like
+    // everything else the questions refer to by path.
+    read: { questions, into: (current, answers) => ({ ...current, read: {
+      opponent_is_close: answers.opponent_is_close?.score ?? null,
+      opponent_wants_slot: answers.opponent_wants?.choice ?? null,
+    } }) },
+    choice: { key: '__move__', instructions: strategy.move.instructions, criteria: moveOptions(strategy, state) },
+    floor: strategy.confidence_floor ?? 0,
+    escalation: ESCALATION,
+    fallback: state.me.phase === 'draw' ? 'draw_stock' : 'discard_0',
+  });
 
   return {
-    decision: moveFor(option, facts),
+    decision: moveFor(result.option, facts),
     record: {
-      strategy: strategy.name, phase: state.me.phase, model: response.model,
-      state: withRead, questions: { read: readQuestions(strategy, state), move: moveQuestion },
-      answers: { ...readAnswers, __move__: answer },
-      option, distribution: answer?.probabilities ?? null,
-      confidence: answer?.confidence ?? null, belowFloor,
-      judgments: judgmentsFrom(readAnswers, facts),
+      strategy: strategy.name, phase: state.me.phase, model: result.model,
+      state: result.state, questions: { read: questions, move: result.question },
+      answers: { ...result.answers.read, __move__: result.answers.choice ?? undefined },
+      option: result.option, distribution: result.distribution,
+      confidence: result.confidence, belowFloor: result.belowFloor,
+      judgments: judgmentsFrom(result.answers.read, facts),
     },
   };
 }

@@ -11,6 +11,8 @@
 // nobody objects to is played.
 
 import { legalOptions } from './options.mjs';
+import { askTable, UNSURE } from '../jev/escalate.mjs';
+import { decide } from '../jev/decide.mjs';
 
 /** Which constraints apply to a move of this KIND - asking "may this
  *  creature block" about a land is noise nobody has to read. `kind` is
@@ -40,50 +42,56 @@ export function stepQuestion(game, options) {
 }
 
 /**
+ * One step (`tools/jev/decide.mjs`): the Choice over this turn's legal
+ * options, then the constraints on the pick. RtG's escalation policy is
+ * the table itself (D151): an unconvinced constraint is ASKED.
  * @param {{ game: object, state: object, tracked?: object, judge: object,
  *   unsure?: number, ask?: (question: string) => Promise<boolean|null> }} input
  *   `ask` puts a question to the table and resolves what it was told -
  *   `null` when nobody answered.
  */
-export async function decideStep({ game, state, tracked = {}, judge, unsure = 0.35, ask }) {
+export async function decideStep({ game, state, tracked = {}, judge, unsure = UNSURE, ask }) {
   const options = legalOptions(state, tracked);
-  const step = stepQuestion(game, options);
-  const chosen = (await judge.systemOne({ state, questions: { __step__: step } })).answers?.__step__;
-  const picked = options.find((option) => option.id === chosen?.choice) ?? options.at(-1); // options.at(-1) is always `pass`
+  const pass = options.at(-1); // options.at(-1) is always `pass`
+  const byId = (id) => options.find((option) => option.id === id);
+  const { instructions, criteria } = stepQuestion(game, options);
+
+  const result = await decide({
+    judge, state, unsure,
+    choice: { key: '__step__', instructions, criteria },
+    verify: (id) => verification(game, state, tracked, byId(id)),
+    escalation: askTable(ask),
+    fallback: pass.id,
+  });
 
   const record = {
-    options: options.map((option) => option.id), picked: picked.id,
-    confidence: chosen?.confidence ?? null, distribution: chosen?.probabilities ?? null,
-    checks: {}, asked: null,
+    options: options.map((option) => option.id), picked: result.picked,
+    confidence: result.confidence, distribution: result.distribution,
+    checks: result.checks, asked: result.asked,
   };
-  if (picked.id === 'pass' || picked.id === 'take_damage') return { move: picked, record };
-
-  const constraints = constraintsFor(game, picked.id.split(':')[0]);
-  if (Object.keys(constraints).length === 0) return { move: picked, record };
-
-  const proposed = { what: picked.what, card: picked.card ?? null, cost: cardCost(state, picked.card), arrived_this_turn: (tracked.arrivedThisTurn ?? []).includes(picked.card), tapped: false };
-  const verdicts = (await judge.systemOne({ state: { ...state, rules: game.rules, proposed }, questions: constraints })).answers ?? {};
-
-  // Sort the verdicts first, then ask ONCE. A person at a table does
-  // not ask two questions about one move, and two talk lines about the
-  // same card read as confusion rather than diligence.
-  const uncertain = [];
-  for (const [name, verdict] of Object.entries(verdicts)) {
-    record.checks[name] = verdict.noul;
-    if (verdict.noul <= unsure) return blocked(record, name, picked, options);
-    if (verdict.noul < 1 - unsure) uncertain.push(name);
-  }
-  if (uncertain.length > 0) {
-    const told = ask ? await ask(`Can I ${picked.what}${picked.card ? ` with ${picked.card}` : ''}?`) : null;
-    record.asked = { rules: uncertain, answered: told };
-    if (told !== true) return blocked(record, uncertain[0], picked, options, told === null ? 'nobody answered' : 'the table said no');
-  }
-  return { move: picked, record };
+  // Pass, rather than play something illegal.
+  if (result.blocked) record.blocked = { rule: result.blocked.rule, move: result.picked, why: result.blocked.why };
+  return { move: byId(result.option), record };
 }
 
-function blocked(record, rule, picked, options, why = 'the rule says no') {
-  record.blocked = { rule, move: picked.id, why };
-  return { move: options.at(-1), record }; // pass, rather than play something illegal
+/** The constraints that bear on `picked`, as a verify step - or `null`
+ *  when nothing needs checking (passing, taking damage, a move with no
+ *  rules of its own). */
+function verification(game, state, tracked, picked) {
+  if (picked.id === 'pass' || picked.id === 'take_damage') return null;
+  const [kind] = picked.id.split(':', 1);
+  const constraints = constraintsFor(game, kind);
+  if (Object.keys(constraints).length === 0) return null;
+  const proposed = {
+    what: picked.what, card: picked.card ?? null, cost: cardCost(state, picked.card),
+    arrived_this_turn: (tracked.arrivedThisTurn ?? []).includes(picked.card), tapped: false,
+  };
+  const withCard = picked.card ? ` with ${picked.card}` : '';
+  return {
+    state: { ...state, rules: game.rules, proposed },
+    questions: constraints,
+    question: `Can I ${picked.what}${withCard}?`,
+  };
 }
 
 function cardCost(state, name) {

@@ -4,7 +4,7 @@
 // `spawn-bot` requests, and answers each with a `spawn-bot-result`.
 //
 // This module is the pure half - which requests are still unanswered,
-// and whether one can be honoured. `tools/gin/player.mjs` does the
+// and whether one can be honoured. `tools/jev/runner.mjs` does the
 // spawning and the talking.
 
 /** @typedef {{ requestId: string, game: string, strategy: string }} SpawnRequest */

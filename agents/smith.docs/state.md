@@ -1,5 +1,32 @@
 # Agent State
 
+## Current Task (2026-09-22) - US-128 *user test: APPROVED
+
+Ran make jev-player error paths (unknown game/strategy, STEPS=abc, HANDS=0):
+all consistent + list choices/range. C1-C4 live: test-jev-runner.
+Findings (non-blocking, filed): ready line "another rtg bot" = internal id
+(#2); C5 budget exit silent at table (user's call).
+
+## Previous - US-128 gate: APPROVED w/ 4 blocking conditions
+
+Tier 2 sprint "Jev player model" (US-128: tools/jev/ shared runner +
+GameAdapter, Gin and RtG as adapters). Reviewed story+arch together
+against shipped code. Conditions (full text: docs/USER_STORIES.md
+"Gate (Smith, 2026-09-22)"):
+1. Gin D137 rule-list strategies stay playable (resolveStrategy, MCP gin_turn).
+2. "Is it my move?" = one REQUIRED adapter hook (Gin code, RtG judged).
+3. Escalation = ONE yes/no question readAnswer can parse; acceptance =
+   the live stall ("it's your turn, go ahead" -> bot takes its turn).
+4. Quit at a decision boundary, goodbye says so.
+Non-blocking (5): RtG step-budget exit is silent at the table - user's call.
+AC6 Hearts sketch lives in DECISIONS.md under the sprint's D-number.
+Verified: AddBot reads offer.games[0], so RtG jev-ready needs no UI change.
+
+## Next Steps
+Mouse plans phases. At sprint close (*user test): check conditions 1-4
+LIVE - RtG shows Add Jev bot + quits cleanly; Gin rule-list still plays;
+the "it's your turn" stall resolves. Needs TYPESAFE_API_KEY for RtG.
+
 ## Current Task (2026-09-19) - Gate 1 on US-121..124: APPROVED w/ 4 conditions
 
 Sprint "Jev at the table" (US-121 bubble, US-122 add bot, US-123

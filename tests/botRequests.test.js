@@ -1,7 +1,7 @@
 // US-122/D143: the pure half of "add a Jev bot from the table" - which
 // spawn requests in a talk log this supervisor still has to answer, and
 // whether it can honour one at all. No process spawning here; the
-// wiring that does spawn lives in `tools/gin/player.mjs`.
+// wiring that does spawn lives in `tools/jev/runner.mjs`.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { pendingSpawnRequests, pendingQuits, spawnRefusal, readyAnnouncement } from '../tools/botRequests.mjs';
@@ -62,7 +62,10 @@ test('the ready announcement carries each strategy with its own description (Gat
 
 // ---- US-122/D143: the supervisor's request handling (no real spawning) ----
 
-import { serveSpawnRequests } from '../tools/gin/player.mjs';
+import { serveSpawnRequests, GOODBYE } from '../tools/jev/runner.mjs';
+import { adapter as ginAdapter } from '../tools/gin/adapter.mjs';
+
+const gin = { game: 'gin', strategies: ginAdapter.strategies() };
 
 function fakePeer(talk) {
   const said = [];
@@ -72,7 +75,7 @@ function fakePeer(talk) {
 test('a good request spawns one bot against the same table and says so', async () => {
   const peer = fakePeer([request(1, 'r1', 'knock-early')]);
   const started = [];
-  const watcher = serveSpawnRequests({ peer, code: 'ABC123', baseUrl: 'http://x', startBot: async (r) => { started.push(r); return null; } });
+  const watcher = serveSpawnRequests({ ...gin, peer, code: 'ABC123', baseUrl: 'http://x', startBot: async (r) => { started.push(r); return null; } });
   watcher.stop();
   await watcher.poll();
   assert.deepEqual(started, [{ requestId: 'r1', game: 'gin', strategy: 'knock-early', code: 'ABC123', baseUrl: 'http://x' }]);
@@ -83,7 +86,7 @@ test('a good request spawns one bot against the same table and says so', async (
 test('an impossible request is refused in words, and nothing is spawned', async () => {
   const peer = fakePeer([request(1, 'r1', 'no-such-strategy')]);
   let spawned = 0;
-  const watcher = serveSpawnRequests({ peer, code: 'ABC123', baseUrl: 'http://x', startBot: async () => { spawned += 1; return null; } });
+  const watcher = serveSpawnRequests({ ...gin, peer, code: 'ABC123', baseUrl: 'http://x', startBot: async () => { spawned += 1; return null; } });
   watcher.stop();
   await watcher.poll();
   assert.equal(spawned, 0);
@@ -94,7 +97,7 @@ test('an impossible request is refused in words, and nothing is spawned', async 
 
 test('a failure to start is reported with its reason, not swallowed', async () => {
   const peer = fakePeer([request(1, 'r1', 'knock-early')]);
-  const watcher = serveSpawnRequests({ peer, code: 'ABC123', baseUrl: 'http://x', startBot: async () => 'node is missing' });
+  const watcher = serveSpawnRequests({ ...gin, peer, code: 'ABC123', baseUrl: 'http://x', startBot: async () => 'node is missing' });
   watcher.stop();
   await watcher.poll();
   assert.equal(peer.said.at(-1).data.ok, false);
@@ -103,7 +106,7 @@ test('a failure to start is reported with its reason, not swallowed', async () =
 
 test('the same request is never answered twice', async () => {
   const peer = fakePeer([request(1, 'r1', 'knock-early')]);
-  const watcher = serveSpawnRequests({ peer, code: 'ABC123', baseUrl: 'http://x', startBot: async () => null });
+  const watcher = serveSpawnRequests({ ...gin, peer, code: 'ABC123', baseUrl: 'http://x', startBot: async () => null });
   watcher.stop();
   await watcher.poll();
   await watcher.poll();
@@ -140,19 +143,20 @@ test('ordinary chat is not a quit', () => {
 
 test('a quit is answered on the same channel, and the bot then reports that it was asked to leave', async () => {
   const peer = fakePeer([quit(1, 'q1')]);
-  const watcher = serveSpawnRequests({ peer, code: 'ABC123', baseUrl: 'http://x', name: 'equilibrium', startBot: async () => null });
+  const watcher = serveSpawnRequests({ ...gin, peer, code: 'ABC123', baseUrl: 'http://x', name: 'equilibrium', startBot: async () => null });
   watcher.stop();
   assert.equal(watcher.wasAskedToLeave(), false, 'nothing asked yet');
   await watcher.poll();
   assert.equal(watcher.wasAskedToLeave(), true);
   assert.equal(peer.said.at(-1).data.kind, 'quit-result');
   assert.equal(peer.said.at(-1).data.ok, true);
-  assert.match(peer.said.at(-1).text, /Leaving the table/);
+  assert.equal(peer.said.at(-1).text, GOODBYE);
+  assert.match(GOODBYE, /finish/i, 'it says it finishes the move it is in (C4)');
 });
 
 test('a quit for another bot is ignored, and this one plays on', async () => {
   const peer = fakePeer([quit(1, 'q1', 'defensive')]);
-  const watcher = serveSpawnRequests({ peer, code: 'ABC123', baseUrl: 'http://x', name: 'equilibrium', startBot: async () => null });
+  const watcher = serveSpawnRequests({ ...gin, peer, code: 'ABC123', baseUrl: 'http://x', name: 'equilibrium', startBot: async () => null });
   watcher.stop();
   await watcher.poll();
   assert.equal(watcher.wasAskedToLeave(), false);

@@ -24,6 +24,7 @@ import { decide } from './strategies.mjs';
  */
 
 const ACT_TIMEOUT_MS = 15_000;
+const TURN_TIMEOUT_MS = 30 * 60_000;
 // Waiting for the other player polls the view: the tracker works from
 // snapshot diffs, so a state missed between polls costs nothing.
 const POLL_MS = 200;
@@ -116,16 +117,23 @@ export class GinBot {
   #tracker;
   #myId;
   #iteration = 0;
+  #hands;
+  #handsFinished = 0;
+  #isBetweenHands = false;
+  #log;
 
   /**
-   * @param {{ peer: object, strategy: GinStrategy, judge?: { systemOne: Function }|null, firstPlayer?: 'bot'|'opponent' }} options
+   * @param {{ peer: object, strategy: GinStrategy, judge?: { systemOne: Function }|null,
+   *   firstPlayer?: 'bot'|'opponent', hands?: number, log?: (line: string) => void }} options
    */
-  constructor({ peer, strategy, judge = null, firstPlayer = 'bot' }) {
+  constructor({ peer, strategy, judge = null, firstPlayer = 'bot', hands = 1, log = () => {} }) {
     if (!judge && strategy.usesJev) throw new Error(`${strategy.name} calls Jev: pass a TypeSafe client as \`judge\``);
     this.#peer = peer;
     this.#strategy = strategy;
     this.#judge = judge;
     this.firstPlayer = firstPlayer;
+    this.#hands = hands;
+    this.#log = log;
   }
 
   async #observe() {
@@ -136,21 +144,40 @@ export class GinBot {
   }
 
   /**
+   * US-128/D153: this seat's "is it my move?" for the shared runner.
+   * `move` when a draw or a discard is due, `wait` when a long wait
+   * turned up nothing (or a hand just ended), `done` once `hands` hands
+   * are over - or when asked to leave, at a turn boundary.
+   * @param {{ shouldStop?: () => boolean }} [options]
+   * @returns {Promise<'move'|'wait'|'done'>}
+   */
+  async nextMove({ shouldStop = () => false } = {}) {
+    if (this.#handsFinished >= this.#hands) return 'done';
+    const obs = await this.waitForTurn({ timeoutMs: TURN_TIMEOUT_MS, pastHandOver: this.#isBetweenHands, shouldStop });
+    if (obs === null) return 'done';
+    if (obs.phase === 'wait') return 'wait'; // still nobody's move after a long wait - keep waiting
+    this.#isBetweenHands = obs.phase === 'hand-over';
+    if (!this.#isBetweenHands) return 'move';
+    this.#handsFinished += 1;
+    this.#log(`hand ${obs.handNumber} over (${obs.outcome}) - ${this.#handsFinished}/${this.#hands}`);
+    return this.#handsFinished >= this.#hands ? 'done' : 'wait';
+  }
+
+  /**
    * Waits (bounded) until it is this bot's move, or the hand is over -
    * or, with `pastHandOver`, until the NEXT hand's first move (a redeal).
-   * @param {{ timeoutMs: number, pastHandOver?: boolean }} options
-   * @returns {Promise<GinObservation>}
-   */
-  /**
-   * `shouldStop` is checked between polls, so a bot asked to leave
-   * stops BETWEEN turns rather than half-way through one - it never
-   * abandons a draw without its discard. Returns `null` when it stops.
+   * `shouldStop` is honoured at a turn boundary only: a Gin turn is a
+   * draw AND a discard, so a bot that has drawn discards before it goes
+   * and never walks away holding 11 cards (C4). Returns `null` when it
+   * stops.
+   * @param {{ timeoutMs: number, pastHandOver?: boolean, shouldStop?: () => boolean }} options
+   * @returns {Promise<GinObservation|null>}
    */
   async waitForTurn({ timeoutMs, pastHandOver = false, shouldStop = () => false }) {
     const deadline = Date.now() + timeoutMs;
     for (;;) {
-      if (shouldStop()) return null;
       const { obs } = await this.#observe();
+      if (obs.phase !== 'discard' && shouldStop()) return null;
       const isWaiting = obs.phase === 'wait' || (pastHandOver && obs.phase === 'hand-over');
       if (!isWaiting || Date.now() >= deadline) return obs;
       await sleep(POLL_MS);

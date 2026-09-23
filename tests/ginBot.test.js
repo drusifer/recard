@@ -32,16 +32,17 @@ test('one turn: draw from stock, then discard; then it waits for the opponent wi
   assert.deepEqual(idle.actions, []);
 });
 
-test('waitForTurn returns once the opponent has drawn and discarded', async () => {
+test('nextMove waits until the opponent has drawn and discarded, then says it is a move', async () => {
   const table = new FakeTable({ mine: HEAVY, theirs: THEIRS, stock: STOCK });
   const bot = new GinBot({ peer: table, strategy: knockEarly(), firstPlayer: 'opponent' });
   setTimeout(() => {
     table.act({ type: 'DRAW', pileId: 'deck' }, 'HOST');
     table.act({ type: 'MOVE', pileableId: 'K-spades-0', toPileId: 'table' }, 'HOST');
   }, 20);
-  const obs = await bot.waitForTurn({ timeoutMs: 2000 });
-  assert.equal(obs.phase, 'draw');
-  assert.deepEqual(obs.opponentDiscards.map((each) => each.id), ['K-spades-0']);
+  assert.equal(await bot.nextMove(), 'move');
+  const draw = await bot.step();
+  assert.equal(draw.phase, 'draw');
+  assert.deepEqual(draw.observation.opponentDiscards.map((each) => each.id), ['K-spades-0']);
 });
 
 test('a knock is a face-down discard, announced on table talk with melds and deadwood', async () => {
@@ -159,11 +160,24 @@ test('a bot asked to leave stops BETWEEN turns, never half-way through one', asy
 
   // It is this bot's turn: asked to leave, it stops without acting.
   leave = true;
-  assert.equal(await bot.waitForTurn({ timeoutMs: 1000, shouldStop }), null);
+  assert.equal(await bot.nextMove({ shouldStop }), 'done');
   assert.equal(table.piles['hand:ME'].length, 10, 'it drew nothing on the way out');
 
   // Not asked, it plays as usual.
   leave = false;
-  const obs = await bot.waitForTurn({ timeoutMs: 1000, shouldStop });
-  assert.equal(obs.phase, 'draw');
+  assert.equal(await bot.nextMove({ shouldStop }), 'move');
+});
+
+test('asked to leave AFTER drawing, it still discards first - a turn is draw and discard (C4)', async () => {
+  const table = new FakeTable({ mine: HEAVY, theirs: THEIRS, stock: STOCK });
+  const bot = new GinBot({ peer: table, strategy: knockEarly() });
+  let leave = false;
+  const shouldStop = () => leave;
+  assert.equal(await bot.nextMove({ shouldStop }), 'move');
+  await bot.step(); // drew: 11 cards
+  leave = true;
+  assert.equal(await bot.nextMove({ shouldStop }), 'move', 'the discard is still owed');
+  await bot.step();
+  assert.equal(table.piles['hand:ME'].length, 10, 'it never walks away holding 11 cards');
+  assert.equal(await bot.nextMove({ shouldStop }), 'done');
 });

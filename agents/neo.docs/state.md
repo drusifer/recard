@@ -1,5 +1,79 @@
 # Agent State
 
+## Current Task (2026-09-22) - US-128 Phase 6 DONE (6 of 6)
+
+T6.2 done as a REPEATABLE browser test, not a hand-driven probe:
+tests/jevRunner.browser.mjs (`bobp make test-jev-runner`, port 8223) runs
+the real CLI as a child: Gin knock-early joins, offers both strategy kinds,
+draws+discards after a real deal (C1); Gin quit before deal -> GOODBYE,
+exit 0 (C4); RtG (needs TYPESAFE_API_KEY, skips without) answers add-bot
+refusal + quit (AC4). 3/3 green on 3 consecutive runs.
+Honest scope: Gin proof is one TURN (draw+discard), not a full hand.
+
+## Previous - US-128 Phase 5 DONE (P5 of 6)
+
+tools/rtg/seat.mjs RtgSeat (join, nextMove one-look-per-call, step; clock/
+pollMs/quietMs/answerMs injectable). tools/rtg/adapter.mjs (strategies:
+rules; STEPS validated; summaryLine). rtg/player.mjs DELETED; jevPlayer has
+one path (run(adapter)); rtg STRATEGY special case gone. rtg/table.mjs:
+WHOSE_TURN -> TURN_QUESTION 'Is it my turn now?' (both the unsure-judgment
+escalation AND the quiet-table ask). FIXED 2 LATENT BUGS: (a) RtG ask could
+never hear a reply (resolver filled by a blocked loop) -> tools/jev/table.mjs
+askPeer listens itself; (b) found in TDD: own question+answer re-triggered
+the unsure judgment -> endless asking; now checkedTalkTo covers the exchange.
+Makefile jev-player now forwards DECK/STEPS (RtG usage documented DECK= but
+it was never passed). 1087 green, new code eslint-clean.
+
+## Previous - US-128 Phase 4 DONE (P4 of 6)
+
+tools/jev/runner.mjs: UsageError, GOODBYE, playSeat({seat,shouldStop,record}),
+serveSpawnRequests({...,game,strategies}), run(adapter, options). Adapter =
+{game, strategies(), checkOptions, sit, summaryLine} (summaryLine added to
+D153's sketch - output formatting is per game). tools/gin/adapter.mjs.
+GinBot: nextMove({shouldStop}) + hands/log opts; waitForTurn stays PUBLIC
+(MCP gin_turn calls it with its own waitMs). FIXED LATENT BUG: waitForTurn
+honoured shouldStop in the discard phase -> a quit between draw and discard
+left 11 cards; now only at a turn boundary (regression test in ginBot.test).
+gin/player.mjs deleted. jevPlayer: gin -> run(adapter); rtg still
+rtg/player.play (temporary, P5 removes) and imports UsageError from runner.
+Logs now build/<game>/ for every game. 1078 green, new files eslint-clean.
+
+## Previous - US-128 Phase 3 DONE (P3 of 6)
+
+tools/jev/decide.mjs: decide({judge,state,read?{questions,into},choice{key,
+instructions,criteria},floor,verify?(id,state)->{state,questions,question}|null,
+escalation,fallback,unsure}) -> {picked, option, state, model, question,
+answers{read,choice,verify}, confidence, distribution, belowFloor, checks,
+asked, blocked{rule,why}}. Gin decideByQuestions: ESCALATION=floorFallback()
+const, key __move__. RtG decideStep: askTable(ask), key __step__, verify via
+verification(); record shapes unchanged (old tests byte-identical). 1075 green.
+
+## Previous - US-128 Phase 2 DONE (P2 of 6)
+
+tools/jev/escalate.mjs: UNSURE=0.35, verdictOf(noul)->yes|no|unsure,
+askTable(ask).resolve(q) / floorFallback().resolve() -> {accepted,
+answered, why}. Wired: rtg/decide.mjs (constraint verification),
+rtg/turnOrder.mjs (isOver/unclear via verdictOf), gin/jevStrategy.mjs
+(floor). Existing tests unchanged + green (1068). P1 nit fixed.
+
+## Previous - US-128 Phase 1 DONE
+
+tools/jev/strategyFile.mjs: checkInstruction, rejectLiterals (new: the
+shared "throw naming WHERE" loop both loaders had), resolvePath (loop,
+not reduce). gin/strategyFile.mjs keeps only listStrategies/loadStrategy;
+rtg/gameFile.mjs uses rejectLiterals - the rtg->gin import is gone.
+tools/jev/table.mjs: shouldAskTable, readAnswer, trackChange. rtg/table.mjs
+keeps readAnnouncement + WHOSE_TURN (RtG words). No re-exports at old paths.
+Tests moved: tests/jevStrategyFile.test.js, tests/jevTable.test.js.
+Deviation from T1.1 wording: no generic "loader taking a directory" -
+the loaders share only the literal check; Gin loads by name from a dir,
+RtG by path + a rules-citation check. Unit 1063/1063 green.
+via index has NO entries for tools/**/*.mjs - grep was the fallback.
+Lint: 165 pre-existing errors repo-wide (make check has no lint) - posted.
+
+## Next Steps
+None assigned - sprint close (Oracle groom, Smith test, retro).
+
 ## Current Task (2026-09-20) - US-125 done, all 4 phases
 
 New: tools/gin/playState.mjs (projection, 11 fixed slots),
