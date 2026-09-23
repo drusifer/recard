@@ -4052,3 +4052,106 @@ Conditions 1-4 are BLOCKING and are part of the AC. Condition 5 is not.
 AC6 (the Hearts sketch) needs a home to be checkable. It goes in
 `docs/DECISIONS.md` under this sprint's decision: one line per adapter
 method, with Hearts' answer to each.
+
+---
+
+### US-129: Players defined in files, not code (XState players)
+
+**As** someone adding a game or a new kind of Jev player, **I want** to
+describe the turn, the questions Jev is asked and the player's
+temperament in files, **so that** a new player is a new file and a new
+game is mostly new files - not another hand-written loop.
+
+**Why now.** US-128 moved the plumbing into `tools/jev/`, but each game
+still hand-writes its turn: RtG's `RtgSeat` (~200 lines of phase and
+turn bookkeeping) and Gin's `GinBot.nextMove`. The first review after
+US-128 found a bug in exactly that bookkeeping: an RtG bot's own turn
+never reaches combat and never ends, because a `pass` advances no phase
+(BACKLOG). A turn written down as states and transitions cannot hide
+that. The user asked for players to be declarative, with Jev questions
+as the TypeSafe artifacts (question definitions are already data).
+
+**AC:**
+1. **A game's turn is a statechart file** (XState v5 machine config in
+   YAML): phases are states, table events and Jev verdicts are
+   transitions. RtG's turn/phase bookkeeping (`#turn`, `applyTracks`,
+   the turn-judgment loop) and Gin's turn logic are replaced by it, not
+   kept alongside.
+2. **Jev questions live in a questions file per game**, written as
+   TypeSafe question definitions (instructions, criteria, Score levels)
+   and referred to by name. The D147 rule still holds at load: prose
+   refers to state by path, never a card name or a number.
+3. **A player is one file**: which questions it asks, its criteria
+   wording, its confidence floor, and what it does when Jev is unsure
+   (ask the table, or fall back). Adding a file adds a player: it
+   appears in the CLI's strategy list and the table's Add Jev bot list
+   with no code change.
+4. **Code is one interpreter plus a named library.** Files refer to
+   code (reading the table, arithmetic, legality, table actions) by
+   name only. A file naming something that does not exist is refused at
+   load, with a message naming the file, the key and the unknown name.
+5. **The RtG turn bug is fixed by construction:** the bot's own turn
+   goes untap, draw, main, combat, end; ending the turn is SAID at the
+   table and hands the turn back. A scripted-judge test pins it.
+6. **No behaviour regression.** Every existing Gin and RtG behaviour
+   test still passes (tests of removed internals are deleted, not
+   ported). `test-gin`, `test-harness-mcp` (MCP `gin_turn`) and
+   `test-jev-runner` stay green.
+7. **Proof of "a player is a file":** a second RtG player, differing
+   from `rules` only in its file, ships and is offered at the table.
+
+**Out of scope:** building Hearts (a sketch in the decision is enough);
+converting Gin's D137 rule-list strategies (D148 keeps them as code
+until the bench retires them; the files may name them); thought-bubble
+changes for RtG (BACKLOG); any change to the app itself (`src/`).
+
+### Gate 1 (Smith, 2026-09-23): APPROVED with 4 conditions
+
+The user of this story is the person WRITING game and player files. The
+stories are right about what they need - fewer places to look and no
+loop to write. What they will hit first is not covered, so conditions
+1-3 are BLOCKING and part of the AC. Condition 4 is not blocking.
+
+1. **Mistakes are caught when the file loads, not mid-game (AC1, AC4).**
+   A transition to a state that does not exist, a guard or action name
+   missing from the library, and a question name missing from the
+   questions file are all refused at load. The message names the file,
+   the path inside it, and the bad name, plus the closest valid name
+   when there is one. Heuristics #5 and #9: an author finding out from a
+   bot silently stuck at a live table is the failure this story exists
+   to remove.
+2. **The library is discoverable, not memorised (AC4).** An author can
+   list every name a file may use (guards, actions, table readers), each
+   with a one-line meaning, from the command line and in a doc generated
+   from the same source, so the two cannot drift. Heuristic #6
+   (recognition rather than recall).
+3. **One format for every game file (AC2, AC3).** Gin's strategy files
+   are JSON today. When US-129 ships, questions, players and turns are
+   in one format for every game, so an author learns one. Heuristic #4.
+   Moving Gin's content changes where and how it is written, not what
+   it says.
+4. **Non-blocking: every player file carries a description**, and it is
+   required at load. The Add Jev bot list shows it (US-122 Gate 2 b),
+   and AC7's second player is only distinguishable to a person by it.
+
+### Gate 2 (Smith, 2026-09-23): D154 APPROVED with 2 conditions
+
+D154 meets Gate 1's C1-C3 as designed. But it asks the file author to
+remember two pieces of plumbing, and forgetting either one fails
+silently at a live table. Both conditions are BLOCKING.
+
+1. **Leaving must not depend on the author remembering it.** D154 lets
+   a state leave only if its own transitions check `asked_to_leave`. A
+   turn file that forgets builds a bot that ignores Quit, which is the
+   exact failure US-128 fixed. Instead, the author TAGS the states where
+   leaving is safe (`safe`), and the interpreter adds the leave
+   transition to them. A turn file with no reachable `safe` state is
+   refused at load. Heuristic #5.
+2. **`busy` is not the author's job either.** A state that invokes Jev,
+   the table or a move is busy by definition, so the interpreter tags it
+   `busy` itself. An author who forgot the tag would get a `nextMove`
+   returning mid-question.
+
+Non-blocking: the CLI still says `STRATEGY=` while the files are
+`players/`. Keep the flag, since renaming it breaks every documented
+command, but its help text should say "a player file name".

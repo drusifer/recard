@@ -1,5 +1,49 @@
 # Agent State
 
+## Current Task (2026-09-23) - US-129 P4 DONE
+
+games/gin/{questions,turn}.yaml + players/{jev-balanced,jev-cagey}.yaml (JSON
+strategies migrated, verified identical read/move/floor/description, JSON
+deleted). gin/strategyFile.mjs now reads games/gin (listStrategies/loadStrategy
+kept - Gin's loader). tools/gin/library.mjs: gin_look, gin_step, gin_phase,
+note_hand_over. GinBot: nextMove/hands/log removed, look() added, waitForTurn
+kept for MCP. gin/adapter ginSeat(). tests/ginTurn.test.js (3). FIXED: questionsFor
+merged a Score's list rewording into an object (test added). Removed the
+'OPTION description' test (loader rejection now proven in jevGameFiles).
+1096 unit, test-gin 1/1, test-harness-mcp 12/12.
+
+## Previous - US-129 P3 DONE
+
+games/rtg/{rules,questions,turn}.yaml + players/{rules,aggressive}.yaml (from
+game.json by script; applies_to replaces constraintsFor). tools/jev/gameFiles.mjs
+(loadGameFiles, questionsFor; checks literals, rule citations, player
+description/escalation/floor/wording). tools/rtg/library.mjs (rtgHooks project/
+options/propose/act + heard_attack/hear_attackers). tools/rtg/adapter.mjs rtgSeat();
+checkOptions validates the turn before joining. DELETED rtg seat/decide/turnOrder/
+gameFile/game.json + their tests; ported content tests to rtgFiles.test.js.
+BUGS FIXED: turn never reached combat/ended (now turn.yaml); playState describe()
+dropped card id -> every live RtG action targeted a NAME (found by combat test).
+Seat: own moves not news (markSeen after step). 1096 green.
+
+## Previous - US-129 P2 DONE
+
+tools/jev/seat.mjs MachineSeat: table memory (#look: heard excl own, changed,
+quietFor; first look seeds), TABLE/STEP events, settle on !busy, record via
+services.onRecord, markSeen after ask. tools/jev/library.mjs genericLibrary(services):
+guards verdict/table_changed/quiet_table/counted/played; actions count/track/
+reset/say; actors judge/ask_table/play. Game hooks: project/options/verify?/act.
+
+## Previous - US-129 P1 DONE
+
+xstate ^5.33.2 dev dep. tools/jev/machine.mjs parseTurn/loadTurn: flat states;
+checks targets/guards/actions/actors/questions (params.question|questions and
+invoke.with) with nearest-name; compile: with->input({...with,context,event}),
+invoke->busy tag, safe->always leave to reserved final `left`; root QUIT ->
+mark_leaving; context from YAML + actor input. Library entry {doc, fn|assign}.
+
+## Next Steps
+P5: make jev-library + docs/JEV_LIBRARY.md (staleness test), STRATEGY= help text.
+
 ## Current Task (2026-09-23) - lint in `make check` + lint debt: DONE
 
 check = cards test lint lint-decks secrets (help text updated). 144 eslint

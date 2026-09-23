@@ -70,6 +70,103 @@ D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rul
 
 ---
 
+### D154. A Jev player is data: a statechart, a questions file, a player file - run by one interpreter
+
+US-129, Tier 1, Smith Gate 1 conditions C1-C3. Supersedes D153's
+per-game Seat (`GinBot.nextMove`, `RtgSeat`) with ONE generic seat that
+runs a statechart. The runner (D153) is unchanged: it still asks a seat
+`nextMove`, then `step`.
+
+**Files, per game, in `games/<game>/`** (one format, YAML - C3):
+
+```
+games/rtg/
+  turn.yaml        # XState v5 machine config: states, transitions, tags
+  questions.yaml   # TypeSafe question definitions, by name (D147 rule holds)
+  rules.yaml       # RtG only: the rules the questions cite (was game.json)
+  players/
+    rules.yaml     # a player: description, floor, escalation, wording
+    <another>.yaml # AC7: a second player is only a file
+games/gin/
+  turn.yaml, questions.yaml, players/jev-balanced.yaml, jev-cagey.yaml
+```
+
+`tools/<game>/library.mjs` holds that game's named code: reading the
+table into state, arithmetic, legal options, and what a move does on
+the table. The files refer to it by name only (AC4). Gin's D137
+rule-list strategies stay code (D148). Their players are named in
+`strategyKinds.mjs` and play through the same machine, whose `step`
+actor already accepts both kinds.
+
+**The interpreter** (`tools/jev/machine.mjs`):
+1. Loads the four kinds of file and **validates everything at load**
+   (C1): every `target` is a state; every guard, action and actor
+   `type` is in the library; every question a file names is in
+   `questions.yaml`; every player has a `description` (Gate 1 note 4).
+   An error names the file, the path inside it, the bad name, and the
+   nearest valid name (edit distance).
+2. Compiles the YAML into an XState config. It rewrites an actor's
+   `with:` into `input` built from context and params, which is the one
+   thing YAML cannot say.
+3. Runs it as a `MachineSeat`. `nextMove` sends `TABLE { view, talk,
+   now }` and waits until no state tagged `busy` is active, then returns
+   `done` for a final state, `move` if the state is tagged `move`, and
+   `wait` otherwise. `step` sends `STEP` and returns the step's record.
+   A quit sets `leaving` in context. Only states whose own transitions
+   check `asked_to_leave` can leave, so each game's file says where its
+   safe boundaries are (C4 of US-128, kept).
+
+**Amended at Gate 2 (Smith):** `safe` is a TAG the author puts on
+states where leaving is harmless, and the interpreter adds the leave
+transition to them. A turn file with no reachable `safe` state is
+refused at load. States that invoke an actor are tagged `busy` by the
+interpreter, not the author. This replaces "only states whose own
+transitions check `asked_to_leave` can leave" above: the author no
+longer writes that check.
+
+**Amended in Phase 3 review:** which rules apply to which move is DATA.
+Each rule question in `questions.yaml` carries `applies_to: [kinds]`, and
+the generic `play` finds them itself. A game supplies only `propose`, the
+description of a proposed move. That replaces the planned `game.verify`
+hook and RtG's `constraintsFor`. Also found by Phase 3's combat test and
+fixed: RtG's projection dropped card ids, so every live RtG action
+targeted a card NAME, which the table does not know.
+
+**The library** (`tools/jev/library.mjs` generic + per-game). Every
+entry carries a one-line `doc`. `make jev-library` lists them, and
+`docs/JEV_LIBRARY.md` is generated from the same registry; a test fails
+if the doc is stale (C2). Generic entries:
+- actors: `judge` (named Nouls/Scores -> verdict), `ask_table` (ONE
+  yes/no, `askPeer`), `decide` (`jev/decide.mjs` with the player's
+  Choice, verify and policy), `act` (run a move's table actions + say it)
+- guards: `verdict { is }`, `quiet_table`, `asked_to_leave`,
+  `counted { field, at_least }`, `table_changed`
+- actions: `remember`, `count`, `say`, `record`
+
+**The RtG turn bug is fixed in `games/rtg/turn.yaml`:** `main` and
+`combat` each move on `PASSED`, and `end_turn` says "I'm done - your
+turn" and returns to `their_turn`. The transition is written down, so it
+cannot be silently missing (AC5).
+
+**Rejected:**
+- keeping per-game seats: the first review found a bug in exactly that
+  hand-written bookkeeping
+- boardgame.io: its own server and turn model fight Recard's P2P table
+- CNCF Serverless Workflow: a YAML standard with no light JS runtime
+- a home-grown YAML state machine: XState is mature, validated,
+  visualisable, and its v5 config is plain data (probed 2026-09-23: a
+  YAML-parsed config ran unmodified with named guards, actors and tags)
+- converting Gin's rule lists now (D148)
+
+**Hearts against this (sketch, not built):** `turn.yaml` has
+`wait -> my_lead|my_follow -> wait`, guarded by a code-computed
+`my_turn_in_trick` reader. `questions.yaml` has one Choice (which card).
+There is no verify and no `judge`, because every rule is computable, and
+escalation is `floor_fallback`. The library adds: trick reader, legal
+cards (follow suit, hearts broken), and `play_card`.
+
+---
+
 ### D153. A Jev player is a runner plus a seat: the game owns "is it my move?" and "one step"
 
 US-128, Tier 2, written in sprint-plan review to settle Smith's gate

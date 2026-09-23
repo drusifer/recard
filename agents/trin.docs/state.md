@@ -1,5 +1,18 @@
 # Agent State
 
+## Current Task (2026-09-23) - US-129 all UAT PASSED (P4 holding-safe mutation, P5 stale-doc mutation)
+
+## Previous - US-129 P3 UAT PASSED
+
+turn.yaml pass->main mutation: turn-bug + combat tests fail; describe() id drop:
+combat test fails. test-jev-runner 3/3 (2 stale asserts fixed; one false '3/3'
+claim corrected - always read build.out before posting).
+
+## Previous - US-129 P1 UAT PASSED
+
+auto-busy + auto-leave each mutation-proved. P2 must prove nextMove never
+returns mid-invoke (the behavioural reason for auto-busy).
+
 ## Current Task (2026-09-22) - US-128 Phase 6 UAT: PASSED (sprint QA done)
 
 test-jev-runner: spawn handling disabled -> only RtG AC4 test fails; Gin

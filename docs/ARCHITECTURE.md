@@ -117,40 +117,53 @@ src/presets.js           static game-preset definitions (deck lists, table layou
 src/rulesReference.js    static in-app rules-reference content
 src/hostSettings.js      host's own sticky pre-game settings (deck/preset choice)
 
+games/<game>/             a Jev-player game as DATA (US-129/D154), YAML:
+games/<game>/turn.yaml    the turn: an XState v5 statechart - phases, the
+                          events and verdicts between them, library names
+games/<game>/questions.yaml  what Jev is asked (TypeSafe question defs;
+                          rule questions carry `applies_to: [kinds]`)
+games/<game>/rules.yaml   RtG: the rules its questions cite (D151)
+games/<game>/players/     one file per player: description, floor,
+                          escalation, rewording - a new player is a file
+
 tools/jevPlayer.mjs      the `make jev-player` CLI: GAME -> that game's adapter,
                           handed to the shared runner (D153)
-tools/jev/               everything a Jev player needs that is not a game (D153)
+tools/jevLibrary.mjs     `make jev-library` / `jev-library-doc`: every name
+                          a turn file may use (docs/JEV_LIBRARY.md)
+tools/jev/               everything a Jev player needs that is not a game
 tools/jev/runner.mjs     join, refuse a spectator seat, announce jev-ready,
-                          serve add-bot + quit ALWAYS, play the game's Seat
-                          (`nextMove` -> move|wait|done, then `step`)
+                          serve add-bot + quit ALWAYS, play the seat (D153)
+tools/jev/machine.mjs    a turn file -> checked (every name, at load) and
+                          compiled XState machine; auto `busy`, `safe` = leave
+tools/jev/seat.mjs       MachineSeat: the ONE seat - keeps the table memory
+                          (changed, quiet, own lines/moves not news)
+tools/jev/library.mjs    the generic names (judge, ask_table, play; verdict,
+                          table_changed, quiet_table, counted, played; ...)
+tools/jev/gameFiles.mjs  loads + checks a game directory (questions, rules,
+                          players); questionsFor = a player's rewording
 tools/jev/decide.mjs     one decision: read? -> Choice over the offered
                           options -> verify?, escalation passed in
-tools/jev/escalate.mjs   verdictOf (yes|no|unsure) + the two policies:
-                          askTable (RtG) and floorFallback (Gin)
+tools/jev/escalate.mjs   verdictOf (yes|no|unsure) + askTable / floorFallback
 tools/jev/strategyFile.mjs  the question-file rule: prose refers to state by
                           path, never a card name or number (D147)
-tools/jev/table.mjs      hearing the table: yes/no answers, a quiet table,
-                          askPeer (asks AND listens for the reply)
+tools/jev/table.mjs      hearing the table: yes/no answers, askPeer
+tools/jev/libraryDocument.mjs  renders the library listing from entry docs
 tools/botRequests.mjs    pure: unanswered "add a bot" / "leave" requests
-tools/gin/adapter.mjs    Gin as a game: its strategies, options, seat
-tools/gin/bot.mjs        GinBot - Gin's Seat, also driven by MCP `gin_turn`
+tools/gin/adapter.mjs    Gin: players, options, a MachineSeat on its turn file
+tools/gin/library.mjs    Gin's names: gin_look, gin_step, gin_phase
+tools/gin/bot.mjs        GinBot: step (either strategy kind), look, and
+                          waitForTurn for MCP `gin_turn` - no turn logic
 tools/gin/playState.mjs  projects the replicated view into the fixed state
                           schema a question file refers to by path (D147)
-tools/gin/strategyFile.mjs  where Gin keeps its strategies, which parts are prose
-tools/gin/strategies/    question-file strategies, static JSON (D147)
+tools/gin/strategyFile.mjs  a Gin player file as a read + move strategy
 tools/gin/jevStrategy.mjs  Gin's read + move, mapped onto jev/decide.mjs
-tools/gin/strategyKinds.mjs  one lookup resolving a name to either kind
-tools/rtg/adapter.mjs    RtG as a game: `rules`, STEPS/DECK, its seat
-tools/rtg/seat.mjs       RtgSeat: judge the turn (D152), ask ONE yes/no when
-                          unsure or quiet, then step
-tools/rtg/game.json      RtG's rules written out in full + the named
-                          constraints that judge a proposed move (D151)
-tools/rtg/gameFile.mjs   loads a game file; a constraint must cite a
-                          rule the game actually states
+tools/gin/strategyKinds.mjs  one lookup: D137 rule list or player file
+tools/rtg/adapter.mjs    RtG: players from files, STEPS/DECK, rtgSeat()
+tools/rtg/library.mjs    RtG's hooks (project, options, propose, act) and
+                          names (heard_attack, hear_attackers)
 tools/rtg/playState.mjs  the RtG projection; mana and costs in CODE
-tools/rtg/options.mjs    the legal next actions, from resources
-tools/rtg/decide.mjs     RtG's step + constraints, mapped onto jev/decide.mjs
-tools/rtg/table.mjs      RtG's own words: announcements, TURN_QUESTION
+tools/rtg/options.mjs    the legal next actions, from resources, per phase
+tools/rtg/table.mjs      RtG's own words: announcements
 
 src/pileables/           the Pileable -> Stackable -> Card/Chip/Token hierarchy
 src/piles/               the Pile -> Stack (+ every derived pile KIND) hierarchy

@@ -1,5 +1,13 @@
 # Agent State
 
+## Current Task (2026-09-23) - US-129 groom DONE
+
+ARCHITECTURE: games/ + tools/jev/{machine,seat,library,gameFiles,libraryDocument}
++ gin/rtg library.mjs; removed rtg seat/decide/turnOrder/gameFile/game.json, gin
+strategies JSON. BACKLOG: closed turn bug, loader-rejection gap, GAMES-map item
+(refiled narrower); RtG combat narrowed to 'unplayed LIVE'. lessons +5.
+chat-report archive not run (on user request).
+
 ## Current Task (2026-09-22) - US-128 groom DONE
 
 ARCHITECTURE.md module map: tools/jev/* (runner, decide, escalate,

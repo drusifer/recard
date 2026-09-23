@@ -4,10 +4,8 @@
 // number has put a VALUE where a path belongs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { URL } from 'node:url';
 import { loadStrategy, listStrategies } from '../tools/gin/strategyFile.mjs';
-import { checkInstruction, resolvePath } from '../tools/jev/strategyFile.mjs';
+import { resolvePath } from '../tools/jev/strategyFile.mjs';
 import { buildPlayState, CANDIDATE_SLOTS } from '../tools/gin/playState.mjs';
 import { computeFacts } from '../tools/gin/rules.mjs';
 import { EXAMPLES } from '../tools/gin/exampleStates.mjs';
@@ -37,17 +35,6 @@ test('two strategies ask the same questions and differ in how they describe the 
   assert.deepEqual(Object.keys(first.read).toSorted(), Object.keys(second.read).toSorted());
   assert.deepEqual(Object.keys(first.move.criteria).toSorted(), Object.keys(second.move.criteria).toSorted());
   assert.notDeepEqual(first.move.criteria, second.move.criteria, 'two strategies describing options identically are one strategy');
-});
-
-test('an OPTION description is held to the same rule as an instruction', () => {
-  // An option's text shapes the answer as much as the question does,
-  // so "Leaves 5 deadwood" is the same mistake there.
-  assert.throws(() => {
-    const strategy = JSON.parse(readFileSync(new URL('../tools/gin/strategies/jev-balanced.json', import.meta.url), 'utf8'));
-    strategy.move.criteria.discard = 'Throw the 5 of hearts.';
-    const complaint = checkInstruction(strategy.move.criteria.discard);
-    if (complaint) throw new Error(complaint);
-  }, /card/i);
 });
 
 test('every path in every shipped strategy resolves against a real projected state', () => {

@@ -101,13 +101,15 @@ test('RtG: now answers "add a bot" and "leave" like every game - the gap US-128 
   const { host, code } = await hostFor('Recard the Gathering');
   const player = startPlayer(code, '--game', 'rtg', '--strategy', 'rules');
   const ready = await heard(host, readyFrom('rtg'), 'the jev-ready announcement', player);
-  assert.deepEqual(ready.data.strategies.map((each) => each.name), ['rules']);
+  // US-129 AC7: every file in games/rtg/players/ is offered, with its description.
+  assert.deepEqual(ready.data.strategies.map((each) => each.name), ['aggressive', 'rules']);
+  assert.ok(ready.data.strategies.every((each) => each.description), 'each offered with its own description');
 
   // A request it cannot honour is refused in words, at the table.
   await host.say('add one', { kind: 'spawn-bot', requestId: 'r-1', game: 'rtg', strategy: 'nope' });
   const refused = await heard(host, (entry) => entry.data?.kind === 'spawn-bot-result' && entry.data.requestId === 'r-1', 'an answer to add-bot', player);
   assert.equal(refused.data.ok, false);
-  assert.match(refused.text, /unknown strategy "nope" - I can play: rules/);
+  assert.match(refused.text, /unknown strategy "nope" - I can play: aggressive, rules/);
 
   await host.say('rules, you can go', { kind: 'quit', requestId: 'q-2', target: 'rules' });
   const goodbye = await heard(host, (entry) => entry.data?.kind === 'quit-result', 'a goodbye', player);

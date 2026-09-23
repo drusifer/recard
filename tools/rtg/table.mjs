@@ -13,7 +13,7 @@ export function readAnnouncement(entry, me) {
   // announcing their OWN turn starting, which is exactly as explicit as
   // a person can be. The reverse - has THEIR turn ended, so mine can
   // start - is not something a phrase can settle (US-127 follow-up):
-  // that is `turnOrder.mjs`'s judgment over the board and this same log.
+  // that is the `their_turn_is_over` judgment in games/rtg/turn.yaml.
   if (/\bmy turn\b|\buntap|\bi draw\b/.test(text)) return { is_mine: false, phase: 'their-turn', attackers: [] };
   if (/\battack/.test(text)) return { is_mine: false, phase: 'combat', attackers: attackersIn(entry) };
   if (/\bno attack|\bdone\b|\bnothing\b/.test(text)) return { attackers: [] };
@@ -26,13 +26,3 @@ function attackersIn(entry) {
   const named = entry.data?.attackers;
   return Array.isArray(named) && named.length > 0 ? named : ['an attacker'];
 }
-
-/**
- * What the bot asks when it cannot tell whose turn it is: ONE yes/no
- * question, so the answer a person gives is one `readAnswer` can read
- * (Smith, US-128 C3). It replaced "whose turn is it, and is anything
- * attacking me?" - two open questions at once, whose honest answers
- * parsed as nothing. Attacks are announced ("attacking with..."), so
- * they need no question of their own.
- */
-export const TURN_QUESTION = 'Is it my turn now?';

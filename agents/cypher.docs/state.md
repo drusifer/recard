@@ -1,5 +1,20 @@
 # Agent State
 
+## Current Task (2026-09-23) - US-129 'XState players' LAUNCHED
+
+Games and players are files (games/<game>/); one interpreter (XState v5).
+RtG turn bug + card-id bug fixed. make check 1100 green; test-gin, test-harness-mcp,
+test-jev-runner green. Not committed (awaiting user).
+
+## Previous - US-129 story written
+
+Tier 1 sprint. 7 ACs (turn statechart YAML, questions file, player = one
+file, interpreter + named library, RtG turn bug fixed, no regression,
+2nd RtG player as proof). Out: Hearts, Gin rule-lists, src/.
+
+## Next Steps
+Await Smith Gate 1, then Morpheus arch.
+
 ## Current Task (2026-09-22) - US-128 LAUNCHED
 
 "Jev player model": tools/jev/ (runner, decide, escalate, strategyFile,

@@ -668,3 +668,23 @@ This file contains critical lessons and rules derived from past errors, technica
   EXISTING test fail, which is what showed the code really went through
   the new module.
 
+
+## Sprint "XState players" (2026-09-23): US-129, D154
+
+- **Write the turn down and its bugs have nowhere to hide.** Two RtG
+  bugs survived three sprints inside hand-written loops: a pass advanced
+  no phase, and the projection dropped card ids, so every action named a
+  card the table does not know. Both surfaced within an hour of the turn
+  becoming a file with one test per transition.
+- **Mapping data belongs in the data.** Which rules apply to which move
+  was a code switch (`constraintsFor`); as `applies_to` on each question
+  it is content a person can read. That removed a planned game hook.
+- **A migration needs a round-trip check before the old files go.** It
+  caught `questionsFor` turning a Score's reworded list into an object.
+  The check itself could not be a test (its source was being deleted),
+  but the bug it found became one.
+- **Never post a result before reading it.** A "3/3" went into chat
+  while the test was 2/3. Claims come from `build/build.out`.
+- **Lint in `make check` pays for itself at once.** In its first sprint
+  it refused 7 errors in the sprint's own new code, including a script
+  that exported functions.

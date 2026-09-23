@@ -2,7 +2,11 @@
 // A Jev-backed player that joins a table YOU are hosting (direct user
 // request, 2026-09-19):
 //
-//   bobp make jev-player GAME=gin STRATEGY=equilibrium CODE=ABC123 [FIRST=bot|opponent] [HANDS=1]
+//   bobp make jev-player GAME=gin|rtg STRATEGY=<player> CODE=ABC123 [FIRST=bot|opponent] [HANDS=1]
+//
+// STRATEGY is a player: a file name in games/<game>/players/ (US-129),
+// or one of Gin's D137 rule lists. `bobp make jev-library` lists what a
+// game's turn file may use.
 //   node tools/jevPlayer.mjs --game gin --strategy equilibrium --code ABC123
 //
 // Picks the game's adapter and hands it to the shared runner
@@ -39,7 +43,7 @@ function fail(message, exitCode = 2) {
 const games = Object.keys(GAMES).join(', ');
 if (!options.game) fail(`pass the game to play: GAME=<${games}> (node: --game)`);
 if (!Object.hasOwn(GAMES, options.game)) fail(`unknown game "${options.game}" - choose one of: ${games}`);
-if (!options.strategy) fail('pass the strategy to play: STRATEGY=<name> (node: --strategy)');
+if (!options.strategy) fail('pass the player to seat: STRATEGY=<player file name> (node: --strategy)');
 if (!options.code) fail('pass the table code you are hosting: CODE=ABC123 (node: --code)');
 
 const { run, UsageError } = await import('./jev/runner.mjs');

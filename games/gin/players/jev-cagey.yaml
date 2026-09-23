@@ -1,0 +1,32 @@
+# Gin, cagey: the same questions, reworded so feeding a meld reads as the
+# worst thing it can do.
+
+description: "Cagey: gives the opponent nothing, and would rather carry
+  deadwood than feed a meld."
+floor: 0.2
+escalation: floor_fallback
+wording:
+  opponent_is_close:
+    criteria:
+      - Showing me nothing yet - early, scattered discards.
+      - Starting to keep what fits together; still loose.
+      - "Collecting with intent: I should stop feeding them."
+      - Ready to end this hand as soon as they draw what they need.
+      - One card from gin - anything I throw could finish them.
+  opponent_wants:
+    instructions: Which slot of `candidates` is the opponent hunting, judged
+      from what they have taken in `opponent.took_from_discard` and thrown
+      away in `opponent.discarded`? Answer with the slot number.
+  move:
+    instructions: It is my turn. Which move gives the opponent least, given what
+      `read` says they are collecting? Carrying deadwood is an acceptable
+      price for not feeding them.
+    criteria:
+      take_upcard: "Take `upcard`: only when it melds, since taking tells them
+        what I am building."
+      draw_stock: "Draw from `stock`: says nothing about my hand, which is usually
+        worth more than `upcard`."
+      discard: Throw this card - safe to give away, whatever `candidates` says it
+        costs me.
+      knock: End the hand now, before they can - worth it when
+        `read.opponent_is_close` says they are nearly there.

@@ -32,9 +32,11 @@ or a live-verification session) versus being pickable directly.
   game file documents the rules, but how to RUN one lives only in a
   comment at the top of `tools/rtg/adapter.mjs` (was `rtg/player.mjs`,
   retired by US-128).
-- **RtG combat is unplayed** (US-127): attacking, blocking and damage
-  are implemented and unit-tested, but no live table has been through a
-  combat step - the live run ended at "pass" with one land down.
+- **RtG combat is unplayed LIVE** (US-127; narrowed by US-129): two
+  bugs kept it unreachable - a pass advanced no phase, and every RtG
+  action named a card by NAME, not id. Both are fixed and tested
+  (`tests/rtgTurn.test.js`), but no live table has been through a
+  combat step yet. Needs one live RtG turn at a hosted table.
 
 - **Play a hand with a question-file strategy** (US-125 close,
   2026-09-20): everything below live play is proven with a scripted
@@ -237,13 +239,6 @@ superseded:
   (`tools/checkStoryNumbers.mjs`, 2026-09-12).
 - ~~**Focus-zoom/context-menu stuck-open bug**~~ — fixed 2026-09-17.
 
-- **No test proves a Jev loader rejects a literal** (Trin, US-128 P1
-  UAT). `rejectLiterals` is tested directly, but removing its call from
-  Gin's `loadStrategy` or RtG's `loadGame` fails nothing. Gin's
-  "an OPTION description is held to the same rule" test calls
-  `checkInstruction` itself, not the loader. Fix by repointing that
-  test, not by adding one; Gin's loader reads by name from a fixed
-  directory, which is why it was deferred.
 
 ## From the US-128 retro (2026-09-22)
 
@@ -254,11 +249,22 @@ superseded:
 - **Join lines name the game by its internal id** (Smith, US-128 test):
   "I can deal in another rtg bot" - a person reads "Recard the
   Gathering". Same for "gin". Heuristic #2.
-- **RtG `applyTracks` has a dead line** (Neo, US-128): `pass` returns no
-  `tracks`, so "after pass, phase becomes combat" never runs. Ported
-  faithfully, not fixed - either delete it or make pass track a phase.
+- **RtG moves never reach the thought bubble** (same review):
+  `botThoughts.js` shows only `bot-decision` talk; RtG narrates as
+  `rtg-move`. Either RtG speaks `bot-decision`, or the bubble reads a
+  shared kind. That belongs in the runner's contract, not in each game.
 - **The via index has no entries for `tools/**/*.mjs`** (Oracle, US-128):
   every symbol lookup this sprint fell back to grep.
-- **A third game should make jevPlayer's GAMES map data** (Morpheus,
-  US-128): fine at two games, a smell at three.
+
+## From US-129 (2026-09-23)
+
+- **A GAMES map still lives in `tools/jevPlayer.mjs`**: games are data
+  now (`games/<game>/`), but the CLI still lists adapters by hand. A
+  third game should make that a directory scan plus a naming convention.
+- **Gin's D137 rule lists are the last Jev players in code** (D148): they
+  retire when the bench says the question-file players beat them.
+- **CLI errors say "strategy" where authors now think "player"** (Smith,
+  US-129 test): "unknown rtg strategy "x" - choose one of: ..." lists
+  player files. Heuristic #4. STRATEGY= stays (renaming breaks every
+  documented command); only the message wording is in question.
 

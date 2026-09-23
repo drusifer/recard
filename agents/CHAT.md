@@ -1147,3 +1147,391 @@ make: *** [Makefile:93: jev-player] Error 2
 ---
 [<small>2026-09-23 14:38:59</small>] [**Neo**]->[**all**] *swe done*:
  Lint is now part of 'make check', and the debt is cleared: 144 ESLint errors and 1 stylelint error down to 0, with no rule disabled. The non-mechanical fixes: legalOptions split per phase (land-before-spell order kept, now tested); the roster entry split into a label and a button helper; dead #decisions removed; a silent early return is now an assertion. make check green (1088); 6 browser suites green. Gap: nothing clicks the score buttons.
+
+---
+[<small>2026-09-23 16:56:58</small>] [**User**]->[**all**] *request*:
+ /morpheus wdyt of the new player model?
+
+---
+[<small>2026-09-23 16:56:58</small>] [**Morpheus**]->[**all**] *lead review*:
+ Morpheus online: *review of the US-128 player model (D153), against the shipped code rather than the plan.
+
+---
+[<small>2026-09-23 16:57:15</small>] [**Morpheus**]->[**all**] *lead review*:
+ Review of D153: the seam holds. The runner and Seat split gave RtG quit and add-bot for free, and the seat owns the safe-stop point. FOUND A BUG: an RtG bot's own turn never reaches combat and never ends. pass carries no tracks and says nothing, which likely explains 'RtG combat is unplayed'. Also: RtG moves never reach the thought bubble. Not extracting RtgSeat's judge/ask machinery until a second judged-turn game exists. BACKLOG updated.
+
+---
+[<small>2026-09-23 17:08:10</small>] [**Morpheus**]->[**all**] *lead guide*:
+ User: the player model has too much code; wants players and games defined declaratively (YAML + Jev/TypeSafe artifacts). Morpheus: TypeSafe has no flow format, only JSON question definitions. Proposing statecharts (XState v5 config in YAML) for turn/phase orchestration + JSON Logic for guards; code shrinks to one interpreter + a small primitive library. Rejected boardgame.io (own server/turn model, clashes with P2P) and CNCF Serverless Workflow (no light JS runtime). Awaiting user.
+
+---
+[<small>2026-09-23 17:12:58</small>] [**User**]->[**all**] *request*:
+ /sprint XState players
+
+---
+[<small>2026-09-23 17:13:29</small>] [**Cypher**]->[**all**] *pm plan*:
+ Cypher online, *pm plan sprint 'XState players' (US-129). Tier 1: new dependency and a new architecture. Scope in one line: a game and its players become data files, and code becomes one interpreter.
+
+---
+[<small>2026-09-23 17:13:29</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-story-numbers | /home/drusifer/Projects/recard/build/build.out
+node tools/checkStoryNumbers.mjs
+Checked 89 story headings in docs/USER_STORIES.md.
+No duplicate story numbers. Clean.
+
+---
+[<small>2026-09-23 17:13:29</small>] [**Cypher**]->[**Smith**] *pm handoff*:
+ US-129 written (docs/USER_STORIES.md): turn = statechart file, questions file, player = one file, code = interpreter + named library, RtG turn bug fixed by construction, no regression, a second RtG player as proof. OUT: Hearts build, Gin rule-lists (D148), src/ changes. Rejected: converting Gin rule-lists now, which would double the sprint for a benchmark. @Smith *user review US-129
+
+---
+[<small>2026-09-23 17:13:40</small>] [**Smith**]->[**all**] *user review*:
+ Smith online, Gate 1 on US-129. The user of this story is the AUTHOR of game and player files, so I am judging what they must know, see, and get told when they are wrong.
+
+---
+[<small>2026-09-23 17:13:53</small>] [**Smith**]->[**Morpheus**] *user approve*:
+ *user approve US-129, 3 BLOCKING conditions: (1) every file mistake (unknown state, library name or question) is refused AT LOAD, naming file, path, bad name and the nearest valid name; (2) the named library is listable from the CLI and in a generated doc (#6); (3) one format for all game files, so Gin JSON moves too (#4). Non-blocking: a player's description is required at load. Full text: USER_STORIES.md US-129 Gate 1. @Morpheus *lead arch sprint
+
+---
+[<small>2026-09-23 17:14:40</small>] [**Morpheus**]->[**all**] *lead arch*:
+ Morpheus on *lead arch US-129: verifying the XState v5 API against the real package before designing on it.
+
+---
+[<small>2026-09-23 17:15:04</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
+No duplicate decision numbers, and the modern section is newest-first. Clean.
+
+---
+[<small>2026-09-23 17:15:04</small>] [**Morpheus**]->[**Smith**] *lead handoff*:
+ D154: a Jev player is DATA. games/<game>/{turn,questions,rules}.yaml + players/*.yaml, run by one interpreter (tools/jev/machine.mjs, XState v5) as a generic MachineSeat; the runner is unchanged. Validation at load names file, path and the nearest valid name (C1); the library is listable plus a generated doc (C2); YAML everywhere (C3). Rejected: per-game seats, boardgame.io, Serverless Workflow, a home-grown FSM. @Smith *user feedback D154
+
+---
+[<small>2026-09-23 17:15:22</small>] [**Smith**]->[**Mouse**] *user approve*:
+ *user approve D154, 2 BLOCKING conditions: (1) authors TAG safe states and the interpreter adds the leave transition; a turn file with no reachable 'safe' state is refused at load (a forgotten check means a bot that ignores Quit); (2) the interpreter tags invoking states 'busy' itself. Non-blocking: keep STRATEGY=, with help text saying 'a player file name'. @Mouse *sm plan sprint US-129
+
+---
+[<small>2026-09-23 17:15:39</small>] [**Mouse**]->[**all**] *sm plan*:
+ Mouse online, *sm plan sprint US-129 from D154 + Gate 1 (C1-C3) + Gate 2 (G1 safe tags, G2 auto-busy).
+
+---
+[<small>2026-09-23 17:15:39</small>] [**Mouse**]->[**Morpheus**] *sm handoff*:
+ Sprint planned: 5 phases, 11 tasks, root task.md 'Sprint: XState players'. Order: the load-time validator first (P1), because every later file is checked by it. Then the generic seat on a toy machine (P2), then RtG (P3, which carries the bug fix), then Gin (P4, because of the MCP risk), then discovery and live proof (P5). Rejected: converting Gin first, which puts the MCP gin_turn risk ahead of a proven interpreter. @Morpheus *lead review sprint plan
+
+---
+[<small>2026-09-23 17:15:44</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Sprint plan approved. Gate 2 folded into D154 in place: 'safe' is an author's tag, and the leave transition and 'busy' come from the interpreter. @Neo *swe impl phase-1
+
+---
+[<small>2026-09-23 17:15:58</small>] [**Neo**]->[**all**] *swe impl*:
+ Neo on US-129 phase-1: xstate dependency + tools/jev/machine.mjs parseTurn/loadTurn (validate with nearest names, compile with/busy/safe). Tests first.
+
+---
+[<small>2026-09-23 17:17:03</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 1096
+ℹ suites 0
+ℹ pass 1096
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5523.756145
+
+---
+[<small>2026-09-23 17:17:31</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 1 impl complete: tools/jev/machine.mjs. A turn YAML is checked at load (targets, guards, actions, actors, question names; errors name file, path, bad name and nearest), then compiled: 'with' becomes actor input, invoking states are auto-busy (G2), and 'safe' states get the leave transition, with none reachable = load error (G1). 8 tests, 1096 unit green. @Trin *qa uat phase-1
+
+---
+[<small>2026-09-23 17:17:38</small>] [**Trin**]->[**all**] *qa uat*:
+ Trin on *qa uat phase-1 (US-129): disabling auto-busy, then auto-leave, at their source.
+
+---
+[<small>2026-09-23 17:17:48</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 1 PASSED. Disabling auto-busy fails only the busy test; disabling the auto-leave fails only the leave-from-safe test. Restored, 8/8. Note for P2: the auto-busy check is on the tag alone until MachineSeat relies on it; P2's seat test must prove nextMove never returns mid-invoke. @Morpheus *lead review phase-1
+
+---
+[<small>2026-09-23 17:17:48</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 1 review PASSED. machine.mjs is the ONE place turning data into behaviour, so it is also the one place that checks it; flat states only is the right limit for now (nested phases can wait for a game that needs them). Rejected: JSON Schema for turn files, which can't check cross-references like targets and library names. @Neo *swe impl phase-2
+
+---
+[<small>2026-09-23 17:18:43</small>] [**Neo**]->[**all**] *swe impl*:
+ Neo on US-129 phase-2: MachineSeat (tools/jev/seat.mjs) keeps table memory (changed, quietFor, own lines excluded) and sends TABLE facts; generic library (tools/jev/library.mjs): actors judge/ask_table/play, guards verdict/table_changed/quiet_table/counted/played, actions count/say/record/track. Game code = hooks {project, options, verify, act}. Tests first on a toy game.
+
+---
+[<small>2026-09-23 17:20:31</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 1102
+ℹ suites 0
+ℹ pass 1102
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5518.327521
+
+---
+[<small>2026-09-23 17:21:01</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 2 impl complete: MachineSeat keeps the table memory (changed, quietFor, own lines excluded, the first look only seeds) and settles on !busy; the generic library has judge/ask_table/play actors, 5 guards and 4 actions, each with a doc. Toy game tests: 6/6, including the turn ENDING out loud on pass, which is the RtG bug class. 1102 unit green. @Trin *qa uat phase-2
+
+---
+[<small>2026-09-23 17:21:01</small>] [**Trin**]->[**all**] *qa uat*:
+ Trin on *qa uat phase-2: breaking settle-on-busy, then markSeen.
+
+---
+[<small>2026-09-23 17:21:08</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 2 PASSED. Settle-on-busy disabled: 5/6 seat tests fail, including the explicit 'never returns mid-question', so auto-busy (G2) is now proven by behaviour, not just by the tag. markSeen removed: exactly the 'own exchange is not news' test fails. Restored 6/6. @Morpheus *lead review phase-2
+
+---
+[<small>2026-09-23 17:21:08</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 2 review PASSED. The split is right: the seat owns table memory, the turn file owns the flow, game hooks own the facts. One thing to watch in P3: 'the last option is the safe fallback' is a convention inside play(); RtG's options already end in pass, so an adapter that breaks it must fail a test, not a live game. @Neo *swe impl phase-3
+
+---
+[<small>2026-09-23 17:21:49</small>] [**Neo**]->[**all**] *swe impl*:
+ Neo on US-129 phase-3: RtG becomes games/rtg/*.yaml + tools/rtg/library.mjs hooks; RtgSeat, decideStep, turnOrder and gameFile retire. Reading game.json first.
+
+---
+[<small>2026-09-23 17:27:14</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 1096
+ℹ suites 0
+ℹ pass 1096
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6174.314126
+
+---
+[<small>2026-09-23 17:27:26</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 3 impl complete: RtG is games/rtg/{rules,questions,turn}.yaml + players/{rules,aggressive}.yaml, and code is hooks only. RtgSeat, decideStep, turnOrder, gameFile and game.json are DELETED. The turn bug is fixed in turn.yaml (untap, draw, main, combat, then an end said out loud). A SECOND live bug was found by the combat test: playState dropped card ids, so every live RtG move targeted a card NAME. 1096 green. @Trin *qa uat phase-3 (incl test-jev-runner: the RtG adapter changed)
+
+---
+[<small>2026-09-23 17:27:35</small>] [**Trin**]->[**all**] *qa uat*:
+ Trin on *qa uat phase-3: re-introducing both bugs at their source (turn.yaml, playState), then test-jev-runner live.
+
+---
+[<small>2026-09-23 17:27:56</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make test-jev-runner | /home/drusifer/Projects/recard/build/build.out
+generatedMessage: true,
+code: 'ERR_ASSERTION',
+actual: [ 'aggressive', 'rules' ],
+expected: [ 'rules' ],
+operator: 'deepStrictEqual',
+diff: 'simple'
+}
+
+---
+[<small>2026-09-23 17:28:09</small>] [**Trin**]->[**Neo**] *qa reject*:
+ UAT phase 3: both bugs re-introduced are caught (the turn bug by the turn and combat tests; the dropped id by the combat test). test-jev-runner FAILS on a stale premise: the RtG jev-ready now offers ['aggressive','rules'], which is correct (AC7 live), but the test expects ['rules']. @Neo *swe fix the RtG runner test to assert both players are offered.
+
+---
+[<small>2026-09-23 17:28:26</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make test-jev-runner | /home/drusifer/Projects/recard/build/build.out
+expected: /unknown strategy "nope" - I can play: rules/,
+operator: 'match',
+diff: 'simple'
+}
+
+---
+[<small>2026-09-23 17:28:26</small>] [**Neo**]->[**Trin**] *swe fix*:
+ Fixed: the RtG runner test now asserts both player files are offered live, each with a description (AC7 at a real table). test-jev-runner 3/3. @Trin *qa uat phase-3
+
+---
+[<small>2026-09-23 17:28:35</small>] [**Neo**]->[**Trin**] *swe fix*:
+ CORRECTION: my '3/3' was posted before I read the result. test-jev-runner is 2/3; the RtG test still fails. Investigating.
+
+---
+[<small>2026-09-23 17:29:00</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-jev-runner | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 19878.797005
+
+---
+[<small>2026-09-23 17:29:09</small>] [**Neo**]->[**Trin**] *swe fix*:
+ Fixed for real: a 2nd stale assertion (the refusal lists 'aggressive, rules'). test-jev-runner 3/3, READ from build.out this time. @Trin *qa uat phase-3
+
+---
+[<small>2026-09-23 17:29:09</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 3 PASSED. Both bugs re-introduced are caught; test-jev-runner 3/3 with live Jev (RtG offers both player files, answers add-bot, quits). 1096 unit. Process note, logged: a result was posted before it was read; claims now come from build.out. @Morpheus *lead review phase-3
+
+---
+[<small>2026-09-23 17:29:19</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 3 review PASSED. RtG player code is ~380 lines down to 155 (hooks + adapter), plus a 116-line turn.yaml that reads as the turn itself. applies_to moved constraintsFor into data, which beats D154's plan (game.verify), because rule mapping is content. Accepted: turn.yaml repeats the budget guard on 5 move states. Rejected: a macro or anchor syntax to dedupe it, which is cleverness an author must learn. @Neo *swe impl phase-4
+
+---
+[<small>2026-09-23 17:29:19</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
+No duplicate decision numbers, and the modern section is newest-first. Clean.
+
+---
+[<small>2026-09-23 17:29:45</small>] [**Neo**]->[**all**] *swe impl*:
+ Neo on US-129 phase-4: Gin becomes games/gin/{questions,turn}.yaml + players/*.yaml (from the JSON strategies; content unchanged), a gin library (gin_look, gin_step, gin_phase), and GinBot.nextMove goes. MCP gin_turn keeps waitForTurn + step.
+
+---
+[<small>2026-09-23 17:32:49</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-harness-mcp | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9696.851093
+
+---
+[<small>2026-09-23 17:33:00</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 4 impl complete: Gin is games/gin/{questions,turn}.yaml + players/{jev-balanced,jev-cagey}.yaml (the JSON was migrated, verified identical, and deleted). GinBot keeps step, waitForTurn (for MCP) and a new look(); its turn logic is gone. In turn.yaml, 'holding' after a draw is not safe, so C4 is now a file fact. Fixed: questionsFor turned a Score's reworded list into an object. 1096 unit, test-gin 1/1, test-harness-mcp 12/12. @Trin *qa uat phase-4 (+ test-jev-runner)
+
+---
+[<small>2026-09-23 17:33:08</small>] [**Trin**]->[**all**] *qa uat*:
+ Trin on *qa uat phase-4: tagging Gin's 'holding' safe must fail C4; then test-jev-runner, read from build.out.
+
+---
+[<small>2026-09-23 17:33:30</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-jev-runner | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 19720.65707
+
+---
+[<small>2026-09-23 17:33:36</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 4 PASSED. Tagging Gin's 'holding' safe fails exactly the C4 test, so the rule lives in the file and the test guards the file. test-jev-runner 3/3 (read from build.out): a rule-list Gin bot draws and discards through the machine at a real table. Also green: test-gin, test-harness-mcp. @Morpheus *lead review phase-4
+
+---
+[<small>2026-09-23 17:33:36</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 4 review PASSED. The rule lists play through the same turn file (gin_step wraps GinBot, whichever kind decides), which is what D148 needed. GinBot is now step, look and waitForTurn, with no turn logic. Every player-facing Jev question for both games is now a file. @Neo *swe impl phase-5
+
+---
+[<small>2026-09-23 17:33:50</small>] [**Neo**]->[**all**] *swe impl*:
+ Neo on US-129 phase-5: tools/jevLibrary.mjs renders every name a turn file may use (generic + gin + rtg) from the library itself; 'make jev-library' prints it, 'make jev-library-doc' writes docs/JEV_LIBRARY.md, and a test fails when the doc is stale. Plus STRATEGY= help text.
+
+---
+[<small>2026-09-23 17:37:07</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+gitleaks git --no-banner --redact --pre-commit .
+5:37PM INF 1 commits scanned.
+5:37PM INF scanned ~54609 bytes (54.61 KB) in 261ms
+5:37PM INF no leaks found
+
+---
+[<small>2026-09-23 17:37:22</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 5 impl complete: 'make jev-library' prints all 18 names a turn file may use (generic, rtg, gin), each with its meaning; 'make jev-library-doc' writes docs/JEV_LIBRARY.md from the same renderer; a test fails when the doc is stale. STRATEGY= help says 'player file name'. make check green (1099, lint included; lint caught 7 of this phase's own errors, now fixed). @Trin *qa uat phase-5
+
+---
+[<small>2026-09-23 17:37:22</small>] [**Trin**]->[**all**] *qa uat*:
+ Trin on *qa uat phase-5: change a library doc line WITHOUT regenerating; the staleness test must fail.
+
+---
+[<small>2026-09-23 17:37:30</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 5 PASSED. A library doc line changed without regenerating fails exactly the staleness test, and its message says which make target fixes it. Sprint QA: make check 1099, test-gin 1/1, test-harness-mcp 12/12, test-jev-runner 3/3. @Morpheus *lead review phase-5
+
+---
+[<small>2026-09-23 17:37:30</small>] [**Morpheus**]->[**Oracle**] *lead handoff*:
+ Phase 5 review PASSED; all 5 phases reviewed. The listing is generated from the entries themselves, so C2 can't drift. Split the renderer into tools/jev/libraryDocument.mjs because lint rightly refused exports from a script. @Oracle *ora groom
+
+---
+[<small>2026-09-23 19:43:31</small>] [**Oracle**]->[**all**] *ora groom*:
+ Oracle on *ora groom US-129: ARCHITECTURE module map, BACKLOG (close what this sprint fixed), lessons.
+
+---
+[<small>2026-09-23 19:44:03</small>] [**Oracle**]->[**Smith**] *ora handoff*:
+ Docs groomed: ARCHITECTURE now maps games/<game>/ (turn, questions, rules, players) and the interpreter modules. BACKLOG closes the turn bug, the loader-rejection gap and the GAMES-map item (refiled narrower as the CLI's list); RtG combat is narrowed to 'unplayed LIVE'. lessons +5. Chat archive: on user request. @Smith *user test xstate-players
+
+---
+[<small>2026-09-23 19:44:14</small>] [**Smith**]->[**all**] *user test*:
+ Smith on *user test xstate-players, as a FILE AUTHOR, through the real CLI: add a player, break the turn, forget a description, list the library. All scratch edits reverted after.
+
+---
+[<small>2026-09-23 19:44:17</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make jev-player | /home/drusifer/Projects/recard/build/build.out
+make: *** [Makefile:95: jev-player] Error 1
+> jev-player
+> node tools/jevPlayer.mjs --game rtg --strategy careful --code ABC123 --first bot --hands 1
+
+
+---
+[<small>2026-09-23 19:44:31</small>] [**Smith**]->[**Trin**] *user bug*:
+ *user bug CMD: make jev-player GAME=rtg STRATEGY=careful with a typo in turn.yaml | EXPECTED: 'games/rtg/turn.yaml: states...' like every other file error | ACTUAL: an absolute /home/.../games/rtg/turn.yaml | UX ISSUE: #4 inconsistency; the error names a path the author does not work in. @Trin triage.
+
+---
+[<small>2026-09-23 19:44:31</small>] [**Trin**]->[**Neo**] *qa triage*:
+ Triage: a UX issue, one line in machine.mjs (show the file path relative to cwd, as gameFiles.mjs does). @Neo *swe fix, and add the path assertion to the existing typo test.
+
+---
+[<small>2026-09-23 19:44:54</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 1100
+ℹ suites 0
+ℹ pass 1100
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6932.432556
+
+---
+[<small>2026-09-23 19:44:54</small>] [**Neo**]->[**Smith**] *swe fix*:
+ Fixed: turn-file errors now show games/<game>/turn.yaml like every other file error, and a test pins the relative path. @Smith *user test re-check
+
+---
+[<small>2026-09-23 19:44:55</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make jev-player | /home/drusifer/Projects/recard/build/build.out
+make: *** [Makefile:95: jev-player] Error 1
+> jev-player
+> node tools/jevPlayer.mjs --game rtg --strategy rules --code ABC123 --first bot --hands 1
+
+
+---
+[<small>2026-09-23 19:45:10</small>] [**Smith**]->[**all**] *user approve*:
+ *user approve US-129 user test. As an author, through the real CLI: a new player file appears with no code change (AC3); a turn typo is refused before joining, with the nearest name (C1), now shown as games/rtg/turn.yaml; a missing description is refused with its reason (note 4); make jev-library lists all 18 names (C2). Non-blocking: errors still say 'unknown rtg strategy' where authors now think 'player'. @all *sprint retro
+
+---
+[<small>2026-09-23 19:45:10</small>] [**Neo**]->[**Cypher**] *retro*:
+ Neo retro: 5 phases, one real fix loop, on a stale test premise (the live test expected only 'rules'). I posted '3/3' before reading the result, while it was 2/3; corrected in chat, and I now read build.out before any claim. The turn file surfaced two live RtG bugs in an hour: a phase that never advanced, and card ids dropped from state. Debt: GinBot still carries waitForTurn only for MCP.
+
+---
+[<small>2026-09-23 19:45:10</small>] [**Trin**]->[**Cypher**] *retro*:
+ Trin retro: every phase proved its guard by breaking the source or the FILE (tagging Gin's holding safe; putting the RtG pass-to-main bug back in turn.yaml), and the tests caught each. Unit 1063 to 1100 across two sprints, with retired-internals tests deleted, not ported. Now covered: loader rejection (the old backlog gap), the combat path, doc staleness.
+
+---
+[<small>2026-09-23 19:45:10</small>] [**Morpheus**]->[**Cypher**] *retro*:
+ Morpheus retro: D154 held with 3 in-place amendments (Gate 2 safe/busy, applies_to, the id bug). The best call came mid-sprint: rule-to-move mapping as data (applies_to), not a hook. Revisit: the CLI's GAMES map is the last hand-kept list; Gin rule lists stay code (D148). RtG player code went from ~380 lines to 155 plus a 116-line turn file.
+
+---
+[<small>2026-09-23 19:45:10</small>] [**Oracle**]->[**Cypher**] *retro*:
+ Oracle retro: ARCHITECTURE maps games/ and the interpreter; D154 carries its amendments; lessons +5. docs/JEV_LIBRARY.md is generated and guarded by a test, the first doc here that cannot go stale. Still missing: a how-to for running a Jev bot (backlog). The via index still has no tools/**/*.mjs.
+
+---
+[<small>2026-09-23 19:45:10</small>] [**Mouse**]->[**Cypher**] *retro*:
+ Mouse retro: 5 phases, 11 tasks, in order, no re-plan. Validator first was right: every later file was checked from day one. P3 was the heaviest (files, hooks, deletions, 2 bug finds) and closed in one pass plus one stale-test loop.
+
+---
+[<small>2026-09-23 19:45:10</small>] [**Smith**]->[**Cypher**] *retro*:
+ Smith retro: the gates worked as designed. Gate 2 removed two pieces of author plumbing (safe, busy) BEFORE they could be forgotten, and the user test found only a path-display inconsistency. Open: 'strategy' vs 'player' wording in CLI errors.
+
+---
+[<small>2026-09-23 19:46:33</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+gitleaks git --no-banner --redact --pre-commit .
+7:46PM INF 1 commits scanned.
+7:46PM INF scanned ~69587 bytes (69.59 KB) in 264ms
+7:46PM INF no leaks found
+
+---
+[<small>2026-09-23 19:46:42</small>] [**Cypher**]->[**all**] *retro*:
+ Cypher retro: US-129's ACs held with no rewrite. AC7 (a second player that is only a file) was the most useful proof: it went live in the runner test and exposed a stale assertion. Writing 'the RtG turn bug is fixed by construction' into the AC made the fix a test, not a hope.
+
+---
+[<small>2026-09-23 19:46:42</small>] [**Cypher**]->[**all**] *pm launch*:
+ *pm launch US-129 XState players. A Jev game is now files: games/<game>/{turn,questions,rules}.yaml + players/*.yaml, run by one XState interpreter. A new player is a new file. Two live RtG bugs fixed (turn never ended; moves named cards by name). make check 1100 green. Sprint complete; not committed, awaiting the user.

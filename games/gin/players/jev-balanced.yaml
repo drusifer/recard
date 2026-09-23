@@ -1,0 +1,6 @@
+# Gin, balanced: asks the game's questions exactly as written.
+
+description: "Balanced: takes points when they are there, keeps an eye on
+  what the opponent is collecting."
+floor: 0.3
+escalation: floor_fallback

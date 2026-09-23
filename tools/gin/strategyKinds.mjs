@@ -3,7 +3,7 @@
 // - `rules`: the ordered rule lists of D137 (`strategies.mjs`). They
 //   remain ONLY as the benchmark the question files have to beat; when
 //   they stop being that, they go (no-back-compat, standing rule).
-// - `questions`: a static question file (`strategies/*.json`, D147).
+// - `questions`: a player file in `games/gin/players/` (D147, D154).
 //
 // One lookup, so every caller - the runner, the MCP, the tests - offers
 // both kinds and neither has to know which is which.

@@ -1,5 +1,33 @@
 # Agent State
 
+## Current Task (2026-09-23) - US-129: all 5 phases reviewed PASSED; D154 amended (Gate 2, P3 applies_to + id bug)
+
+## Previous - US-129 architecture: D154 recorded
+
+games/<game>/{turn,questions,rules}.yaml + players/*.yaml; tools/jev/machine.mjs
+(load+validate+compile+MachineSeat), tools/jev/library.mjs + tools/<game>/library.mjs,
+make jev-library + docs/JEV_LIBRARY.md. XState 5.33.2 probed OK from YAML.
+
+Gate 2 folded into D154 (safe tag -> auto leave; auto busy). Plan approved.
+
+## Next Steps
+*lead review each phase. Watch: no per-game loop code left; library names only.
+
+## Current Task (2026-09-23) - *review of the US-128 player model: DONE
+
+Verdict: the runner/Seat seam is right (RtG got quit+add-bot for free;
+the seat owns the safe-stop boundary). Weaknesses: (1) BUG - RtG's own
+turn never reaches combat and never ends (pass has no tracks; pass says
+nothing); (2) RtG moves are invisible to the thought bubble (rtg-move vs
+bot-decision); (3) RtgSeat is the old loop in a class - its judge/ask/
+quiet-table machinery is generic but only worth extracting when a 2nd
+judged-turn game exists (Hearts is code-computable); (4) GinBot.step
+still branches on strategy.kind until D148 retires rule lists;
+(5) floorFallback is ceremony for Gin (always no). Backlog updated.
+
+## Next Steps
+Await user: fix the RtG turn-progression bug first (small, high value).
+
 ## Current Task (2026-09-22) - US-128 sprint plan: APPROVED, D153 recorded (100%)
 
 Tier 2 sprint "Jev player model". D153 (docs/DECISIONS.md) narrows the

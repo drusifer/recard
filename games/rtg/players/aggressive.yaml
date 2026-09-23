@@ -1,0 +1,11 @@
+# US-129 AC7: a second RtG player that is ONLY this file. Same rules, same
+# turn; it words the move choice so pressing the attack reads as the
+# better play.
+description: plays by the rules, and presses the attack whenever it legally can
+escalation: ask_table
+wording:
+  step:
+    criteria:
+      attack: Attack with this creature - pressure wins games, and holding back rarely does.
+      cast: Cast this spell now, to put more pressure on the board.
+      pass: Do nothing further - only when nothing useful is left to do.

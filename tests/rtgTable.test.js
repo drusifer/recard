@@ -2,7 +2,7 @@
 // asks out loud when the table says nothing.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readAnnouncement, TURN_QUESTION } from '../tools/rtg/table.mjs';
+import { readAnnouncement } from '../tools/rtg/table.mjs';
 import { readAnswer } from '../tools/jev/table.mjs';
 
 const said = (name, text, data) => ({ name, text, ...(data && { data }) });
@@ -26,8 +26,7 @@ test('ordinary chat says nothing about the turn', () => {
   assert.equal(readAnnouncement(said('Drew', 'nice draw'), 'bot'), null);
 });
 
-test('the turn question is ONE yes/no, and the answers people actually give are read (C3)', () => {
-  assert.match(TURN_QUESTION, /^Is it my turn now\?$/);
+test('the answers people actually give to a yes/no are read (C3)', () => {
   assert.equal(readAnswer({ text: "it's your turn, go ahead" }), true, 'the live stall\'s answer');
   assert.equal(readAnswer({ text: 'yes' }), true);
   assert.equal(readAnswer({ text: 'no, not yet' }), false);

@@ -1,0 +1,116 @@
+# RtG's turn, as a statechart (US-129/D154). Run by tools/jev/machine.mjs;
+# every name below is from the library (`make jev-library`).
+#
+# Whose turn it is, is JUDGED from the board and table talk (D152), and
+# asked out loud as ONE yes/no when Jev is unsure or the table goes quiet.
+# What I may do is computed from resources (D151). Each phase of my own
+# turn ends when I pass, and the turn ends OUT LOUD (the US-129 bug: a
+# pass used to advance nothing, so combat was never reached).
+#
+# `safe` marks where a bot asked to leave may go; `move` marks where it
+# is this bot's move. States that ask something are busy by themselves.
+
+initial: joining
+context:
+  land_played: false
+  arrivedThisTurn: []
+  attackers: []
+  taken: 0
+  steps: 12 # a RUN limit (STEPS=), not a turn limit
+
+states:
+  joining:
+    entry:
+      - { type: say, params: { text: I play by the rules in my game file. Tell me when it is my turn. } }
+    always: watching
+
+  # ---- not my turn, or I cannot tell yet ----
+  watching:
+    tags: [safe]
+    on:
+      TABLE:
+        - { target: defending, guard: heard_attack, actions: [hear_attackers] }
+        - { target: judging, guard: table_changed }
+        - { target: asking, guard: { type: quiet_table, params: { ms: 8000 } } }
+  judging:
+    invoke:
+      src: judge
+      with: { question: their_turn_is_over, also: [attack_phase_complete], phase: their_turn }
+      onDone:
+        - { target: untap, guard: { type: verdict, params: { is: 'yes' } } }
+        - { target: asking, guard: { type: verdict, params: { is: unsure } } }
+        - { target: watching }
+  asking:
+    invoke:
+      src: ask_table
+      with: { say: Is it my turn now? }
+      onDone:
+        - { target: untap, guard: { type: verdict, params: { is: 'yes' } } }
+        - { target: watching }
+
+  # ---- my turn: each phase is a move; a step in it is `play` ----
+  untap:
+    tags: [move]
+    always: { target: out_of_steps, guard: { type: counted, params: { field: taken, at_least: steps } } }
+    on: { STEP: untapping }
+  untapping:
+    invoke:
+      src: play
+      with: { phase: untap, question: step }
+      onDone: { target: draw, actions: [track, { type: count, params: { field: taken } }] }
+
+  draw:
+    tags: [move]
+    always: { target: out_of_steps, guard: { type: counted, params: { field: taken, at_least: steps } } }
+    on: { STEP: drawing }
+  drawing:
+    invoke:
+      src: play
+      with: { phase: draw, question: step }
+      onDone: { target: main, actions: [track, { type: count, params: { field: taken } }] }
+
+  main:
+    tags: [move]
+    always: { target: out_of_steps, guard: { type: counted, params: { field: taken, at_least: steps } } }
+    on: { STEP: playing }
+  playing:
+    invoke:
+      src: play
+      with: { phase: main, question: step }
+      onDone:
+        - { target: combat, guard: { type: played, params: { move: pass } }, actions: [{ type: count, params: { field: taken } }] }
+        - { target: main, actions: [track, { type: count, params: { field: taken } }] }
+
+  combat:
+    tags: [move]
+    always: { target: out_of_steps, guard: { type: counted, params: { field: taken, at_least: steps } } }
+    on: { STEP: attacking }
+  attacking:
+    invoke:
+      src: play
+      with: { phase: combat, question: step }
+      onDone:
+        - { target: end_turn, guard: { type: played, params: { move: pass } }, actions: [{ type: count, params: { field: taken } }] }
+        - { target: combat, actions: [track, { type: count, params: { field: taken } }] }
+
+  end_turn:
+    entry:
+      - { type: say, params: { text: "I'm done - your turn." } }
+      - { type: reset, params: { to: { land_played: false, arrivedThisTurn: [], attackers: [] } } }
+    always: watching
+
+  # ---- drawn in on their turn: blocks and damage ----
+  defending:
+    tags: [move]
+    always: { target: out_of_steps, guard: { type: counted, params: { field: taken, at_least: steps } } }
+    on: { STEP: blocking }
+  blocking:
+    invoke:
+      src: play
+      with: { phase: defending, question: step }
+      onDone:
+        target: watching
+        actions: [{ type: reset, params: { to: { attackers: [] } } }, { type: count, params: { field: taken } }]
+
+  out_of_steps:
+    type: final

@@ -1,5 +1,23 @@
 # Agent State
 
+## Current Task (2026-09-23) - US-129 *user test: APPROVED
+
+Author flow via CLI: new player file offered; turn typo refused pre-join w/
+nearest name (path bug filed+fixed: absolute -> games/rtg/turn.yaml); missing
+description refused. NB open: 'unknown rtg strategy' wording vs 'player'.
+
+## Current Task (2026-09-23) - US-129 Gate 1: APPROVED w/ 3 blocking conds
+
+1 load-time errors naming file/path/name/nearest; 2 library listable (CLI +
+generated doc); 3 one file format for all games. NB 4: description required.
+
+Gate 2 on D154: APPROVED w/ 2 blocking: interpreter adds leave to `safe`-tagged
+states (no reachable safe state = load error); interpreter auto-tags invoking
+states `busy`. NB: STRATEGY= help text says 'a player file name'.
+
+## Next Steps
+Sprint close *user test: author a player file + a broken turn file as a user.
+
 ## Current Task (2026-09-22) - US-128 *user test: APPROVED
 
 Ran make jev-player error paths (unknown game/strategy, STEPS=abc, HANDS=0):

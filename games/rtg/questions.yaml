@@ -1,0 +1,63 @@
+# What Jev is asked in RtG, as TypeSafe question definitions (US-129/D154).
+# Prose refers to state by path, never a card name or number (D147).
+# `step` is the Choice over this turn's legal options; its criteria are
+# keyed by option KIND. The rest are Nouls: rule checks on a proposed move,
+# and the D152 turn judgments.
+
+step:
+  type: choice
+  instructions: It is my move in Recard the Gathering. Given `rules.goal`,
+    what I hold in `me` and what the opponent has in `opponent`, which of
+    these should I do next? Passing is always allowed.
+  criteria:
+    untap_all: Untap everything I control, which starts my turn.
+    draw: Draw a card for the turn.
+    play_land: Put a land from my hand onto the battlefield - the one land I get
+      this turn.
+    cast: Cast this spell from my hand, tapping lands to pay for it.
+    attack: Attack with this creature.
+    block: Block the attacking creature with this one.
+    take_damage: Take the damage from what got through, off my life total.
+    pass: Do nothing further and let the table move on.
+one_land_per_turn:
+  type: noul
+  instructions: The move puts a land onto the battlefield. Given
+    `rules.land_drop`, `turn.land_played` and `turn.is_mine`, is that
+    allowed right now?
+  applies_to: [ play_land ]
+can_pay_for_it:
+  type: noul
+  instructions: Given `rules.mana` and `me.untapped_lands`, can this spell's
+    cost in `proposed.cost` be paid in full right now?
+  applies_to: [ cast ]
+creature_can_attack:
+  type: noul
+  instructions: Given `rules.attacking` and `rules.summoning_sickness`, may
+    the creature in `proposed.card` attack this turn, considering
+    `proposed.arrived_this_turn` and `proposed.tapped`?
+  applies_to: [ attack ]
+block_is_legal:
+  type: noul
+  instructions: Given `rules.blocking`, may the creature in `proposed.card`
+    block the attacker named in `turn.attackers`, considering
+    `proposed.tapped`?
+  applies_to: [ block ]
+timing_is_right:
+  type: noul
+  instructions: Given `rules.turn_sequence`, `rules.priority`, `turn.is_mine`
+    and `turn.phase`, is this the right moment for the move in
+    `proposed.what`?
+  applies_to: [ play_land, cast, attack ]
+attack_phase_complete:
+  type: noul
+  instructions: Given `rules.no_mechanical_signal`, the board in `me` and
+    `opponent`, and `table_talk` in order, IF the counter-clockwise player
+    declared an attack this turn, has it been resolved? Answer yes if no
+    attack was declared at all - there is nothing pending.
+their_turn_is_over:
+  type: noul
+  instructions: Given `rules.seating`, `rules.no_mechanical_signal`, the board
+    in `me` and `opponent`, `table_talk` in order, and the read on
+    `attack_phase_complete` - has the counter-clockwise player's turn ended?
+    Judge only from the board and what was said - never guess about
+    something already visible.

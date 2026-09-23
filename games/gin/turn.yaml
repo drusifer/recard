@@ -1,0 +1,66 @@
+# Gin Rummy's turn, as a statechart (US-129/D154). Run by
+# tools/jev/machine.mjs; every name below is from the library
+# (`make jev-library`).
+#
+# Whose move it is, is COMPUTED from the table (gin_look), never judged.
+# A turn is a draw AND a discard: after drawing the bot is `holding`,
+# which is not `safe`, so a bot asked to leave always discards first and
+# never walks away with eleven cards (C4 of US-128).
+
+initial: waiting
+context:
+  hands: 1 # HANDS=: how many hands this run plays
+  hands_done: 0
+
+states:
+  waiting:
+    tags: [safe]
+    on: { TABLE: looking }
+  looking:
+    invoke:
+      src: gin_look
+      onDone:
+        - { target: drawing, guard: { type: gin_phase, params: { is: draw } } }
+        - { target: discarding, guard: { type: gin_phase, params: { is: discard } } }
+        - { target: hand_over, guard: { type: gin_phase, params: { is: hand-over } } }
+        - { target: waiting }
+
+  drawing:
+    tags: [move]
+    on: { STEP: taking }
+  taking:
+    invoke: { src: gin_step, onDone: holding }
+
+  holding: # drawn; the discard is still owed
+    on: { TABLE: checking }
+  checking:
+    invoke:
+      src: gin_look
+      onDone:
+        - { target: discarding, guard: { type: gin_phase, params: { is: discard } } }
+        - { target: holding }
+
+  discarding:
+    tags: [move]
+    on: { STEP: throwing }
+  throwing:
+    invoke: { src: gin_step, onDone: waiting }
+
+  hand_over:
+    entry: [{ type: count, params: { field: hands_done } }, note_hand_over]
+    always:
+      - { target: finished, guard: { type: counted, params: { field: hands_done, at_least: hands } } }
+      - { target: between_hands }
+  between_hands: # the hand is scored; wait for the redeal
+    tags: [safe]
+    on: { TABLE: redeal_check }
+  redeal_check:
+    invoke:
+      src: gin_look
+      onDone:
+        - { target: drawing, guard: { type: gin_phase, params: { is: draw } } }
+        - { target: waiting, guard: { type: gin_phase, params: { is: wait } } }
+        - { target: between_hands }
+
+  finished:
+    type: final

@@ -50,6 +50,7 @@
     "playwright": "^1.62.1",
     "stylelint": "^17.14.1",
     "stylelint-config-standard": "^40.0.0",
+    "xstate": "^5.33.2",
     "yaml": "^2.9.0",
     "zod": "^4.6.5"
   }

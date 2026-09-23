@@ -1,5 +1,13 @@
 # Agent State
 
+## Current Task (2026-09-23) - Sprint 'XState players' (US-129) planned
+
+5 phases/11 tasks in task.md: P1 load+validate, P2 MachineSeat+library,
+P3 RtG files (+bug fix, 2nd player), P4 Gin files (MCP risk), P5 discovery+live.
+
+## Next Steps
+Track phase closes in task.md.
+
 ## Current Task (2026-09-22) - Sprint "Jev player model" (US-128) planned (100%)
 
 Tier 2. 6 phases x 2 tasks in root task.md "Sprint: Jev player model":

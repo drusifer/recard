@@ -1,61 +1,37 @@
-// US-125/D147: loading a Gin strategy - a static JSON file of questions
-// over the fixed play-state schema (`playState.mjs`). What may appear
-// in its prose is the shared rule in `tools/jev/strategyFile.mjs`
-// (US-128); this file knows only where Gin keeps its strategies and
-// which parts of one are prose.
+// US-125/D147, as files by US-129/D154: a Gin question-file strategy is a
+// PLAYER in `games/gin/players/`, asking the questions in
+// `games/gin/questions.yaml` in its own wording. This assembles the shape
+// Gin's decision code reads (a read step, a move step, a confidence
+// floor); every check - no literals, a description, real question names -
+// is the game-files loader's (`tools/jev/gameFiles.mjs`).
 
-import { readFileSync, readdirSync } from 'node:fs';
-import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
-import { rejectLiterals } from '../jev/strategyFile.mjs';
+import { loadGameFiles, questionsFor } from '../jev/gameFiles.mjs';
 
-const DIR = fileURLToPath(new URL('strategies', import.meta.url));
+export const GAME_DIR = fileURLToPath(new URL('../../games/gin', import.meta.url));
 
 /**
-The strategy names that ship, in file order.
-*/
+ * The Gin players that ship, by file name.
+ */
 export function listStrategies() {
-  return readdirSync(DIR).filter((file) => file.endsWith('.json')).map((file) => file.replace(/\.json$/, ''));
+  return Object.keys(loadGameFiles(GAME_DIR).players);
 }
 
 /**
- * Loads and validates one strategy file (D150): a read step, a move
- * step, and the confidence the file is willing to act on.
+ * One Gin player as a strategy (D150): a read step, a move step, and the
+ * confidence the file is willing to act on.
  * @param {string} name
  */
 export function loadStrategy(name) {
-  let raw;
-  try {
-    raw = readFileSync(path.join(DIR, `${name}.json`), 'utf8');
-  } catch {
-    throw new Error(`unknown gin strategy "${name}" - choose one of: ${listStrategies().join(', ')}`);
-  }
-  const strategy = JSON.parse(raw);
-  rejectLiterals([...everyInstruction(strategy)].map(([id, text]) => [`${name}.${id}`, text]));
+  const files = loadGameFiles(GAME_DIR);
+  const player = files.players[name];
+  if (!player) throw new Error(`unknown gin strategy "${name}" - choose one of: ${Object.keys(files.players).join(', ')}`);
+  const asked = questionsFor(files, player);
   return {
     name,
-    description: strategy.description ?? '',
-    confidence_floor: strategy.confidence_floor ?? 0,
-    read: strategy.read ?? {},
-    move: strategy.move ?? { instructions: '', criteria: {} },
+    description: player.description,
+    confidence_floor: player.floor,
+    read: { opponent_is_close: asked.opponent_is_close, opponent_wants: asked.opponent_wants },
+    move: asked.move,
   };
-}
-
-/** Every piece of prose the model will read, with a label for the
- *  error message. Criteria count: an option's description shapes the
- *  answer as much as the question does. */
-function* everyInstruction(strategy) {
-  const reads = Object.entries(strategy.read ?? {});
-  for (const [id, question] of reads) {
-    yield [`read.${id}`, question.instructions ?? ''];
-    const criteria = Object.entries(question.criteria ?? {});
-    for (const [key, text] of criteria) {
-      if (typeof text === 'string') yield [`read.${id}.criteria.${key}`, text];
-    }
-  }
-  yield ['move', strategy.move?.instructions ?? ''];
-  const moveCriteria = Object.entries(strategy.move?.criteria ?? {});
-  for (const [key, text] of moveCriteria) {
-    yield [`move.criteria.${key}`, text];
-  }
 }

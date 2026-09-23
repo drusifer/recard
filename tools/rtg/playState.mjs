@@ -16,6 +16,10 @@ import { parseManaCost } from './cardSchema.mjs';
 const TAPPED = 'landscape';
 
 const describe = (card) => ({
+  // The id is what an action names; the name is what a question reads.
+  // Dropping the id made every RtG move target a card by NAME, which the
+  // table does not know (found by US-129's combat test).
+  id: card.id,
   card: card.name ?? card.id,
   type: card.type ?? null,
   cost: card.cost ?? '',

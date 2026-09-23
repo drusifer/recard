@@ -2157,3 +2157,48 @@ against the story's sketch.
       Done as a REPEATABLE test, `bobp make test-jev-runner`
       (tests/jevRunner.browser.mjs): real CLI, real table. Gin covers one
       turn through the runner; a full hand stays `test-gin`'s (GinBot)
+
+---
+
+# Sprint: XState players (US-129) — 2026-09-23 — SHIPPED
+
+Story: `docs/USER_STORIES.md` US-129 (Gate 1: C1-C3; Gate 2: G1-G2).
+Architecture: D154. Standing rules: TDD, no shims (a replaced seat is
+deleted, not kept beside the machine), tests of removed internals are
+deleted rather than ported, every phase leaves `make check` green.
+
+## Phase 1 — Load and validate a turn file (C1, G1, G2)
+- [x] T1.1 add `xstate`; `tools/jev/machine.mjs` `loadTurn(file, library)`:
+      YAML -> XState config; every target, guard, action, actor name
+      checked, with errors naming file, path, bad name and nearest name
+- [x] T1.2 compile: `with:` becomes actor `input`; invoking states are
+      auto-tagged `busy` (G2); `safe` states get the leave transition,
+      and no reachable `safe` state is a load error (G1)
+
+## Phase 2 — The generic seat and library (D154)
+- [x] T2.1 `MachineSeat`: nextMove (TABLE, settle on !busy, final ->
+      done, `move` tag -> move) and step (STEP -> record); tested on a
+      toy turn file, no game involved
+- [x] T2.2 `tools/jev/library.mjs`: judge, ask_table, decide, act;
+      verdict, quiet_table, asked_to_leave, counted, table_changed;
+      remember, count, say, record - each with a `doc`
+
+## Phase 3 — RtG is files (AC1-AC5, AC7)
+- [x] T3.1 `games/rtg/{rules,questions,turn}.yaml` + `players/rules.yaml`
+      from game.json; `tools/rtg/library.mjs` (state, options, actions)
+- [x] T3.2 RtgSeat and its bookkeeping deleted; the RtG adapter sits a
+      MachineSeat. The turn bug test: untap -> draw -> main -> combat
+      -> end, and the end is SAID and hands the turn back
+- [x] T3.3 AC7: a second RtG player that is only a file
+
+## Phase 4 — Gin is files (AC1-AC3, AC6, C3)
+- [x] T4.1 `games/gin/{turn,questions}.yaml` + players from the JSON
+      strategies (content unchanged, format YAML); Gin library
+- [x] T4.2 GinBot's turn logic replaced by the machine; rule-lists and
+      MCP `gin_turn` still play (D148)
+
+## Phase 5 — Discoverable, and proven live (C2, AC3, AC6)
+- [x] T5.1 `make jev-library` + generated `docs/JEV_LIBRARY.md` with a
+      staleness test; players listed from files; STRATEGY= help text
+- [x] T5.2 test-gin, test-harness-mcp, test-jev-runner green; the second
+      RtG player appears in jev-ready

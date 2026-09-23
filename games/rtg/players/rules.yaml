@@ -1,0 +1,3 @@
+# The RtG player that plays exactly as the game file says (US-127/D151).
+description: plays by the rules written in its game file
+escalation: ask_table # an unconvinced rule check, or whose turn it is, is asked at the table

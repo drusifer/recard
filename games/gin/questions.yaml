@@ -1,0 +1,59 @@
+# What Jev is asked in Gin Rummy (US-125/D150, as files by US-129/D154):
+# a READ of the opponent, then the MOVE - a Choice over the legal moves,
+# whose criteria are keyed by kind (take_upcard, draw_stock, discard,
+# knock, gin). A player file may reword any of it.
+
+opponent_is_close:
+  type: score
+  instructions: From `opponent.discarded` (oldest first),
+    `opponent.took_from_discard` and `stock.drawn_so_far`, how close is the
+    opponent to being able to knock?
+  criteria:
+    - "Far from knocking: still throwing high cards, with no melds evident."
+    - Building melds, but likely still holding a lot of deadwood.
+    - Could plausibly knock within the next two or three turns.
+    - Able to knock now or on the next turn.
+    - One card away from gin.
+opponent_wants:
+  type: choice
+  instructions: Which slot of `candidates` is the opponent most likely to
+    meld, judged from `opponent.discarded` and `opponent.took_from_discard`?
+    Answer with the slot number.
+  criteria:
+    "0": The card in `candidates[0]`, at the cost `candidates[0].deadwood_after`
+      leaves me.
+    "1": The card in `candidates[1]`, at the cost `candidates[1].deadwood_after`
+      leaves me.
+    "2": The card in `candidates[2]`, at the cost `candidates[2].deadwood_after`
+      leaves me.
+    "3": The card in `candidates[3]`, at the cost `candidates[3].deadwood_after`
+      leaves me.
+    "4": The card in `candidates[4]`, at the cost `candidates[4].deadwood_after`
+      leaves me.
+    "5": The card in `candidates[5]`, at the cost `candidates[5].deadwood_after`
+      leaves me.
+    "6": The card in `candidates[6]`, at the cost `candidates[6].deadwood_after`
+      leaves me.
+    "7": The card in `candidates[7]`, at the cost `candidates[7].deadwood_after`
+      leaves me.
+    "8": The card in `candidates[8]`, at the cost `candidates[8].deadwood_after`
+      leaves me.
+    "9": The card in `candidates[9]`, at the cost `candidates[9].deadwood_after`
+      leaves me.
+    "10": The card in `candidates[10]`, at the cost
+      `candidates[10].deadwood_after` leaves me.
+move:
+  type: choice
+  instructions: It is my turn. Which move should I make? Weigh `me.deadwood`
+    and what each option costs me against what `read` says the opponent is
+    doing.
+  criteria:
+    take_upcard: "Take `upcard` into my hand: worth it when it joins one of
+      `me.melds` or clearly cuts `me.deadwood`."
+    draw_stock: "Draw the unknown top of `stock`: the ordinary move when
+      `upcard` does not help."
+    discard: Throw this card and play on - the balanced choice when
+      `read.opponent_is_close` leaves me room to improve.
+    knock: End the hand now and take the points, which is right once I can and
+      `read.opponent_is_close` says waiting is a gamble.
+    gin: "Go gin: every card melded, nothing left over."
