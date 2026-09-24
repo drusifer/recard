@@ -2,9 +2,25 @@
 // constraint may cite one by path but never derives one.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildRtgState, manaAvailable, canPay } from '../tools/rtg/playState.mjs';
+import { buildRtgState, manaAvailable, canPay, describe } from '../tools/rtg/playState.mjs';
 
-const land = (id, colors, isTapped = false) => ({ id, name: id, type: 'Land', cost: '', cmc: 0, colors, ...(isTapped && { orientation: 'landscape' }) });
+// A land's real shape (D80: the full printed card travels on it): `cost`
+// is always "" and `colors` (its COLOR IDENTITY, derived from `cost`) is
+// therefore always [], exactly like every land in the shipped catalog -
+// what it produces lives in `text` ("{T}: Add {W}."), never in `colors`.
+// `produces` defaults to matching `text`'s own symbols, one color per
+// entry ("{T}: Add {W} or {U}." for a dual), the same shape
+// `landColorSources` (deckSchema.mjs) parses.
+const manaText = (produces) => {
+  if (produces.length === 0) return '';
+  const symbols = produces.map((color) => `{${color}}`).join(' or ');
+  return '{T}: Add ' + symbols + '.';
+};
+const land = (id, produces = [], isTapped = false) => ({
+  id, name: id, type: 'Land', cost: '', cmc: 0, colors: [],
+  text: manaText(produces),
+  ...(isTapped && { orientation: 'landscape' }),
+});
 const creature = (id, cost, cmc, colors, extra = {}) => ({ id, name: id, type: 'Creature', cost, cmc, colors, power: 2, toughness: 2, ...extra });
 
 const view = {
@@ -39,8 +55,27 @@ test('tapped is read from the card\'s orientation - Recard taps by rotating', ()
 });
 
 test('mana available is counted in code: one per untapped land, by colour', () => {
-  assert.deepEqual(manaAvailable([land('a', ['G']), land('b', ['G'], true), land('c', ['U'])].map((c) => ({ ...c, tapped: c.orientation === 'landscape' }))),
+  assert.deepEqual(manaAvailable([land('a', ['G']), land('b', ['G'], true), land('c', ['U'])].map((c) => describe(c))),
     { total: 2, by_color: { G: 1, U: 1 } });
+});
+
+test('BUG (live, D156): a basic land has colors [] - its color IDENTITY - but still taps for its printed colour', () => {
+  // Exactly the shape of `rtg-land-plains` in the real catalog: cost ""
+  // (so colors derives to []) and text "{T}: Add {W}." - manaAvailable
+  // must read the colour off `text`, never off `colors`.
+  const plains = { id: 'p1', name: 'Sunlit Expanse', type: 'Land', cost: '', cmc: 0, colors: [], text: '{T}: Add {W}.' };
+  assert.deepEqual(manaAvailable([describe(plains)]), { total: 1, by_color: { W: 1 } });
+});
+
+test('a dual land taps for either of its colours', () => {
+  const dual = land('gate', ['W', 'U']);
+  assert.deepEqual(manaAvailable([describe(dual)]).by_color, { W: 1, U: 1 });
+});
+
+test('a land with a drawback clause after the Add sentence still parses cleanly', () => {
+  const wellspring = { id: 'w1', name: 'Clearwater Wellspring', type: 'Land', cost: '', cmc: 0, colors: [],
+    text: '{T}: Add {W} or {U}. Clearwater Wellspring deals 1 damage to you.' };
+  assert.deepEqual(manaAvailable([describe(wellspring)]).by_color, { W: 1, U: 1 });
 });
 
 test('whether a cost can be paid is computed, never asked', () => {

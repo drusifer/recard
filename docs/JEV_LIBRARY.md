@@ -24,7 +24,7 @@ the names in backticks in each line below are the ones it reads.
 
 ### guards
 
-- `verdict` - the last judgment or table answer was `is` (yes | no | unsure)
+- `verdict` - the last judgment or table answer was `is` (yes | no | unsure) - or, with `of`, that answer to question `of` asked alongside it
 - `table_changed` - the board or the talk moved since the last look (the bot's own lines excluded)
 - `quiet_table` - the board changed and nobody has spoken for `ms` since
 - `counted` - context `field` has reached `at_least` (a number, or another context field)

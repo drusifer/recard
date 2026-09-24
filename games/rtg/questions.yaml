@@ -61,3 +61,16 @@ their_turn_is_over:
     `attack_phase_complete` - has the counter-clockwise player's turn ended?
     Judge only from the board and what was said - never guess about
     something already visible.
+
+# ---- the first turn: nobody has taken a turn yet (Smith live finding F2) ----
+i_go_first:
+  type: noul
+  instructions: Nobody has taken a turn in this game yet. Given
+    `rules.first_player` and `table_talk` in order - including any dice
+    rolls, and anything said to me by my name `me.name` - has the table
+    settled that I take the first turn?
+game_has_begun:
+  type: noul
+  instructions: Given `rules.turn_sequence`, the board in `me` and
+    `opponent` and `table_talk` in order, has another player already
+    started the game by taking the first turn?

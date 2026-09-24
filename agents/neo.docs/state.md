@@ -1,5 +1,35 @@
 # Agent State
 
+## Current Task (2026-09-24) - D156 colorless-lands fix: DONE (uncommitted)
+
+Fixed Smith's live F1: manaAvailable (tools/rtg/playState.mjs) summed by
+land.colors (colour IDENTITY, derived from cost - always [] for a land,
+since cost is always "") instead of landColorSources(card) (rules-text
+parse, deckSchema.mjs, already existed for lint:decks). describe() now
+attaches produces to a land alongside its unchanged colors. Verified live
+against the real catalog (node -e against src/decks/rtg/catalog.js): all
+25 lands produce >=1 colour; Sunlit Expanse (the exact card from the live
+session) -> W. tests/rtgPlayState.test.js: +4 tests (mana-by-colours
+rewritten to use describe(), a BUG reproduction test, a dual-land test, a
+drawback-clause test), mutation-proved (revert -> 5 fail). Caught my own
+mistake mid-fix: I'd cited a fabricated "US-130" in comments/tests before
+confirming it existed - replaced with D156 (no story was opened for this,
+a direct *fix request outside the sprint loop). make check 1120 green.
+
+## Next Steps
+Not re-tested LIVE with real bots (the MCP bridge from the earlier
+session was stopped). Smith's live report follow-up section updated.
+Nothing committed yet - awaiting the user.
+
+## Current Task (2026-09-23) - D155 dice + RtG first turn: DONE (uncommitted)
+
+src/dice.js (parseRoll/rollDice/rollTalk), tableTalk.js hostLine (host rolls, strips
+claimed dice data), main.js publishTalk uses it; TableTalk placeholder+title hint.
+RtG: questions i_go_first/game_has_begun, rules.first_player, me.name in state,
+turn.yaml pregame/judging_first/asking_first, verdict guard `of`. Fixed a racy
+harnessMcp talk test (await stamp). make check 1117; harness-mcp 5/6 clean
+(1 unexplained game_start timeout - BACKLOG); jev-runner 3/3.
+
 ## Current Task (2026-09-23) - US-129 P4 DONE
 
 games/gin/{questions,turn}.yaml + players/{jev-balanced,jev-cagey}.yaml (JSON

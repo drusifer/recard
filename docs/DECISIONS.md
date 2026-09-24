@@ -70,6 +70,79 @@ D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rul
 
 ---
 
+### D156. A land's mana colour comes from its rules text, never its colour identity
+
+Smith's live session (2026-09-23, finding F1): two Jev bots played untap,
+draw, land, pass every single turn with no spell ever castable, for the
+whole session. `tools/rtg/playState.mjs`'s `manaAvailable` counted a
+land's mana by `colors` - the card's COLOUR IDENTITY, derived from its
+mana COST (`cardSchema.mjs` `parseManaCost`). A land's cost is always
+`""`, so its colour identity is always `[]` (Magic rules-as-written: a
+land has no colour identity of its own) - `{W}` never paid, `cast` was
+never offered, and combat followed from it never being reachable either.
+
+**The fix reuses code that already exists.** `tools/rtg/deckSchema.mjs`'s
+`landColorSources` already parses a land's own rules text ("{T}: Add
+{W}.", "... Add {W} or {U}.") to measure deck balance for `lint:decks` -
+the SAME fact `manaAvailable` needed and was computing from the wrong
+field instead. `describe()` (`playState.mjs`) now attaches a land's
+`produces` (from `landColorSources`) alongside its unchanged `colors`
+(colour identity, still correct for a spell's cost); `manaAvailable`
+sums `produces`, not `colors`.
+
+**Verified against the real catalog, not only a fixture**: all 25
+shipped lands parse to at least one colour; the exact card that stalled
+the live session (Sunlit Expanse, a basic Plains, `{T}: Add {W}.`) now
+produces `W`. Unit-tested and mutation-proved in
+`tests/rtgPlayState.test.js` (reverting the fix fails exactly the 5
+mana-counting tests).
+
+**Rejected:** a second, RtG-specific mana parser (one source of truth
+already existed in `deckSchema.mjs` - the sprint that wrote it noted
+"duals work through the same path as basics without a second mechanism",
+and this bug was exactly that second mechanism appearing anyway,
+unnoticed, in a sibling module); hard-coding basic-land colours by name
+(`Plains` -> W) rather than parsing text (breaks the moment a reprint or
+a new land words its ability differently, and duals/Wellspring lands
+would still need parsing).
+
+---
+
+### D155. Dice live in table talk and the host rolls them; RtG's first turn is its own question
+
+Direct user request (2026-09-23), after Smith's live session found that
+an RtG bot could not start a game (F2): "their turn is over?" has no
+answer when nobody has had a turn.
+
+**Dice.** `/roll [N]d[S] [xR]` in table talk: N dice of S sides, rolled
+R times, defaulting to one six-sided die rolled once (`/roll`,
+`/roll 2d6`, `/roll d20`, `/roll 2d6 x3`; limits 1-20 dice, 2-1000 sides,
+1-10 rolls). **The host rolls**, in `hostLine`, as it stamps the line
+(D138). The result is a talk line anyone reads ("rolled 2d6 x3: ...") and
+carries the numbers as `data` (`kind: 'dice'`). Dice data a sender
+includes is dropped, so a roll can only be produced by the table, never
+claimed. Anything that can talk can roll: a person, the MCP harness, a
+Jev bot. The talk box's placeholder and tooltip say `/roll` exists.
+
+**First turn (RtG).** `games/rtg/turn.yaml` gains a `pregame` phase
+before `watching`. Until the game has begun, the bot judges
+`i_go_first` (citing the newly written `rules.first_player`: decide by
+dice or agreement) and `game_has_begun`, over the board and table talk
+(dice rolls included). The bot's own seat name is now in its state
+(`me.name`), so a line meant for it can be told apart. Yes goes to
+`untap`; someone else began goes to `watching`; unsure asks the table
+"Do I go first?"; otherwise it stays in `pregame`, and never asks "has
+THEIR turn ended?" before anyone has had one. The generic `verdict` guard
+gained `of`, to read a second question asked alongside.
+
+**Rejected:** rolling on the sender's machine (a player could claim any
+result); a dice button with its own widget (talk is where a table
+already speaks, and every client, MCP and bot gets it for free);
+hard-coding "the first player to join goes first" (the table decides,
+and RtG can have several players).
+
+---
+
 ### D154. A Jev player is data: a statechart, a questions file, a player file - run by one interpreter
 
 US-129, Tier 1, Smith Gate 1 conditions C1-C3. Supersedes D153's

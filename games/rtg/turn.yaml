@@ -22,7 +22,34 @@ states:
   joining:
     entry:
       - { type: say, params: { text: I play by the rules in my game file. Tell me when it is my turn. } }
-    always: watching
+    always: pregame
+
+  # ---- before anyone has taken a turn (Smith live finding F2) ----
+  # "Has THEIR turn ended?" has no answer here: nobody has had one. So
+  # the question is "have we settled that I go first?" - from talk, dice
+  # rolls (/roll) included - until the game has begun.
+  pregame:
+    tags: [safe]
+    on:
+      TABLE:
+        - { target: judging_first, guard: table_changed }
+        - { target: asking_first, guard: { type: quiet_table, params: { ms: 8000 } } }
+  judging_first:
+    invoke:
+      src: judge
+      with: { question: i_go_first, also: [game_has_begun], phase: pregame }
+      onDone:
+        - { target: untap, guard: { type: verdict, params: { is: 'yes' } } }
+        - { target: watching, guard: { type: verdict, params: { of: game_has_begun, is: 'yes' } } }
+        - { target: asking_first, guard: { type: verdict, params: { is: unsure } } }
+        - { target: pregame }
+  asking_first:
+    invoke:
+      src: ask_table
+      with: { say: Do I go first? }
+      onDone:
+        - { target: untap, guard: { type: verdict, params: { is: 'yes' } } }
+        - { target: pregame }
 
   # ---- not my turn, or I cannot tell yet ----
   watching:

@@ -6,6 +6,8 @@
  * relays it to everyone, so every peer's log has the same order.
  */
 
+import { rollTalk } from './dice.js';
+
 export const MAX_TALK_TEXT = 500;
 
 /**
@@ -43,4 +45,22 @@ export function createTalkLog({ limit = 100, now = Date.now } = {}) {
     },
     entries: () => [...entries],
   };
+}
+
+/**
+ * What the host actually posts for a line it is stamping. A "/roll"
+ * line becomes the host's own roll (src/dice.js), and dice data a sender
+ * tries to send is dropped - a roll is produced by the table, never
+ * claimed by a player.
+ * @param {{ type: 'talk', text: string, data?: unknown }} line
+ * @param {() => number} [random]
+ */
+export function hostLine(line, random = Math.random) {
+  const rolled = rollTalk(line.text, random, MAX_TALK_TEXT);
+  if (rolled) return { type: 'talk', text: rolled.text, data: rolled.data };
+  if (line.data?.kind === 'dice' || line.data?.kind === 'dice-error') {
+    const { data: _claimed, ...honest } = line;
+    return honest;
+  }
+  return line;
 }

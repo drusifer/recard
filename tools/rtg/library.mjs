@@ -31,13 +31,15 @@ function cardCost(state, name) {
 
 /**
  * The game hooks the generic library calls (`tools/jev/library.mjs`).
- * @param {{ rules: object, myId: string, deck?: string }} options
+ * @param {{ rules: object, myId: string, name?: string, deck?: string }} options
+ *   `name` is the seat name, so a question can tell a line meant for me.
  */
-export function rtgHooks({ rules, myId, deck }) {
+export function rtgHooks({ rules, myId, name, deck }) {
   return {
     project(view, context, phase = 'unknown') {
       const turn = { is_mine: MY_PHASES.has(phase), phase, land_played: context.land_played === true, attackers: context.attackers ?? [] };
-      return { ...buildRtgState(view, myId, turn), rules };
+      const state = buildRtgState(view, myId, turn);
+      return { ...state, me: { ...state.me, name }, rules };
     },
     options: (state, _phase, context) => legalOptions(state, { arrivedThisTurn: context.arrivedThisTurn }),
     propose: (option, state, context) => ({

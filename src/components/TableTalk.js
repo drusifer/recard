@@ -22,9 +22,11 @@ export class TableTalkElement extends HTMLElement {
     input.type = 'text';
     input.className = 'talk-input';
     input.maxLength = 500;
-    // Smith (D138 consult): say where the line goes.
-    input.placeholder = 'Say to the table…';
-    input.setAttribute('aria-label', 'Say to the table');
+    // Smith (D138 consult): say where the line goes - and that dice live
+    // here too, so nobody has to already know `/roll` exists.
+    input.placeholder = 'Say, or /roll 2d6…';
+    input.title = 'Say to the table, or roll dice: /roll [dice]d[sides] [x rolls] - e.g. /roll, /roll d20, /roll 2d6 x3. The host rolls.';
+    input.setAttribute('aria-label', 'Say to the table, or /roll dice');
     const send = document.createElement('button');
     send.type = 'submit';
     send.textContent = 'Say';

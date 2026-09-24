@@ -268,3 +268,15 @@ superseded:
   player files. Heuristic #4. STRATEGY= stays (renaming breaks every
   documented command); only the message wording is in question.
 
+- **RtG bots assume one opponent; RtG can have several, and allies**
+  (user, 2026-09-23). `buildRtgState` exposes a single `opponent` = the
+  first player who isn't me, and does not skip spectators. The rules
+  reference also says "Two players". Seated players (roles are data,
+  spectators out) should all reach the questions; who is an ally or an
+  opponent, who is attacking me and whose turn follows mine are Jev
+  judgments over the board and table talk.
+- **`test-harness-mcp` failed once in 6 runs** (2026-09-23): `game_start`
+  gave up after ~19s with no table, and the tests that share its table
+  cascaded. Cause unproven - the test's `call` helper drops the tool's
+  error text, so nothing says why. First step: surface `isError` text in
+  the helper; then find out whether it is the public PeerJS broker (D2).

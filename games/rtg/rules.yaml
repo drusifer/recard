@@ -44,3 +44,7 @@ rules:
     - a player may hold mana untapped for instants, and may choose not to
     attack at all. Work out what happened from the board as it stands now
     and what was said, in order.
+  first_player: Before the first turn the table decides who goes first. Usually each
+    player rolls a die in table talk (/roll d20) and the highest roll goes
+    first, rolling again on a tie; the table may also simply agree. After
+    that first turn, turns pass clockwise as rules.seating says.

@@ -51,7 +51,7 @@ import './components/DeckStack.js';
 import './components/TableTalk.js';
 import './components/AddBot.js';
 import './components/ThoughtBubble.js';
-import { createTalkLog, makeTalkMessage } from './tableTalk.js';
+import { createTalkLog, makeTalkMessage, hostLine } from './tableTalk.js';
 import { botOffers, spawnResult, spawnRequestLine } from './botOffers.js';
 import { decisionsBySpeaker } from './botThoughts.js';
 import { colorForPlayer } from './playerColors.js';
@@ -1229,7 +1229,8 @@ globalThis.__recardHarness = {
 function publishTalk(speakerKey, message) {
   let line;
   try {
-    line = makeTalkMessage(message.text, message.data);
+    // A "/roll" is rolled HERE, by the host, as the line is stamped.
+    line = hostLine(makeTalkMessage(message.text, message.data));
   } catch (error) {
     console.warn('Rejected table talk from', speakerKey, error);
     return;

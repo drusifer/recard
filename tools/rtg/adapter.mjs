@@ -39,7 +39,7 @@ export async function rtgSeat({ peer, judge, name, player, deck, steps, clock, p
   const myId = await peer.myId();
   const services = {
     peer, judge, name, player: chosen, questions: questionsFor(files, chosen),
-    game: rtgHooks({ rules: files.rules, myId, deck }), answerMs, answerPollMs,
+    game: rtgHooks({ rules: files.rules, myId, name, deck }), answerMs, answerPollMs,
   };
   const input = steps === undefined ? {} : { steps };
   return new MachineSeat({ machine: machineFor(files, services), services, input, clock, pollMs });

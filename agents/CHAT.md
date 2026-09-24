@@ -1535,3 +1535,80 @@ gitleaks git --no-banner --redact --pre-commit .
 ---
 [<small>2026-09-23 19:46:42</small>] [**Cypher**]->[**all**] *pm launch*:
  *pm launch US-129 XState players. A Jev game is now files: games/<game>/{turn,questions,rules}.yaml + players/*.yaml, run by one XState interpreter. A new player is a new file. Two live RtG bugs fixed (turn never ended; moves named cards by name). make check 1100 green. Sprint complete; not committed, awaiting the user.
+
+---
+[<small>2026-09-23 19:51:15</small>] [**User**]->[**all**] *request*:
+ /smith set up an rtg game, add two jev players, join as a spectator, observe over webrtc via MCP, help via table talk, a few rounds, report findings
+
+---
+[<small>2026-09-23 19:51:15</small>] [**Smith**]->[**all**] *user test*:
+ Smith online, *user test live RtG: two Jev bots (rules + aggressive) at a harness-hosted table, me spectating over MCP/WebRTC. First live test of US-129's turn files.
+
+---
+[<small>2026-09-23 19:52:23</small>] [**Smith**]->[**all**] *user blocked*:
+ Smith BLOCKED on setup, not on the product: MCP game_start cannot host as a spectator (hostTable supports it, game_start never passed it). Neo added game_start spectate:boolean (one pass-through). The running MCP server needs a /mcp reconnect to load it.
+
+---
+[<small>2026-09-23 19:55:53</small>] [**Smith**]->[**all**] *user blocked*:
+ Smith: still blocked. game_start accepted spectate:true but hosted as role 'player', so the running MCP server predates the change (zod dropped the unknown field silently). Also noted: an unknown tool parameter is ignored rather than refused (#9). Awaiting the user's /mcp reconnect of recard-harness.
+
+---
+[<small>2026-09-23 19:57:03</small>] [**Smith**]->[**all**] *user note*:
+ Noted from the user: RtG can have MORE than one opponent, and allies. buildRtgState's single 'opponent' (the first non-me player, spectators included) is wrong beyond 1v1. Filed in BACKLOG; saved to memory. The live session will show how it behaves 1v1 with a spectating host.
+
+---
+[<small>2026-09-23 20:08:19</small>] [**Smith**]->[**all**] *user finding*:
+ Smith LIVE finding: 'rules, it is your turn' (host, table talk) does NOT start the RtG bot's turn. 5+ min idle, both processes alive, no step taken, no question asked. The turn file enters my turn only via Jev's their_turn_is_over ('has the counter-clockwise player's turn ended?'), which fits no game start, and a line addressed to the bot by name is not a signal. Also: judgments are invisible (nothing logged). Nudging over talk now.
+
+---
+[<small>2026-09-23 20:10:54</small>] [**Smith**]->[**all**] *user finding*:
+ Smith CONFIRMED with real Jev on this exact state: their_turn_is_over = 0.21 ('no') even after 'it is your turn' twice. The question asks whether the OTHER player's turn ended, and at game start nobody has had one; a confident no is never escalated, only 'unsure' is. Also confirmed live: the bot's 'opponent' is the spectating host (hand_size 0, life null). Unsticking via the quiet-table path (board change + silence).
+
+---
+[<small>2026-09-23 20:16:17</small>] [**Smith**]->[**all**] *user finding*:
+ Smith findings: (a) a spectating host could FLIP the shared deck's top card face UP but is refused flipping it back ('not authorized to conceal'), so the top of the library is now revealed by me: disclosed. (b) Two bots at one table: the first bot's 'Is it my turn now?' counts as talk and resets the other's quiet timer; rules never got to ask. Retrying with a reversible token move.
+
+---
+[<small>2026-09-23 20:23:14</small>] [**Smith**]->[**Trin**] *user bug*:
+ *user bug CMD: live RtG, 2 bots | EXPECTED: casting and combat | ACTUAL: no colored spell is ever offered; basic lands have colors [] and mana counts by colors, so {W} never pays | UX ISSUE: the game cannot progress past lands. Plus F2 (the first turn never starts from talk), F3 (unaddressed talk moves both bots), F4 (opponent = spectator). Full: agents/smith.docs/RTG_LIVE_Summary_2026-09-23T20-30.md. @Trin triage.
+
+---
+[<small>2026-09-23 20:47:30</small>] [**User**]->[**all**] *request*:
+ add first-turn logic to the is-it-my-turn rules; add a 'roll' dice feature to table talk (sides, dice, rolls as parameters with sane defaults)
+
+---
+[<small>2026-09-23 20:48:18</small>] [**Neo**]->[**all**] *swe impl*:
+ Neo on it: (1) dice: '/roll [N]d[S] [xR]' in table talk, defaults 1d6 x1, rolled BY THE HOST when it stamps the line, so no sender can fake a result; works from the UI, MCP and bots alike. (2) RtG first turn: a 'pregame' phase in turn.yaml judging 'i_go_first' (and 'game_has_begun') from talk incl. dice, asking 'Do I go first?' when unsure. TDD.
+
+---
+[<small>2026-09-23 20:57:37</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
+No duplicate decision numbers, and the modern section is newest-first. Clean.
+
+---
+[<small>2026-09-23 20:57:37</small>] [**Neo**]->[**all**] *swe decision*:
+ D155: dice in table talk (/roll [N]d[S] [xR], defaults 1d6 x1), rolled BY THE HOST so nobody can claim a result; any sender works (UI, MCP, bots). RtG first turn: a 'pregame' phase judges i_go_first (the new rules.first_player: dice or agreement) and game_has_begun, and asks 'Do I go first?' when unsure. Fixes live F2. Rejected: sender-side rolls (claimable). make check 1117 green; MCP suite has a WebRTC dice test; runner 3/3.
+
+---
+[<small>2026-09-24 00:32:00</small>] [**Neo**]->[**all**] *swe fix*:
+ *fix colorless basic lands: lands carry colors [] (correct - a land IS colorless) but manaAvailable counts mana BY colors, so {W} never pays. Tracing what the app already uses for a land's mana (LandsPile's per-colour badge) to reuse it.
+
+---
+[<small>2026-09-24 01:12:41</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+gitleaks git --no-banner --redact --pre-commit .
+1:12AM INF 1 commits scanned.
+1:12AM INF scanned ~28813 bytes (28.81 KB) in 252ms
+1:12AM INF no leaks found
+
+---
+[<small>2026-09-24 01:12:52</small>] [**Neo**]->[**all**] *swe decision*:
+ D156: fixed the F1 blocker - manaAvailable counted mana by a land's colour IDENTITY (always [] - a land has no cost), not what it actually PRODUCES (parsed from its rules text via deckSchema.mjs's existing landColorSources, built for lint:decks). Verified against the real catalog: all 25 lands now produce mana; Sunlit Expanse (the card that stalled the live session) makes W. Mutation-proved, make check 1120 green. Full text: DECISIONS.md D156.
+
+---
+[<small>2026-09-24 01:14:37</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+gitleaks git --no-banner --redact --pre-commit .
+1:14AM INF 1 commits scanned.
+1:14AM INF scanned ~30846 bytes (30.85 KB) in 256ms
+1:14AM INF no leaks found

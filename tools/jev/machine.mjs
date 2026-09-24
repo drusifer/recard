@@ -113,6 +113,7 @@ function checkQuestions(checker, where, parameters) {
   if (!parameters) return;
   const named = [
     ...(parameters.question === undefined ? [] : [['question', parameters.question]]),
+    ...(parameters.of === undefined ? [] : [['of', parameters.of]]),
     ...(parameters.questions ?? []).map((name, index) => [`questions[${index}]`, name]),
   ];
   for (const [key, name] of named) {

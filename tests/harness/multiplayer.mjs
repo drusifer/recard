@@ -251,8 +251,8 @@ export async function dealTable(host, guests, { players, cardsPerPlayer }) {
  * joined by the real table code, then started with a real Deal of
  * `cardsPerPlayer`. Resolves `{ host, guests, close() }`.
  */
-export async function createTable({ browser, baseUrl, players, preset, cardsPerPlayer }) {
-  const hosted = await hostTable({ browser, baseUrl, preset });
+export async function createTable({ browser, baseUrl, players, preset, cardsPerPlayer, spectate }) {
+  const hosted = await hostTable({ browser, baseUrl, preset, spectate });
   const closers = [hosted.close];
   const guests = [];
   for (let index = 1; index < players; index++) {

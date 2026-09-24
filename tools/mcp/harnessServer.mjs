@@ -98,11 +98,12 @@ server.registerTool('game_start', {
     players: z.number().int().min(1).max(8).describe('total players, host included'),
     preset: z.string().optional().describe('preset label, e.g. "War" (default) or "Recard the Gathering"'),
     cardsPerPlayer: z.number().int().min(0).default(5),
+    spectate: z.boolean().default(false).describe('the host watches without a seat (US-124) - e.g. to watch Jev bots play each other'),
   },
-}, tool(async ({ players, preset, cardsPerPlayer }) => {
+}, tool(async ({ players, preset, cardsPerPlayer, spectate }) => {
   await stopGame();
   await startBrowser();
-  game.table = await createTable({ browser: game.browser, baseUrl: game.staticServer.baseUrl, players, preset, cardsPerPlayer });
+  game.table = await createTable({ browser: game.browser, baseUrl: game.staticServer.baseUrl, players, preset, cardsPerPlayer, spectate });
   game.players.set('host', game.table.host);
   for (const [index, guest] of game.table.guests.entries()) game.players.set(`guest${index + 1}`, guest);
   return asJson({ players: game.players.keys().toArray(), code: await game.table.host.myId() });

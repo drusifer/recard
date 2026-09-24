@@ -1,5 +1,17 @@
 # Agent State
 
+## Current Task (2026-09-23) - LIVE RtG 2-bot session: DONE, report filed
+
+Report: agents/smith.docs/RTG_LIVE_Summary_2026-09-23T20-30.md. Blockers: F1 lands
+have colors [] so no spell castable; F2 first turn can't start from talk (Jev 0.21,
+'no' never escalated). High: F3 talk unaddressed -> both bots move; F4 opponent =
+spectator host. Tools: build/mcpBridge.mjs (MCP stdio bridge, :8231), build/talk.sh,
+build/act.sh (session-only, build/ is ignored). Harness game_start gained `spectate`
+(uncommitted).
+
+## Next Steps
+Trin triage F1-F4; re-run live after fixes (needs TYPESAFE_API_KEY).
+
 ## Current Task (2026-09-23) - US-129 *user test: APPROVED
 
 Author flow via CLI: new player file offered; turn typo refused pre-join w/

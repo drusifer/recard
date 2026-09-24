@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createTalkLog, makeTalkMessage, MAX_TALK_TEXT } from '../src/tableTalk.js';
+import { createTalkLog, makeTalkMessage, MAX_TALK_TEXT, hostLine } from '../src/tableTalk.js';
 
 test('makeTalkMessage: trims text, carries optional structured data, refuses an empty line', () => {
   assert.deepEqual(makeTalkMessage('  knock!  '), { type: 'talk', text: 'knock!' });
@@ -28,4 +28,23 @@ test('createTalkLog: a relayed entry keeps the host\'s seq and time, so every pe
   const log = createTalkLog({ now: () => 999 });
   log.add({ seq: 7, at: 50, from: 'p1', name: 'Ann', text: 'hi' });
   assert.deepEqual(log.entries(), [{ seq: 7, at: 50, from: 'p1', name: 'Ann', text: 'hi' }]);
+});
+
+// ---- dice: the HOST rolls, when it stamps the line ----
+
+
+test('a "/roll" line is replaced by the host\'s own roll', () => {
+  const line = hostLine({ type: 'talk', text: '/roll 2d6' }, () => 0.5);
+  assert.equal(line.text, 'rolled 2d6: 4 + 4 = 8');
+  assert.equal(line.data.kind, 'dice');
+});
+
+test('nobody can claim a roll: dice data sent with a line is dropped', () => {
+  const claimed = hostLine({ type: 'talk', text: 'I rolled a 20!', data: { kind: 'dice', results: [[20]] } }, () => 0.5);
+  assert.deepEqual(claimed, { type: 'talk', text: 'I rolled a 20!' });
+});
+
+test('an ordinary line passes through untouched', () => {
+  const line = { type: 'talk', text: 'your turn', data: { kind: 'bot-decision' } };
+  assert.equal(hostLine(line, () => 0.5), line);
 });

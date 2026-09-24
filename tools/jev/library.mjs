@@ -58,8 +58,11 @@ export function genericLibrary(services) {
   return {
     guards: {
       verdict: {
-        doc: 'the last judgment or table answer was `is` (yes | no | unsure)',
-        fn: ({ event }, parameters) => event.output?.verdict === parameters.is,
+        doc: 'the last judgment or table answer was `is` (yes | no | unsure) - or, with `of`, that answer to question `of` asked alongside it',
+        fn: ({ event }, parameters) => {
+          const reading = parameters.of === undefined ? event.output?.verdict : verdictOf(event.output?.checks?.[parameters.of] ?? 0);
+          return reading === parameters.is;
+        },
       },
       table_changed: {
         doc: 'the board or the talk moved since the last look (the bot\'s own lines excluded)',

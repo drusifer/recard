@@ -12,31 +12,52 @@
 // computes one.
 
 import { parseManaCost } from './cardSchema.mjs';
+import { landColorSources } from './deckSchema.mjs';
 
 const TAPPED = 'landscape';
 
-const describe = (card) => ({
-  // The id is what an action names; the name is what a question reads.
-  // Dropping the id made every RtG move target a card by NAME, which the
-  // table does not know (found by US-129's combat test).
-  id: card.id,
-  card: card.name ?? card.id,
-  type: card.type ?? null,
-  cost: card.cost ?? '',
-  cmc: card.cmc ?? parseManaCost(card.cost ?? '').cmc,
-  colors: card.colors ?? [],
-  ...(card.power !== undefined && { power: card.power, toughness: card.toughness }),
-  tapped: card.orientation === TAPPED,
-});
-
 const isLand = (card) => /land/i.test(card.type ?? '');
 
-/** Mana available right now: one per untapped land, by colour. Code's
- *  job, not a question's - "can I pay for this" is arithmetic. */
+/**
+ * @param {object} card
+ * @returns {object} the fixed schema a question refers to by path - `id`
+ *   for actions, `colors` (color IDENTITY, from `cost`; always [] for a
+ *   land, which has none) for what a spell costs or a question asks
+ *   about, and, for a land only, `produces` - the colours it actually
+ *   taps for, parsed from its own rules text (`deckSchema.mjs`'s
+ *   `landColorSources`, the same parser `lint:decks` measures a deck
+ *   by). A basic land's `colors: []` is correct Magic rules-as-written;
+ *   conflating it with `produces` was the live bug (D156) that made
+ *   every land count as producing NO mana of any colour.
+ */
+export function describe(card) {
+  return {
+    // The id is what an action names; the name is what a question reads.
+    // Dropping the id made every RtG move target a card by NAME, which
+    // the table does not know (found by US-129's combat test).
+    id: card.id,
+    card: card.name ?? card.id,
+    type: card.type ?? null,
+    cost: card.cost ?? '',
+    cmc: card.cmc ?? parseManaCost(card.cost ?? '').cmc,
+    colors: card.colors ?? [],
+    ...(isLand(card) && { produces: landColorSources(card) }),
+    ...(card.power !== undefined && { power: card.power, toughness: card.toughness }),
+    tapped: card.orientation === TAPPED,
+  };
+}
+
+/** Mana available right now: one per untapped land, by the colour(s) it
+ *  actually taps for (`produces`, not the land's own colour identity -
+ *  a basic land has none). Code's job, not a question's - "can I pay
+ *  for this" is arithmetic. */
 export function manaAvailable(lands) {
   const untapped = lands.filter((card) => !card.tapped);
   const byColor = {};
-  for (const land of untapped) for (const color of land.colors) byColor[color] = (byColor[color] ?? 0) + 1;
+  for (const land of untapped) {
+    const produced = land.produces ?? [];
+    for (const color of produced) byColor[color] = (byColor[color] ?? 0) + 1;
+  }
   return { total: untapped.length, by_color: byColor };
 }
 

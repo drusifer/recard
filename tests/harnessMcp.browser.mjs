@@ -148,9 +148,27 @@ test('game_join seats a new named player at a table by its code; table talk flow
   assert.equal(JSON.parse(seated.content[0].text), 'Bot (knock-early)');
 
   await call('player_say', { player: 'bot', text: 'hello', data: { hi: true } });
+  // player_say returns once a line is SENT: the guest's line still has
+  // to cross WebRTC to be stamped, while the host stamps its own at once.
+  // Wait for the stamp, or the order below is a race.
+  await call('player_talk', { player: 'host', waitFor: 1 });
   await call('player_say', { player: 'host', text: 'welcome' });
   const { data: heard } = await call('player_talk', { player: 'bot', waitFor: 2 });
   assert.deepEqual(heard.map(({ name, text }) => [name, text]), [['Bot (knock-early)', 'hello'], ['Host', 'welcome']]);
+});
+
+test('a guest\'s "/roll" crosses WebRTC and comes back ROLLED BY THE HOST, for everyone', async () => {
+  const { data: before } = await call('player_talk', { player: 'host' });
+  await call('player_say', { player: 'bot', text: '/roll 2d6 x3' });
+  const { data: heard } = await call('player_talk', { player: 'host', waitFor: before.length + 1 });
+  const roll = heard.at(-1);
+  assert.equal(roll.name, 'Bot (knock-early)', 'the roller is who asked');
+  assert.match(roll.text, /^rolled 2d6 x3: /);
+  assert.equal(roll.data.kind, 'dice');
+  assert.equal(roll.data.results.length, 3);
+  assert.ok(roll.data.results.flat().every((value) => value >= 1 && value <= 6));
+  const { data: botHeard } = await call('player_talk', { player: 'bot', waitFor: before.length + 1 });
+  assert.deepEqual(botHeard.at(-1).data, roll.data, 'the guest sees the same roll the host made');
 });
 
 test('gin_turn: one bot decision as a typed record - a bot dealt no cards just waits', async () => {
