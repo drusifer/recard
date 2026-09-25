@@ -1,0 +1,10 @@
+# How to stand up a table for Gin Rummy (D159): two Jev players, dealt ten
+# each. `bobp make jev-table GAME=gin` reads this.
+preset: Gin Rummy
+players: [jev-balanced, jev-cagey]
+deal: 10
+# Gin has a first mover (jev-player's --first): one bot goes first and the
+# other waits for its move, or both would draw from the stock at once.
+seat_args:
+  - { first: bot }
+  - { first: opponent }

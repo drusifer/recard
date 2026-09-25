@@ -70,6 +70,124 @@ D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rul
 
 ---
 
+### D159. `bobp make jev-table` - a hosted table with N Jev bots, for any game, as one command
+
+Direct user request ("add a make target so it's easy to repeat"), after
+the live session that produced D155-D158; then, on seeing it was written
+for RtG only, "I didn't want that to be game specific - can we
+generalize?" `tools/jevTable.mjs` hosts a table as a spectator, seats N
+Jev bots as the real `jevPlayer.mjs` CLI, sets the game up, and on
+Ctrl-C asks every bot to leave over table talk (D149) before closing the
+table - the SAME facilitator steps this whole live-testing effort did by
+hand, now one command.
+
+**What is particular to a game is data, not code.** Everything the
+first version hardcoded for RtG - the preset name, the 7-card hand, the
+20 starting life, the d20 roll for who goes first, `--game rtg`, the
+default players, the step limit - moved into `games/<game>/table.yaml`,
+beside the game's turn, questions and players (D154). `jev/tableFile.mjs`
+loads and checks it (a mistake names the file, the path in it and the
+nearest good name); `jev/tableSetup.mjs` turns it into the host's steps
+and each bot's flags as plain data, so none of that needs a browser to
+test. The launcher itself knows no game. A game with a first mover (Gin)
+says so per seat (`seat_args`) rather than the launcher learning about
+Gin. `jev/games.mjs` is the one registry of games, shared with
+`jevPlayer.mjs`, so a new game is one more entry there plus one more
+`table.yaml`.
+
+Renames that generality forced (no back-compat - the first version was
+never committed): `rtg-table` -> `jev-table`; `HANDS`/`LIFE` ->
+`DEAL`/`SCORE`, because `hands` already means "hands to play" to
+`jev-player` (Gin) and "starting life" is one game's word for a score.
+
+Two more bugs found running THIS tool live, both fixed same session:
+- Without the dice-roll step, nobody ever decides who goes first
+  (D155's `pregame` has no way to resolve itself) - the opening step
+  closes that loop the same way a person would.
+- A `detached: true` bot child, once asked to leave and not confirmed
+  within a grace period, was not reliably killed: `child.kill()` only
+  signals the child's own pid, and its Playwright-launched browser
+  starts a FURTHER, separate process group of its own - neither
+  `child.kill()` nor group-targeting (`-pid`) reliably reached it.
+  Separately, `child.exitCode`/the `'exit'` event were observed live to
+  report a detached child as already gone while the OS process table
+  said otherwise. Fixed by checking liveness directly (`kill(pid, 0)`,
+  no bookkeeping trusted) and escalating SIGTERM then SIGKILL against
+  that live check, with a final "could not confirm" report naming any
+  PID still standing rather than pretending success.
+
+**The real cause of "bots survive Ctrl-C", found when generalizing this
+tool** (the process-group fix above is still correct, but it was not
+what was leaving bots running): `chromium.launch()` installs its OWN
+`SIGINT` handler by default, which closes the browser and calls
+`process.exit(130)` - ahead of this launcher's async shutdown, so
+Ctrl-C ended the launcher in about 0 seconds with the quit request never
+sent and every bot still running. The tell was the exit code: 130 in
+0s, where a shutdown that waits on bots cannot finish that fast. The
+launcher now starts Chromium with `handleSIGINT: false` so it owns
+Ctrl-C itself, and `tests/jevTable.browser.mjs` (`bobp make
+test-jevtable`) pins it down with a real table and two real bots -
+Gin's `knock-early` is a rule-list strategy, so no Jev and no
+TYPESAFE_API_KEY - failing before the fix on "bots left running behind
+the table". The quit grace is 5 seconds (user: 15s "is bonkers").
+
+Fixing that exposed two more, both found because the same test went
+intermittently red once shutdown genuinely ran (it had been preempted
+before): (1) the "every bot finished" path and the SIGINT handler both
+called `shutdown()`, concurrently, both closing the table, browser and
+server - now one `once()` promise however it is reached; (2) after
+SIGTERM it slept its whole 5s even when the bot died in milliseconds -
+now `waitUntilDead()` ends the moment they are gone. Both are pure
+(`tools/jev/shutdown.mjs`), so they are tested with no browser. Measured
+Ctrl-C-to-exit: 1.1-2.1s across eight runs. A guest that has not
+finished seating cannot hear the quit request and falls to SIGTERM after
+the grace.
+
+**Rejected**: keeping an RtG-only launcher and writing a Gin one beside
+it (the two would differ only by constants); a per-game launcher
+module (the same constants, in code instead of a file a person can read
+and edit); reusing the table-talk "Add Jev bot" (D143) spawn-request
+protocol to seat the second bot (adds a request/response round trip for
+no benefit over spawning both directly, the same way a person running
+`bobp make jev-player` twice would); trusting Node's own child-exit
+bookkeeping for the kill escalation (observed live, twice, to disagree
+with the OS's own process table).
+
+---
+
+### D158. A seat's first look seeds a quiet-detection baseline too, not just "nothing new yet"
+
+Found live: running two RtG bots against the new `rtg-table` tool
+(below), both sat in `pregame` forever even after dice correctly
+decided who went first. `tools/jev/seat.mjs`'s `MachineSeat#look()`
+seeds `seen.talk`/`seen.seq` on its first call and deliberately reports
+`changed: false` ("joining mid-game is not a change") - correct. But it
+left `changedAt` at its constructor default of `null` forever, and
+`quietFor` is computed FROM `changedAt`. If the only relevant talk (a
+dice roll, an announcement) lands BEFORE a bot's first look, `changed`
+can never become true for it (already in the seeded baseline) AND
+`quietFor` can never start counting (no `changedAt` to count from) -
+the seat waits for a change it can, by definition, never see. A fast,
+automated setup (dealing, life, dice, all within a second or two of
+joining) makes this far more likely than a person's own naturally
+slower pace, which is why it surfaced now rather than in earlier
+manual sessions.
+
+**Fix**: the first look also seeds `changedAt = now` (the moment
+observation began is a valid reference point for "how long has it been
+quiet SINCE"), while leaving `lastTalkAt` at `null` (nobody has spoken
+WHILE this seat was watching - true by construction). A later true
+quiet period is then correctly detected even when nothing "changes"
+relative to the seeded baseline. Shared by both games (Gin and RtG both
+use `MachineSeat`); full suite (1131, Gin included) still green.
+
+Verified with a new unit test (`tests/jevSeat.test.js`) reproducing the
+exact shape: pre-existing talk, one look to seed, then only CLOCK time
+passing - the seat now reaches `move` instead of staying stuck on
+`wait` forever.
+
+---
+
 ### D157. Casting a spell taps the lands that paid for it
 
 Found live, in the same re-verification session that confirmed D155/D156:

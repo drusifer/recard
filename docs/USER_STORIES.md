@@ -4155,3 +4155,76 @@ silently at a live table. Both conditions are BLOCKING.
 Non-blocking: the CLI still says `STRATEGY=` while the files are
 `players/`. Keep the flag, since renaming it breaks every documented
 command, but its help text should say "a player file name".
+
+---
+
+## Sprint: A hosted table for any game (2026-09-25) — Tier 2, combined story + architecture
+
+Cypher and Morpheus, one document (bob-protocol standing rule #10). The
+order of events is stated plainly because it was NOT the protocol's:
+`tools/rtgTable.mjs` (D159, untracked, RtG-only) already existed; the
+user asked "I didn't want that to be game specific, can we generalize?"
+and then "15s+ is a bonkers exit timeout, make it 5s". Both were done
+directly, then the user asked for the bob protocol - so the gates below
+review work that already exists, and say so.
+
+### US-130: One command hosts a table with bots for ANY game
+**As** someone running a live Jev session (or adding a third game),
+**I want** one command that hosts a table, seats N bots and sets the
+game up, **so that** re-running a session is not hand setup and adding a
+game is not writing another launcher.
+
+**AC:**
+1. `bobp make jev-table GAME=<game>` hosts a SPECTATOR table (US-124),
+   seats the bots as the real `jevPlayer.mjs` CLI, and sets the game up.
+   Nothing in the launcher names a game.
+2. Everything particular to a game is DATA in `games/<game>/table.yaml`:
+   `preset`, default `players`, `deal`, starting `score`, `steps`, an
+   `opening` (what the host says once two or more are seated - RtG's
+   d20 roll for who goes first), and `seat_args` (per-seat bot flags -
+   Gin's first mover). The file is checked at load; a mistake names the
+   file, the path in it and the nearest good name (D154).
+3. Any of `PLAYERS`, `DECK`, `DEAL`, `SCORE`, `STEPS` overrides the file
+   on the command line, with an error that names what is allowed.
+4. One registry of games (`tools/jev/games.mjs`) serves `jev-player` and
+   `jev-table`; a new game is one entry there plus one `table.yaml`.
+5. It works for Gin and for RtG, proven live: Gin bot-vs-bot to a
+   knock; RtG bots past the who-goes-first roll into a real turn.
+6. **Ctrl-C ends the table and leaves no bot running behind it.** Bots
+   are asked to leave over table talk (D149), given 5 seconds (user:
+   15s "is bonkers"), then SIGTERM then SIGKILL against a direct
+   liveness check. A repeatable test with real bots pins it.
+7. What the host does at setup and how each bot is started are pure
+   functions of the table file, testable with no browser.
+
+**Out of scope:** how a bot models its opponents (RtG can have several
+opponents and allies - the bot's single-opponent state is its own
+problem, not this launcher's, which seats N players); table files for
+games with no Jev player yet; changing what any bot decides.
+
+### Architecture (Morpheus) - full text is D159, amended
+
+- `games/<game>/table.yaml` next to the game's turn/questions/players;
+  `tools/jev/tableFile.mjs` loads and checks it, `tools/jev/tableSetup.mjs`
+  turns it into the host's steps and each bot's flags (pure),
+  `tools/jev/games.mjs` is the one registry and `gameDirectory()`.
+- `tools/jevTable.mjs` is process handling only - spawn, shutdown,
+  reap - and knows no game.
+- Renames forced by generality, with no back-compat (the first version
+  was never committed): `rtg-table` -> `jev-table`; `HANDS`/`LIFE` ->
+  `DEAL`/`SCORE` (`hands` already means "hands to play" to `jev-player`;
+  "life" is one game's word for a score).
+- **Root cause found while proving AC6:** `chromium.launch()` installs
+  its own SIGINT handler that closes the browser and calls
+  `process.exit(130)`, ahead of the launcher's async shutdown - so
+  Ctrl-C ended it in ~0s with every bot still running. D159 had put
+  this down to process groups; that fix is still correct but was not
+  the cause. The launcher now starts Chromium with `handleSIGINT: false`.
+- **Rejected:** an RtG launcher plus a Gin one beside it (they would
+  differ only by constants); per-game launcher modules (the same
+  constants, in code instead of a file a person can edit); a step
+  budget or coded phases (not this story).
+
+**Open for Gate 1/2:** the 5s applies to the quit grace only. Worst case
+with a hung bot is still ~16s (5s for the say, 5s grace, 5s after
+SIGTERM, 1s after SIGKILL). Does the user want those cut too?

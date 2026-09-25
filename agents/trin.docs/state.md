@@ -1,6 +1,13 @@
 # Agent State
 
-## Current Task (2026-09-23) - US-129 all UAT PASSED (P4 holding-safe mutation, P5 stale-doc mutation)
+## Current Task (2026-09-25) - US-130 UAT PASSED: check clean, test-jevtable 8/8 (1.1-2.1s), regressions clean, mutation caught
+
+check exit 0. test-jevtable 8 consecutive green after an intermittent red (which was a REAL bug:
+concurrent double shutdown). test-jev-runner + test-gin green (registry moved out of jevPlayer).
+Mutation: Playwright handler back -> 'bots left running behind the table'; restored, green.
+Lesson kept: one green run of a test that just went intermittent proves nothing - run it 8x.
+
+## Previous - (2026-09-23) - US-129 all UAT PASSED (P4 holding-safe mutation, P5 stale-doc mutation)
 
 ## Previous - US-129 P3 UAT PASSED
 

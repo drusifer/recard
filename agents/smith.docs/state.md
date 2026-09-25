@@ -1,6 +1,21 @@
 # Agent State
 
-## Current Task (2026-09-23) - LIVE RtG 2-bot session: DONE, report filed
+## Current Task (2026-09-25) - US-130 user test PASSED (ran both real flows after the shutdown refactor)
+
+Gin: full hand to a natural knock, launcher exit 0, 'every bot finished on its own'.
+RtG: ONE Ctrl-C -> exit 130 in 5s, 0 bots left. Both bots HEARD quit; one left cleanly, one was
+mid-decision and cut off at the 5s grace (Gin ~2s). Filed to BACKLOG as the user's tradeoff.
+
+## Previous - (2026-09-25) - US-130 gate: APPROVED after ONE defect found by running it
+
+Ran the CLI: help, no game, typo'd game/player, bad number, broken table.yaml.
+FOUND: a table-file error printed an ABSOLUTE path where every other game-file
+error (D154) shows it relative. Fixed test-first (T1.4).
+Non-blocking, filed: 'unknown player' lists names but gives no did-you-mean, unlike
+the table-file errors (Nielsen #4 consistency). Not done - unprompted.
+Open for the USER: worst-case shutdown with a hung bot is ~16s.
+
+## Previous - (2026-09-23) - LIVE RtG 2-bot session: DONE, report filed
 
 Report: agents/smith.docs/RTG_LIVE_Summary_2026-09-23T20-30.md. Blockers: F1 lands
 have colors [] so no spell castable; F2 first turn can't start from talk (Jev 0.21,

@@ -1,0 +1,17 @@
+# How to stand up a table for Recard the Gathering (D159) - what a person
+# otherwise does by hand before a live bot session. `bobp make jev-table
+# GAME=rtg` reads this; every value here can be overridden on the command
+# line (PLAYERS, DEAL, SCORE, STEPS).
+preset: Recard the Gathering
+players: [rules, aggressive]
+deal: 7       # RtG's opening hand (rulesReference.js)
+score: 20     # RtG's starting life
+steps: 40     # decisions each bot's RUN may take
+# Nobody decides who goes first on their own (D155's `pregame` has no way
+# to answer itself) - so the host asks the table, and each seat rolls.
+opening:
+  say:
+    - Roll d20 for who goes first - highest wins.
+  each_seat:
+    - "{name}, roll for it:"
+    - /roll d20

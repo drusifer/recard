@@ -1615,9 +1615,108 @@ No duplicate decision numbers, and the modern section is newest-first. Clean.
  D157: fixed - casting never tapped the lands that paid for it (found live, same re-run that confirmed D155/D156). One untapped land paid for the same spell twice in one main phase. landsToTap() picks lands by cost (colour pips first, matching produces from D156), moves.mjs's cast case now taps them. Live confirmed too: real dice decided first player, and the first real spell ever cast by a live RtG bot happened before this bug surfaced. make check 1125 green, mutation-proved. Full text: DECISIONS.md D157.
 
 ---
-[<small>2026-09-24 23:47:12</small>] [**make**]->[**all**] *build*:
+[<small>2026-09-25 15:10:06</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-jevtable | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 19362.22095
+
+---
+[<small>2026-09-25 15:12:58</small>] [**User**]->[**all**] *request*:
+ use bob protocol. (Context: I asked to generalize the untracked tools/rtgTable.mjs - 'I didn't want that to be game specific'; then '15s+ is a bonkers exit timeout, make it 5s'. That work was done ad hoc, outside the protocol.)
+
+---
+[<small>2026-09-25 15:15:36</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 1150
+ℹ suites 0
+ℹ pass 1150
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 14051.81682
+
+---
+[<small>2026-09-25 15:16:02</small>] [**Mouse**]->[**Neo**] *sm handoff*:
+ Sprint planned in task.md: 4 phases. 1-3 marked done from what exists and labelled pre-protocol (not passed off as gated); T1.4 is Smith's finding, fixed. Open: T3.3 tighten the test's exit bound, T4.1-4.3 UAT/review/groom. Needs the user: hung-bot shutdown ~16s. @Neo *swe impl T3.3
+
+---
+[<small>2026-09-25 15:16:59</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-jevtable | /home/drusifer/Projects/recard/build/build.out
+ℹ exited 2050ms after Ctrl-C
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 15106.198192
+
+---
+[<small>2026-09-25 15:17:10</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ T3.3 done: exit bound tightened 12s -> 8s and the test now REPORTS elapsed. Measured 3 runs: Ctrl-C to exit 1995-2077ms (~2.0s) - the 5s grace only bites when a bot does not answer. Also: loadTable names files relative (Smith's T1.4). Tell-tale that found the Ctrl-C bug: exit code 130 in 0s (a shutdown that waits on bots cannot finish that fast). @Trin *qa uat US-130
+
+---
+[<small>2026-09-25 15:30:38</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-jevtable | /home/drusifer/Projects/recard/build/build.out
+ℹ exited 1150ms after Ctrl-C
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 15110.80675
+
+---
+[<small>2026-09-25 15:30:57</small>] [**Morpheus**]->[**Oracle**] *lead handoff*:
+ Review US-130 PASSED. The launcher knows no game, table.yaml is data, setup+argv are pure, and the shutdown rules are pure with the clock and process table injected - which is why they were testable at all. One note for the record: the ordering between 'every bot left' and Ctrl-C was implicit and racy; once().started() makes it explicit. Watch item: a guest that has not finished seating cannot hear quit, so it falls to SIGTERM after the grace. @Oracle *ora groom
+
+---
+[<small>2026-09-25 15:31:26</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
+No duplicate decision numbers, and the modern section is newest-first. Clean.
+
+---
+[<small>2026-09-25 15:33:04</small>] [**Neo**]->[**Cypher**] *retro*:
+ Neo retro: Two real bugs came out of one intermittent test: read the captured log until it explains itself instead of re-running. Lint is part of check now - strict unicorn/sonarjs rules hit every new file; fix them, do not suppress.
+
+---
+[<small>2026-09-25 15:33:04</small>] [**Trin**]->[**Cypher**] *retro*:
+ Trin retro: Ran the flaky-then-fixed test 8 times, not once. Mutation (Playwright handler back) proved the test load-bearing. Gap: no deterministic way to force a bot that cannot hear quit - it relies on repetition.
+
+---
+[<small>2026-09-25 15:33:04</small>] [**Morpheus**]->[**Cypher**] *retro*:
+ Morpheus retro: Shutdown is now one path (once) with injected clock/process table. Open design tradeoff, not mine to close: RtG's safe points vs the 5s grace.
+
+---
+[<small>2026-09-25 15:33:04</small>] [**Mouse**]->[**Cypher**] *retro*:
+ Mouse retro: Phases 1-3 were marked done from what existed and labelled pre-protocol - the board should read true, not tidy. One item needs the user, three are in BACKLOG.
+
+---
+[<small>2026-09-25 15:33:04</small>] [**Oracle**]->[**Cypher**] *retro*:
+ Oracle retro: D159 corrected in place (it blamed process groups) and now carries the real root cause. Not done: CHAT.md archive - other sessions have uncommitted edits in it.
+
+---
+[<small>2026-09-25 15:33:04</small>] [**Cypher**]->[**Cypher**] *retro*:
+ Cypher retro: Story quality: US-130 was written AFTER the code, and said so. AC6 (Ctrl-C leaves no bot) is the one that mattered and it is the one with a real test.
+
+---
+[<small>2026-09-25 15:33:04</small>] [**Cypher**]->[**all**] *pm launch*:
+ *pm launch US-130. bobp make jev-table GAME=<game> hosts a table with bots for any game from games/<game>/table.yaml; Ctrl-C ends it in ~2s and leaves no bot behind (test-jevtable 8/8, mutation-proved). Live: Gin bot-vs-bot to a knock, RtG past the who-goes-first roll. Root cause of bots-survive-Ctrl-C was Playwright's own SIGINT handler, not process groups (D159 corrected). 3 items to BACKLOG. NOT committed - tree also holds other sessions' uncommitted work. Sprint complete.
+
+---
+[<small>2026-09-25 15:34:30</small>] [**make**]->[**all**] *build*:
  Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
-11:47PM INF no leaks found
-11:47PM INF 1 commits scanned.
-11:47PM INF scanned ~11156 bytes (11.16 KB) in 255ms
-11:47PM INF no leaks found
+3:34PM INF no leaks found
+3:34PM INF 1 commits scanned.
+3:34PM INF scanned ~33843 bytes (33.84 KB) in 258ms
+3:34PM INF no leaks found

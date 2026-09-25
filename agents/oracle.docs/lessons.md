@@ -688,3 +688,29 @@ This file contains critical lessons and rules derived from past errors, technica
 - **Lint in `make check` pays for itself at once.** In its first sprint
   it refused 7 errors in the sprint's own new code, including a script
   that exported functions.
+
+## US-130 (2026-09-25): a hosted table for any game (D159)
+
+- **A library can install a signal handler you never asked for.**
+  `chromium.launch()` handles SIGINT by default: it closes the browser
+  and calls `process.exit(130)` - ahead of your own async shutdown. The
+  tell was the exit code: **130 in 0 seconds**, where a shutdown that
+  waits on other processes cannot finish that fast. D159 had blamed
+  process groups; that was a plausible story that fit some symptoms.
+  Look at the exit code and the timing before choosing a theory.
+- **Fixing a hidden bug can uncover the ones it was hiding.** With
+  Playwright's `process.exit` gone, shutdown really ran - and two latent
+  faults appeared (it ran twice concurrently, and slept a fixed 5s after
+  SIGTERM). The browser test went intermittently red. The right response
+  to an intermittent red is to read the captured log until it explains
+  itself, not to re-run until green: one pass of a test that just
+  flaked proves nothing, so it was run eight times.
+- **A game-specific first draft costs two rounds.** Twice now (US-128,
+  then this) a tool was written for RtG and had to be generalized. Ask
+  "what here is one game's own value?" before writing it, and put those
+  in `games/<game>/` data.
+- **Running the tool is a review.** Smith ran the CLI and found what no
+  test asserted: a file error printed as an absolute path where every
+  other game-file error is relative (D154's convention).
+- **`bobp make` swallows a target's output**, so `bobp make help | grep`
+  finds nothing. Read `build/build.out`.

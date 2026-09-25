@@ -11,14 +11,10 @@
 //
 // Picks the game's adapter and hands it to the shared runner
 // (`jev/runner.mjs`); the strategy names belong to the game. A new game is
-// one more `GAMES` entry.
+// one more entry in `jev/games.mjs`.
 import { parseArgs } from 'node:util';
+import { GAMES } from './jev/games.mjs';
 
-// A game is an adapter for the shared runner (US-128/D153).
-const GAMES = {
-  gin: () => import('./gin/adapter.mjs'),
-  rtg: () => import('./rtg/adapter.mjs'),
-};
 
 const { values: options } = parseArgs({
   options: {

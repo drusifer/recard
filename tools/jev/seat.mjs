@@ -82,7 +82,16 @@ export class MachineSeat {
 
   /**
    * What the table shows now, and what is NEW since the last look. The
-   * first look only seeds: joining mid-game is not a change.
+   * first look only SEEDS - joining mid-game is not a sudden change -
+   * but it still marks THIS MOMENT as the reference point a later quiet
+   * check measures from. Without that, a table whose only relevant talk
+   * (a dice roll, an announcement) landed before this seat's first look
+   * could never be noticed quiet either: `changed` stays false forever
+   * (nothing it hasn't already seen), and `quietFor` never starts
+   * counting because it has no "since when" to count from - the seat
+   * would wait forever for a change it can, by definition, never see
+   * (D158, found running two bots against `tools/rtgTable.mjs`, whose
+   * facilitator setup all lands within the first second or two).
    */
   async #look() {
     const { peer, name } = this.#services;
@@ -92,7 +101,10 @@ export class MachineSeat {
     const seq = view.lastTouch?.seq ?? null;
     const seen = this.#seen;
     if (seen.talk === null) {
-      Object.assign(seen, { talk: talk.length, seq });
+      // `lastTalkAt` stays null (nobody has spoken WHILE this seat was
+      // watching - the existing talk predates it), so `quietFor` grows
+      // from `changedAt` starting now, same as after any real change.
+      Object.assign(seen, { talk: talk.length, seq, changedAt: now });
       return { view, talk, heard: [], changed: false, quietFor: 0, now };
     }
     const heard = talk.slice(seen.talk).filter((entry) => entry.name !== name);

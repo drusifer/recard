@@ -17,6 +17,20 @@ or a live-verification session) versus being pickable directly.
 
 ## Product
 
+- **RtG bots may not reach a safe point inside the 5s quit grace** (Smith,
+  US-130 user test): on one Ctrl-C both RtG bots heard "asked to leave",
+  one left cleanly and one, mid-decision, was cut off when the table
+  closed at the grace limit (Gin bots leave in ~2s). It is D154's `safe`
+  tag working as designed, but the tradeoff is the user's: a longer
+  grace for RtG, more `safe` states in its turn file, or accept the cut.
+- **`jev-table`'s "unknown player" error lists names but gives no
+  did-you-mean** (Smith, US-130, non-blocking): the table-file errors do
+  (D154's `unknown()`). Not done - unprompted.
+- **A bot that IGNORES SIGTERM makes shutdown ~11s** (US-130): 5s say
+  cap, 5s grace, up to 5s after SIGTERM, 1s after SIGKILL. Only reached
+  by a bot that neither leaves nor dies on SIGTERM; the user's ask was
+  the 15s grace, now 5s. Cut the rest too if wanted.
+
 - **The RtG bot is unsure about starting its own turn** (Smith, US-127
   close): `untap_all` came back at 0.12 confidence on the first live
   run - it nearly passed instead of beginning its turn. Nothing broke,

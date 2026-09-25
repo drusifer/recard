@@ -36,6 +36,27 @@ const MIN_ART_PROMPT_LENGTH = 30;
  * art's: a good flavor line is often a single short sentence. */
 const MIN_FLAVOR_LENGTH = 16;
 
+/** A whole cost is nothing but brace-wrapped symbols, back to back -
+ *  `'2W'` (no braces) or `'{W}x'` (stray text) are both rejected by
+ *  never matching this, rather than by counting characters. */
+const WHOLE_COST = /^(?:\{[^{}]*\})*$/;
+const SYMBOL = /\{([^{}]*)\}/g;
+
+/**
+ * What one symbol adds to the total cost - 1 for a colour or `{C}`
+ * (colourless), 0 for `{X}` (contributes nothing outside the stack,
+ * per the real rule), or its own value for a generic number.
+ * @throws {Error} naming `cost` and the symbol, for a symbol that is
+ *   none of those - scoring it as 0 would quietly flatten the curve
+ *   instead of failing the build.
+ */
+function pips(symbol, cost) {
+  if (symbol === 'C' || WUBRG.includes(symbol)) return 1;
+  if (symbol === 'X') return 0;
+  if (/^\d+$/.test(symbol)) return Number(symbol);
+  throw new Error(`Invalid mana cost "${cost}": unknown symbol "{${symbol}}"`);
+}
+
 /**
  * Parse a Magic-style mana cost into its derived `cmc` and `colors`.
  *
@@ -46,39 +67,16 @@ const MIN_FLAVOR_LENGTH = 16;
  *
  * @param {string} cost e.g. `'{2}{W}{W}'`, or `''` for a land
  * @returns {{cmc: number, colors: string[], symbols: string[]}}
- * @throws {Error} on a malformed cost - scoring one as 0 would quietly
- *   flatten the curve instead of failing the build.
+ * @throws {Error} on a malformed cost (see `pips` and `WHOLE_COST`).
  */
 export function parseManaCost(cost) {
   if (typeof cost !== 'string') throw new TypeError('mana cost must be a string');
-  if (cost === '') return { cmc: 0, colors: [], symbols: [] };
+  if (!WHOLE_COST.test(cost)) throw new Error(`Invalid mana cost "${cost}": every symbol must be brace-wrapped`);
 
-  const matches = cost.matchAll(/\{([^{}]*)\}/g).toArray();
-  const consumed = matches.reduce((total, match) => total + match[0].length, 0);
-  if (consumed !== cost.length) {
-    throw new Error(`Invalid mana cost "${cost}": every symbol must be brace-wrapped`);
-  }
-
-  let cmc = 0;
-  const colors = new Set();
-  const symbols = [];
-  for (const [, symbol] of matches) {
-    symbols.push(symbol);
-    if (WUBRG.includes(symbol)) {
-      cmc += 1;
-      colors.add(symbol);
-    } else if (symbol === 'C') {
-      cmc += 1; // colorless, contributes no color identity
-    } else if (symbol === 'X') {
-      // X contributes nothing to cmc outside the stack, per the real
-      // rule - listed explicitly so it reads as handled, not forgotten.
-    } else if (/^\d+$/.test(symbol)) {
-      cmc += Number(symbol);
-    } else {
-      throw new Error(`Invalid mana cost "${cost}": unknown symbol "{${symbol}}"`);
-    }
-  }
-  return { cmc, colors: WUBRG.filter((color) => colors.has(color)), symbols };
+  const symbols = cost.matchAll(SYMBOL).map(([, symbol]) => symbol).toArray();
+  const cmc = symbols.reduce((total, symbol) => total + pips(symbol, cost), 0);
+  const colors = WUBRG.filter((color) => symbols.includes(color));
+  return { cmc, colors, symbols };
 }
 
 /**

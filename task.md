@@ -2202,3 +2202,35 @@ deleted rather than ported, every phase leaves `make check` green.
       staleness test; players listed from files; STRATEGY= help text
 - [x] T5.2 test-gin, test-harness-mcp, test-jev-runner green; the second
       RtG player appears in jev-ready
+
+---
+
+# Sprint: A hosted table for any game (US-130) — 2026-09-25 — Tier 2
+
+Story + architecture: `docs/USER_STORIES.md` US-130, D159 (amended).
+Built at the user's direct request BEFORE the protocol was invoked, so
+phases 1-3 are marked done from what exists, and the gates reviewed it
+after the fact. Smith's review ran the CLI and found one defect (T1.4).
+
+## Phase 1 — Data: a game's table is a file (AC1-AC4, AC7)
+- [x] T1.1 `games/{rtg,gin}/table.yaml` + `tools/jev/tableFile.mjs` checked loader
+- [x] T1.2 `tools/jev/games.mjs` one registry, shared with `jevPlayer.mjs`
+- [x] T1.3 `tools/jev/tableSetup.mjs` pure `setupSteps`/`botArguments` + tests
+- [x] T1.4 (Smith Gate finding) errors name the file as the author knows it, relative, not absolute — test first
+
+## Phase 2 — The launcher (AC1, AC3, AC5)
+- [x] T2.1 `tools/jevTable.mjs` knows no game; `make jev-table`; `rtg-table` retired, `HANDS/LIFE` -> `DEAL/SCORE`
+- [x] T2.2 live: Gin bot-vs-bot to a knock; RtG bots past the who-goes-first roll into a real turn
+
+## Phase 3 — Ctrl-C reaps every bot (AC6)
+- [x] T3.1 `tests/jevTable.browser.mjs` (`make test-jevtable`), red before the fix on "bots left running"
+- [x] T3.2 `handleSIGINT: false` (Playwright's own handler `process.exit(130)`s first); quit grace 15s -> 5s
+- [x] T3.3 tighten the test's exit bound from 12s to the user's expectation
+
+## Phase 4 — Verify, review, groom
+- [x] T4.1 Trin UAT: check, test-jevtable x3, test-jev-runner + test-gin (registry moved), mutation
+- [x] T4.2 Morpheus review
+- [x] T4.3 Oracle groom: ARCHITECTURE map, lessons, memory
+
+## Needs the user
+- Worst-case shutdown with a HUNG bot is still ~16s (5 say + 5 grace + 5 after SIGTERM + 1). Only the 15s grace was asked to change.

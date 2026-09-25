@@ -1,6 +1,11 @@
 # Agent State
 
-## Current Task (2026-09-23) - Sprint 'XState players' (US-129) planned
+## Current Task (2026-09-25) - US-130 planned in task.md (4 phases; 1-3 done pre-protocol, said so)
+
+task.md sprint 'A hosted table for any game'. Open: T3.3 test bound, T4.x UAT/review/groom.
+User decision pending: worst-case shutdown ~16s.
+
+## Previous - (2026-09-23) - Sprint 'XState players' (US-129) planned
 
 5 phases/11 tasks in task.md: P1 load+validate, P2 MachineSeat+library,
 P3 RtG files (+bug fix, 2nd player), P4 Gin files (MCP risk), P5 discovery+live.

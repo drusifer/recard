@@ -130,6 +130,10 @@ tools/jevPlayer.mjs      the `make jev-player` CLI: GAME -> that game's adapter,
                           handed to the shared runner (D153)
 tools/jevLibrary.mjs     `make jev-library` / `jev-library-doc`: every name
                           a turn file may use (docs/JEV_LIBRARY.md)
+tools/jevTable.mjs       the `make jev-table` CLI (D159): host a spectator
+                          table for ANY game, seat N bots, set the game up
+                          from games/<game>/table.yaml; process handling
+                          only - it knows no game
 tools/jev/               everything a Jev player needs that is not a game
 tools/jev/runner.mjs     join, refuse a spectator seat, announce jev-ready,
                           serve add-bot + quit ALWAYS, play the seat (D153)
@@ -147,6 +151,14 @@ tools/jev/escalate.mjs   verdictOf (yes|no|unsure) + askTable / floorFallback
 tools/jev/strategyFile.mjs  the question-file rule: prose refers to state by
                           path, never a card name or number (D147)
 tools/jev/table.mjs      hearing the table: yes/no answers, askPeer
+tools/jev/games.mjs      the ONE registry of games (jev-player + jev-table)
+                          and gameDirectory(); a new game is an entry here
+tools/jev/tableFile.mjs  games/<game>/table.yaml: preset, players, deal,
+                          score, steps, opening, seat_args - checked at load
+tools/jev/tableSetup.mjs pure: the host's steps once seated, and each bot's
+                          flags, from a table file
+tools/jev/shutdown.mjs   pure: once() (one shutdown however reached) and
+                          waitUntilDead() (ends when they are gone)
 tools/jev/libraryDocument.mjs  renders the library listing from entry docs
 tools/botRequests.mjs    pure: unanswered "add a bot" / "leave" requests
 tools/gin/adapter.mjs    Gin: players, options, a MachineSeat on its turn file

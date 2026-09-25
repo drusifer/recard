@@ -1,6 +1,18 @@
 # Agent State
 
-## Current Task (2026-09-23) - US-129 'XState players' LAUNCHED
+## Current Task (2026-09-25) - US-130 LAUNCHED (pending commit)
+
+jev-table for any game; games/<game>/table.yaml; Ctrl-C reaps bots (test-jevtable 8/8).
+Backlog: RtG safe-point vs 5s grace; did-you-mean on unknown player; ignore-SIGTERM worst case ~11s.
+Uncommitted: mine + other sessions' work in the same tree (see final report) - commit only on the user's word.
+
+## Previous - (2026-09-25) - US-130 (jev-table for any game) written, Tier 2
+
+Story + architecture in one doc (docs/USER_STORIES.md US-130, D159 amended).
+Work was done ad hoc before the protocol was invoked - said so in the doc.
+Next: Smith gate, Mouse plan, then Neo/Trin/Morpheus review of what exists.
+
+## Previous - (2026-09-23) - US-129 'XState players' LAUNCHED
 
 Games and players are files (games/<game>/); one interpreter (XState v5).
 RtG turn bug + card-id bug fixed. make check 1100 green; test-gin, test-harness-mcp,

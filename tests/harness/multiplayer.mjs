@@ -56,10 +56,16 @@ export async function startStaticServer(port) {
  * suite launches with reduced motion forced ON (browser-wide, so a
  * suite that builds its own contexts gets it too); a suite ABOUT the
  * motion passes `{ motion: true }`.
+ *
+ * `handleSIGINT: false` is for a tool that owns its own Ctrl-C handling:
+ * Playwright's default handler closes the browser and calls
+ * `process.exit(130)` itself, ahead of any shutdown the tool was in the
+ * middle of (D159 - `jev-table` exited in ~0s with every bot still
+ * running).
  */
-export async function launchChromium({ motion = false } = {}) {
+export async function launchChromium({ motion = false, handleSIGINT = true } = {}) {
   const arguments_ = ['--no-sandbox'];
-  const launched = await launchAnyChromium(arguments_);
+  const launched = await launchAnyChromium(arguments_, handleSIGINT);
   if (motion) return launched;
   // Reduced motion has to be set per CONTEXT - Chromium's
   // `--force-prefers-reduced-motion` flag does NOT reach `matchMedia`
@@ -71,13 +77,13 @@ export async function launchChromium({ motion = false } = {}) {
   return launched;
 }
 
-async function launchAnyChromium(arguments_) {
+async function launchAnyChromium(arguments_, handleSIGINT) {
   try {
-    return await chromium.launch({ args: arguments_ });
+    return await chromium.launch({ args: arguments_, handleSIGINT });
   } catch (error) {
     for (const executablePath of SYSTEM_CHROMIUM_PATHS) {
       try {
-        return await chromium.launch({ executablePath, args: arguments_ });
+        return await chromium.launch({ executablePath, args: arguments_, handleSIGINT });
       } catch { /* try the next candidate */ }
     }
     throw error;

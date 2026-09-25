@@ -1,6 +1,20 @@
 # Agent State
 
-## Current Task (2026-09-23) - US-129: all 5 phases reviewed PASSED; D154 amended (Gate 2, P3 applies_to + id bug)
+## Current Task (2026-09-25) - US-130 review PASSED, one note
+
+launcher knows no game; table.yaml is data; setup/argv are pure. shutdown.mjs helpers are the
+right shape (clock + process table injected). NOTE: the ordering between 'every bot left' and
+SIGINT was implicit - now explicit via once().started(). Watch: guests that have not finished
+seating cannot hear quit, so they fall to SIGTERM after the grace.
+
+## Previous - (2026-09-25) - US-130 architecture: games/<game>/table.yaml + one launcher (D159 amended)
+
+tableFile/tableSetup/games.mjs + jevTable.mjs (process handling only).
+Root cause of bots-survive-Ctrl-C = Playwright's default SIGINT handler
+(process.exit(130) ahead of our shutdown), NOT process groups. handleSIGINT:false.
+Open: worst-case shutdown ~16s if a bot hangs; user only asked 15s->5s.
+
+## Previous - (2026-09-23) - US-129: all 5 phases reviewed PASSED; D154 amended (Gate 2, P3 applies_to + id bug)
 
 ## Previous - US-129 architecture: D154 recorded
 

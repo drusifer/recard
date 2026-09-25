@@ -185,3 +185,20 @@ test('asked to leave, the seat is done at the next safe state - never mid-move',
   assert.equal((await seat.step()).move, 'pass');
   assert.equal(await seat.nextMove({ shouldStop }), 'done');
 });
+
+test('BUG (live, D158): a table quiet since BEFORE this seat ever looked is still noticed - not stuck forever', async () => {
+  // Setup that matters (a dice roll, "rules goes first") can land before
+  // a freshly-joined bot's very first look - found running two bots
+  // against tools/rtgTable.mjs, whose facilitator setup (deal, life,
+  // roll) all happens within the first second or two of joining. The
+  // FIRST look only seeds (deliberately: "joining mid-game is not a
+  // change"), but if NOTHING ever changes again after that, the seat
+  // must still notice the table has gone quiet - it must not need a
+  // change it can, by definition, never see.
+  const table = fakeTable({ reply: () => 'yes' });
+  table.talk.push({ name: 'Drew', text: 'setup already happened before I ever looked' });
+  const { seat, at } = seatAt(table, judgeSaying());
+  assert.equal(await seat.nextMove({ shouldStop: isNever }), 'wait', 'the first look only seeds - not a change yet');
+  at(10_000); // 10s pass; nothing else ever happens
+  assert.equal(await seat.nextMove({ shouldStop: isNever }), 'move', 'quiet since the first look counts as quiet');
+});

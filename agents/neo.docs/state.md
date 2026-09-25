@@ -1,6 +1,15 @@
 # Agent State
 
-## Current Task (2026-09-25) - D157 casting-doesn't-tap fix: DONE, live re-run confirmed all 3 fixes
+## Current Task (2026-09-25) - US-130: impl + 2 real bugs found by the browser test going intermittently red
+
+1) Playwright's own SIGINT handler process.exit(130)s ahead of our shutdown -> handleSIGINT:false.
+2) That EXPOSED two more: shutdown ran twice at once (main flow + SIGINT handler) and
+   waited a fixed 5s after SIGTERM even if the bot died at once. Fixed with pure helpers
+   tools/jev/shutdown.mjs (once, waitUntilDead), tested first.
+Tell-tale: exit code 130 in 0s. Measured Ctrl-C->exit 1.1-2.1s over 8 runs.
+lint is part of check - new files hit strict unicorn/sonarjs rules; fix, don't suppress.
+
+## Previous - (2026-09-25) - D157 casting-doesn't-tap fix: DONE, live re-run confirmed all 3 fixes
 
 Re-ran the live 2-bot RtG session (fresh MCP bridge, table YFSEEF) to
 confirm D155/D156. Dice worked live: real /roll d20 (rules 13,

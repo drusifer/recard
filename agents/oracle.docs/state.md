@@ -1,6 +1,11 @@
 # Agent State
 
-## Current Task (2026-09-23) - US-129 groom DONE
+## Current Task (2026-09-25) - US-130 groomed: ARCHITECTURE map (+5 files), D159 (root cause + 2nd-order bugs), 5 lessons
+
+Not done: CHAT.md archive (uncommitted edits from other sessions in that file; a chat-report
+resets it - do not do it mid-flight). docs/JEV_LIBRARY.md untouched (table files are not library names).
+
+## Previous - (2026-09-23) - US-129 groom DONE
 
 ARCHITECTURE: games/ + tools/jev/{machine,seat,library,gameFiles,libraryDocument}
 + gin/rtg library.mjs; removed rtg seat/decide/turnOrder/gameFile/game.json, gin

@@ -7,7 +7,7 @@
 #
 # Adding a task: add the npm script first, then a one-line target here.
 
-.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-tablezoom test-focuszoom test-multiplayer test-harness-mcp test-gin test-jev-runner jev-player jev-library jev-library-doc secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers
+.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-tablezoom test-focuszoom test-multiplayer test-harness-mcp test-gin test-jev-runner test-jevtable jev-player jev-library jev-library-doc jev-table secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers
 
 help:
 	@echo "Recard targets (all front npm scripts):"
@@ -23,6 +23,8 @@ help:
 	@echo "  test-gin      a Gin bot joins a hosted table, draws and knocks out loud (US-120)"
 	@echo "  jev-library   every name a turn file (games/<game>/turn.yaml) may use, with its meaning (US-129)"
 	@echo "  jev-library-doc  regenerate docs/JEV_LIBRARY.md from the library"
+	@echo "  jev-table     GAME=gin|rtg [PLAYERS=a,b] [DECK=<pile id>] [DEAL=n] [SCORE=n] [STEPS=n]: host a spectator table with N Jev bots dealt and ready, set up as games/<game>/table.yaml says - watch live or via the harness MCP tools"
+	@echo "  test-jevtable  Ctrl-C at jev-table ends the table and leaves no bot running (D159)"
 	@echo "  test-jev-runner  the real jev-player CLI at a hosted table: moves, add-bot, quit (US-128)"
 	@echo "  jev-player    GAME=gin|rtg STRATEGY=<player file name> CODE=<table code> [FIRST=bot|opponent] [HANDS=1] [DECK=<pile id>] [STEPS=12]: a Jev player joins your table (US-120, US-128)"
 	@echo "  secrets      gitleaks: every commit + uncommitted changes to tracked files"
@@ -98,8 +100,17 @@ jev-player:
 jev-library:
 	node tools/jevLibrary.mjs
 
+test-jevtable:
+	npm run test:jevtable
+
 jev-library-doc:
 	node tools/jevLibrary.mjs --write
+
+# A hosted table for any game with N Jev bots already seated and set up
+# the way games/<game>/table.yaml says (D159) - repeats the setup a live
+# bot session otherwise needs by hand (US-129 live-session follow-up)
+jev-table:
+	node tools/jevTable.mjs --game '$(GAME)' $(if $(PLAYERS),--players '$(PLAYERS)') $(if $(DECK),--deck '$(DECK)') $(if $(DEAL),--deal '$(DEAL)') $(if $(SCORE),--score '$(SCORE)') $(if $(STEPS),--steps '$(STEPS)') --port '$(or $(PORT),8230)'
 
 # Secret scan (direct user request, 2026-09-19 - the Jev players read
 # TYPESAFE_API_KEY from the environment, and it must never land in a
