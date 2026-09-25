@@ -498,4 +498,6 @@ sequenceDiagram
     Note right of Cypher: "Cypher retro: Story<br/>quality: US-130 was<br/>written AFTER the code,<br/>and said so. AC6 (Ctrl-C<br/>leaves no bot) is the<br/>one that mattered and it<br/>is…"
     Cypher->>All: "pm launch"
     Note right of Cypher: "*pm launch US-130. bobp<br/>make jev-table<br/>GAME=<game> hosts a<br/>table with bots for any<br/>game from<br/>games/<game>/table.yaml,<br/>Ctrl-C ends it in ~2s…"
+    Cypher->>All: "handoff"
+    Note right of Cypher: "Prep for /clear: tree<br/>clean, HEAD 5955ae1 on<br/>dev + main, no stray<br/>bots, harness table<br/>stopped. Cold-start note<br/>is at the top of<br/>agents/cyph…"
 ```

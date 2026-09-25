@@ -1,10 +1,29 @@
 # Agent State
 
-## Current Task (2026-09-25) - US-130 LAUNCHED (pending commit)
+## Current Task (2026-09-25) - US-130 SHIPPED (5955ae1, dev + main). READY FOR CLEAR.
 
-jev-table for any game; games/<game>/table.yaml; Ctrl-C reaps bots (test-jevtable 8/8).
-Backlog: RtG safe-point vs 5s grace; did-you-mean on unknown player; ignore-SIGTERM worst case ~11s.
-Uncommitted: mine + other sessions' work in the same tree (see final report) - commit only on the user's word.
+COLD START - read in this order: this file, docs/BACKLOG.md (top 3 items), task.md tail.
+
+What exists now (all committed and pushed):
+- `bobp make jev-table GAME=gin|rtg` hosts a spectator table with N Jev bots; everything
+  game-specific is `games/<game>/table.yaml` (D159). tools/jevTable.mjs knows no game.
+- Ctrl-C ends it in ~1-2s and reaps every bot. Root cause of bots-survive-Ctrl-C was
+  Playwright's own SIGINT handler (exit code 130 in 0s was the tell), fixed with
+  handleSIGINT:false; tests/jevTable.browser.mjs pins it (make test-jevtable, 8/8).
+- Jev players are files run by one XState interpreter (US-129/D154); Gin and RtG are adapters
+  (US-128/D153). The RtG bot's state still models a single `opponent` (see memory
+  project-rtg-multiplayer) - NOT yet fixed.
+
+DECISIONS WAITING ON THE USER (in docs/BACKLOG.md):
+1. RtG bots can be mid-decision and cut off at the 5s quit grace (Gin ~2s): longer grace for
+   RtG, more `safe` states in games/rtg/turn.yaml, or accept it.
+2. A bot that ignores SIGTERM makes shutdown ~11s (only their ask was 15s->5s grace).
+
+Standing rules learned this session: tools around Jev players are game-agnostic, game values
+in games/<game>/ data (memory feedback-game-agnostic-tools); lint is part of `bobp make check`
+(strict unicorn/sonarjs - fix, do not suppress); `bobp make` swallows output, read
+build/build.out; run an intermittently-red test 8x, read its log; never `pkill -f` (it kills
+the calling shell - use ps + kill by pid).
 
 ## Previous - (2026-09-25) - US-130 (jev-table for any game) written, Tier 2
 

@@ -1720,3 +1720,7 @@ No duplicate decision numbers, and the modern section is newest-first. Clean.
 3:34PM INF 1 commits scanned.
 3:34PM INF scanned ~33843 bytes (33.84 KB) in 258ms
 3:34PM INF no leaks found
+
+---
+[<small>2026-09-25 15:50:12</small>] [**Cypher**]->[**all**] *handoff*:
+ Prep for /clear: tree clean, HEAD 5955ae1 on dev + main, no stray bots, harness table stopped. Cold-start note is at the top of agents/cypher.docs/state.md; two user decisions are in docs/BACKLOG.md (RtG safe point vs 5s quit grace; ignore-SIGTERM ~11s).
