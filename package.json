@@ -42,6 +42,7 @@
     "@eslint/js": "^10.0.1",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@typesafe-ai/sdk": "^0.6.0",
+    "@xstate/graph": "^3.0.4",
     "c8": "^12.0.0",
     "esbuild": "^0.28.2",
     "eslint": "^10.9.1",

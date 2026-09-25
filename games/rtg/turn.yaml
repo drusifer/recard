@@ -10,6 +10,9 @@
 # `safe` marks where a bot asked to leave may go; `move` marks where it
 # is this bot's move. States that ask something are busy by themselves.
 
+description: >-
+  A Jev bot plays Recard the Gathering under the written rules in rules.yaml. It judges from the board and table talk whose turn it is, asking the table out loud when unsure, then plays each phase of its own turn (untap, draw, main, combat) and defends when attacked.
+
 initial: joining
 context:
   land_played: false
@@ -20,6 +23,7 @@ context:
 
 states:
   joining:
+    description: "Introduces itself at the table, then goes to pregame."
     entry:
       - { type: say, params: { text: I play by the rules in my game file. Tell me when it is my turn. } }
     always: pregame
@@ -29,12 +33,14 @@ states:
   # the question is "have we settled that I go first?" - from talk, dice
   # rolls (/roll) included - until the game has begun.
   pregame:
+    description: "Nobody has had a turn yet; waits for talk or a dice roll to settle who goes first. Safe to leave."
     tags: [safe]
     on:
       TABLE:
         - { target: judging_first, guard: table_changed }
         - { target: asking_first, guard: { type: quiet_table, params: { ms: 8000 } } }
   judging_first:
+    description: "Asks Jev whether it goes first, and whether the game has begun."
     invoke:
       src: judge
       with: { question: i_go_first, also: [game_has_begun], phase: pregame }
@@ -44,6 +50,7 @@ states:
         - { target: asking_first, guard: { type: verdict, params: { is: unsure } } }
         - { target: pregame }
   asking_first:
+    description: "Asks the table out loud: Do I go first?"
     invoke:
       src: ask_table
       with: { say: Do I go first? }
@@ -53,6 +60,7 @@ states:
 
   # ---- not my turn, or I cannot tell yet ----
   watching:
+    description: "Not my turn, or can't tell yet; listens for an attack or the end of their turn. Safe to leave."
     tags: [safe]
     on:
       TABLE:
@@ -60,6 +68,7 @@ states:
         - { target: judging, guard: table_changed }
         - { target: asking, guard: { type: quiet_table, params: { ms: 8000 } } }
   judging:
+    description: "Asks Jev whether their turn is over."
     invoke:
       src: judge
       with: { question: their_turn_is_over, also: [attack_phase_complete], phase: their_turn }
@@ -68,6 +77,7 @@ states:
         - { target: asking, guard: { type: verdict, params: { is: unsure } } }
         - { target: watching }
   asking:
+    description: "Asks the table out loud: Is it my turn now?"
     invoke:
       src: ask_table
       with: { say: Is it my turn now? }
@@ -77,30 +87,36 @@ states:
 
   # ---- my turn: each phase is a move; a step in it is `play` ----
   untap:
+    description: "My move: start of my turn."
     tags: [move]
     always: { target: out_of_steps, guard: { type: counted, params: { field: taken, at_least: steps } } }
     on: { STEP: untapping }
   untapping:
+    description: "Untaps everything I control."
     invoke:
       src: play
       with: { phase: untap, question: step }
       onDone: { target: draw, actions: [track, { type: count, params: { field: taken } }] }
 
   draw:
+    description: "My move: draw step."
     tags: [move]
     always: { target: out_of_steps, guard: { type: counted, params: { field: taken, at_least: steps } } }
     on: { STEP: drawing }
   drawing:
+    description: "Draws a card."
     invoke:
       src: play
       with: { phase: draw, question: step }
       onDone: { target: main, actions: [track, { type: count, params: { field: taken } }] }
 
   main:
+    description: "My move: main phase; cast spells, play a land, or pass."
     tags: [move]
     always: { target: out_of_steps, guard: { type: counted, params: { field: taken, at_least: steps } } }
     on: { STEP: playing }
   playing:
+    description: "Jev chooses one main-phase step; a pass moves on to combat."
     invoke:
       src: play
       with: { phase: main, question: step }
@@ -109,10 +125,12 @@ states:
         - { target: main, actions: [track, { type: count, params: { field: taken } }] }
 
   combat:
+    description: "My move: combat phase; attack or pass."
     tags: [move]
     always: { target: out_of_steps, guard: { type: counted, params: { field: taken, at_least: steps } } }
     on: { STEP: attacking }
   attacking:
+    description: "Jev chooses the attackers; a pass ends the turn."
     invoke:
       src: play
       with: { phase: combat, question: step }
@@ -121,6 +139,7 @@ states:
         - { target: combat, actions: [track, { type: count, params: { field: taken } }] }
 
   end_turn:
+    description: "Says the turn is over out loud, resets per-turn memory, goes back to watching."
     entry:
       - { type: say, params: { text: "I'm done - your turn." } }
       - { type: reset, params: { to: { land_played: false, arrivedThisTurn: [], attackers: [] } } }
@@ -128,10 +147,12 @@ states:
 
   # ---- drawn in on their turn: blocks and damage ----
   defending:
+    description: "They attacked; my move to block."
     tags: [move]
     always: { target: out_of_steps, guard: { type: counted, params: { field: taken, at_least: steps } } }
     on: { STEP: blocking }
   blocking:
+    description: "Jev chooses blockers, then back to watching."
     invoke:
       src: play
       with: { phase: defending, question: step }
@@ -140,4 +161,5 @@ states:
         actions: [{ type: reset, params: { to: { attackers: [] } } }, { type: count, params: { field: taken } }]
 
   out_of_steps:
+    description: "The run hit its STEPS limit; the run ends."
     type: final

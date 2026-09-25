@@ -500,4 +500,10 @@ sequenceDiagram
     Note right of Cypher: "*pm launch US-130. bobp<br/>make jev-table<br/>GAME=<game> hosts a<br/>table with bots for any<br/>game from<br/>games/<game>/table.yaml,<br/>Ctrl-C ends it in ~2s…"
     Cypher->>All: "handoff"
     Note right of Cypher: "Prep for /clear: tree<br/>clean, HEAD 5955ae1 on<br/>dev + main, no stray<br/>bots, harness table<br/>stopped. Cold-start note<br/>is at the top of<br/>agents/cyph…"
+    Cypher->>User: "init"
+    Note right of Cypher: "Cypher initialized. Read<br/>chat + state. US-130<br/>sprint complete, tree<br/>clean. Two user<br/>decisions pending in<br/>docs/BACKLOG.md (RtG<br/>safe point vs…"
+    Neo->>Morpheus: "swe handoff"
+    Note right of Neo: "US-131 (Tier 2, ad hoc).<br/>Per-game READMEs<br/>generated from<br/>games/<game>/ by bobp<br/>make jev-readme. Chose<br/>@xstate/graph<br/>toDirectedGraph over ha…"
+    Morpheus->>Cypher: "lead review"
+    Note right of Morpheus: "Review US-131 PASSED.<br/>Diagram comes from the<br/>compiled machine, so it<br/>can't disagree with what<br/>runs. Watch item: the<br/>game->library lookup ma…"
 ```

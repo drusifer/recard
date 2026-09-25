@@ -1,5 +1,15 @@
 # Agent State
 
+## Current Task (2026-09-25) - US-131 per-game READMEs BUILT, review passed, NOT COMMITTED
+
+`bobp make jev-readme` writes games/<game>/README.md (description, Mermaid statechart, states table,
+players, questions) from the game's files. Diagram = @xstate/graph toDirectedGraph on the compiled
+machine (user rule: do not roll your own); `always` edges (omitted by the lib) read from the same
+machine's state nodes. Descriptions are `description:` in turn.yaml (file + every state; test enforces).
+Files: tools/jev/gameReadme.mjs, tools/jevReadme.mjs, tests/jevGameReadme.test.js, Makefile, US-131 in
+docs/USER_STORIES.md. Lint clean; 6 tests; mutation-proved. Morpheus note: game->library lookup relies
+on allLibraries() titles equalling game keys (gin, rtg). Next: user commits; then the two BACKLOG decisions.
+
 ## Current Task (2026-09-25) - US-130 SHIPPED (5955ae1, dev + main). READY FOR CLEAR.
 
 COLD START - read in this order: this file, docs/BACKLOG.md (top 3 items), task.md tail.

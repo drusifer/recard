@@ -7,6 +7,9 @@
 # which is not `safe`, so a bot asked to leave always discards first and
 # never walks away with eleven cards (C4 of US-128).
 
+description: >-
+  A Jev bot plays Gin Rummy: it works out whose move it is from the table, draws or takes the upcard, discards, and repeats until the hands are played. Who moves is computed, never judged; Jev is only asked for the move itself.
+
 initial: waiting
 context:
   hands: 1 # HANDS=: how many hands this run plays
@@ -14,9 +17,11 @@ context:
 
 states:
   waiting:
+    description: "Not my move yet; looks again when the table changes. Safe to leave."
     tags: [safe]
     on: { TABLE: looking }
   looking:
+    description: "Reads the table (gin_look) to find the phase: draw, discard, hand over, or wait."
     invoke:
       src: gin_look
       onDone:
@@ -26,14 +31,18 @@ states:
         - { target: waiting }
 
   drawing:
+    description: "My move: take the upcard or draw from the stock."
     tags: [move]
     on: { STEP: taking }
   taking:
+    description: "Making that draw at the table."
     invoke: { src: gin_step, onDone: holding }
 
   holding: # drawn; the discard is still owed
+    description: "Drawn, discard still owed. Not safe, so a bot asked to leave discards first."
     on: { TABLE: checking }
   checking:
+    description: "Re-reads the table to see the discard is now due."
     invoke:
       src: gin_look
       onDone:
@@ -41,20 +50,25 @@ states:
         - { target: holding }
 
   discarding:
+    description: "My move: discard, knock or go gin."
     tags: [move]
     on: { STEP: throwing }
   throwing:
+    description: "Making that discard at the table."
     invoke: { src: gin_step, onDone: waiting }
 
   hand_over:
+    description: "The hand ended; counts it and decides whether more hands remain."
     entry: [{ type: count, params: { field: hands_done } }, note_hand_over]
     always:
       - { target: finished, guard: { type: counted, params: { field: hands_done, at_least: hands } } }
       - { target: between_hands }
   between_hands: # the hand is scored; wait for the redeal
+    description: "Hand scored; waiting for the redeal. Safe to leave."
     tags: [safe]
     on: { TABLE: redeal_check }
   redeal_check:
+    description: "Reads the table for the new deal."
     invoke:
       src: gin_look
       onDone:
@@ -63,4 +77,5 @@ states:
         - { target: between_hands }
 
   finished:
+    description: "All requested hands played; the run ends."
     type: final

@@ -1724,3 +1724,22 @@ No duplicate decision numbers, and the modern section is newest-first. Clean.
 ---
 [<small>2026-09-25 15:50:12</small>] [**Cypher**]->[**all**] *handoff*:
  Prep for /clear: tree clean, HEAD 5955ae1 on dev + main, no stray bots, harness table stopped. Cold-start note is at the top of agents/cypher.docs/state.md; two user decisions are in docs/BACKLOG.md (RtG safe point vs 5s quit grace; ignore-SIGTERM ~11s).
+
+---
+[<small>2026-09-25 15:51:21</small>] [**Cypher**]->[**User**] *init*:
+ Cypher initialized. Read chat + state. US-130 sprint complete, tree clean. Two user decisions pending in docs/BACKLOG.md (RtG safe point vs 5s quit grace; ignore-SIGTERM ~11s). Awaiting direction.
+
+---
+[<small>2026-09-25 16:03:16</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-story-numbers | /home/drusifer/Projects/recard/build/build.out
+node tools/checkStoryNumbers.mjs
+Checked 91 story headings in docs/USER_STORIES.md.
+No duplicate story numbers. Clean.
+
+---
+[<small>2026-09-25 16:03:17</small>] [**Neo**]->[**Morpheus**] *swe handoff*:
+ US-131 (Tier 2, ad hoc). Per-game READMEs generated from games/<game>/ by bobp make jev-readme. Chose @xstate/graph toDirectedGraph over hand-parsing turn.yaml (user: do not roll your own). Gap: it omits always edges; read from the same machine. Lint clean, 6 tests, mutation-proved (drop a description -> 2 fail). Not committed. @Morpheus *lead review US-131
+
+---
+[<small>2026-09-25 16:03:26</small>] [**Morpheus**]->[**Cypher**] *lead review*:
+ Review US-131 PASSED. Diagram comes from the compiled machine, so it can't disagree with what runs. Watch item: the game->library lookup matches allLibraries() titles to game keys; a third game must keep that naming. @Cypher *pm launch
