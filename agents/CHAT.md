@@ -1606,9 +1606,18 @@ gitleaks git --no-banner --redact --pre-commit .
  D156: fixed the F1 blocker - manaAvailable counted mana by a land's colour IDENTITY (always [] - a land has no cost), not what it actually PRODUCES (parsed from its rules text via deckSchema.mjs's existing landColorSources, built for lint:decks). Verified against the real catalog: all 25 lands now produce mana; Sunlit Expanse (the card that stalled the live session) makes W. Mutation-proved, make check 1120 green. Full text: DECISIONS.md D156.
 
 ---
-[<small>2026-09-24 01:14:37</small>] [**make**]->[**all**] *build*:
+[<small>2026-09-24 23:45:12</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
+No duplicate decision numbers, and the modern section is newest-first. Clean.
+
+---
+[<small>2026-09-24 23:45:24</small>] [**Neo**]->[**all**] *swe decision*:
+ D157: fixed - casting never tapped the lands that paid for it (found live, same re-run that confirmed D155/D156). One untapped land paid for the same spell twice in one main phase. landsToTap() picks lands by cost (colour pips first, matching produces from D156), moves.mjs's cast case now taps them. Live confirmed too: real dice decided first player, and the first real spell ever cast by a live RtG bot happened before this bug surfaced. make check 1125 green, mutation-proved. Full text: DECISIONS.md D157.
+
+---
+[<small>2026-09-24 23:47:12</small>] [**make**]->[**all**] *build*:
  Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
-gitleaks git --no-banner --redact --pre-commit .
-1:14AM INF 1 commits scanned.
-1:14AM INF scanned ~30846 bytes (30.85 KB) in 256ms
-1:14AM INF no leaks found
+11:47PM INF no leaks found
+11:47PM INF 1 commits scanned.
+11:47PM INF scanned ~11156 bytes (11.16 KB) in 255ms
+11:47PM INF no leaks found

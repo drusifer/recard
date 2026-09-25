@@ -1,5 +1,31 @@
 # Agent State
 
+## Current Task (2026-09-25) - D157 casting-doesn't-tap fix: DONE, live re-run confirmed all 3 fixes
+
+Re-ran the live 2-bot RtG session (fresh MCP bridge, table YFSEEF) to
+confirm D155/D156. Dice worked live: real /roll d20 (rules 13,
+aggressive 8) correctly decided who went first via the pregame
+judgment. Colourless-lands fix confirmed live: aggressive cast a real
+spell for the first time ever in this project's history. That same run
+surfaced a NEW bug: the spell got cast TWICE off one land - casting
+never tapped anything. Fixed same session (D157):
+tools/rtg/playState.mjs landsToTap(cost, lands) (colour pips matched to
+produces, then generic from whatever's left, mutation-proved),
+tools/rtg/moves.mjs's cast case ROTATEs them before moving to the
+Stack. tests/rtgMoves.test.js's old cast test never gave Bear a cost -
+same "fixture doesn't reflect reality" shape as D156 - rewritten to
+exercise real tapping. make check 1125, test-jev-runner 3/3,
+test-harness-mcp 13/13, all green.
+
+Also found, NOT fixed (scoped to BACKLOG, out of "give it a go"'s
+scope): nothing ever resolves a cast spell off the shared Stack onto a
+battlefield - a real feature (priority/pass), not a bug fix.
+
+## Next Steps
+Awaiting the user: commit+push (standing instruction), or scope the
+Stack-resolution feature, or another live re-run now that spells
+actually cost mana.
+
 ## Current Task (2026-09-24) - D156 colorless-lands fix: DONE (uncommitted)
 
 Fixed Smith's live F1: manaAvailable (tools/rtg/playState.mjs) summed by

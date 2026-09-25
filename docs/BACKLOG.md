@@ -280,3 +280,11 @@ superseded:
   cascaded. Cause unproven - the test's `call` helper drops the tool's
   error text, so nothing says why. First step: surface `isError` text in
   the helper; then find out whether it is the public PeerJS broker (D2).
+- **A cast spell never resolves off the Stack** (found live, 2026-09-24/25
+  session that confirmed D155-D157): nothing in `tools/rtg/options.mjs`
+  or `moves.mjs` ever moves a card from the Stack to a battlefield, and
+  `rules.casting` says resolution happens "once both players are done
+  responding" - a real priority/pass concept RtG's bots don't have yet.
+  A bot's own spells sit on the Stack forever from its perspective. A
+  real feature (a `resolve` step, knowing when both sides have passed),
+  not a one-line fix like D157 was - scoping it is its own task.

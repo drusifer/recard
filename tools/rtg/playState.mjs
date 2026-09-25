@@ -72,6 +72,41 @@ export function canPay(cost, mana) {
   return Object.entries(need).every(([color, count]) => (mana.by_color[color] ?? 0) >= count);
 }
 
+/**
+ * Which SPECIFIC untapped lands pay `cost` - colour pips first, each to
+ * a land that produces that colour and is not already spoken for; the
+ * rest of the cmc (generic pips) from whatever untapped lands are left.
+ * Assumes `canPay` already said yes; a cost this cannot fully cover
+ * simply taps as many as it can (the caller's job to have checked
+ * first, same division of labour as `canPay` itself).
+ *
+ * `rules.mana` ("Tap an untapped land you control to pay for a spell")
+ * makes this a real table action, not bookkeeping: casting a spell
+ * MUST tap the lands that paid for it, or the same land pays for every
+ * spell all main phase (the live bug this fixes, D157).
+ * @param {string} cost
+ * @param {object[]} lands described lands (`describe()`'s shape)
+ * @returns {string[]} land ids to ROTATE
+ */
+export function landsToTap(cost, lands) {
+  const { cmc, symbols } = parseManaCost(cost ?? '');
+  const untapped = lands.filter((each) => !each.tapped);
+  const used = new Set();
+  const chosen = [];
+  const take = (land) => { used.add(land.id); chosen.push(land.id); };
+
+  for (const symbol of symbols) {
+    if (!/^[WUBRG]$/.test(symbol)) continue;
+    const land = untapped.find((each) => !used.has(each.id) && (each.produces ?? []).includes(symbol));
+    if (land) take(land);
+  }
+  for (const land of untapped) {
+    if (chosen.length >= cmc) break;
+    if (!used.has(land.id)) take(land);
+  }
+  return chosen;
+}
+
 const pileOf = (view, kind, ownerId) => view.piles.find((pile) => pile.kind === kind
   && (ownerId === undefined || pile.ownerId === ownerId))?.cards ?? [];
 

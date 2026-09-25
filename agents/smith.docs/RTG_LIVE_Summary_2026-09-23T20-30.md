@@ -61,3 +61,28 @@ Unverified: two `make jev-player` bots on one machine likely collide on
   card that stalled the live session (Sunlit Expanse, `{T}: Add {W}.`)
   now produces W. Unit-tested + mutation-proved (tests/rtgPlayState.test.js);
   not yet re-tested LIVE with real bots.
+
+## Live re-run, take 2 (2026-09-24/25, table YFSEEF)
+
+Full end-to-end confirmation of D155/D156, dice included - a REAL /roll
+d20 decided who went first (rules 13, aggressive 8), and the pregame
+judgment correctly started rules' turn from that. First real spell EVER
+cast by a live RtG bot: `aggressive: Casting Oathlight Acolyte - on the
+stack.` (D156's colourless-lands fix confirmed live, not just unit-level).
+
+**New bug found by this run, fixed same session (D157):** the SAME
+spell got cast TWICE off one land - casting never tapped the land(s)
+that paid for it. Fixed: `moves.mjs`'s `cast` now ROTATEs the lands
+`landsToTap` picks before moving the spell to the Stack. Unit-tested,
+mutation-proved, make check 1125 green.
+
+Session stopped cleanly after that finding (both bots quit on request,
+"left the table cleanly", exit 0) rather than continuing to chase F3/F5
+(unaddressed talk moving both bots at once) - those are pre-existing,
+already-filed, non-blocking UX issues, not new.
+
+Not yet re-verified: a full turn with the tap fix live (stopped to fix
+it instead of re-running once more this session), whether spells on the
+Stack ever get moved to the battlefield (no code was found that does
+this - RtG's Stack resolution may be entirely a human/table action
+today, worth checking separately).

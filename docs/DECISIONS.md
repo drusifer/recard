@@ -70,6 +70,45 @@ D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rul
 
 ---
 
+### D157. Casting a spell taps the lands that paid for it
+
+Found live, in the same re-verification session that confirmed D155/D156:
+once colourless lands were fixed (D156), the first real spell was cast -
+and then a single untapped land paid for the SAME spell a second time,
+in the same main phase. `tools/rtg/moves.mjs`'s `cast` case moved the
+spell to the Stack but never tapped anything - `rules.mana` ("Tap an
+untapped land you control to pay for a spell") was written but not
+carried out. With mana never actually spent, casting had no real cost.
+
+**Fix**: `tools/rtg/playState.mjs` gains `landsToTap(cost, lands)` -
+colour pips first, each paid by an untapped land whose `produces`
+(D156) covers it and is not already spoken for; the remaining cmc from
+whatever untapped lands are left. `moves.mjs`'s `cast` case looks up
+the card's own cost and ROTATEs the chosen lands before moving the
+spell to the Stack. The very next decision re-reads the table fresh, so
+a now-tapped land is correctly excluded from the next `cast` option
+without any other code changing.
+
+Verified live: re-ran the two-bot session from D155/D156 end to end -
+dice decided who went first, the winner started correctly, and a real
+spell was cast for the first time (confirming D156's own fix live, not
+just the two prior isolated fixes). That live run is what surfaced this
+bug. Unit-tested and mutation-proved in `tests/rtgPlayState.test.js`
+(landsToTap) and `tests/rtgMoves.test.js` (the rewritten cast test,
+whose old fixture never gave Bear a cost and so never exercised
+tapping at all - the same "fixture doesn't reflect reality" pattern
+D156 was).
+
+**Rejected**: tapping lands as a side effect of `canPay`/`manaAvailable`
+(those are pure read-only checks called from `legalOptions` on every
+possible move, not just the one chosen - tapping there would spend mana
+on moves that are merely being considered, not played); a generic
+"spend N mana" counter divorced from which physical lands are tapped
+(the table shows tapped lands, not a hidden pool - a person watching
+must see the SAME lands rotate that a spell's cost implies).
+
+---
+
 ### D156. A land's mana colour comes from its rules text, never its colour identity
 
 Smith's live session (2026-09-23, finding F1): two Jev bots played untap,

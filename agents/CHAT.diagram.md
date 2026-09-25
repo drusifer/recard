@@ -473,4 +473,6 @@ sequenceDiagram
     Note right of Neo: "*fix colorless basic<br/>lands: lands carry<br/>colors [] (correct - a<br/>land IS colorless) but<br/>manaAvailable counts<br/>mana BY colors, so {W}<br/>never pay…"
     Neo->>All: "swe decision"
     Note right of Neo: "D156: fixed the F1<br/>blocker - manaAvailable<br/>counted mana by a land's<br/>colour IDENTITY (always<br/>[] - a land has no<br/>cost), not what it<br/>actually…"
+    Neo->>All: "swe decision"
+    Note right of Neo: "D157: fixed - casting<br/>never tapped the lands<br/>that paid for it (found<br/>live, same re-run that<br/>confirmed D155/D156).<br/>One untapped land paid<br/>fo…"
 ```

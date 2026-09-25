@@ -6,6 +6,8 @@
 // detects (D151). Kept pure-ish: it returns the actions and the line,
 // and the runner sends them.
 
+import { landsToTap } from './playState.mjs';
+
 /**
 @returns {{ actions: object[], say: string|null, tracks?: object }}
 */
@@ -30,7 +32,12 @@ export function actionsFor(move, state, ids) {
         say: `Playing ${move.card}.`, tracks: { land_played: true } };
     }
     case 'cast': {
-      return { actions: [{ type: 'MOVE', pileableId: card(move.card), toPileId: ids.stack }],
+      // rules.mana: "Tap an untapped land you control to pay for a
+      // spell." Never tapping the paying lands let one land pay for
+      // every spell in a main phase (live bug, D157).
+      const cost = [...state.me.hand, ...state.me.battlefield].find((each) => each.card === move.card)?.cost ?? '';
+      const taps = landsToTap(cost, state.me.lands).map((id) => ({ type: 'ROTATE', pileableId: id }));
+      return { actions: [...taps, { type: 'MOVE', pileableId: card(move.card), toPileId: ids.stack }],
         say: `Casting ${move.card} - on the stack.`, tracks: { arrived: move.card } };
     }
     case 'attack': {

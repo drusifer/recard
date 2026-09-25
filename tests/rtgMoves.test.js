@@ -5,11 +5,17 @@ import assert from 'node:assert/strict';
 import { actionsFor } from '../tools/rtg/moves.mjs';
 
 const ids = { library: 'deck-green', lands: 'lands:me', stack: 'stack' };
+// Bear costs {1}{G} - a real cost, not omitted, so casting it actually
+// exercises `landsToTap` (D157: casting used to tap NOTHING at all).
 const state = {
   me: {
-    hand: [{ card: 'Forest', id: 'f1', type: 'Land', tapped: false }, { card: 'Bear', id: 'b1', type: 'Creature', tapped: false }],
+    hand: [{ card: 'Forest', id: 'f1', type: 'Land', tapped: false }, { card: 'Bear', id: 'b1', type: 'Creature', cost: '{1}{G}', tapped: false }],
     battlefield: [{ card: 'Wolf', id: 'w1', type: 'Creature', tapped: true }],
-    lands: [{ card: 'Forest1', id: 'l1', type: 'Land', tapped: true }, { card: 'Forest2', id: 'l2', type: 'Land', tapped: false }],
+    lands: [
+      { card: 'Forest1', id: 'l1', type: 'Land', produces: ['G'], tapped: true },
+      { card: 'Forest2', id: 'l2', type: 'Land', produces: ['G'], tapped: false },
+      { card: 'Island', id: 'l3', type: 'Land', produces: ['U'], tapped: false },
+    ],
   },
 };
 
@@ -27,10 +33,24 @@ test('playing a land moves that card to the lands pile', () => {
   assert.equal(tracks.land_played, true);
 });
 
-test('casting puts the card on the shared stack and announces it', () => {
+test('BUG (live, D157): casting TAPS the lands that pay for it - one land no longer pays for every spell', () => {
   const { actions, say } = actionsFor({ id: 'cast:Bear', card: 'Bear' }, state, ids);
-  assert.deepEqual(actions, [{ type: 'MOVE', pileableId: 'b1', toPileId: 'stack' }]);
+  // {1}{G}: the untapped Forest (colour pip) plus one more untapped
+  // land (generic) - l1 is already tapped and never chosen again, and
+  // the spell itself moves to the stack last.
+  assert.deepEqual(actions, [
+    { type: 'ROTATE', pileableId: 'l2' },
+    { type: 'ROTATE', pileableId: 'l3' },
+    { type: 'MOVE', pileableId: 'b1', toPileId: 'stack' },
+  ]);
   assert.match(say, /Casting Bear/);
+});
+
+test('casting a free spell taps no lands', () => {
+  const { actions } = actionsFor({ id: 'cast:Trinket', card: 'Trinket' }, {
+    ...state, me: { ...state.me, hand: [...state.me.hand, { card: 'Trinket', id: 't1', type: 'Artifact', cost: '', tapped: false }] },
+  }, ids);
+  assert.deepEqual(actions, [{ type: 'MOVE', pileableId: 't1', toPileId: 'stack' }]);
 });
 
 test('attacking taps the creature and says which one', () => {

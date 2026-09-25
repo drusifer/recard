@@ -2,7 +2,7 @@
 // constraint may cite one by path but never derives one.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildRtgState, manaAvailable, canPay, describe } from '../tools/rtg/playState.mjs';
+import { buildRtgState, manaAvailable, canPay, describe, landsToTap } from '../tools/rtg/playState.mjs';
 
 // A land's real shape (D80: the full printed card travels on it): `cost`
 // is always "" and `colors` (its COLOR IDENTITY, derived from `cost`) is
@@ -84,6 +84,34 @@ test('whether a cost can be paid is computed, never asked', () => {
   assert.equal(canPay('{G}{G}', mana), false, 'one green land cannot pay two green pips');
   assert.equal(canPay('{3}', mana), false, 'three generic needs three lands');
   assert.equal(canPay('', mana), true, 'a land costs nothing');
+});
+
+// ---- BUG (live, D157): casting never taps the lands that pay for it ----
+
+test('landsToTap picks one land per coloured pip, then the rest for generic', () => {
+  const forest = describe(land('f', ['G']));
+  const island = describe(land('i', ['U']));
+  const swamp = describe(land('s', ['B']));
+  const chosen = landsToTap('{1}{G}', [forest, island, swamp]);
+  assert.equal(chosen.length, 2, 'cmc 2 taps exactly 2 lands, not all 3');
+  assert.ok(chosen.includes('f'), 'the coloured pip is paid by a land that actually produces it');
+});
+
+test('landsToTap never picks the same land twice for two pips of the same colour', () => {
+  const forest = describe(land('f', ['G']));
+  const chosen = landsToTap('{G}{G}', [forest]);
+  assert.deepEqual(chosen, ['f'], 'one land can only be tapped once - the second G is simply unpaid');
+});
+
+test('landsToTap leaves an already-tapped land alone', () => {
+  const untappedForest = describe(land('f1', ['G']));
+  const tappedForest = describe(land('f2', ['G'], true));
+  assert.deepEqual(landsToTap('{G}', [untappedForest, tappedForest]), ['f1']);
+});
+
+test('landsToTap on a free spell taps nothing', () => {
+  const forest = describe(land('f', ['G']));
+  assert.deepEqual(landsToTap('', [forest]), []);
 });
 
 test('the opponent has a hand SIZE, and their battlefield is public', () => {
