@@ -5,7 +5,7 @@ const SUITS = { c: 'clubs', d: 'diamonds', h: 'hearts', s: 'spades' };
 const card = (short) => ({ pileableType: 'card', id: `${short.slice(0, -1)}-${SUITS[short.at(-1)]}-0`, rank: short.slice(0, -1), suit: SUITS[short.at(-1)], faceUp: true });
 const cards = (text) => text.split(' ').map((short) => card(short));
 
-export class TimeoutError extends Error {
+class TimeoutError extends Error {
   name = 'TimeoutError';
 }
 
@@ -73,4 +73,4 @@ export class FakeTable {
 }
 
 
-export { card, cards };
+;

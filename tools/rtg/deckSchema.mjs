@@ -29,8 +29,8 @@ export const ARCHETYPE_LAND_BANDS = {
   control: [25, 27],
 };
 
-export const DECK_SIZE = 60;
-export const MAX_COPIES = 4;
+const DECK_SIZE = 60;
+const MAX_COPIES = 4;
 
 /** A left-skewed bell curve, expressed as two bounds on the SPELLS (not
  * the whole deck): plenty of early plays, few expensive ones. */

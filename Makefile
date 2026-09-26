@@ -7,7 +7,7 @@
 #
 # Adding a task: add the npm script first, then a one-line target here.
 
-.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-tablezoom test-focuszoom test-multiplayer test-harness-mcp test-gin test-jev-runner test-jevtable jev-player jev-library jev-library-doc jev-readme jev-table secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers
+.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-tablezoom test-focuszoom test-multiplayer test-harness-mcp test-gin test-jev-runner test-jevtable jev-player jev-library jev-library-doc jev-readme jev-table secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers dead-code
 
 help:
 	@echo "Recard targets (all front npm scripts):"
@@ -44,6 +44,7 @@ help:
 	@echo "  build-standalone  bundle everything into dist/recard-standalone.html (runs via file://)"
 	@echo "  dist         gather index.html/style.css/src/assets into dist/ for a static host upload"
 	@echo "  check-decisions  verify docs/DECISIONS.md's modern section is newest-first, no duplicate D-numbers"
+	@echo "  dead-code    knip: unused files, exports and dependencies (US-132)"
 	@echo "  check-story-numbers  verify docs/USER_STORIES.md has no duplicate US-numbers"
 
 test:
@@ -247,3 +248,7 @@ check-decisions:
 # duplicates.
 check-story-numbers:
 	node tools/checkStoryNumbers.mjs
+
+# US-132: unused files, exports and dependencies, by knip (knip.json declares the real entry points).
+dead-code:
+	npx knip

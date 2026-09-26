@@ -1,0 +1,20 @@
+// US-132: `bobp make dead-code`. Everything here is an ENTRY POINT or an
+// ignore with the reason it is not dead - a silenced finding needs a reason.
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "src/main.js", // index.html loads it; knip does not read HTML
+    "tests/*.test.js",
+    "tests/*.browser.mjs",
+    "tools/*.mjs",
+    "tools/mcp/*.mjs",
+    "tools/codeConnectome/*.mjs", // `bobp make connectome`
+    "tools/gin/examples.mjs" // regenerates docs/GIN_STRATEGY.md section 7
+  ],
+  "project": ["src/**/*.js", "tools/**/*.mjs", "tests/**/*.{js,mjs}"],
+  // a URL the dev server serves to the browser test, not a file path
+  "ignoreUnresolved": ["/src/playerColors.js"],
+  // D148: the rule-list strategies retire together, in the sprint that
+  // retires the benchmark - not before.
+  "ignoreIssues": { "tools/gin/strategies.mjs": ["exports"] }
+}

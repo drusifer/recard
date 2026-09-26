@@ -9,7 +9,7 @@
  * crosses a data channel as a serialized snapshot, and nothing mutates a
  * sent or received message afterwards.
  */
-export const DEFAULT_TRAFFIC_CAPACITY = 500;
+const DEFAULT_TRAFFIC_CAPACITY = 500;
 
 export function createTrafficLog({ capacity = DEFAULT_TRAFFIC_CAPACITY, now = Date.now } = {}) {
   const buffer = [];

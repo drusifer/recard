@@ -13,7 +13,7 @@ import { noul, score } from '@typesafe-ai/sdk';
  * @typedef {{ threat: number, threatConfidence: number, helps: Record<string, number>, model: string }} GinJudgments
  */
 
-export const DISCARD_CANDIDATES = 4;
+const DISCARD_CANDIDATES = 4;
 
 /**
  * Levels 0..4 - the answer's `score` is a position on this scale.

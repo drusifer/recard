@@ -22,7 +22,7 @@ export const rankIndex = (card) => RANKS.indexOf(card.rank) + 1;
  */
 export const cardValue = (card) => Math.min(rankIndex(card), 10);
 
-export const pointsOf = (cards) => cards.reduce((sum, card) => sum + cardValue(card), 0);
+const pointsOf = (cards) => cards.reduce((sum, card) => sum + cardValue(card), 0);
 
 /**
  * Every 3-subset of a list (and the list itself when it has 4).

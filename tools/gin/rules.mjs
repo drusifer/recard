@@ -89,7 +89,7 @@ const stageOf = (stockDrawn) => {
  * @param {GinObservation} obs
  * @returns {DiscardOption[]}
  */
-export function discardOptions(obs) {
+function discardOptions(obs) {
   return obs.hand
     .filter((card) => card.id !== obs.takenFromDiscard)
     .map((card) => {

@@ -185,6 +185,13 @@ or a live-verification session) versus being pickable directly.
   Remove button always failing) in the Save Layout work. Not a
   standing bug itself, a reminder for whoever next builds on that area.
 
+- **`src/ui.js` is 2766 lines and 31.7% unit-covered** (US-132 audit): the
+  largest smell in the repo; splitting it is a design call, not a
+  mechanical cleanup, so it was not done in the tech-debt sprint.
+- **`tools/codeConnectome/connectome.html` is tracked but generated**
+  (US-132): like `test_audit.md`, it goes stale on any change. Untrack it
+  too, or is it a deliberate deliverable? The user's call.
+
 ## Dropped (direct user decision, 2026-09-17)
 
 Not pursuing - removed at the user's explicit request, not resolved or

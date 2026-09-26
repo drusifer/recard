@@ -49,7 +49,7 @@ const COPY_LABEL = 'Copy table code';
  * deprecated - the modern replacement doesn't cover this real case).
  * Resolves `true`/`false` for whether it actually worked, never throws.
  */
-export async function copyText(text) {
+async function copyText(text) {
   if (navigator.clipboard?.writeText) {
     try {
       await navigator.clipboard.writeText(text);

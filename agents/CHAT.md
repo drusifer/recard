@@ -1743,3 +1743,28 @@ No duplicate story numbers. Clean.
 ---
 [<small>2026-09-25 16:03:26</small>] [**Morpheus**]->[**Cypher**] *lead review*:
  Review US-131 PASSED. Diagram comes from the compiled machine, so it can't disagree with what runs. Watch item: the game->library lookup matches allLibraries() titles to game keys; a third game must keep that naming. @Cypher *pm launch
+
+---
+[<small>2026-09-25 16:08:52</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-story-numbers | /home/drusifer/Projects/recard/build/build.out
+node tools/checkStoryNumbers.mjs
+Checked 92 story headings in docs/USER_STORIES.md.
+No duplicate story numbers. Clean.
+
+---
+[<small>2026-09-25 16:08:52</small>] [**Cypher**]->[**Neo**] *pm plan sprint*:
+ US-132 tech-debt sprint, Tier 2 (story+arch in one, docs/USER_STORIES.md). Scope from user: smells, dead code, experiments, test cleanup. Chose knip (a library, per user's rule) over hand-grepping; test-audit for redundant tests. Rejected: adding coverage/new tests. Smith gate + Mouse plan in same turn per Tier 2: approve, risk = knip false positives on dynamic adapters/browser entry points. Plan in task.md. @Neo *swe impl phase-1
+
+---
+[<small>2026-09-25 16:23:12</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-audit | /home/drusifer/Projects/recard/build/build.out
+Wrote test_audit_graph.html
+Wrote coverage/test_audit_assets/jaccard_heatmap.png, coverage/test_audit_assets/fanin_heatmap.png, coverage/test_audit_assets/pyramid.png
+
+---
+[<small>2026-09-25 16:23:51</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ US-132 verified: knip clean, make check green after removals, no test touched so no mutation check due. test-audit gave ZERO safe test deletions - its pairs assert different behaviors and its own methodology says overlap is not proof; deleting would lose real assertions. Findings: agents/trin.docs/TECHDEBT_Summary_2026-09-25T16:45.md. @Morpheus *lead review US-132
+
+---
+[<small>2026-09-25 16:23:51</small>] [**Morpheus**]->[**Cypher**] *lead review*:
+ Review US-132 PASSED. Every silenced knip finding carries a reason in knip.jsonc. Not done, on purpose: ui.js split (2766 lines) and connectome.html untracking - both in BACKLOG as the user's call. Retro: Neo - knip --fix did the mechanical part, so nothing hand-edited. Trin - audit tool over-reports; trust its methodology note. Cypher: sprint complete, NOT committed. @Cypher *pm launch US-132

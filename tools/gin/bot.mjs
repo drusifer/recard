@@ -52,7 +52,7 @@ function factsSummary(facts) {
  * twice, with the record merged onto the same line.
  * @returns {{ text: string, data: object }}
  */
-export function decisionTalk(record, announcement) {
+function decisionTalk(record, announcement) {
   const { decision } = record;
   const thrown = decision.type === 'discard' && record.observation.hand.find((card) => card.id === decision.cardId);
   const source = decision.source === 'discard' ? 'the discard pile' : 'stock';

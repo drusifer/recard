@@ -19,8 +19,8 @@
  * linter's color-identity check (US-76) depends on that. */
 export const WUBRG = ['W', 'U', 'B', 'R', 'G'];
 
-export const CARD_TYPES = ['Creature', 'Instant', 'Sorcery', 'Enchantment', 'Artifact', 'Land', 'Planeswalker'];
-export const RARITIES = ['common', 'uncommon', 'rare', 'mythic'];
+const CARD_TYPES = ['Creature', 'Instant', 'Sorcery', 'Enchantment', 'Artifact', 'Land', 'Planeswalker'];
+const RARITIES = ['common', 'uncommon', 'rare', 'mythic'];
 
 /** An `art:` prompt shorter than this can't describe subject +
  * composition + palette, which is the whole point of the field (D77) -

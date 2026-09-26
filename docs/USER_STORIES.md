@@ -4250,3 +4250,44 @@ how it plays without reading YAML - and it cannot go stale.
 
 **Out of scope:** README for Hearts or non-Jev games; rendering the diagram
 to an image (GitHub renders Mermaid).
+
+### US-132: Tech-debt sprint - code smells, dead code, experiments, tests
+**As** the person who reads and changes this repo, **I want** the dead
+code, leftover experiments and redundant tests gone and the worst smells
+fixed, **so that** what is left is all load-bearing and easier to change.
+
+**Method (Tier 2, story + architecture in one):** FIND with tools, then
+REMOVE, then PRUNE tests. Nothing is judged by eye that a tool can report.
+- Dead code: `knip` (new devDependency; a repo-wide unused files/exports/
+  dependencies report - the user's rule is to use a library, not write one),
+  behind `bobp make dead-code`.
+- Smells: the existing `eslint` (strict unicorn/sonarjs - already in
+  `bobp make check`), plus its complexity/duplication rules if not on.
+- Redundant tests: the existing `bobp make test-audit` (case-level overlap;
+  its own methodology says overlap is a heuristic, not proof).
+- Experiments: tracked files nothing imports, runs or documents (found by
+  knip + `git ls-files` review), e.g. one-off probes and stale generated docs.
+
+**AC:**
+1. `bobp make dead-code` reports unused files, exports and dependencies;
+   the findings are written to `agents/trin.docs/` as a list with a verdict
+   per item (remove / keep-because / ask-user).
+2. Every removal is proven by `bobp make check` staying green - no
+   backward-compat shims or aliases left behind (memory: no-backcompat).
+   Anything referenced only from docs is removed from the docs too.
+3. Tests: redundant or dead tests are REMOVED, not padded around; a
+   mutation check shows any guard whose test was touched is still
+   load-bearing (memory: prune-dont-pad, repeatable-tests).
+4. Smells: complexity/duplication hot spots eslint or knip can name are
+   simplified where the fix is mechanical; anything needing a design call
+   goes to `docs/BACKLOG.md`, not done unprompted.
+5. `bobp make dead-code` (or its knip config) is kept, so this does not
+   silently regrow; ignore entries each carry a reason.
+
+**Out of scope:** behaviour changes; the two open Jev shutdown decisions;
+new tests for coverage's sake; touching `src/` game rules beyond removing
+provably dead code.
+
+**Risks:** knip false positives on dynamically-imported adapters
+(`tools/jev/games.mjs` imports by path) and Playwright `*.browser.mjs`
+entry points - both need to be declared as entries, not silenced.

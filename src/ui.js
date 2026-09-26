@@ -352,7 +352,7 @@ export function dragImageAnchor(renderedWidth, renderedHeight) {
 /**
 Drops any in-progress drag-target highlighting.
 */
-export function clearPileTargets() {
+function clearPileTargets() {
   for (const element of document.querySelectorAll('.pile-target')) {
     element.classList.remove('pile-target');
   }
@@ -710,7 +710,7 @@ function performReveal(card, viewerId, onReveal) {
  * now, and every row gets the property written from this one function -
  * no second "unadjusted" rendering path anywhere.
  */
-export function effectiveSpread(pileView) {
+function effectiveSpread(pileView) {
   return pileView.spread ?? PILE_TYPES[pileView.kind]?.defaultSpread ?? 0;
 }
 

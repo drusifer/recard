@@ -53,7 +53,7 @@ export function readQuestions(strategy, state) {
 
 /** The rule-list `GinJudgments` shape (D137), read out of the read
  *  step - so record, summary and thought bubble see one shape. */
-export function judgmentsFrom(read, facts) {
+function judgmentsFrom(read, facts) {
   const helps = {};
   const wanted = Object.entries(read.opponent_wants?.probabilities ?? {});
   for (const [slot, probability] of wanted) {

@@ -35,7 +35,7 @@ export function criteriaFor(question, options) {
  * A question as TypeSafe takes it: only its own fields. Anything else in
  * a questions file (`applies_to`) is for the interpreter.
  */
-export function asked({ type, instructions, criteria, levels }) {
+function asked({ type, instructions, criteria, levels }) {
   return { type, instructions, ...(criteria && { criteria }), ...(levels && { levels }) };
 }
 

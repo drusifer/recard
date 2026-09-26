@@ -10,7 +10,7 @@ import { TokenPileable } from './TokenPileable.js';
 
 export const PILEABLE_TYPES = { card: CardPileable, chip: ChipPileable, token: TokenPileable };
 
-export { Pileable } from './Pileable.js';
+;
 
 /**
  * A live instance for a plain record.

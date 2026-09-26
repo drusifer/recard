@@ -2234,3 +2234,27 @@ after the fact. Smith's review ran the CLI and found one defect (T1.4).
 
 ## Needs the user
 - Worst-case shutdown with a HUNG bot is still ~16s (5 say + 5 grace + 5 after SIGTERM + 1). Only the 15s grace was asked to change.
+
+# Sprint: Tech debt (US-132) — 2026-09-25 — Tier 2
+
+Story + architecture: `docs/USER_STORIES.md` US-132. Smith review and Mouse
+plan done in one turn (Tier 2). Pruning, not padding.
+
+## Phase 1 — Find (AC1, AC5)
+- [x] T1.1 Add `knip` (devDependency), config declaring real entry points (tools CLIs, `*.browser.mjs`, dynamic adapters), `bobp make dead-code`
+- [x] T1.2 Run dead-code, test-audit, lint; Trin writes the findings list with a verdict per item
+
+## Phase 2 — Remove dead code and experiments (AC2, AC4)
+- [x] T2.1 Remove every `remove` item: files, exports, deps, and their doc mentions
+- [x] T2.2 Mechanical smell fixes only; design-call items go to BACKLOG
+
+## Phase 3 — Prune tests (AC3)
+- [x] T3.1 test-audit yields NO safe deletions (see Trin summary); no dead tests exist
+- [x] T3.2 (no test touched - nothing to mutation-check)
+
+## Phase 4 — Verify, review, groom
+- [x] T4.1 Trin: `bobp make check` green, once, at the end
+- [x] T4.2 Morpheus review; Oracle groom
+
+## Needs the user
+- Any `ask-user` item in the T1.2 findings (deleting something that might be a wanted experiment).

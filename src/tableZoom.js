@@ -88,7 +88,7 @@ export function zoomFromPinch(startZoom, distanceRatio) {
  * zoom or below, the table already fits the surface, so there is
  * nothing worth panning to reveal - the bound is exactly 0 there.
  */
-export const PAN_RANGE_PER_ZOOM = 400;
+const PAN_RANGE_PER_ZOOM = 400;
 
 export function maxPan(zoom) {
   return Math.max(0, (zoom - 1) * PAN_RANGE_PER_ZOOM);

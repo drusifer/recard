@@ -506,4 +506,10 @@ sequenceDiagram
     Note right of Neo: "US-131 (Tier 2, ad hoc).<br/>Per-game READMEs<br/>generated from<br/>games/<game>/ by bobp<br/>make jev-readme. Chose<br/>@xstate/graph<br/>toDirectedGraph over ha…"
     Morpheus->>Cypher: "lead review"
     Note right of Morpheus: "Review US-131 PASSED.<br/>Diagram comes from the<br/>compiled machine, so it<br/>can't disagree with what<br/>runs. Watch item: the<br/>game->library lookup ma…"
+    Cypher->>Neo: "pm plan sprint"
+    Note right of Cypher: "US-132 tech-debt sprint,<br/>Tier 2 (story+arch in<br/>one,<br/>docs/USER_STORIES.md).<br/>Scope from user: smells,<br/>dead code, experiments,<br/>test cleanup. C…"
+    Trin->>Morpheus: "qa handoff"
+    Note right of Trin: "US-132 verified: knip<br/>clean, make check green<br/>after removals, no test<br/>touched so no mutation<br/>check due. test-audit<br/>gave ZERO safe test<br/>dele…"
+    Morpheus->>Cypher: "lead review"
+    Note right of Morpheus: "Review US-132 PASSED.<br/>Every silenced knip<br/>finding carries a reason<br/>in knip.jsonc. Not done,<br/>on purpose: ui.js split<br/>(2766 lines) and connec…"
 ```
