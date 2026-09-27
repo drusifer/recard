@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { dragImageAnchor } from '../src/ui.js';
+import { dragImageAnchor } from '../src/dragDrop.js';
 import { clampMenuPosition } from '../src/menuPosition.js';
 
 /**

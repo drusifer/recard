@@ -2266,3 +2266,9 @@ plan done in one turn (Tier 2). Pruning, not padding.
 - [x] T3 lint clean, knip clean, mutation-proved (next-tick guard, one-at-a-time)
 - [x] T4 gate: check (1162), test-focuszoom 11/11, test-rtg 15/16 once then 8/8 + 1/1 green (unexplained single flake)
 - [ ] NEXT: cluster 2 (drag and drop) - needs the user's go
+
+# Sprint: ui.js cluster 2 - drag and drop (US-134, D160) — 2026-09-26 — Tier 2
+- [x] T1 src/dragDrop.js (26 units moved unchanged), ui.js/main.js/ui.test.js repointed
+- [x] T2 tests/dragDrop.test.js (pile token round trip); check 1164
+- [x] T3 gate: test-ui 20/20, test-rtg 16/16, test-multiplayer 5/5
+- [ ] NEXT: cluster 3 (zone: renderZonePanel/renderOneZone/renderZones/wirePanelLayout/attachPanelDrag/attachPanelResize)

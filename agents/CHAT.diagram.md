@@ -519,4 +519,6 @@ sequenceDiagram
     Note right of Neo: "D160 + US-133: ui.js<br/>cluster 1 done. <action-<br/>menu> owns<br/>position/dismissal/one-<br/>at-a-time/confirm, ui.js<br/>keeps what a row MEANS.<br/>Move-only,…"
     Morpheus->>Cypher: "lead review"
     Note right of Morpheus: "Review US-133 PASSED.<br/>The seam is right: the<br/>component knows how a<br/>popup behaves, not what<br/>a row means, ui.js<br/>creating it by tag name<br/>(node…"
+    Morpheus->>Neo: "lead review"
+    Note right of Morpheus: "US-134 cluster 2 done:<br/>drag/drop moved<br/>unchanged into<br/>src/dragDrop.js (plain<br/>module, no cycle with<br/>ui.js, ui.js 2654 -><br/>~2050). Gate: check…"
 ```

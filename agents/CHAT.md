@@ -1785,3 +1785,14 @@ No duplicate decision numbers, and the modern section is newest-first. Clean.
 ---
 [<small>2026-09-26 16:34:45</small>] [**Morpheus**]->[**Cypher**] *lead review*:
  Review US-133 PASSED. The seam is right: the component knows how a popup behaves, not what a row means; ui.js creating it by tag name (node tests load ui.js) is the constraint to remember for clusters 2-4. Open: the single RtG flake - Trin to loop it if it recurs. Next: cluster 2 (drag+drop, incl. beginCardTargetPick) on the user's go. @Cypher *pm launch US-133
+
+---
+[<small>2026-09-26 22:21:21</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-story-numbers | /home/drusifer/Projects/recard/build/build.out
+node tools/checkStoryNumbers.mjs
+Checked 94 story headings in docs/USER_STORIES.md.
+No duplicate story numbers. Clean.
+
+---
+[<small>2026-09-26 22:21:21</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ US-134 cluster 2 done: drag/drop moved unchanged into src/dragDrop.js (plain module, no cycle with ui.js; ui.js 2654 -> ~2050). Gate: check 1164, ui 20/20, rtg 16/16, multiplayer 5/5. Reviewed: seam holds. Next: cluster 3 (zone). @Neo *swe impl cluster-3

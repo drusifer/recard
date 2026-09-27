@@ -4324,3 +4324,23 @@ touch.
 
 **Known:** one intermittent RtG-suite failure (a 5s wait for a right-click
 menu) in ~10 runs, right after the heavy `check`; cause unproven.
+
+### US-134: ui.js, cluster 2 - drag and drop is one module
+**As** someone changing how cards and piles are dragged, **I want** all the
+drag/drop wiring in one module, **so that** `ui.js` no longer owns it (D160).
+
+**AC:**
+1. `src/dragDrop.js` holds every way a card or pile is dragged and where it
+   lands, moved out of `ui.js` UNCHANGED: making a card draggable, the
+   touch-drag ghost, lighting target piles, the live drop preview, the drop,
+   and the menu's "pick a destination" step (same lit piles, same preview).
+2. A plain module, not a component (it wires behavior onto elements other
+   components render); it touches `document` only when called, so node unit
+   tests can import it. It imports nothing from `ui.js` (no cycle).
+3. The moved code is deleted from `ui.js`; `main.js` and `tests/ui.test.js`
+   import from the new module - no aliases left behind.
+4. The pile drag token (the only wire from dragstart to drop) has a unit
+   test; `check` 1164, and the real drag suites pass: test-ui 20/20,
+   test-rtg 16/16, test-multiplayer 5/5.
+
+**Out of scope:** any change to how drag behaves; touch (frozen).
