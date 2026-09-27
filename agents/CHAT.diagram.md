@@ -512,4 +512,11 @@ sequenceDiagram
     Note right of Trin: "US-132 verified: knip<br/>clean, make check green<br/>after removals, no test<br/>touched so no mutation<br/>check due. test-audit<br/>gave ZERO safe test<br/>dele…"
     Morpheus->>Cypher: "lead review"
     Note right of Morpheus: "Review US-132 PASSED.<br/>Every silenced knip<br/>finding carries a reason<br/>in knip.jsonc. Not done,<br/>on purpose: ui.js split<br/>(2766 lines) and connec…"
+    Note over User,Oracle: 📅 2026-09-26
+    Morpheus->>Cypher: "lead guide"
+    Note right of Morpheus: "ui.js plan: strangler,<br/>one cluster per Tier-2<br/>sprint, MOVE-ONLY (no<br/>behavior change). Order:<br/>1 menus/actions<br/>(openCardContextMenu,<br/>stack/en…"
+    Neo->>Morpheus: "swe handoff"
+    Note right of Neo: "D160 + US-133: ui.js<br/>cluster 1 done. <action-<br/>menu> owns<br/>position/dismissal/one-<br/>at-a-time/confirm, ui.js<br/>keeps what a row MEANS.<br/>Move-only,…"
+    Morpheus->>Cypher: "lead review"
+    Note right of Morpheus: "Review US-133 PASSED.<br/>The seam is right: the<br/>component knows how a<br/>popup behaves, not what<br/>a row means, ui.js<br/>creating it by tag name<br/>(node…"
 ```

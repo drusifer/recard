@@ -70,6 +70,31 @@ D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rul
 
 ---
 
+### D160. `ui.js` is taken apart by strangler extraction, one cluster per sprint - menus first
+
+`src/ui.js` is 2947 lines and 71 functions, and only 31.7% unit-covered
+(the rest is browser-tested). The `<pile-panel>`/`<zone-panel>`/
+`<header-actions>` components already exist but are 24-47-line shells that
+CALL back into `ui.js`; the logic never moved. Direction: move it INTO the
+components, one cluster per Tier-2 sprint, each MOVE-ONLY (no behavior
+change), the `ui.js` original deleted as it moves (no aliases): 1 menus and
+actions, 2 drag and drop, 3 zone (owns move/resize), 4 pile (type-specific
+behavior on the Pile class hierarchy, not `if`s). `ui.js` ends holding only
+the roster, banner, screens and small leftovers. Touch stays frozen.
+
+**Cluster 1 (US-133):** the popup a card's right-click menu and a stack's
+gear menu share is `<action-menu>`. It owns position, dismissal, one-at-a-
+time and the destructive confirm; the caller keeps what a row MEANS and
+gets `onSelect(id)`. `ui.js` creates it by tag name - it cannot import a
+component file because node unit tests load `ui.js` and a component's
+`class extends HTMLElement` does not exist there (why `clampMenuPosition`
+is its own pure module). One deliberate change: a stack menu now closes on
+Escape too (there was one closer for both by design).
+
+**Rejected:** a big-bang rewrite (too much under too little unit
+coverage); splitting by line count (`ui2.js` moves the mess, models
+nothing).
+
 ### D159. `bobp make jev-table` - a hosted table with N Jev bots, for any game, as one command
 
 Direct user request ("add a make target so it's easy to repeat"), after

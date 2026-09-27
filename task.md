@@ -2258,3 +2258,11 @@ plan done in one turn (Tier 2). Pruning, not padding.
 
 ## Needs the user
 - Any `ask-user` item in the T1.2 findings (deleting something that might be a wanted experiment).
+
+# Sprint: ui.js cluster 1 - `<action-menu>` (US-133, D160) — 2026-09-26 — Tier 2
+
+- [x] T1 tests first: tests/actionMenu.browser.mjs (11 cases), red for the right reason
+- [x] T2 src/components/ActionMenu.js + src/menuPosition.js; ui.js menus reduced to plumbing; main.js import
+- [x] T3 lint clean, knip clean, mutation-proved (next-tick guard, one-at-a-time)
+- [x] T4 gate: check (1162), test-focuszoom 11/11, test-rtg 15/16 once then 8/8 + 1/1 green (unexplained single flake)
+- [ ] NEXT: cluster 2 (drag and drop) - needs the user's go

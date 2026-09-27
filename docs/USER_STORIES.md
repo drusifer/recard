@@ -4291,3 +4291,36 @@ provably dead code.
 **Risks:** knip false positives on dynamically-imported adapters
 (`tools/jev/games.mjs` imports by path) and Playwright `*.browser.mjs`
 entry points - both need to be declared as entries, not silenced.
+
+### US-133: ui.js, cluster 1 - the action menu is a component
+**As** someone changing how menus behave, **I want** the popup a card's
+right-click menu and a stack's gear menu share to be one `<action-menu>`
+component, **so that** `ui.js` (2947 lines) shrinks by what it never
+should have owned, and the plan in D160 (menus -> drag/drop -> zone ->
+pile) has a first, proven step.
+
+**AC:**
+1. `<action-menu>` (`src/components/ActionMenu.js`) owns what every such
+   popup shares: anchored at the cursor and clamped on-screen, closed by
+   Escape or an outside click, only ever one open, the confirm gate on a
+   destructive row, and the `pilemenu:opened` event. It does not know what
+   a row means: it is handed rows (or a ready-made node, a slider) and
+   reports `onSelect(id)`.
+2. MOVE-ONLY otherwise: `openCardContextMenu` / `openStackActionMenu` in
+   `ui.js` shrink to what each action means for a card / a stack. The moved
+   code is deleted from `ui.js` (no aliases); `clampMenuPosition` is its
+   own pure module (`src/menuPosition.js`) so node unit tests still reach it.
+3. The one visible change: a stack's gear menu now also closes on Escape
+   (the card menu always did; there was one closer for both by design).
+4. A component-level browser test (`bobp make test-actionmenu`, 11 cases,
+   no table needed) pins position, dismissal, one-at-a-time, the confirm
+   gate and the slider case; the next-tick guard and the one-at-a-time rule
+   are mutation-proved. The existing focus-zoom and RtG suites, which drive
+   the real menus, still pass.
+
+**Out of scope:** the card-target-pick step (belongs with drag/drop,
+cluster 2); `renderActionHeader`'s own menus (the pile header - cluster 3/4);
+touch.
+
+**Known:** one intermittent RtG-suite failure (a 5s wait for a right-click
+menu) in ~10 runs, right after the heavy `check`; cause unproven.

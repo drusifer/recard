@@ -12,8 +12,9 @@
     "tools/gin/examples.mjs" // regenerates docs/GIN_STRATEGY.md section 7
   ],
   "project": ["src/**/*.js", "tools/**/*.mjs", "tests/**/*.{js,mjs}"],
-  // a URL the dev server serves to the browser test, not a file path
-  "ignoreUnresolved": ["/src/playerColors.js"],
+  // URLs a browser test imports from the static server (`import('/src/...')`
+  // inside page.evaluate), not file paths
+  "ignoreUnresolved": ["^/src/"],
   // D148: the rule-list strategies retire together, in the sprint that
   // retires the benchmark - not before.
   "ignoreIssues": { "tools/gin/strategies.mjs": ["exports"] }

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { clampMenuPosition, dragImageAnchor } from '../src/ui.js';
+import { dragImageAnchor } from '../src/ui.js';
+import { clampMenuPosition } from '../src/menuPosition.js';
 
 /**
 US-100 (right-click card action menu, D101): the menu opens at the cursor,

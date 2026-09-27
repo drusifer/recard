@@ -295,28 +295,6 @@ function attachTouchDrag(sourceElement, card, context) {
 // never disagree with the rule.
 
 /**
- * US-100/D101: where a cursor-anchored popup (the card context menu) should
- * actually render so it never spills off-screen - pure and DOM-free like
- * `pileActions.js`, so it's directly testable without a browser
- * (`tests/ui.test.js`). Shifts left/up just enough to fit; if the menu is
- * bigger than the viewport itself, pins to the origin rather than going
- * negative (a popup partly off the TOP-left is worse than one that simply
- * can't fully fit).
- *
- * @param {number} x cursor x (where the menu would naively open)
- * @param {number} y cursor y
- * @param {{width: number, height: number}} size the menu's own footprint
- * @param {{width: number, height: number}} viewport
- * @returns {{x: number, y: number}}
- */
-export function clampMenuPosition(x, y, size, viewport) {
-  return {
-    x: Math.max(0, Math.min(x, viewport.width - size.width)),
-    y: Math.max(0, Math.min(y, viewport.height - size.height)),
-  };
-}
-
-/**
  * *fix (direct user bug report, 2026-09-17, corrected same day): "drag
  * is weird, not scaled right so the dragged items fall behind the
  * mouse pointer" - then, after a first attempt: "still off, it needs
@@ -661,7 +639,7 @@ function buildRangeAction(id, spec, { value, min, max }, options) {
   // A completed drag on a native range input fires a real `click` that
   // bubbles - inside `openStackActionMenu`'s popup, that click would
   // otherwise reach the document-level outside-click listener that
-  // closes the menu (`closeCardContextMenu`), dismissing it the instant
+  // closes the menu (`<action-menu>`'s own), dismissing it the instant
   // a drag finishes. Every button in these menus already stops this
   // same propagation in its own click handler for the same reason.
   slider.addEventListener('click', (event) => event.stopPropagation());
@@ -1064,37 +1042,14 @@ function attachCardContextMenu(wrapper, card, pileableActions, piles, fromPileId
 }
 
 /**
- * Builds and shows the actual popup, positioned at the cursor and clamped
- * on-screen (`clampMenuPosition`). Appended to `document.body` rather than
- * the card's own wrapper so it's never clipped by a pile's overflow, same
- * reasoning `pileElement` lookups already rely on for cross-cutting UI.
- */
-// *fix (standing backlog bug, filed 2026-09-13, root-caused 2026-09-17):
-// right-clicking a card/stack ALSO satisfies US-117 focus-zoom's own
-// hover-intent trigger (the click hovers first) - a menu opens and
-// closes well within the 180ms delay, but nothing ever cancelled the
-// timer THAT hover armed, so it fires later, unrelated to anything
-// still open, growing an orphaned pile mid a later interaction. main.js
-// owns the timer and has no reference to ui.js's menu functions (nor
-// should it), so this event is the seam: every menu-open call site
-// dispatches it once the popup is actually in the DOM, and `main.js`'s
-// `wireFocusZoom` cancels the pending timer on it.
-export const PILE_MENU_OPENED_EVENT = 'pilemenu:opened';
-
-/**
- * One stack's own action menu, opened by its gear emblem.
- *
- * Reuses the card context menu's own list styling and dismissal
- * (`.pile-action-menu`/`.card-context-menu`, `clampMenuPosition`) - the
- * same "reuse the existing *Actions look, don't invent a parallel one"
- * rule D101 followed. What differs is only WHAT it acts on: a stack,
- * addressed by its key, rather than a card.
+ * One stack's own action menu, opened by its gear emblem: rows and range
+ * sliders handed to `<action-menu>`, which owns everything else about a
+ * popup (where it sits, how it closes, that there is only one). What
+ * differs from the card menu is only WHAT it acts on: a stack, addressed
+ * by its key, rather than a card.
  */
 function openStackActionMenu(clientX, clientY, actionIds, disabled, pileId, stackKey, rangeOptions, options) {
-  closeCardContextMenu();
-  const menu = document.createElement('div');
-  menu.className = 'pile-action-menu card-context-menu stack-action-menu';
-  for (const id of actionIds) {
+  const items = actionIds.map((id) => {
     const spec = ACTION_SPECS[id];
     // Tighten/Loosen slider (2026-09-13): `spreadStack` (`spec.range`)
     // renders as a `<spread-slider>`, same as the pile-level menu's own
@@ -1103,78 +1058,39 @@ function openStackActionMenu(clientX, clientY, actionIds, disabled, pileId, stac
     // meant to be dragged repeatedly, not clicked once and dismissed.
     const rangeInfo = spec.range ? rangeOptions?.[id] : undefined;
     if (rangeInfo) {
-      menu.append(buildRangeAction(id, spec, rangeInfo, {
-        onAction: (actionId, value) => options.onStackAction?.(pileId, stackKey, actionId, value),
-      }));
-      continue;
+      return {
+        node: buildRangeAction(id, spec, rangeInfo, {
+          onAction: (actionId, value) => options.onStackAction?.(pileId, stackKey, actionId, value),
+        }),
+      };
     }
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'pile-action-menu-item';
-    button.textContent = `${spec.icon} ${spec.label}`;
-    button.title = spec.hint;
-    button.setAttribute('aria-label', spec.label);
-    button.dataset.action = id;
-    button.disabled = disabled.includes(id);
-    button.addEventListener('click', (event) => {
-      event.stopPropagation();
-      closeCardContextMenu();
-      options.onStackAction?.(pileId, stackKey, id);
-    });
-    menu.append(button);
-  }
-  document.body.append(menu);
-  document.dispatchEvent(new Event(PILE_MENU_OPENED_EVENT));
-  const rect = menu.getBoundingClientRect();
-  const pos = clampMenuPosition(clientX, clientY, { width: rect.width, height: rect.height },
-    { width: globalThis.innerWidth, height: globalThis.innerHeight });
-  menu.style.left = `${pos.x}px`;
-  menu.style.top = `${pos.y}px`;
-  // Same dismissal the card menu uses - `closeCardContextMenu` finds it
-  // by the shared `.card-context-menu` class, so there is one closer,
-  // not two that can leave each other's menu open. Bound on the NEXT
-  // tick so the click that OPENED this menu is not itself read as the
-  // outside click that closes it.
-  setTimeout(() => {
-    document.addEventListener('click', closeCardContextMenu, { once: true });
-  }, 0);
+    return { id, text: `${spec.icon} ${spec.label}`, title: spec.hint, label: spec.label, disabled: disabled.includes(id) };
+  });
+  document.createElement('action-menu').open({
+    x: clientX,
+    y: clientY,
+    items,
+    className: 'stack-action-menu',
+    onSelect: (id) => options.onStackAction?.(pileId, stackKey, id),
+  });
 }
 
+/**
+ * A card's context menu. Every decision about these rows - what each
+ * says, which ones need a destination picked, which need a confirm - is
+ * `pileableMenuItems` (`pileActions.js`), unit-tested there; `<action-menu>`
+ * draws them. What is left here is what each ACTION means for a card.
+ */
 function openCardContextMenu(clientX, clientY, actionIds, card, piles, fromPileId, options) {
-  closeCardContextMenu();
-
-  // Reuses `.pile-action-menu`/`.pile-action-menu-item` (`style.css`) -
-  // the SAME visual list style.js already gives the EnumAction menu
-  // (`buildEnumActionMenu`) - and layers `.card-context-menu` on top only
-  // to override the anchoring (fixed at the cursor, not `absolute` under
-  // a `<details>`). Direct user ask: card actions should reuse existing
-  // *Actions classes, not invent a parallel look.
-  const menu = document.createElement('div');
-  menu.className = 'pile-action-menu card-context-menu';
-  // Every decision about these rows - what each says, which ones need a
-  // destination picked, which need a confirm - is `pileableMenuItems`
-  // (`pileActions.js`), unit-tested there. This loop is plumbing only:
-  // turn each row into a `<button>` and wire its click.
-  for (const { id, text, label, destructive, targeted } of pileableMenuItems(actionIds)) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'pile-action-menu-item' + (destructive ? ' btn-danger' : '');
-    // Icon THEN name. *nit (direct user request): "put the name of the
-    // action in the card action menu" - D101 built these with
-    // `applyIconButton`, the pile header's COMPACT button helper, so
-    // the name was only ever a tooltip. `title`/`aria-label` keep the
-    // bare name; the visible text carries both.
-    button.textContent = text;
-    button.title = label;
-    button.setAttribute('aria-label', label);
-    // `data-action` is what a browser test clicks by (`tests/
-    // uiActions.browser.mjs`) - the row's own identity, stable across
-    // relabelling, rather than matching on the text a *nit may change.
-    button.dataset.action = id;
-    button.addEventListener('click', (event) => {
-      event.stopPropagation();
-      closeCardContextMenu();
-      if (destructive && !globalThis.confirm(`${ACTION_SPECS[id].hint}\n\nContinue?`)) return;
+  const rows = pileableMenuItems(actionIds);
+  const items = rows.map(({ id, text, label, destructive }) => ({
+    id, text, title: label, label, destructive, confirm: destructive ? ACTION_SPECS[id].hint : undefined,
+  }));
+  document.createElement('action-menu').open({
+    x: clientX,
+    y: clientY,
+    items,
+    onSelect: (id) => {
       // *nit (show/hide): `conceal` dispatches the same `onReveal`
       // callback - one `FLIP` reducer action, whichever direction
       // the card is going - but skips `performReveal`'s confirm, which
@@ -1197,33 +1113,11 @@ function openCardContextMenu(clientX, clientY, actionIds, card, piles, fromPileI
         // Phase 2 (D101): a targeted action (move/pickup) has no
         // in-place effect - it needs a destination, chosen next.
         default: {
-          if (targeted) beginCardTargetPick(id, card, piles, fromPileId, options);
+          if (rows.find((row) => row.id === id)?.targeted) beginCardTargetPick(id, card, piles, fromPileId, options);
         }
       }
-    });
-    menu.append(button);
-  }
-  document.body.append(menu);
-  document.dispatchEvent(new Event(PILE_MENU_OPENED_EVENT));
-
-  const rect = menu.getBoundingClientRect();
-  const pos = clampMenuPosition(clientX, clientY, { width: rect.width, height: rect.height },
-    { width: globalThis.innerWidth, height: globalThis.innerHeight });
-  menu.style.left = `${pos.x}px`;
-  menu.style.top = `${pos.y}px`;
-
-  // Dismiss on Escape or a click anywhere outside the menu. Listeners are
-  // added on the NEXT tick (not synchronously) so the `contextmenu` event
-  // that opened this menu doesn't itself get read as the "outside click"
-  // that closes it.
-  setTimeout(() => {
-    document.addEventListener('click', closeCardContextMenu, { once: true });
-    document.addEventListener('keydown', onContextMenuKeydown);
-  }, 0);
-}
-
-function onContextMenuKeydown(event) {
-  if (event.key === 'Escape') closeCardContextMenu();
+    },
+  });
 }
 
 /**
@@ -1302,12 +1196,6 @@ function beginCardTargetPick(actionId, card, piles, fromPileId, options) {
     document.addEventListener('keydown', cancelOnEscape, { once: true });
     document.addEventListener('mousemove', previewTargetUnderPointer);
   }, 0);
-}
-
-function closeCardContextMenu() {
-  document.querySelector('.card-context-menu')?.remove();
-  document.removeEventListener('click', closeCardContextMenu);
-  document.removeEventListener('keydown', onContextMenuKeydown);
 }
 
 /**

@@ -7,7 +7,7 @@
 #
 # Adding a task: add the npm script first, then a one-line target here.
 
-.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-tablezoom test-focuszoom test-multiplayer test-harness-mcp test-gin test-jev-runner test-jevtable jev-player jev-library jev-library-doc jev-readme jev-table secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers dead-code
+.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-tablezoom test-focuszoom test-multiplayer test-harness-mcp test-gin test-jev-runner test-jevtable test-actionmenu jev-player jev-library jev-library-doc jev-readme jev-table secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers dead-code
 
 help:
 	@echo "Recard targets (all front npm scripts):"
@@ -25,6 +25,7 @@ help:
 	@echo "  jev-library-doc  regenerate docs/JEV_LIBRARY.md from the library"
 	@echo "  jev-readme    regenerate games/<game>/README.md (description + statechart diagram) from each game's files (US-131)"
 	@echo "  jev-table     GAME=gin|rtg [PLAYERS=a,b] [DECK=<pile id>] [DEAL=n] [SCORE=n] [STEPS=n]: host a spectator table with N Jev bots dealt and ready, set up as games/<game>/table.yaml says - watch live or via the harness MCP tools"
+	@echo "  test-actionmenu  <action-menu> component in a real browser: position, dismissal, one at a time (US-133)"
 	@echo "  test-jevtable  Ctrl-C at jev-table ends the table and leaves no bot running (D159)"
 	@echo "  test-jev-runner  the real jev-player CLI at a hosted table: moves, add-bot, quit (US-128)"
 	@echo "  jev-player    GAME=gin|rtg STRATEGY=<player file name> CODE=<table code> [FIRST=bot|opponent] [HANDS=1] [DECK=<pile id>] [STEPS=12]: a Jev player joins your table (US-120, US-128)"
@@ -104,6 +105,9 @@ jev-library:
 
 test-jevtable:
 	npm run test:jevtable
+
+test-actionmenu:
+	npm run test:actionmenu
 
 jev-library-doc:
 	node tools/jevLibrary.mjs --write

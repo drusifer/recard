@@ -1,5 +1,24 @@
 # Agent State
 
+## Current Task (2026-09-26) - US-133 / D160 ui.js cluster 1 (`<action-menu>`) REVIEWED, NOT COMMITTED
+
+Done: src/components/ActionMenu.js, src/menuPosition.js, ui.js menus now plumbing, main.js imports the
+event constant from the component. tests/actionMenu.browser.mjs (make test-actionmenu). Gate: check 1162,
+focuszoom 11/11, rtg 15/16 once then 9 green. Rule for clusters 2-4: ui.js must not import a component
+file (node tests load ui.js) - create by tag name; components are registered by main.js.
+Next: cluster 2 = drag+drop incl. beginCardTargetPick/showDropPreview/cardBoxesIn (menu calls it).
+
+## Current Task (2026-09-26) - *guide: how to tackle src/ui.js (2947 lines, 71 functions)
+
+Finding: the Web Components already exist (PilePanel 25, ZonePanel 28, DeckStack 47, FanPile 41,
+HeaderActions 24 lines) but are thin shells; the logic is still imperative in ui.js (renderPileCards
+221, renderPileShell 209, renderZonePanel 165, renderActionHeader 140, attachTouchDrag 123 ...).
+Plan (posted to CHAT, awaiting user go): strangler, move-only, one cluster per sprint: menus ->
+drag/drop -> zone (owns move/resize) -> pile (polymorphic per Pile class). Characterize at the
+component boundary first (ui.js is 31.7% unit-covered; rest is browser tests - run e2e only at the
+cluster gate). Touch stays frozen (desktop-only pass). No shims: delete the ui.js function when moved.
+Next: user says go -> Cypher writes the cluster-1 story.
+
 ## Current Task (2026-09-25) - US-130 review PASSED, one note
 
 launcher knows no game; table.yaml is data; setup/argv are pure. shutdown.mjs helpers are the

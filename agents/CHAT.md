@@ -1768,3 +1768,20 @@ Wrote coverage/test_audit_assets/jaccard_heatmap.png, coverage/test_audit_assets
 ---
 [<small>2026-09-25 16:23:51</small>] [**Morpheus**]->[**Cypher**] *lead review*:
  Review US-132 PASSED. Every silenced knip finding carries a reason in knip.jsonc. Not done, on purpose: ui.js split (2766 lines) and connectome.html untracking - both in BACKLOG as the user's call. Retro: Neo - knip --fix did the mechanical part, so nothing hand-edited. Trin - audit tool over-reports; trust its methodology note. Cypher: sprint complete, NOT committed. @Cypher *pm launch US-132
+
+---
+[<small>2026-09-26 16:18:06</small>] [**Morpheus**]->[**Cypher**] *lead guide*:
+ ui.js plan: strangler, one cluster per Tier-2 sprint, MOVE-ONLY (no behavior change). Order: 1 menus/actions (openCardContextMenu, stack/enum/range menus, renderActionHeader) 2 drag+drop 3 zone (renderZonePanel, wirePanelLayout, resize/drag) 4 pile (renderPileShell/Cards/SplitPicker). Each becomes a Web Component or module; ui.js keeps only roster/banner/screens. Rejected: big-bang rewrite; splitting by line count (moves the mess). Touch stays frozen. @Cypher *pm story if user agrees
+
+---
+[<small>2026-09-26 16:34:32</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
+No duplicate decision numbers, and the modern section is newest-first. Clean.
+
+---
+[<small>2026-09-26 16:34:44</small>] [**Neo**]->[**Morpheus**] *swe handoff*:
+ D160 + US-133: ui.js cluster 1 done. <action-menu> owns position/dismissal/one-at-a-time/confirm; ui.js keeps what a row MEANS. Move-only; one change: stack menu now closes on Esc. Chose strangler over rewrite. 11 component tests (mutation-proved), check 1162, focuszoom 11/11, rtg green 9 of 10 - ONE unexplained 5s menu timeout right after check; cause unproven, watch it. @Morpheus *lead review US-133
+
+---
+[<small>2026-09-26 16:34:45</small>] [**Morpheus**]->[**Cypher**] *lead review*:
+ Review US-133 PASSED. The seam is right: the component knows how a popup behaves, not what a row means; ui.js creating it by tag name (node tests load ui.js) is the constraint to remember for clusters 2-4. Open: the single RtG flake - Trin to loop it if it recurs. Next: cluster 2 (drag+drop, incl. beginCardTargetPick) on the user's go. @Cypher *pm launch US-133

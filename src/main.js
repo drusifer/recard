@@ -23,8 +23,8 @@ import {
   removeDragGhost,
   pileDragFromDrop,
   pileElement,
-  PILE_MENU_OPENED_EVENT,
 } from './ui.js';
+import { PILE_MENU_OPENED_EVENT } from './components/ActionMenu.js';
 import { clampOverlayPosition, clampFocusZoomScale, HOVER_INTENT_MS } from './focusZoom.js';
 import { PRESETS, filterDeckChoicePiles } from './presets.js';
 import { RULES_REFERENCE } from './rulesReference.js';
@@ -1905,8 +1905,8 @@ function wireFocusZoom() {
   // hover armed - it fired later, unrelated to anything still open,
   // growing an orphaned pile mid a later interaction (confirmed live:
   // a card's own context menu closing left a pending timer that fired
-  // ~300ms afterward). `ui.js` dispatches `PILE_MENU_OPENED_EVENT`
-  // from both its menu-opening functions specifically so this file -
+  // ~300ms afterward). `<action-menu>` dispatches `PILE_MENU_OPENED_EVENT`
+  // whenever it opens, specifically so this file -
   // the one that owns `hoverIntentTimer` - can cancel it.
   document.addEventListener(PILE_MENU_OPENED_EVENT, () => clearTimeout(hoverIntentTimer));
 
