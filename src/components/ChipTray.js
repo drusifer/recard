@@ -1,4 +1,5 @@
-import { renderPileShell, renderPileCards, renderSplitPicker } from '../ui.js';
+import { PileElement } from './PileElement.js';
+import { renderPileCards } from '../pileCards.js';
 import { PILE_TYPES } from '../piles/pileTypes.js';
 
 /**
@@ -25,52 +26,43 @@ import { PILE_TYPES } from '../piles/pileTypes.js';
  * code: only the LAYOUT differs, which is exactly the split `<fan-pile>`
  * and `<deck-stack>` already make.
  */
-export class ChipTrayElement extends HTMLElement {
-  render(pile, allPiles, options) {
-    // Same picker branch every other pile component has: a tray toggled
-    // into Split renders the shared picker, not a tray-specific one.
-    if (options.splitPicker?.pileId === pile.id) {
-      renderPileShell(this, pile, allPiles, options, (container) => renderSplitPicker(container, pile, options));
-      return;
-    }
+export class ChipTrayElement extends PileElement {
+  buildRow(container, pile, allPiles, options) {
+    const tray = document.createElement('div');
+    // *nit (direct user request, "align cascades to the top"):
+    // `stacksDownward` (`GroupedPile`, opt-in - `LandsPile` only) flips
+    // the tray from chips' own bottom-aligned/grows-up default to
+    // top-aligned/grows-down, the same direction a cascade already
+    // reads in. One modifier class, not a second component.
+    tray.className = PILE_TYPES[pile.kind]?.stacksDownward ? 'chip-tray chip-tray-downward' : 'chip-tray';
+    container.append(tray);
 
-    renderPileShell(this, pile, allPiles, options, (container) => {
-      const tray = document.createElement('div');
-      // *nit (direct user request, "align cascades to the top"):
-      // `stacksDownward` (`GroupedPile`, opt-in - `LandsPile` only) flips
-      // the tray from chips' own bottom-aligned/grows-up default to
-      // top-aligned/grows-down, the same direction a cascade already
-      // reads in. One modifier class, not a second component.
-      tray.className = PILE_TYPES[pile.kind]?.stacksDownward ? 'chip-tray chip-tray-downward' : 'chip-tray';
-      container.append(tray);
+    // D129: the tray no longer builds its own columns or positions
+    // anything. `renderPileCards` renders EVERY pile as a row of
+    // `Stack`s now - which is exactly what a tray already was - and
+    // hands back the stack elements it made. All this component adds
+    // is the per-stack badge.
+    tray.className += ' card-row';
+    const renderedStacks = renderPileCards(tray, pile, allPiles, options);
 
-      // D129: the tray no longer builds its own columns or positions
-      // anything. `renderPileCards` renders EVERY pile as a row of
-      // `Stack`s now - which is exactly what a tray already was - and
-      // hands back the stack elements it made. All this component adds
-      // is the per-stack badge.
-      tray.className += ' card-row';
-      const renderedStacks = renderPileCards(tray, pile, allPiles, options);
-
-      for (const { stack, element } of renderedStacks) {
-        // *nit (direct user request): "display the total manacount in a
-        // cool way, when tapping" - `groupBadge` is opt-in (`LandsPile`
-        // only; the `GroupedPile` default is absent, so chips/tokens are
-        // unaffected). Derived fresh from this stack's own cards every
-        // render, so it always reflects the real tapped/untapped state,
-        // never a separately-tracked count that could drift from it.
-        if (stack.id !== undefined) element.dataset.denom = String(stack.id);
-        const badge = PILE_TYPES[pile.kind]?.groupBadge?.(stack.pileables);
-        if (badge) {
-          const badgeElement = document.createElement('span');
-          badgeElement.className = `chip-stack-badge ${badge.className}`;
-          badgeElement.textContent = badge.text;
-          badgeElement.title = badge.title;
-          element.append(badgeElement);
-        }
+    for (const { stack, element } of renderedStacks) {
+      // *nit (direct user request): "display the total manacount in a
+      // cool way, when tapping" - `groupBadge` is opt-in (`LandsPile`
+      // only; the `GroupedPile` default is absent, so chips/tokens are
+      // unaffected). Derived fresh from this stack's own cards every
+      // render, so it always reflects the real tapped/untapped state,
+      // never a separately-tracked count that could drift from it.
+      if (stack.id !== undefined) element.dataset.denom = String(stack.id);
+      const badge = PILE_TYPES[pile.kind]?.groupBadge?.(stack.pileables);
+      if (badge) {
+        const badgeElement = document.createElement('span');
+        badgeElement.className = `chip-stack-badge ${badge.className}`;
+        badgeElement.textContent = badge.text;
+        badgeElement.title = badge.title;
+        element.append(badgeElement);
       }
-      return tray;
-    });
+    }
+    return tray;
   }
 }
 

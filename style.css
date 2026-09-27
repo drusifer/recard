@@ -896,7 +896,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    `Stackable.offsetIn` (unit-tested JS) instead of through a `calc()`
    nobody could test. */
 
-/* D91: the Split picker (`renderSplitPicker`, ui.js) - a `fan-row` used
+/* D91: the Split picker (`PileElement`'s split picker) - a `fan-row` used
    OUTSIDE a hand's own `.seat-zone` (any pile can be split, not just a
    hand), so it needs its own nowrap/clearance rather than relying on
    `.seat-zone .fan-row.card-row` below. `position: relative` anchors
@@ -914,7 +914,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   cursor: pointer;
 }
 
-/* A disabled `<button class="card">` (`renderSplitPicker`'s cards are
+/* A disabled `<button class="card">` (`PileElement`'s split picker's cards are
    all non-interactive while picking) never fires `click` at all in a
    browser, disabled elements are excluded from activation behavior
    entirely - so a click landing ON a card, not the gap between two,
@@ -1317,7 +1317,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    native drag-and-drop otherwise gives no feedback at all until release.
    UX follow-up (direct user request): "zone is one thing, pile is
    another" - a card is always dropped onto a specific PILE now
-   (`renderPile`, `ui.js`), never generically "the zone", so a Pile's own
+   (`<pile-panel>`), never generically "the zone", so a Pile's own
    drop-over needs the same feedback a Zone's does. D90: one shared,
    level-neutral class (`.drag-over`) rather than a Pile borrowing a
    class literally named after the Zone entity - applies identically to
@@ -1953,14 +1953,14 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* D95 (direct user request: "make card counts a feature for all
    Piles... upper left corner... like a badge") - universal, every pile
-   kind, one mechanism (`renderPileShell`, ui.js). `position: absolute`
+   kind, one mechanism (`PileElement`, ui.js). `position: absolute`
    against `.pile-section` itself (already `position: relative`), so it
    sits in the same corner regardless of whether the pile below it
    renders as a flat row, a fan, or a stack - never anchored to any one
    card the way `.deck-count-badge` is to the deck's single stack card
    (that badge is suppressed inside a real pile now, `renderDeckStack`'s
    own comment - only the standalone pre-game preview screen, which
-   never reaches `renderPileShell` at all, still uses it). `z-index`
+   never reaches `PileElement` at all, still uses it). `z-index`
    above the header/cards so it's never covered by either. */
 .pile-count-badge {
   position: absolute;
@@ -3235,7 +3235,7 @@ body.panel-resize-active {
    table off screen. Cap it and scroll INSIDE the pile, so the table
    layout stays stable no matter how wide the board gets.
 
-   Scoped by `[data-kind='battlefield']`, which `renderPileShell` already
+   Scoped by `[data-kind='battlefield']`, which `PileElement` already
    sets - no JS change needed. */
 [data-kind='battlefield'] .card-row {
   max-height: 15rem;

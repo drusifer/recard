@@ -1688,7 +1688,7 @@ const ACTIONS = {
    * CLIENT-ONLY overlay on top of a fixed hand array, retired once a
    * hand became a real state-level pile with nothing built to replace
    * it (`ui.js` filtered the buttons out rather than ship a false
-   * affordance - see `renderPileShell`'s own note). This is that
+   * affordance - see `PileElement`'s own note). This is that
    * reducer action, finally.
    *
    * `action.by` picks the primary key (`'rank'` or `'suit'`); the OTHER

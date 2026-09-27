@@ -2518,7 +2518,7 @@ test('TAKE_PILE: fully permissive - deck/hand are eligible too now, no kind allo
 });
 
 // D91: `split` joins this offer list now that a real UI exists behind
-// it (`ui.js`'s `renderSplitPicker`) - `Pile.pileActions`'s own comment
+// it (`PileElement`'s split picker) - `Pile.pileActions`'s own comment
 // used to explain why it was withheld; that's resolved now. (A separate
 // `pickupSplit` briefly existed too and was a direct user correction -
 // "there is not supposed to be a pickupSplit" - `take`, already in this

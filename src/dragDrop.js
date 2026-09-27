@@ -288,7 +288,7 @@ export function clearPileTargets() {
 
 /** The element standing in for a pile id, for highlighting/clicking.
  * UX follow-up (direct user request): "zone is one thing, pile is
- * another" - a Pile (`renderPile`, above) is what's addressable by pile
+ * another" - a Pile (`<pile-panel>`, above) is what's addressable by pile
  * id, never the Zone it lives in (a Zone can hold several piles, so it
  * has no single pile id of its own to be found by). */
 export function pileElement(pileId) {
@@ -581,7 +581,7 @@ export function performPileDrop(pileElement, row, pileId, pileableId, point, onD
 }
 
 // (bloop: piles/zones/cards are all Movable) - a dragged PILE (its own
-// title bar is the handle, `renderPileShell`) carries its id the same
+// title bar is the handle, `PileElement`) carries its id the same
 // tagged-string way a pile-ACTION token does, so every drop target's
 // existing "is this actually a plain card?" check can tell the three
 // payload shapes apart with one string prefix test each, no new

@@ -2050,7 +2050,7 @@ const SORT_BY_FOR_ACTION = {
 };
 
 /**
- * Every pile-level action button dispatches through here (`renderPile`,
+ * Every pile-level action button dispatches through here (`<pile-panel>`,
  * ui.js, one callback regardless of which pile kind offered the
  * action). A plain top-level function, not inlined in `renderGameFromView`
  * - keeps that already-large function's own complexity from absorbing
@@ -2153,7 +2153,7 @@ function buildZoneOptions(nameById) {
     onMoveCard: (pileableId, toPileId, placement) => moveCard(pileableId, toPileId, placement),
     onCardLift: (pileableId, active) => motionThrottler.schedule('card-lift', { pileableId, active }),
     onDropCard: (pileableId, toPileId, placement) => dropCardOnPile(pileableId, toPileId, placement),
-    // D91: `renderPile` (ui.js) checks `splitPicker?.pileId === pile.id`
+    // D91: `<pile-panel>` checks `splitPicker?.pileId === pile.id`
     // to switch that one pile into the picker row; `onSplitCommit` is
     // only ever called FROM that row (a click on a chosen gap), so it
     // doesn't need its own pileId param - `splitPicker.pileId` already
@@ -2163,7 +2163,7 @@ function buildZoneOptions(nameById) {
     // UX follow-up (direct user request): "like zones, Piles are
     // Actionable and should have a title bar with action buttons for
     // that pile type" - every pile's heading is a real action header now
-    // (`renderPile`, `ui.js`). Dispatch table itself is `handlePileAction`
+    // (`<pile-panel>`). Dispatch table itself is `handlePileAction`
     // above (its own doc comment has the rest).
     onPileAction: whenLive(handlePileAction),
     // D129: one stack's own actions, from its gear emblem.
@@ -2188,7 +2188,7 @@ function buildZoneOptions(nameById) {
     // US-41/D29: dealing lives on the deck, where the cards are - the
     // whole point of the story. Read/written here since the deck now
     // renders through the exact same generic pile pipeline (`<deck-
-    // stack>`, `renderPile`'s row) as any other pile, not a bespoke
+    // stack>`, `<pile-panel>`'s row) as any other pile, not a bespoke
     // `<deck-zone>` element with its own property surface any more.
     dealCount: lastDealCount,
     onDealCountChange: whenLive((value) => { lastDealCount = value; }),
@@ -2240,7 +2240,7 @@ function renderGameFromView(view) {
   // builds and groups it into the Table Zone, exactly like Table/
   // Discard - no separate `<deck-zone>` element/property wiring needed
   // here any more (`<deck-stack>`, `src/components/DeckStack.js`, is
-  // what `renderPile` uses for its row instead - see `zoneOpts.
+  // what `<pile-panel>` uses for its row instead - see `zoneOpts.
   // dealCount`/`onDealCountChange` above for the one piece of deck-
   // specific state this file still owns: the Deal count input's value).
   renderZones(zonesElement, view.piles, seatedOrder(view.players, myId), view.zones, zoneOptions);
@@ -2654,7 +2654,7 @@ function noticeForcedSpectator(view) {
 
 // D91/D92 (direct user request, "we're missing... split pile" / "split
 // should always fan the pile"): which pile (if any) is currently
-// raised into the Split picker (`ui.js`'s `renderSplitPicker`, used by
+// raised into the Split picker (`PileElement`'s split picker, used by
 // `<pile-panel>` AND `<deck-stack>` identically - no kind distinction)
 // - real CLIENT-LOCAL UI state, same reasoning as `lastDealCount`
 // above: this app tears down and rebuilds every pile's DOM on every
@@ -2803,7 +2803,7 @@ function markCardDragStale(playerId) {
 // *nit (D68, direct user request): "always use a coordinate relative
 // to Player, remap relative to the player's position at the table" -
 // every viewer renders every player's own hand pile somewhere
-// (`data-pile-id="hand:<playerId>"`, `renderPileShell`), so it's a
+// (`data-pile-id="hand:<playerId>"`, `PileElement`), so it's a
 // stable, always-present anchor - unlike an absolute screen fraction,
 // which has no correct meaning across two viewers' genuinely
 // independent, local `panelLayout.js` arrangements (D-numbered

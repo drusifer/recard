@@ -32,13 +32,13 @@ export class ZonePanelElement extends HTMLElement {
    *
    * Move/resize (`wirePanelLayout`) is wired EXACTLY ONCE, here, for the
    * whole Zone - "Piles move with their containing Zone." A Pile
-   * (`renderPile`, above) never wires its own.
+   * (`<pile-panel>`, above) never wires its own.
    */
   render(id, title, piles, allPiles, options) {
     this.replaceChildren();
     this.className = 'zone';
     // The Zone's own stable identity (`opts.layout` key) - distinct from
-    // any one pile's own `data-pile-id` (`renderPile`), since a Zone can
+    // any one pile's own `data-pile-id` (`<pile-panel>`), since a Zone can
     // hold several piles and so has no single pile id of its own.
     this.dataset.groupId = id;
 
@@ -84,11 +84,11 @@ export class ZonePanelElement extends HTMLElement {
     // brand-new pile here, seeded with that card. Wired on `body`, not
     // `zoneEl` itself - `zoneEl` also contains the heading/pile-panel
     // children, and a drop landing on one of THOSE is handled by that
-    // pile's own listener (`renderPileShell`, which now stops
+    // pile's own listener (`PileElement`, which now stops
     // propagation so it never also reaches the zone element one).
     // (bloop) also handles a dragged PILE dropped here - reparenting it
     // into THIS zone as a sibling (Smith's Gate 1 ruling, D55: always a
-    // sibling, never a merge). `renderPileShell`'s own per-pile drop
+    // sibling, never a merge). `PileElement`'s own per-pile drop
     // handler ignores a pile-drag-token and lets it bubble up here
     // unhandled (rather than misreading it as a card id) - a pile
     // reparents into the ZONE it lands in, not specifically the other
@@ -134,7 +134,7 @@ export class ZonePanelElement extends HTMLElement {
     // `pileActions.js`), never a `pile.kind === 'hand'` check inside any
     // one component. `<fan-pile>`/`<deck-stack>` are now fully self-
     // contained Piles (their own header+row+drop wiring, via
-    // `renderPileShell`) - `<pile-panel>` is just the flat-row case's own
+    // `PileElement`) - `<pile-panel>` is just the flat-row case's own
     // equally-thin wrapper, not a generic container the other two nest
     // inside any more.
     for (const pile of piles) {

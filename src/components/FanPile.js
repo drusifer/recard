@@ -1,4 +1,5 @@
-import { renderPileShell, renderPileCards } from '../ui.js';
+import { PileElement } from './PileElement.js';
+import { renderPileCards } from '../pileCards.js';
 
 /**
  * UX follow-up (direct user request): "create WebComponents for the
@@ -15,7 +16,7 @@ import { renderPileShell, renderPileCards } from '../ui.js';
  * default `'flat'` case - three equally-thin components now, none
  * nesting inside another.
  *
- * `renderPileShell` (`ui.js`) is what's actually SHARED across all
+ * `PileElement` is what's actually SHARED across all
  * three: the header, the addressability, the drop wiring.
  *
  * D129: this component supplies NOTHING layout-related any more. A fan
@@ -26,15 +27,13 @@ import { renderPileShell, renderPileCards } from '../ui.js';
  * hand's position and its arc came from two different mechanisms, and
  * that was the last place two layout mechanisms coexisted.
  */
-export class FanPileElement extends HTMLElement {
-  render(pile, allPiles, options) {
-    renderPileShell(this, pile, allPiles, options, (container) => {
-      const row = document.createElement('div');
-      row.className = 'card-row fan-row';
-      container.append(row);
-      renderPileCards(row, pile, allPiles, options);
-      return row;
-    });
+export class FanPileElement extends PileElement {
+  buildRow(container, pile, allPiles, options) {
+    const row = document.createElement('div');
+    row.className = 'card-row fan-row';
+    container.append(row);
+    renderPileCards(row, pile, allPiles, options);
+    return row;
   }
 }
 

@@ -1,4 +1,5 @@
-import { renderPileShell, renderDeckStack, renderSplitPicker } from '../ui.js';
+import { PileElement } from './PileElement.js';
+import { renderDeckStack } from '../ui.js';
 
 /**
  * UX follow-up (direct user request): "a Deck is a specific kind of
@@ -14,33 +15,17 @@ import { renderPileShell, renderDeckStack, renderSplitPicker } from '../ui.js';
  * `<fan-pile>` for `'fan'` and `<pile-panel>` for the default `'flat'`
  * case - three equally-thin components now, none nesting in another.
  *
- * `renderPileShell` (`ui.js`) is what's actually SHARED across all
+ * `PileElement` is what's actually SHARED across all
  * three: the header, the addressability, the drop wiring. This only
  * supplies the one thing unique to a deck - the row's own stack+badge
  * visual and Deal count input, via the already-proven `renderDeckStack`.
  */
-export class DeckStackElement extends HTMLElement {
-  render(pile, allPiles, options) {
-    // D92 (direct user request: "split should always fan the pile to
-    // allow the guided picker" - deck included): identical branch to
-    // `renderPile`'s own (ui.js) - a deck toggled into the picker
-    // (`options.splitPicker`) renders the same `renderSplitPicker` row
-    // every other pile kind gets, not a deck-specific shortcut.
-    if (options.splitPicker?.pileId === pile.id) {
-      renderPileShell(this, pile, allPiles, options, (container) => renderSplitPicker(container, pile, options));
-      return;
-    }
-    renderPileShell(this, pile, allPiles, options, (container) => {
-      const row = document.createElement('div');
-      container.append(row);
-      // D84: `pile.cards` carries the deck's full, real contents now
-      // (TOTAL PERMISSIVE - the data was never redacted, only who sees
-      // it visually) - `renderDeckStack` still only ever shows the top
-      // one as the stack's own drag source, same mechanism as any other
-      // pile's top card.
-      renderDeckStack(row, pile.count ?? pile.cards.length, { ...options, pileId: pile.id, topCard: pile.cards[0] });
-      return row;
-    });
+export class DeckStackElement extends PileElement {
+  buildRow(container, pile, allPiles, options) {
+    const row = document.createElement('div');
+    container.append(row);
+    renderDeckStack(row, pile.count ?? pile.cards.length, { ...options, pileId: pile.id, topCard: pile.cards[0] });
+    return row;
   }
 }
 

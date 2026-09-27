@@ -447,7 +447,7 @@ export class Pile {
    *
    * D91: `split` (the old roughly-in-half `'split'`'s real, index-
    * driven replacement) is offered here now that a real picker UI
-   * exists (`ui.js`'s `renderSplitPicker`) - `disabledActions` below
+   * exists (`PileElement`'s split picker) - `disabledActions` below
    * still gates it off below 2 cards, matching `splitPileAt`'s
    * (state.js) own minimum. `take` (above) already covers "everything
    * into my hand" - a separate `pickupSplit` briefly existed alongside

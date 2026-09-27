@@ -36,7 +36,7 @@
  * panel behavior"), then DIRECTLY RESTORED by the user: "zone movement
  * is still broken, it was working great until you broke it - Zones can
  * be moved anywhere on the table." Piles use a DIFFERENT mechanism -
- * native HTML5 drag, `renderPileShell`'s `pileDraggable` - for their
+ * native HTML5 drag, `PileElement`'s `pileDraggable` - for their
  * own different capability (reparent into another Zone, or reorder
  * among siblings, both discrete target-based operations). A Zone
  * needs genuine free, continuous, anywhere-on-the-table placement,

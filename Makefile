@@ -7,7 +7,7 @@
 #
 # Adding a task: add the npm script first, then a one-line target here.
 
-.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-tablezoom test-focuszoom test-multiplayer test-harness-mcp test-gin test-jev-runner test-jevtable test-actionmenu test-zonepanel test-headeractions jev-player jev-library jev-library-doc jev-readme jev-table secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers dead-code
+.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-tablezoom test-focuszoom test-multiplayer test-harness-mcp test-gin test-jev-runner test-jevtable test-actionmenu test-zonepanel test-headeractions test-pileelement jev-player jev-library jev-library-doc jev-readme jev-table secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers dead-code
 
 help:
 	@echo "Recard targets (all front npm scripts):"
@@ -28,6 +28,7 @@ help:
 	@echo "  test-actionmenu  <action-menu> component in a real browser: position, dismissal, one at a time (US-133)"
 	@echo "  test-zonepanel  <zone-panel> component in a real browser: box, title bar, drop routing (US-135)"
 	@echo "  test-headeractions  <header-actions> component in a real browser: title, rename, actions, confirm (US-136)"
+	@echo "  test-pileelement  PileElement base + the four pile components in a real browser: shared shell, split-picker mode (US-137)"
 	@echo "  test-jevtable  Ctrl-C at jev-table ends the table and leaves no bot running (D159)"
 	@echo "  test-jev-runner  the real jev-player CLI at a hosted table: moves, add-bot, quit (US-128)"
 	@echo "  jev-player    GAME=gin|rtg STRATEGY=<player file name> CODE=<table code> [FIRST=bot|opponent] [HANDS=1] [DECK=<pile id>] [STEPS=12]: a Jev player joins your table (US-120, US-128)"
@@ -116,6 +117,9 @@ test-zonepanel:
 
 test-headeractions:
 	npm run test:headeractions
+
+test-pileelement:
+	npm run test:pileelement
 
 jev-library-doc:
 	node tools/jevLibrary.mjs --write

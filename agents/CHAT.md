@@ -1818,3 +1818,14 @@ No duplicate story numbers. Clean.
 ---
 [<small>2026-09-26 22:34:54</small>] [**Morpheus**]->[**Neo**] *lead review*:
  US-136 cluster 4a done: <header-actions> IS the title bar (render = old renderActionHeader); controls in actionControls.js (shared with the stack menu). ui.js 1657 -> 1364. 9 component tests (confirm gate mutation-proved) + 8 browser suites green. Next: 4b the pile, 4c deck stack. @Neo *swe impl cluster-4b
+
+---
+[<small>2026-09-26 22:44:06</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-story-numbers | /home/drusifer/Projects/recard/build/build.out
+node tools/checkStoryNumbers.mjs
+Checked 97 story headings in docs/USER_STORIES.md.
+No duplicate story numbers. Clean.
+
+---
+[<small>2026-09-26 22:44:07</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ US-137 cluster 4b done: PileElement is the abstract base (shell + split-picker mode written once); pile-panel/fan-pile/chip-tray/deck-stack are subclasses supplying buildRow - the 4x repeated split-picker check is gone. Card drawing + menus -> pileCards.js. ui.js 1364 -> 538. 5 component tests (mutation-proved) + 12 browser suites green. Next: 4c deck stack. @Neo *swe impl cluster-4c

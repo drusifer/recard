@@ -193,7 +193,7 @@ export const ACTION_SPECS = {
   // deck included, no exceptions): the old `'split'` (roughly-in-half,
   // instant on click) was retired long ago in favor of a real, tested,
   // index-driven `SPLIT_PILE` reducer action - this is that picker
-  // (`ui.js`'s `renderSplitPicker`, raise-and-choose-a-gap), the SAME
+  // (`PileElement`'s split picker, raise-and-choose-a-gap), the SAME
   // one for every pile kind including `deck` (`DeckPile.showsFace`
   // always `false` is what keeps a deck's own fan showing backs, not
   // real faces - `pile.cards` is the deck's real, full contents in the
@@ -241,7 +241,7 @@ export const ACTION_SPECS = {
   // Generic at this table's level - any future multi-choice pile action
   // can reuse the same `enum: true` flag - but the actual current
   // value/choices are per-instance data only the render call site has
-  // (`renderPileShell`'s `enumOptions`, `ui.js`), same "static spec +
+  // (`PileElement`'s `enumOptions`, `ui.js`), same "static spec +
   // per-instance options" split `disabled`/`noConfirm`/`labels` already
   // use elsewhere in this table's callers.
   changePileType: {

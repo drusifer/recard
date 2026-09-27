@@ -55,7 +55,7 @@ export class DeckPile extends Pile {
    * `Pile.showsFace` (`card.faceUp !== false`) would read that missing
    * field as "face-up" and show the real card. `visibility: 'hidden'`
    * already says nobody sees a deck's cards; this is what makes the
-   * picker (`ui.js`'s `renderSplitPicker`, reused unchanged for a deck
+   * picker (`PileElement`'s split picker, reused unchanged for a deck
    * via `<deck-stack>` now) actually agree - a deck's fan shows real
    * backs, same silhouette as any other hidden card, never the faces. */
   showsFace() {

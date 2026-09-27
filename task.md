@@ -2284,3 +2284,9 @@ plan done in one turn (Tier 2). Pruning, not padding.
 - [x] T2 tests/headerActions.browser.mjs (9 cases; confirm gate mutation-proved)
 - [x] T3 gate: check 1164 + 8 browser suites green
 - [ ] NEXT: 4b pile (renderPileShell/Cards/SplitPicker/renderPile + menus/helpers), 4c deck stack
+
+# Sprint: ui.js cluster 4b - the pile (US-137, D160) — 2026-09-26 — Tier 2
+- [x] T1 src/pileCards.js + PileElement base (shell + split picker once) + 4 subclasses; ui.js 1364 -> 538
+- [x] T2 tests/pileElement.browser.mjs (5 cases; split-picker decision mutation-proved)
+- [x] T3 gate: check 1164 + 12 browser suites green
+- [ ] NEXT: 4c deck stack (renderDeckStack/deckDepth/pileCountInput), then close: retro, ARCHITECTURE map, groom

@@ -4392,3 +4392,32 @@ header in its own component, **so that** `ui.js` no longer owns it (D160).
    hostsetup 7, newgame 5, focuszoom 11 all pass.
 
 **Out of scope:** any behavior change.
+
+### US-137: ui.js, cluster 4b - the pile is a class hierarchy: `PileElement`, four subclasses
+**As** someone adding or changing a kind of pile, **I want** the pile's shared
+section written once and each kind to supply only its row, **so that** a new
+pile component is one small `buildRow` (D160; memory: polymorphism over
+conditionals, not four copies of the same `if`).
+
+**AC:**
+1. `PileElement` (`src/components/PileElement.js`, abstract) owns what every
+   pile shares: the section (`pile-section`, addressable by id/kind), the
+   count badge, the title bar, the drop wiring, the action controls, AND the
+   Split/Pickup picker mode - decided ONCE in `render`. A subclass supplies
+   `buildRow(container, pile, allPiles, options)` and nothing else.
+2. `<pile-panel>`, `<fan-pile>`, `<chip-tray>`, `<deck-stack>` are subclasses;
+   the split-picker check each used to repeat is gone from all four.
+3. `src/pileCards.js` (plain) holds how a pile's cards are drawn: the card
+   shell, stacks, a stack's gear, and the card/stack menus (a row's meaning
+   for a card or stack; the popup is `<action-menu>`).
+4. `renderPile`, `renderPileShell`, `renderSplitPicker`, `renderPileCards` and
+   their helpers are deleted from `ui.js` (1364 -> 538 lines); comments that
+   named them now name the class; no aliases.
+5. `tests/pileElement.browser.mjs` (`bobp make test-pileelement`, 5 cases, no
+   table) pins that all four are PileElements, the abstract refusal, the shell,
+   and the split-picker decision (mutation-proved). check 1164 and 12 browser
+   suites green (pileelement, headeractions, zonepanel, actionmenu, ui, rtg,
+   hostsetup, newgame, tablezoom, focuszoom, multiplayer, motion).
+
+**Out of scope:** any behavior change; the deck stack's own body
+(`renderDeckStack`, cluster 4c).

@@ -525,4 +525,6 @@ sequenceDiagram
     Note right of Morpheus: "US-135 cluster 3 done:<br/><zone-panel> IS the zone<br/>(render = old<br/>renderZonePanel),<br/>move/resize is<br/>panelInteraction.js<br/>(plain module: score<br/>pan…"
     Morpheus->>Neo: "lead review"
     Note right of Morpheus: "US-136 cluster 4a done:<br/><header-actions> IS the<br/>title bar (render = old<br/>renderActionHeader),<br/>controls in<br/>actionControls.js<br/>(shared with the…"
+    Morpheus->>Neo: "lead review"
+    Note right of Morpheus: "US-137 cluster 4b done:<br/>PileElement is the<br/>abstract base (shell +<br/>split-picker mode<br/>written once), pile-<br/>panel/fan-pile/chip-<br/>tray/deck-stack…"
 ```
