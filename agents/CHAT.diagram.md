@@ -521,4 +521,6 @@ sequenceDiagram
     Note right of Morpheus: "Review US-133 PASSED.<br/>The seam is right: the<br/>component knows how a<br/>popup behaves, not what<br/>a row means, ui.js<br/>creating it by tag name<br/>(node…"
     Morpheus->>Neo: "lead review"
     Note right of Morpheus: "US-134 cluster 2 done:<br/>drag/drop moved<br/>unchanged into<br/>src/dragDrop.js (plain<br/>module, no cycle with<br/>ui.js, ui.js 2654 -><br/>~2050). Gate: check…"
+    Morpheus->>Neo: "lead review"
+    Note right of Morpheus: "US-135 cluster 3 done:<br/><zone-panel> IS the zone<br/>(render = old<br/>renderZonePanel),<br/>move/resize is<br/>panelInteraction.js<br/>(plain module: score<br/>pan…"
 ```

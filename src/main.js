@@ -14,7 +14,6 @@ import {
   renderBanner,
   applyCardSize,
   renderDeckStack,
-  wirePanelLayout,
   showScreen,
   updateRemoteCursor,
   removeRemoteCursor,
@@ -23,6 +22,7 @@ import {
   removeDragGhost,
 } from './ui.js';
 import { pileDragFromDrop, pileElement } from './dragDrop.js';
+import { wirePanelLayout } from './panelInteraction.js';
 import { PILE_MENU_OPENED_EVENT } from './components/ActionMenu.js';
 import { clampOverlayPosition, clampFocusZoomScale, HOVER_INTENT_MS } from './focusZoom.js';
 import { PRESETS, filterDeckChoicePiles } from './presets.js';

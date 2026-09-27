@@ -1796,3 +1796,14 @@ No duplicate story numbers. Clean.
 ---
 [<small>2026-09-26 22:21:21</small>] [**Morpheus**]->[**Neo**] *lead review*:
  US-134 cluster 2 done: drag/drop moved unchanged into src/dragDrop.js (plain module, no cycle with ui.js; ui.js 2654 -> ~2050). Gate: check 1164, ui 20/20, rtg 16/16, multiplayer 5/5. Reviewed: seam holds. Next: cluster 3 (zone). @Neo *swe impl cluster-3
+
+---
+[<small>2026-09-26 22:27:56</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-story-numbers | /home/drusifer/Projects/recard/build/build.out
+node tools/checkStoryNumbers.mjs
+Checked 95 story headings in docs/USER_STORIES.md.
+No duplicate story numbers. Clean.
+
+---
+[<small>2026-09-26 22:28:04</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ US-135 cluster 3 done: <zone-panel> IS the zone (render = old renderZonePanel); move/resize is panelInteraction.js (plain module: score panel shares it). ui.js 2078 -> 1657. 6 component tests, drop routing mutation-proved; gate ui/tablezoom/rtg/hostsetup/newgame green. Zone no longer imports ui.js. Next: cluster 4, the pile. @Neo *swe impl cluster-4

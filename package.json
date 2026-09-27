@@ -12,6 +12,7 @@
     "test:focuszoom": "node --test tests/focusZoom.browser.mjs",
     "test:multiplayer": "node --test tests/multiplayer.browser.mjs",
     "test:actionmenu": "node --test tests/actionMenu.browser.mjs",
+    "test:zonepanel": "node --test tests/zonePanel.browser.mjs",
     "test:jevtable": "node --test tests/jevTable.browser.mjs",
     "test:spectator": "node --test tests/spectator.browser.mjs",
     "test:addbot": "node --test tests/addBot.browser.mjs",

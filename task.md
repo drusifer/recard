@@ -2272,3 +2272,9 @@ plan done in one turn (Tier 2). Pruning, not padding.
 - [x] T2 tests/dragDrop.test.js (pile token round trip); check 1164
 - [x] T3 gate: test-ui 20/20, test-rtg 16/16, test-multiplayer 5/5
 - [ ] NEXT: cluster 3 (zone: renderZonePanel/renderOneZone/renderZones/wirePanelLayout/attachPanelDrag/attachPanelResize)
+
+# Sprint: ui.js cluster 3 - the zone (US-135, D160) — 2026-09-26 — Tier 2
+- [x] T1 src/panelInteraction.js (wirePanelLayout + drag/resize), <zone-panel> owns renderZonePanel; ui.js 2078 -> 1657
+- [x] T2 tests/zonePanel.browser.mjs (6 cases, mutation-proved drop routing)
+- [x] T3 gate: check 1164; ui 20, tablezoom 7, rtg 16, hostsetup 7, newgame 5
+- [ ] NEXT: cluster 4 (pile: renderPileShell/Cards/SplitPicker/renderPile, deck stack)

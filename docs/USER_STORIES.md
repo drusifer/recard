@@ -4344,3 +4344,28 @@ drag/drop wiring in one module, **so that** `ui.js` no longer owns it (D160).
    test-rtg 16/16, test-multiplayer 5/5.
 
 **Out of scope:** any change to how drag behaves; touch (frozen).
+
+### US-135: ui.js, cluster 3 - a zone is `<zone-panel>`, moving is `panelInteraction.js`
+**As** someone changing what a Zone is or how a panel moves, **I want** the
+Zone in its own component and the move/resize behavior in its own module,
+**so that** `ui.js` no longer owns either (D160), and Zone stays genuinely
+separate from Pile (memory: zone-vs-pile).
+
+**AC:**
+1. `<zone-panel>` (`src/components/ZonePanel.js`) IS the zone: the box, its
+   one title bar, the body, where things dropped on it go, the drop gutter.
+   Its `render` is the former `renderZonePanel`, unchanged but for `this`.
+   It no longer imports `ui.js`.
+2. `src/panelInteraction.js` holds `wirePanelLayout` and its drag/resize
+   helpers, unchanged. A plain module because the score panel (`main.js`)
+   moves and resizes the same way; the zone wires it once for everything in it.
+3. All moved code is deleted from `ui.js` (2078 -> 1657 lines); no aliases.
+4. `tests/zonePanel.browser.mjs` (`bobp make test-zonepanel`, 6 cases, no
+   table needed) pins the box, the Table Zone being unremovable, pile-vs-card
+   drop routing (mutation-proved), drag-over lighting, and the gutter.
+   check 1164; test-ui 20, test-tablezoom 7, test-rtg 16, test-hostsetup 7,
+   test-newgame 5 all pass.
+
+**Out of scope:** any behavior change; `renderOneZone`/`renderZones`
+(how zones are grouped and seated - they stay until the pile cluster, since
+they choose which pile component each zone holds).
