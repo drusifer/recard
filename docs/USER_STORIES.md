@@ -4439,3 +4439,37 @@ left over, **so that** D160 is finished, not just started.
    check 1164; ui/zonepanel/rtg/hostsetup/newgame/multiplayer/tablezoom green.
 
 **Out of scope:** `main.js` (2946 lines) - BACKLOG.
+
+### US-139: main.js is split by cluster, state stays put
+**As** someone reading or changing `main.js` (2946 lines, ~147 top-level
+functions), **I want** it broken into cohesive files, **so that** it's
+navigable - without pretending its module-level mutable state (`session`,
+`gameState`, `latestView`, `tableCamera`, ~15 timers/maps) is something it
+isn't.
+
+**Method (Tier 2, story + architecture in one, user's direct choice over a
+shared-context redesign):** `main.js` is NOT `ui.js`. `ui.js` was pure
+render functions with Web Component scaffolding already in place - moving
+them was mechanical. `main.js`'s ~147 functions close directly over ~40
+pieces of shared mutable state. The split moves functions into files by
+concern; each extracted function takes the state it touches as an EXPLICIT
+parameter (a getter/accessor where the value is reassigned elsewhere, e.g.
+`role`/`selectedPreset`/`gameState`, since those are `let`s read fresh on
+every call, not captured once) - no shared context object, more plumbing
+per call site, but no redesign of who owns what.
+
+**AC:**
+1. Each extracted module is a plain file (not a component - none of this
+   is DOM the way `ui.js`'s pile/zone code was); `main.js` still owns the
+   actual state and wires callbacks into it.
+2. MOVE-ONLY otherwise: no behavior change. Deleted from `main.js` as it
+   moves; no aliases.
+3. Clusters, smallest/most self-contained first (a pilot before the
+   larger ones): layout save; table-zoom/focus-zoom; then reassess sizing
+   before committing to host-setup/session/action-dispatch/cursor-motion.
+4. `check` stays green after each cluster; the browser suites that
+   exercise the moved code (per cluster) pass.
+
+**Out of scope:** any behavior change; a shared context object (the
+user's call, D161); host-setup/session/action-dispatch/cursor-motion
+clusters unless the pilot's plumbing cost is acceptable.

@@ -33,7 +33,8 @@ import { CLIENT_KEY_STORAGE, resolvePlayer, peerFor, rememberSession, recallSess
 import { rememberHostSettings, recallHostSettings } from './hostSettings.js';
 import { artUrl, rtgColorClasses, PIP_CLASS } from './cards/RtgCardFace.js';
 import { loadPanelLayout, savePanelPosition, savePanelSize, applyPresetLayout } from './panelLayout.js';
-import { saveLayoutOverride, deleteLayoutOverride, overridesForPreset, stableLayoutSubset } from './layoutOverrides.js';
+import { overridesForPreset } from './layoutOverrides.js';
+import { wireLayoutControls } from './layoutSave.js';
 // UX follow-up (direct user request): Score is a native Web Component
 // (customElements, light DOM) - importing it (and every pile/zone
 // component below) for its registration side effect
@@ -155,6 +156,8 @@ globalThis.addEventListener('beforeunload', () => {
   if (role === 'join') session?.close();
 });
 let selectedPreset = null; // US-15: applied to cards-per-player once host-share is shown
+
+const layoutControls = wireLayoutControls(() => ({ role, selectedPreset, gameState }));
 
 function describeDeckConfig({ type, numDecks, jokers }) {
   const deckWord = numDecks === 1 ? 'deck' : 'decks';
@@ -2008,38 +2011,6 @@ function renderRosterOnly() {
 // THIS table was created with, which only the host's own
 // `selectedPreset` knows (presets/GameConfig.piles/zones are already
 // host-only concepts in this codebase, not part of replicated state).
-function updateLayoutControlsVisibility() {
-  document.querySelector('#layout-controls').hidden = role !== 'host' || !selectedPreset;
-}
-
-function performSaveLayout() {
-  if (role !== 'host' || !selectedPreset) return;
-  const layout = stableLayoutSubset(loadPanelLayout(localStorage), gameState.gameConfig);
-  saveLayoutOverride(localStorage, selectedPreset.name, selectedPreset.name, layout);
-  globalThis.alert(`Layout saved as "${selectedPreset.name}".`);
-}
-
-function performSaveLayoutAs() {
-  if (role !== 'host' || !selectedPreset) return;
-  const name = globalThis.prompt('Save layout as:', selectedPreset.name)?.trim();
-  if (!name) return;
-  const existing = overridesForPreset(localStorage, selectedPreset.name).some((o) => o.name === name);
-  if (existing && !globalThis.confirm(`"${name}" already exists. Overwrite it?`)) return;
-  const layout = stableLayoutSubset(loadPanelLayout(localStorage), gameState.gameConfig);
-  saveLayoutOverride(localStorage, name, selectedPreset.name, layout);
-  globalThis.alert(`Layout saved as "${name}".`);
-}
-
-function performResetLayout() {
-  if (role !== 'host' || !selectedPreset) return;
-  if (!globalThis.confirm(`Reset "${selectedPreset.name}" to its built-in default layout? This only affects new games, not this table.`)) return;
-  deleteLayoutOverride(localStorage, selectedPreset.name);
-  globalThis.alert(`"${selectedPreset.name}" reset to its built-in default.`);
-}
-
-document.querySelector('#save-layout-btn').addEventListener('click', performSaveLayout);
-document.querySelector('#save-layout-as-btn').addEventListener('click', performSaveLayoutAs);
-document.querySelector('#reset-layout-btn').addEventListener('click', performResetLayout);
 
 /** Every `sort*` action id's own `SORT_PILE.by` value (US-113 added
  * `sortColor`/`sortCardType` alongside the original `sortRank`/
@@ -2227,7 +2198,7 @@ function renderGameFromView(view) {
   // guest go through, so this is what keeps a GUEST's own cards sized
   // correctly too, not just the host's local preview.
   applyCardSize(view.gameConfig?.cardSize);
-  updateLayoutControlsVisibility();
+  layoutControls.updateLayoutControlsVisibility();
   const nameById = new Map(view.players.map((p) => [p.id, p.id === myId ? 'You' : p.name]));
   const zoneOptions = buildZoneOptions(nameById);
   // UX follow-up (direct user request): "just have table-surface ->

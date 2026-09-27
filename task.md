@@ -2296,3 +2296,12 @@ plan done in one turn (Tier 2). Pruning, not padding.
 - [x] T2 gate: check 1164 + ui/zonepanel/rtg/hostsetup/newgame/multiplayer/tablezoom/focuszoom green
 - [x] T3 docs: UI_ARCHITECTURE layers, ARCHITECTURE map, D160 outcome, BACKLOG (ui.js item resolved; main.js candidate)
 - [x] D160 program COMPLETE: ui.js 2947 -> 268 over US-133..US-138
+
+# Sprint: main.js pilot - layout save (US-139, D161) — 2026-09-27 — Tier 2
+- [x] T1 D161: shared-context vs explicit-params vs don't-split - user chose explicit params
+- [x] T2 src/layoutSave.js (wireLayoutControls, read() getter for role/selectedPreset/gameState); main.js 2946 -> 2917
+- [x] T3 gate: check 1164, hostsetup 7, newgame 5
+- [ ] PAUSE: pattern proven on the smallest cluster. Remaining clusters, by size: pile/zone/stack action
+      dispatch (~700 lines, 34 fns), host-setup/new-game (~1000 lines), session/reconnect, table-zoom/
+      focus-zoom (~340 lines), cursor/motion (~200 lines). Continue only on user go - plumbing cost per
+      cluster (read() getters, explicit params) is real; check size/appetite before each.

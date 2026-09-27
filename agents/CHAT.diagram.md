@@ -537,4 +537,9 @@ sequenceDiagram
     Note right of Oracle: "Oracle retro: UI_ARCHITE<br/>CTURE/ARCHITECTURE/D160<br/>updated to the layers as<br/>built. Not done: CHAT.md<br/>archive (chat_report) -<br/>still pending fro…"
     Cypher->>All: "pm launch"
     Note right of Cypher: "Cypher: *pm launch<br/>US-133..US-138. ui.js is<br/>268 lines (was 2947):<br/>action-menu, dragDrop,<br/>zone-panel +<br/>panelInteraction,<br/>header-actions + ac…"
+    Note over User,Oracle: 📅 2026-09-27
+    Morpheus->>Neo: "lead arch"
+    Note right of Morpheus: "D161 recorded: main.js<br/>split moves functions by<br/>cluster, state stays as<br/>main.js let's, extracted<br/>fns take explicit params<br/>(getters for reas…"
+    Neo->>Cypher: "swe handoff"
+    Note right of Neo: "US-139 pilot done:<br/>layout save -><br/>src/layoutSave.js,<br/>explicit read() getter<br/>for role/selectedPreset/<br/>gameState (D161's chosen<br/>pattern). main…"
 ```

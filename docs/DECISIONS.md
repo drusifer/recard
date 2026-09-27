@@ -70,6 +70,29 @@ D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rul
 
 ---
 
+### D161. `main.js` splits by cluster with explicit params, not a shared context object
+
+`main.js` (2946 lines, ~147 functions) is not `ui.js`: ~40 pieces of
+module-level mutable state (`session`, `gameState`, `latestView`,
+`tableCamera`, ~15 timers/maps) are closed over directly by functions
+across every concern. Asked the user to choose between (a) a shared
+`TableApp`-style context object passed to every extracted module, (b)
+moving functions by cluster with the state they touch passed as explicit
+parameters (more plumbing per call, no ownership redesign), or (c) not
+splitting `main.js` now. **Chose (b).** `main.js` keeps every `let`;
+extracted functions take a getter for anything reassigned elsewhere
+(`role`, `selectedPreset`, `gameState`) rather than capturing it once.
+
+**Rejected:** (a) - the more thorough fix, but a real redesign of state
+ownership, and the user did not ask for one; (c) - `main.js` is now the
+largest file in the repo (BACKLOG, since D160/US-138) and worth the
+plumbing cost to make navigable.
+
+Pilot order (US-139): layout save (smallest, cleanest test of the
+pattern) then table-zoom/focus-zoom, before committing to the larger
+clusters (host-setup ~1000 lines, pile/zone/stack action dispatch ~700
+lines, session/reconnect, cursor/motion).
+
 ### D160. `ui.js` is taken apart by strangler extraction, one cluster per sprint - menus first
 
 `src/ui.js` is 2947 lines and 71 functions, and only 31.7% unit-covered

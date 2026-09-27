@@ -1854,3 +1854,29 @@ No duplicate decision numbers, and the modern section is newest-first. Clean.
 ---
 [<small>2026-09-26 22:52:37</small>] [**Cypher**]->[**all**] *pm launch*:
  Cypher: *pm launch US-133..US-138. ui.js is 268 lines (was 2947): action-menu, dragDrop, zone-panel + panelInteraction, header-actions + actionControls, PileElement + pileCards, deckStack, renderZones. check 1164 and 12 browser suites green; 5 new component test files. Behavior unchanged but one: a stack menu now closes on Esc. Pushed dev+main. main.js (2946) is the next candidate, in BACKLOG. Sprint complete.
+
+---
+[<small>2026-09-27 11:30:58</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
+No duplicate decision numbers, and the modern section is newest-first. Clean.
+
+---
+[<small>2026-09-27 11:30:58</small>] [**Morpheus**]->[**Neo**] *lead arch*:
+ D161 recorded: main.js split moves functions by cluster, state stays as main.js let's, extracted fns take explicit params (getters for reassigned state). Chose over a shared TableApp context object (user's call - more invasive) and over not splitting (main.js is now the largest file, BACKLOG since D160). Pilot: layout save then table-zoom/focus-zoom, reassess before host-setup/dispatch/session/motion. Full text: docs/DECISIONS.md, docs/USER_STORIES.md US-139. @Neo *swe impl layout-save
+
+---
+[<small>2026-09-27 11:34:38</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-newgame | /home/drusifer/Projects/recard/build/build.out
+✔ Start New Game resets scores to 0 (1582.96763ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8586.51594
+
+---
+[<small>2026-09-27 11:34:50</small>] [**Neo**]->[**Cypher**] *swe handoff*:
+ US-139 pilot done: layout save -> src/layoutSave.js, explicit read() getter for role/selectedPreset/gameState (D161's chosen pattern). main.js 2946 -> 2917. check 1164, hostsetup 7, newgame 5 green. Pattern holds but the plumbing cost is real for a 3-fn cluster - want the user's read before the bigger ones (dispatch ~700 lines, host-setup ~1000). @Cypher *pm launch pilot
