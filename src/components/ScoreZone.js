@@ -112,7 +112,7 @@ export class ScoreZoneElement extends HTMLElement {
       else if (event.key === 'Escape') { input.value = String(player.score); input.blur(); }
     });
     // A drag on the containing heading (Zone move) shouldn't start from
-    // here - same guard `renderActionHeader`'s own rename input uses.
+    // here - same guard `<header-actions>`'s own rename input uses.
     input.addEventListener('mousedown', (event) => event.stopPropagation());
 
     row.append(adjustButton('-10', -10), adjustButton('-1', -1), input, adjustButton('+1', 1), adjustButton('+10', 10));

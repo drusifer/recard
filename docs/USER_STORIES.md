@@ -4369,3 +4369,26 @@ separate from Pile (memory: zone-vs-pile).
 **Out of scope:** any behavior change; `renderOneZone`/`renderZones`
 (how zones are grouped and seated - they stay until the pile cluster, since
 they choose which pile component each zone holds).
+
+### US-136: ui.js, cluster 4a - `<header-actions>` is the title bar, `actionControls.js` its parts
+**As** someone changing what a pile or zone title bar does, **I want** the
+header in its own component, **so that** `ui.js` no longer owns it (D160).
+
+**AC:**
+1. `<header-actions>` IS the actionable title bar: title, optional rename,
+   optional pile drag handle, one button per action, the destructive
+   confirm. Its `render` is the former `renderActionHeader`, unchanged but
+   for `this`; it no longer imports `ui.js`.
+2. `src/actionControls.js` holds the controls (icon button, enum dropdown,
+   range slider), unchanged - shared by the header and the stack's gear
+   menu, so a plain module.
+3. All moved code is deleted from `ui.js` (1657 -> 1364 lines); comments
+   that named `renderActionHeader` now name the component; no aliases.
+4. `tests/headerActions.browser.mjs` (`bobp make test-headeractions`, 9
+   cases, no table) pins title/classes/id, action buttons, disabled ones
+   not drawn, the destructive confirm (mutation-proved) and `noConfirm`,
+   rename commit/cancel/unchanged, non-renamable, and the pile drag token.
+   check 1164; headeractions 9, zonepanel 6, ui 20, tablezoom 7, rtg 16,
+   hostsetup 7, newgame 5, focuszoom 11 all pass.
+
+**Out of scope:** any behavior change.

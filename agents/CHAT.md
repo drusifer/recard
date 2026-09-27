@@ -1807,3 +1807,14 @@ No duplicate story numbers. Clean.
 ---
 [<small>2026-09-26 22:28:04</small>] [**Morpheus**]->[**Neo**] *lead review*:
  US-135 cluster 3 done: <zone-panel> IS the zone (render = old renderZonePanel); move/resize is panelInteraction.js (plain module: score panel shares it). ui.js 2078 -> 1657. 6 component tests, drop routing mutation-proved; gate ui/tablezoom/rtg/hostsetup/newgame green. Zone no longer imports ui.js. Next: cluster 4, the pile. @Neo *swe impl cluster-4
+
+---
+[<small>2026-09-26 22:34:52</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-story-numbers | /home/drusifer/Projects/recard/build/build.out
+node tools/checkStoryNumbers.mjs
+Checked 96 story headings in docs/USER_STORIES.md.
+No duplicate story numbers. Clean.
+
+---
+[<small>2026-09-26 22:34:54</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ US-136 cluster 4a done: <header-actions> IS the title bar (render = old renderActionHeader); controls in actionControls.js (shared with the stack menu). ui.js 1657 -> 1364. 9 component tests (confirm gate mutation-proved) + 8 browser suites green. Next: 4b the pile, 4c deck stack. @Neo *swe impl cluster-4b

@@ -2,6 +2,7 @@ import {
   ACTION_SPECS, pileableMenuItems, actionsForPileable, pileLevelActions,
   disabledPileActionsFor,
 } from './pileActions.js';
+import { buildRangeAction } from './actionControls.js';
 import { seatPosition } from './seating.js';
 import { stacksOf, stackKeyFor } from './piles/Stack.js';
 import { MAX_SPREAD, MIN_SPREAD } from './piles/Pile.js';
@@ -13,7 +14,6 @@ import {
   clearPileTargets,
   performPileDrop,
   pileDragFromDrop,
-  pileDragToken,
   showPileDragOver,
   wireCardDrag,
   wireCardLiftCue,
@@ -73,299 +73,6 @@ function cardBackElement(card) {
   element.textContent = '🂠';
   if (card?.id) element.dataset.pileableId = card.id;
   return element;
-}
-
-/**
- * UX follow-up (direct user request, 2026-08-24): "small square icons
- * ... with tool tip style hover text ... keep each button the same
- * size." The button's visible content is just `spec.icon` now - the
- * full name (an override from `labels`, or `spec.label`) moves to
- * `title` (a native tooltip) and `aria-label` (so the icon-only button
- * still has a real accessible name, not just a glyph). Shared by both
- * `renderActionHeader` (piles/zones) and `attachActionRow` (cards) so
- * the icon-button contract can't drift between the two.
- */
-function applyIconButton(button, spec, labelOverride) {
-  const label = labelOverride ?? spec.label;
-  button.textContent = spec.icon;
-  button.title = label;
-  button.setAttribute('aria-label', label);
-}
-
-/**
- * UX follow-up (direct user request, 2026-08-24): "the radials are not
- * working... use a header on Piles and Zones to display the actions
- * ... as a set of buttons next to the title." Retires D52's pointer-
- * centered radial menu entirely for pile/zone-level actions - the
- * heading itself IS the action row now, always visible, no hover state
- * to get wrong. Dispatch keeps D51/D36's split: an in-place action or a
- * STATIC `singleTarget` action (Draw) fires the moment it's clicked;
- * every pile-level action today is one of those two shapes (none needs
- * a "choose a destination" step - see `renderPileAnchor`'s own note),
- * so no targeting-mode branch is needed here at all.
- *
- * UX follow-up (continuing the Web Components pass): takes `container`
- * instead of creating its own `<div>`, same shape as `renderDeck`/
- * `renderPileCards` - so `<header-actions>` (`src/components/
- * HeaderActions.js`) can call this against `this`, the same "thin
- * adapter around proven logic" every other component in this pass uses.
- *
- * @param {HTMLElement} container
- * @param {string} titleText e.g. "Hand (7)"
- * @param {string[]} actionIds
- * @param {{labels?: Record<string,string>, disabled?: string[],
- *   onAction: (actionId: string, value?: string) => void, draggable?: boolean,
- *   headingId?: string, headingClass?: string, rawName?: string,
- *   onRename?: (name: string) => void,
- *   enumOptions?: Record<string, {value: string, choices: {value: string, label: string}[]}>}} opts
- *   `enumOptions[id]` supplies an EnumAction id's current value and full
- *   choice list (`buildEnumActionMenu`) - `onAction`'s second arg is only
- *   ever populated for one of those ids.
- */
-/**
- * An action id that isn't a plain single-click button: an EnumAction
- * (`spec.enum`, e.g. `changePileType`, `buildEnumActionMenu`) or a
- * RangeAction (`spec.range`, e.g. `spread`, `buildRangeAction` -
- * Tighten/Loosen slider, 2026-09-13). Extracted out of
- * `renderActionHeader`'s own action loop so that loop stays under its
- * cognitive-complexity budget as more of these special cases join
- * plain buttons - each one is a self-contained "does this id need
- * something other than a button, and if so what" check.
- *
- * @returns {HTMLElement|undefined} the control to render instead of a
- *   button, or `undefined` for a plain action.
- */
-function buildSpecialActionControl(id, spec, options) {
-  const enumInfo = spec.enum ? options.enumOptions?.[id] : undefined;
-  if (enumInfo) return buildEnumActionMenu(id, spec, enumInfo, options);
-  const rangeInfo = spec.range ? options.rangeOptions?.[id] : undefined;
-  if (rangeInfo) return buildRangeAction(id, spec, rangeInfo, options);
-}
-
-export function renderActionHeader(container, titleText, actionIds, options = {}) {
-  container.replaceChildren();
-  const extraClass = options.headingClass ? ` ${options.headingClass}` : '';
-  container.className = `zone-name pile-action-header${extraClass}`;
-  if (options.headingId) container.id = options.headingId;
-
-  const label = document.createElement('span');
-  label.className = 'zone-name-text';
-  label.textContent = titleText;
-  container.append(label);
-
-  // *nit (2026-08-26): "allow user to rename zones and piles - any user
-  // can edit". `titleText` often carries a derived suffix a pile's own
-  // heading appends ("Hand (7)") that isn't part of the actual stored
-  // name, so editing needs the RAW name (`options.rawName`) as its
-  // starting value, not `titleText` itself - only wired when a caller
-  // supplies `onRename` (a Zone with no name, e.g. the common
-  // single-pile case, never gets this at all, matching how it already
-  // renders no heading there).
-  if (options.onRename) {
-    label.title = 'Double-click to rename';
-    label.classList.add('renamable');
-    label.addEventListener('dblclick', (event) => {
-      event.stopPropagation();
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.className = 'zone-name-edit';
-      input.value = options.rawName ?? titleText;
-      label.replaceWith(input);
-      input.focus();
-      input.select();
-
-      let isSettled = false;
-      const commit = () => {
-        if (isSettled) return;
-        isSettled = true;
-        const name = input.value.trim();
-        // A blank/unchanged edit reverts silently rather than round-
-        // tripping a no-op (or a reducer throw the user never asked
-        // for) through the network - same "cancel is a valid outcome"
-        // spirit as the split/take confirm dialogs' Cancel button.
-        if (name && name !== (options.rawName ?? titleText)) options.onRename(name);
-        input.replaceWith(label);
-      };
-      input.addEventListener('blur', commit);
-      input.addEventListener('keydown', (ke) => {
-        if (ke.key === 'Enter') { ke.preventDefault(); input.blur(); }
-        else if (ke.key === 'Escape') { isSettled = true; input.replaceWith(label); }
-      });
-      // A drag on the containing heading (Zone move, D24) shouldn't
-      // start while the input has focus - the same class this heading
-      // uses as a drag handle would otherwise steal the mousedown.
-      input.addEventListener('mousedown', (me) => me.stopPropagation());
-    });
-  }
-
-  // (bloop: piles/zones/cards are all Movable) - a reparentable pile's
-  // own title bar IS its drag handle for moving it between zones (or
-  // reordering within one), native HTML5 DnD (same mechanism a card's
-  // own drag already uses). A Zone's OWN heading deliberately does NOT
-  // get this - it uses real pointer-drag (`attachPanelDrag`,
-  // `wirePanelLayout`) instead, for genuine free anywhere-on-the-table
-  // positioning, which a discrete native-drop-target model can't give.
-  // Two different Movable mechanisms for two different entities, not
-  // one shared one - see `wirePanelLayout`'s own comment.
-  if (options.pileDraggable) {
-    container.draggable = true;
-    container.addEventListener('dragstart', (event) => {
-      event.dataTransfer.setData('text/plain', pileDragToken(options.pileId));
-    });
-  }
-
-  for (const id of actionIds) {
-    if (options.disabled?.includes(id)) continue;
-    const spec = ACTION_SPECS[id];
-    const specialControl = buildSpecialActionControl(id, spec, options);
-    if (specialControl) {
-      container.append(specialControl);
-      continue;
-    }
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'pile-action-btn' + (spec.destructive ? ' btn-danger' : '');
-    applyIconButton(button, spec, options.labels?.[id]);
-    button.addEventListener('click', (event) => {
-      event.stopPropagation();
-      // US-61 (Sprint 23), Smith's ruling (Phase 70): each spec's own
-      // `hint` already states its real consequence (reshuffleDeal's own
-      // hint says it deals a fresh hand to each player; take's says it
-      // takes every card) - a second, hardcoded "every player's hand
-      // will be cleared" sentence bolted on here was WRONG for every
-      // destructive action except reshuffleDeal, silently inherited by
-      // `take` the moment it became destructive (Phase 68). One prompt,
-      // built from the actual action's own hint, for all of them.
-      // `options.noConfirm` (a 1-card `take`, Smith's ruling) skips the
-      // dialog entirely - identical in effect to that card's own
-      // un-confirmed single-card `pickup`.
-      if (spec.destructive && !options.noConfirm?.includes(id) &&
-        !globalThis.confirm(`${spec.hint}\n\nContinue?`)) return;
-      options.onAction(id);
-    });
-    // D67: the `spec.target`-driven action-token drag protocol (D34/
-    // D35, fixed D65) is retired - direct user correction: "drop isn't
-    // triggering an action it's moving cards around." An action that
-    // always resolved to the SAME fixed destination (Draw -> your own
-    // hand) regardless of where you actually released the drag was
-    // never real drop semantics, just a click wearing a drag costume.
-    // Draw stays available as a plain click (`onAction` above); the
-    // deck's own real drag-to-anywhere entry point is now
-    // `renderDeckStack`'s single card visual, using the exact same
-    // generic card-move mechanism (`onDropCard`) every other pile's
-    // cards already use - see its own comment for why a synthetic
-    // token stands in for a real card id there.
-    container.append(button);
-  }
-}
-
-/**
- * *nit (direct user request): "a menu for the change pile action and
- * give me an indication of the currently selected pile type." Builds an
- * EnumAction's header control: a native `<details>/<summary>` disclosure
- * (open/close, keyboard, click-outside-to-close all free from the
- * browser - no bespoke show/hide state to get wrong, same "reach for the
- * platform first" instinct as this file's native HTML5 drag) rather than
- * a plain `pile-action-btn`. The summary itself IS the indicator - it
- * shows the CURRENT choice's label, not just a generic icon, so a
- * glance at the header says what this pile is right now, not only what
- * it could become. Not a `<button>`, so it's naturally outside the
- * design-lint 44px-floor check's selector (same as `.pile-action-btn`
- * is deliberately exempted) - the small habitual header-control sizing
- * this whole row already uses, not a new exemption to add. The MENU
- * ITEMS below it, though, are real `<button>`s a viewer taps to commit
- * to - sized to the 44px floor on purpose (`style.css`'s
- * `.pile-action-menu-item`), unlike the compact toggle, since these ARE
- * the primary target once the menu is open.
- *
- * @param {string} id the action id (e.g. `'changePileType'`)
- * @param {{label: string, icon: string}} spec
- * @param {{value: string, choices: {value: string, label: string}[]}} enumInfo
- * @param {{onAction: (id: string, value: string) => void}} options
- */
-function buildEnumActionMenu(id, spec, { value, choices }, options) {
-  const details = document.createElement('details');
-  details.className = 'pile-action-enum';
-
-  const current = choices.find((c) => c.value === value);
-  const summary = document.createElement('summary');
-  summary.className = 'pile-action-enum-btn';
-  summary.textContent = `${spec.icon} ${current?.label ?? value}`;
-  summary.title = spec.label;
-  summary.setAttribute('aria-label', `${spec.label}: ${current?.label ?? value}`);
-  details.append(summary);
-
-  const menu = document.createElement('div');
-  menu.className = 'pile-action-menu';
-  for (const choice of choices) {
-    const item = document.createElement('button');
-    item.type = 'button';
-    const isCurrent = choice.value === value;
-    item.className = 'pile-action-menu-item' + (isCurrent ? ' pile-action-menu-item-current' : '');
-    item.textContent = choice.label;
-    if (isCurrent) item.setAttribute('aria-current', 'true');
-    item.addEventListener('click', (event) => {
-      event.stopPropagation();
-      details.open = false;
-      if (!isCurrent) options.onAction(id, choice.value);
-    });
-    menu.append(item);
-  }
-  details.append(menu);
-  return details;
-}
-
-/**
- * Tighten/Loosen slider (direct user request, 2026-09-13): a
- * RangeAction (`spec.range`, e.g. `spread`/`spreadStack`) renders as
- * one `<spread-slider>` (`components/SpreadSlider.js`) instead of a
- * button - the same "static spec + per-instance value/bounds at the
- * render call site" split `buildEnumActionMenu` above already uses
- * (`rangeOptions` here, `enumOptions` there).
- *
- * The slider fires live on every drag tick (the user's own answer at
- * Smith's gate) via its `spread-input` event, forwarded straight to
- * `options.onAction(id, value)` - the same second-argument shape
- * `buildEnumActionMenu`'s choice buttons already use.
- *
- * @param {string} id the action id (e.g. `'spread'`)
- * @param {{label: string}} spec
- * @param {{value: number, min: number, max: number}} rangeInfo
- * @param {{onAction: (id: string, value: number) => void}} options
- */
-function buildRangeAction(id, spec, { value, min, max }, options) {
-  const slider = document.createElement('spread-slider');
-  slider.className = 'pile-action-range';
-  slider.setAttribute('min', String(min));
-  slider.setAttribute('max', String(max));
-  // `step="any"`, not `0.1`: `SET_STACK_SPREAD` rounds to 3 decimal
-  // places, not to a 0.1 grid, and a fixed 0.1 step from `min` (0) can
-  // never actually LAND on a kind's own ceiling when it isn't a clean
-  // multiple of 0.1 - a card pile's own 0.85 is exactly this case,
-  // found live: the browser refuses a `step`-misaligned value outright
-  // (a stack could drag to 0.8 but never reach its true maximum).
-  slider.setAttribute('step', 'any');
-  slider.title = spec.label;
-  slider.setAttribute('aria-label', spec.label);
-  // A completed drag on a native range input fires a real `click` that
-  // bubbles - inside `openStackActionMenu`'s popup, that click would
-  // otherwise reach the document-level outside-click listener that
-  // closes the menu (`<action-menu>`'s own), dismissing it the instant
-  // a drag finishes. Every button in these menus already stops this
-  // same propagation in its own click handler for the same reason.
-  slider.addEventListener('click', (event) => event.stopPropagation());
-  slider.addEventListener('spread-input', (event) => {
-    options.onAction(id, event.detail.value);
-  });
-  // Set as a property, not just the initial attribute: `connectedCallback`
-  // reads the attribute once on first connection, but a later external
-  // update (this pile's spread changed - by this viewer's own drag once
-  // it round-trips through replicated state, or by someone else's) has
-  // to go through the property setter's own drag-guard
-  // (`shouldApplyExternalValue`, `SpreadSlider.js`) to avoid fighting an
-  // in-progress drag.
-  slider.value = value;
-  return slider;
 }
 
 /**
@@ -690,7 +397,7 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
  * dead-end custom menu on a card with nothing to offer at all).
  *
  * Each item carries the action's icon AND its name, plus the same
- * tooltip/aria-label and destructive-confirm gate `renderActionHeader`
+ * tooltip/aria-label and destructive-confirm gate `<header-actions>`
  * uses - one contract for "here is a button for this action id", not a
  * second one invented for menus. It used `applyIconButton` (icon only,
  * name in the tooltip) until the *nit below; that helper is for the
@@ -836,7 +543,7 @@ export function renderPileShell(container, pile, allPiles, options, buildRow) {
   // UX follow-up (direct user request): "like zones, Piles are
   // Actionable and should have a title bar with action buttons for
   // that pile type" - every pile's own heading is a real
-  // `renderActionHeader` now (the same builder the deck's own title bar
+  // `<header-actions>` now (the same builder the deck's own title bar
   // already used), not a plain text div. `pileLevelActions(pile.kind,
   // ...)` returns `[]` for every kind with nothing pile-level to offer
   // (plain/discard/foundation/cascade/rankAdjacent today), so this is a

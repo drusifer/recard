@@ -2521,7 +2521,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    header on Piles and Zones to display the actions ... as a set of
    buttons next to the title.") ---------------------------------------
    Every pile/zone's own heading (`.zone-name`) doubles as its action
-   header now (`ui.js`'s `renderActionHeader`) - the actions it offers
+   header now (`<header-actions>`) - the actions it offers
    are always-visible buttons next to the title, not something you have
    to hover to discover. No more `position: fixed`-at-pointer menu, no
    more per-render open/close/reposition state to get wrong. */

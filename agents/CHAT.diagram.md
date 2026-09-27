@@ -523,4 +523,6 @@ sequenceDiagram
     Note right of Morpheus: "US-134 cluster 2 done:<br/>drag/drop moved<br/>unchanged into<br/>src/dragDrop.js (plain<br/>module, no cycle with<br/>ui.js, ui.js 2654 -><br/>~2050). Gate: check…"
     Morpheus->>Neo: "lead review"
     Note right of Morpheus: "US-135 cluster 3 done:<br/><zone-panel> IS the zone<br/>(render = old<br/>renderZonePanel),<br/>move/resize is<br/>panelInteraction.js<br/>(plain module: score<br/>pan…"
+    Morpheus->>Neo: "lead review"
+    Note right of Morpheus: "US-136 cluster 4a done:<br/><header-actions> IS the<br/>title bar (render = old<br/>renderActionHeader),<br/>controls in<br/>actionControls.js<br/>(shared with the…"
 ```

@@ -2278,3 +2278,9 @@ plan done in one turn (Tier 2). Pruning, not padding.
 - [x] T2 tests/zonePanel.browser.mjs (6 cases, mutation-proved drop routing)
 - [x] T3 gate: check 1164; ui 20, tablezoom 7, rtg 16, hostsetup 7, newgame 5
 - [ ] NEXT: cluster 4 (pile: renderPileShell/Cards/SplitPicker/renderPile, deck stack)
+
+# Sprint: ui.js cluster 4a - header actions (US-136, D160) — 2026-09-26 — Tier 2
+- [x] T1 src/actionControls.js + <header-actions> owns renderActionHeader; ui.js 1657 -> 1364
+- [x] T2 tests/headerActions.browser.mjs (9 cases; confirm gate mutation-proved)
+- [x] T3 gate: check 1164 + 8 browser suites green
+- [ ] NEXT: 4b pile (renderPileShell/Cards/SplitPicker/renderPile + menus/helpers), 4c deck stack
