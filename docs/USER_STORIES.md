@@ -4421,3 +4421,21 @@ conditionals, not four copies of the same `if`).
 
 **Out of scope:** any behavior change; the deck stack's own body
 (`renderDeckStack`, cluster 4c).
+
+### US-138: ui.js, clusters 4c/4d - the deck stack and the zone layout leave `ui.js`
+**As** someone reading `ui.js`, **I want** it to hold only what is genuinely
+left over, **so that** D160 is finished, not just started.
+
+**AC:**
+1. `src/deckStack.js` (plain: `<deck-stack>` and `main.js`'s pre-game deck
+   preview both draw it) holds `renderDeckStack`, `deckDepth`,
+   `pileCountInput`, unchanged.
+2. `src/renderZones.js` (plain) holds `renderZones`/`renderOneZone` - group
+   piles by zone, seat each player's own zone - unchanged.
+3. `ui.js` is 268 lines: roster, rules panel, banner, screens, remote
+   cursors/ghosts, card size. 2947 -> 268 across US-133..US-138.
+4. `docs/UI_ARCHITECTURE.md` and `docs/ARCHITECTURE.md` describe the layers
+   and the "`ui.js` cannot import a component" rule; D160 records the outcome.
+   check 1164; ui/zonepanel/rtg/hostsetup/newgame/multiplayer/tablezoom green.
+
+**Out of scope:** `main.js` (2946 lines) - BACKLOG.

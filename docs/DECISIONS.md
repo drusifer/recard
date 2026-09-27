@@ -91,6 +91,15 @@ component file because node unit tests load `ui.js` and a component's
 is its own pure module). One deliberate change: a stack menu now closes on
 Escape too (there was one closer for both by design).
 
+**Outcome (US-133 to US-138, all four clusters):** `ui.js` 2947 -> 268 lines.
+Menus -> `<action-menu>`; drag/drop -> `dragDrop.js`; zone -> `<zone-panel>`
++ `panelInteraction.js`; header -> `<header-actions>` + `actionControls.js`;
+pile -> abstract `PileElement` (shell + split-picker written once, four
+subclasses supply `buildRow`) + `pileCards.js`; deck stack -> `deckStack.js`;
+zone layout -> `renderZones.js`. Each cluster added component-level browser
+tests (no table needed) with the load-bearing guards mutation-proved.
+Standing rule: `ui.js` cannot import a component file.
+
 **Rejected:** a big-bang rewrite (too much under too little unit
 coverage); splitting by line count (`ui2.js` moves the mess, models
 nothing).

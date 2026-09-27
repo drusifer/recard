@@ -1,5 +1,14 @@
 # Agent State
 
+## Current Task (2026-09-26) - D160 ui.js program COMPLETE (US-133..US-138), pushed dev+main
+
+ui.js 2947 -> 268. Clusters: <action-menu>; dragDrop.js; <zone-panel>+panelInteraction.js;
+<header-actions>+actionControls.js; abstract PileElement (+4 subclasses) + pileCards.js;
+deckStack.js; renderZones.js. Rule: ui.js cannot import a component file. Component browser tests:
+make test-actionmenu / zonepanel / headeractions / pileelement (each ~5-11 cases, no table).
+Open: 1 unexplained RtG timeout (loop if it recurs); BACKLOG has main.js (2946 lines) as next candidate,
+and the 2 Jev shutdown decisions still wait on the user.
+
 ## Current Task (2026-09-25) - US-131 per-game READMEs BUILT, review passed, NOT COMMITTED
 
 `bobp make jev-readme` writes games/<game>/README.md (description, Mermaid statechart, states table,

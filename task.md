@@ -2290,3 +2290,9 @@ plan done in one turn (Tier 2). Pruning, not padding.
 - [x] T2 tests/pileElement.browser.mjs (5 cases; split-picker decision mutation-proved)
 - [x] T3 gate: check 1164 + 12 browser suites green
 - [ ] NEXT: 4c deck stack (renderDeckStack/deckDepth/pileCountInput), then close: retro, ARCHITECTURE map, groom
+
+# Sprint: ui.js clusters 4c/4d + close (US-138, D160) — 2026-09-26 — Tier 2
+- [x] T1 src/deckStack.js, src/renderZones.js; ui.js 538 -> 268
+- [x] T2 gate: check 1164 + ui/zonepanel/rtg/hostsetup/newgame/multiplayer/tablezoom/focuszoom green
+- [x] T3 docs: UI_ARCHITECTURE layers, ARCHITECTURE map, D160 outcome, BACKLOG (ui.js item resolved; main.js candidate)
+- [x] D160 program COMPLETE: ui.js 2947 -> 268 over US-133..US-138

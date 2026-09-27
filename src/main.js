@@ -8,12 +8,10 @@ import {
   TABLE_ZOOM_MIN, TABLE_ZOOM_MAX, zoomFromWheelDrag, TableCamera, TABLE_CANVAS_SIZE, computeFitZoom,
 } from './tableZoom.js';
 import {
-  renderZones,
   renderRoster,
   renderRulesPanel,
   renderBanner,
   applyCardSize,
-  renderDeckStack,
   showScreen,
   updateRemoteCursor,
   removeRemoteCursor,
@@ -23,6 +21,8 @@ import {
 } from './ui.js';
 import { pileDragFromDrop, pileElement } from './dragDrop.js';
 import { wirePanelLayout } from './panelInteraction.js';
+import { renderDeckStack } from './deckStack.js';
+import { renderZones } from './renderZones.js';
 import { PILE_MENU_OPENED_EVENT } from './components/ActionMenu.js';
 import { clampOverlayPosition, clampFocusZoomScale, HOVER_INTENT_MS } from './focusZoom.js';
 import { PRESETS, filterDeckChoicePiles } from './presets.js';
@@ -38,7 +38,7 @@ import { saveLayoutOverride, deleteLayoutOverride, overridesForPreset, stableLay
 // (customElements, light DOM) - importing it (and every pile/zone
 // component below) for its registration side effect
 // (`customElements.define(...)`), same as any other module that just
-// needs to run once at load. `renderDeckStack` (above, from './ui.js')
+// needs to run once at load. `renderDeckStack` (above, from './deckStack.js')
 // stays imported too - `#host-deck-area` (the pre-game preview screen,
 // not a `#zones` panel) calls it directly on a plain div, no component
 // needed there.

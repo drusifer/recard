@@ -1,5 +1,5 @@
 import { PileElement } from './PileElement.js';
-import { renderDeckStack } from '../ui.js';
+import { renderDeckStack } from '../deckStack.js';
 
 /**
  * UX follow-up (direct user request): "a Deck is a specific kind of

@@ -6,28 +6,51 @@ the camera/view features. For history and rationale, see
 `docs/DECISIONS.md`.
 **Part of:** `docs/ARCHITECTURE.md`'s documentation set.
 
-## ui.js / main.js split
+## The UI layers (D160)
 
-`ui.js` builds and returns DOM — card faces, pile rows, zone panels,
-action menus, drag-and-drop wiring — as pure-ish functions taking data
-and an options bag of callbacks. `main.js` owns everything stateful:
-the session/reducer wiring, dispatching an action when a callback
-fires, and every piece of **local-only view state** (table zoom, table
-pan, which pile is focus-zoomed, panel layout overrides) that never
-touches the network. `ui.js` never dispatches an action or reads
-`state.js` directly; `main.js` never builds DOM directly beyond calling
-into `ui.js`/the Web Components.
+`main.js` owns everything stateful: the session/reducer wiring, dispatching
+an action when a callback fires, and every piece of **local-only view state**
+(table zoom, table pan, which pile is focus-zoomed, panel layout overrides)
+that never touches the network. Everything that builds DOM takes data and
+an options bag of callbacks and never dispatches an action or reads
+`state.js` directly. That DOM code used to be one 2947-line `ui.js`; D160
+(US-133 to US-138) took it apart:
+
+- **Web Components** (`src/components/`) own what a *thing* is - the zone,
+  the title bar, the pile, the menu popup. Each is a light-DOM element with
+  a `render(...)`/`open(...)` method that holds the logic.
+- **Plain modules** (`src/*.js`) own behavior wired onto elements other
+  components render, or drawing shared by more than one component:
+  `dragDrop.js` (every drag and drop), `panelInteraction.js` (move/resize a
+  panel), `actionControls.js` (icon button, enum dropdown, range slider),
+  `pileCards.js` (a pile's cards, stacks, and card/stack menus),
+  `deckStack.js`, `renderZones.js` (group piles into zones), `menuPosition.js`.
+- **`ui.js`** keeps only the roster, rules panel, banner, screens, remote
+  cursors/ghosts and card sizing.
+
+The rule that shapes it: **`ui.js` cannot import a component file** (node unit
+tests load `ui.js`, and a component's `class extends HTMLElement` does not
+exist there), so anything `ui.js` needs from a component it creates by tag
+name, and `main.js` registers the components. Components and plain modules
+may import each other freely, but not `ui.js` back.
 
 ## Web Components
 
 Every pile/zone type renders through one of a small set of registered
-custom elements (`src/components/`, each a light-DOM wrapper around a
-thin `render(...)` call into the matching `ui.js` function — the
-component owns almost no logic of its own; `ui.js`'s function is the
-actually-tested unit):
+custom elements (`src/components/`). Each owns its own logic and is tested
+as a component in a real browser (`bobp make test-<name>`):
 
+- **`PileElement`** (abstract, not registered) - what every pile shares: its
+  section (badge, title bar, drop wiring, action controls) and the
+  Split/Pickup picker mode, written once. A subclass supplies only
+  `buildRow(container, pile, allPiles, options)` - a template method, not four
+  copies of the same `if`.
+- **`<action-menu>`** - the popup a card's right-click menu and a stack's gear
+  menu share: cursor-anchored and clamped on-screen, closed by Escape or an
+  outside click, only one open, the destructive confirm gate.
 - **`<zone-panel>`** — the box: border, padding, title bar, and every
-  Pile it holds as a child. Owns move/resize; never draws card content.
+  Pile it holds as a child. Wires move/resize once for the whole zone
+  (`panelInteraction.js`); never draws card content.
 - **`<pile-panel>`** — the flat-row case (every kind except a hand's fan
   or a deck's stack): its own Actionable title bar plus a wrapped card
   row and drop-target wiring.
@@ -83,7 +106,7 @@ on `#zones` via CSS custom properties:
   menu or stack-gear menu cancels any pending grow — a menu opening
   and closing quickly must not leave a stale hover-intent timer to fire
   later and grow an orphaned pile mid some unrelated interaction
-  (`PILE_MENU_OPENED_EVENT`, the seam between `ui.js`'s menu code and
+  (`PILE_MENU_OPENED_EVENT`, dispatched by `<action-menu>`; the seam between the menu and
   `main.js`'s timer).
 
 Pinch-to-zoom math exists (`zoomFromPinch`, `tableZoom.js`, unit-tested)

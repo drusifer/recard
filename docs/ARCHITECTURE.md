@@ -186,8 +186,11 @@ src/cardTransforms.js    FLIP/ROTATE as real polymorphism (extends the Pileable
                           hierarchy), not a type-conditional branch in state.js
 src/dropTarget.js        drop-target resolution shared by drag-and-drop
 
-src/ui.js               DOM rendering: card/pile/zone rows, action menus,
-                         drag-and-drop wiring, roster, connection status
+src/ui.js               DOM rendering left over after D160: roster, rules panel,
+                         banner, screens, remote cursors, card size
+src/dragDrop.js         every drag and drop; src/panelInteraction.js move/resize
+src/pileCards.js        a pile's cards, stacks and card/stack menus (+ deckStack.js,
+                         actionControls.js, renderZones.js, menuPosition.js)
 src/main.js              wires session + state + ui together; owns local-only
                          view state (table zoom/pan, focus-zoom)
 src/components/          registered Web Components - see docs/UI_ARCHITECTURE.md

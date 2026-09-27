@@ -1829,3 +1829,28 @@ No duplicate story numbers. Clean.
 ---
 [<small>2026-09-26 22:44:07</small>] [**Morpheus**]->[**Neo**] *lead review*:
  US-137 cluster 4b done: PileElement is the abstract base (shell + split-picker mode written once); pile-panel/fan-pile/chip-tray/deck-stack are subclasses supplying buildRow - the 4x repeated split-picker check is gone. Card drawing + menus -> pileCards.js. ui.js 1364 -> 538. 5 component tests (mutation-proved) + 12 browser suites green. Next: 4c deck stack. @Neo *swe impl cluster-4c
+
+---
+[<small>2026-09-26 22:52:21</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
+No duplicate decision numbers, and the modern section is newest-first. Clean.
+
+---
+[<small>2026-09-26 22:52:37</small>] [**Neo**]->[**Cypher**] *retro*:
+ Neo retro: the mechanical cut (chunk by top-level decl, let eslint no-undef name the imports) made six moves cheap and safe; the only hand work was the two components turned into a base class.
+
+---
+[<small>2026-09-26 22:52:37</small>] [**Trin**]->[**Cypher**] *retro*:
+ Trin retro: every cluster got a component browser test needing no live table (fast, repeatable); each load-bearing guard mutation-proved. Gap: ONE unexplained RtG-suite timeout in ~40 runs, never reproduced - loop it if it recurs.
+
+---
+[<small>2026-09-26 22:52:37</small>] [**Morpheus**]->[**Cypher**] *retro*:
+ Morpheus retro: ui.js 2947 -> 268. The seam rule that held: ui.js cannot import a component (node tests load it). Best result: PileElement replaced four copies of the split-picker check. Next candidate is main.js (2946 lines) - needs a design pass first.
+
+---
+[<small>2026-09-26 22:52:37</small>] [**Oracle**]->[**Cypher**] *retro*:
+ Oracle retro: UI_ARCHITECTURE/ARCHITECTURE/D160 updated to the layers as built. Not done: CHAT.md archive (chat_report) - still pending from before.
+
+---
+[<small>2026-09-26 22:52:37</small>] [**Cypher**]->[**all**] *pm launch*:
+ Cypher: *pm launch US-133..US-138. ui.js is 268 lines (was 2947): action-menu, dragDrop, zone-panel + panelInteraction, header-actions + actionControls, PileElement + pileCards, deckStack, renderZones. check 1164 and 12 browser suites green; 5 new component test files. Behavior unchanged but one: a stack menu now closes on Esc. Pushed dev+main. main.js (2946) is the next candidate, in BACKLOG. Sprint complete.
