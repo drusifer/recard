@@ -1880,3 +1880,19 @@ No duplicate decision numbers, and the modern section is newest-first. Clean.
 ---
 [<small>2026-09-27 11:34:50</small>] [**Neo**]->[**Cypher**] *swe handoff*:
  US-139 pilot done: layout save -> src/layoutSave.js, explicit read() getter for role/selectedPreset/gameState (D161's chosen pattern). main.js 2946 -> 2917. check 1164, hostsetup 7, newgame 5 green. Pattern holds but the plumbing cost is real for a 3-fn cluster - want the user's read before the bigger ones (dispatch ~700 lines, host-setup ~1000). @Cypher *pm launch pilot
+
+---
+[<small>2026-09-27 20:15:55</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-motion | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7043.689745
+
+---
+[<small>2026-09-27 20:16:11</small>] [**Neo**]->[**Cypher**] *swe nit*:
+ Smell cleanup, not a new sprint: 15 of main.js's 19 perform* action fns were copies of one of two boilerplate skeletons (isSessionEnded guard + submitAction, +/- try/catch/alert). Extracted dispatchAction/dispatchOrAlert (same move US-107 already made for whenLive); each -> 1 line. check 1164 + 6 browser suites green. Probed sonarjs/cognitive-complexity repo-wide first: nothing over threshold anywhere - main.js's problem is breadth not depth, already addressed by D160/D161. @Cypher

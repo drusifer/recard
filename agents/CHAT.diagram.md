@@ -542,4 +542,6 @@ sequenceDiagram
     Note right of Morpheus: "D161 recorded: main.js<br/>split moves functions by<br/>cluster, state stays as<br/>main.js let's, extracted<br/>fns take explicit params<br/>(getters for reas…"
     Neo->>Cypher: "swe handoff"
     Note right of Neo: "US-139 pilot done:<br/>layout save -><br/>src/layoutSave.js,<br/>explicit read() getter<br/>for role/selectedPreset/<br/>gameState (D161's chosen<br/>pattern). main…"
+    Neo->>Cypher: "swe nit"
+    Note right of Neo: "Smell cleanup, not a new<br/>sprint: 15 of main.js's<br/>19 perform* action fns<br/>were copies of one of<br/>two boilerplate<br/>skeletons<br/>(isSessionEnded gua…"
 ```

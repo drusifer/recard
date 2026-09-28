@@ -2305,3 +2305,15 @@ plan done in one turn (Tier 2). Pruning, not padding.
       dispatch (~700 lines, 34 fns), host-setup/new-game (~1000 lines), session/reconnect, table-zoom/
       focus-zoom (~340 lines), cursor/motion (~200 lines). Continue only on user go - plumbing cost per
       cluster (read() getters, explicit params) is real; check size/appetite before each.
+
+# Nit: main.js smell cleanup - perform* boilerplate (2026-09-27)
+
+Found by lowering sonarjs/cognitive-complexity to probe for real smells: none over
+threshold anywhere (main.js's problem was breadth, not depth - already addressed by
+D160/D161). The one concrete duplication: 15 of 19 `perform*` action functions were
+copies of one of two 3-5 line skeletons (isSessionEnded guard + submitAction, or the
+same + try/catch/alert). Extracted dispatchAction/dispatchOrAlert (same pattern US-107
+already used for whenLive); each collapsed to a 1-line body. main.js 2917 -> 2910
+(net; helpers added 20 lines, 15 functions lost ~55). Behavior unchanged (same two
+shapes, not merged into one - the try/catch distinction is real, kept). check 1164;
+ui/rtg/hostsetup/newgame/multiplayer/motion green.

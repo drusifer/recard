@@ -1205,6 +1205,30 @@ function submitAction(action) {
 }
 
 /**
+ * Every `perform*` below that has nothing of its own to check first is
+ * exactly this one guard plus `submitAction` - the shape US-107 already
+ * named for `whenLive`'s object-literal siblings. One place, not one
+ * copy per action.
+ */
+function dispatchAction(action) {
+  if (isSessionEnded) return;
+  submitAction(action);
+}
+
+/**
+ * The same shape, for an action whose reducer validates and can THROW
+ * (D-numbered guards like "must be empty first") - the one thing that
+ * differs between `perform*` functions, so it stays its own helper
+ * rather than folding into `dispatchAction` and adding a try/catch no
+ * presentation-only action (spread, flip, shuffle...) ever needed.
+ */
+function dispatchOrAlert(action) {
+  if (isSessionEnded) return;
+  try { submitAction(action); }
+  catch (error) { globalThis.alert(error.message); }
+}
+
+/**
  * US-118: the multi-player test harness's page-side hook
  * (`tests/harness/multiplayer.mjs`). Exposed unconditionally (D1, no
  * build step) - not a new trust surface: any player can already call
@@ -2363,10 +2387,7 @@ function performBreakChip(pileId) {
  * `ADJUST_PILE_SPREAD` used for the old +/- buttons.
  */
 function performSetSpread(pileId, value, stackKey) {
-  if (isSessionEnded) return;
-  // D129: `stackKey` omitted means every stack - the pile-level slider.
-  const action = { type: 'SET_STACK_SPREAD', pileId, value, stackKey };
-  submitAction(action);
+  dispatchAction({ type: 'SET_STACK_SPREAD', pileId, value, stackKey });
 }
 
 /**
@@ -2386,20 +2407,15 @@ function handleStackAction(pileId, stackKey, actionId, value) {
  * every other presentation-adjacent change here - see
  * `performFlipStack`'s own comment. */
 function performSetStackOrientation(pileId, stackKey, orientation) {
-  if (isSessionEnded) return;
-  const action = { type: 'SET_STACK_ORIENTATION', pileId, stackKey, orientation };
-  submitAction(action);
+  dispatchAction({ type: 'SET_STACK_ORIENTATION', pileId, stackKey, orientation });
 }
 
 function performFlipStack(pileId, stackKey) {
-  if (isSessionEnded) return;
-  const action = { type: 'FLIP_STACK', pileId, stackKey };
-  submitAction(action);
+  dispatchAction({ type: 'FLIP_STACK', pileId, stackKey });
 }
 
 function performShuffle(pileId) {
-  if (isSessionEnded) return;
-  submitAction({ type: 'SHUFFLE_DECK', pileId });
+  dispatchAction({ type: 'SHUFFLE_DECK', pileId });
 }
 
 // Sprint 12 (D34/D35/D36, T54.1): named so the deck's pile anchor - both
@@ -2407,20 +2423,15 @@ function performShuffle(pileId) {
 // implementation the legacy button did, rather than a second one. D92:
 // `pileId` is the real target now, no hardcoded deck constant.
 function performDraw(pileId) {
-  if (isSessionEnded) return;
-  submitAction({ type: 'DRAW', pileId });
+  dispatchAction({ type: 'DRAW', pileId });
 }
 
 function performTakePile(pileId) {
-  if (isSessionEnded) return;
-  try { submitAction({ type: 'TAKE_PILE', pileId }); }
-  catch (error) { globalThis.alert(error.message); }
+  dispatchOrAlert({ type: 'TAKE_PILE', pileId });
 }
 
 function performSetPileOrientation(pileId, faceUp) {
-  if (isSessionEnded) return;
-  try { submitAction({ type: 'SET_PILE_ORIENTATION', pileId, faceUp }); }
-  catch (error) { globalThis.alert(error.message); }
+  dispatchOrAlert({ type: 'SET_PILE_ORIENTATION', pileId, faceUp });
 }
 
 // *nit (2026-08-26): rename, any player - same dispatch shape as every
@@ -2429,15 +2440,11 @@ function performSetPileOrientation(pileId, faceUp) {
 // can't prevent in advance (here: a concurrent delete of the pile/zone
 // between the dblclick and the commit).
 function performRenamePile(pileId, name) {
-  if (isSessionEnded) return;
-  try { submitAction({ type: 'RENAME_PILE', pileId, name }); }
-  catch (error) { globalThis.alert(error.message); }
+  dispatchOrAlert({ type: 'RENAME_PILE', pileId, name });
 }
 
 function performRenameZone(zoneId, name) {
-  if (isSessionEnded) return;
-  try { submitAction({ type: 'RENAME_ZONE', zoneId, name }); }
-  catch (error) { globalThis.alert(error.message); }
+  dispatchOrAlert({ type: 'RENAME_ZONE', zoneId, name });
 }
 
 // US-71/72/73 (D62/D63): same host-local/guest-relay + try/catch +
@@ -2445,32 +2452,24 @@ function performRenameZone(zoneId, name) {
 // reducer's empty-only/exemption throws are the real gate, this is
 // just how they reach the user (Gate 1 Nielsen #9).
 function performRemovePile(pileId) {
-  if (isSessionEnded) return;
-  try { submitAction({ type: 'REMOVE_PILE', pileId }); }
-  catch (error) { globalThis.alert(error.message); }
+  dispatchOrAlert({ type: 'REMOVE_PILE', pileId });
 }
 
 function performRemoveZone(zoneId) {
-  if (isSessionEnded) return;
-  try { submitAction({ type: 'REMOVE_ZONE', zoneId }); }
-  catch (error) { globalThis.alert(error.message); }
+  dispatchOrAlert({ type: 'REMOVE_ZONE', zoneId });
 }
 
 // D79 (US-82): the untap step. Same host-authoritative / guest-relay
 // dispatch shape as every other pile action here.
 function performUntapAll(pileId) {
-  if (isSessionEnded) return;
-  try { submitAction({ type: 'UNTAP_ALL', pileId }); }
-  catch (error) { globalThis.alert(error.message); }
+  dispatchOrAlert({ type: 'UNTAP_ALL', pileId });
 }
 
 // D91: same dispatch shape as every other pile action here - `by` is
 // forwarded straight through to `SORT_PILE` (state.js), which does the
 // actual rank/suit ordering.
 function performSortPile(pileId, by) {
-  if (isSessionEnded) return;
-  try { submitAction({ type: 'SORT_PILE', pileId, by }); }
-  catch (error) { globalThis.alert(error.message); }
+  dispatchOrAlert({ type: 'SORT_PILE', pileId, by });
 }
 
 // D91: commits the Split picker (`splitPicker`, above) at the gap the
@@ -2487,9 +2486,7 @@ function performSplitCommit(index) {
 }
 
 function performChangePileType(pileId, kind) {
-  if (isSessionEnded) return;
-  try { submitAction({ type: 'CHANGE_PILE_TYPE', pileId, kind }); }
-  catch (error) { globalThis.alert(error.message); }
+  dispatchOrAlert({ type: 'CHANGE_PILE_TYPE', pileId, kind });
 }
 
 // (bloop: piles/zones/cards are all Movable) - reparent a pile
@@ -2497,18 +2494,14 @@ function performChangePileType(pileId, kind) {
 // existing design). Same dispatch shape as every other pile-affecting
 // action above.
 function performMovePile(pileId, targetZoneId) {
-  if (isSessionEnded) return;
-  try { submitAction({ type: 'MOVE_PILE', pileId, targetZoneId }); }
-  catch (error) { globalThis.alert(error.message); }
+  dispatchOrAlert({ type: 'MOVE_PILE', pileId, targetZoneId });
 }
 
 // (direct user request) - "all piles can be dropped into any other
 // pile... cards added to the target, dropped pile removed once empty."
 // Same dispatch shape as every other pile-affecting action above.
 function performMergePile(pileId, targetPileId) {
-  if (isSessionEnded) return;
-  try { submitAction({ type: 'MERGE_PILE', pileId, targetPileId }); }
-  catch (error) { globalThis.alert(error.message); }
+  dispatchOrAlert({ type: 'MERGE_PILE', pileId, targetPileId });
 }
 
 
