@@ -2348,3 +2348,14 @@ motion, multiplayer, ui green.
       display counts, idempotent re-entry) - first tests this logic has ever had
 - [x] gate: check 1178; hostsetup/newgame/multiplayer/ui/rtg/tablezoom/focuszoom/motion green
 - [ ] Named risk: no live/E2E test of an actual dropped connection, before or after
+
+# Reconnect: overridable clock + live test (US-142, D164) — 2026-09-29
+
+- [x] reconnectClock injectable via __recardHarness.setReconnectClock; RECONNECT_DELAYS_MS/
+      ATTEMPT_TIMEOUT_MS UNCHANGED in production - "override the clock, not the numbers"
+- [x] __recardHarness.disconnect() (real peer.destroy()) - context.close() does not reliably
+      surface as a WebRTC disconnect here (watched 30s, nothing); found by running it
+- [x] tests/reconnect.browser.mjs: 2 cases, real host+guest+PeerJS, ~3-7s not ~51s;
+      exact-8-attempts assertion mutation-proved (delay-index+3 caught)
+- [x] gate: check 1178; hostsetup/multiplayer/rtg green
+- [ ] Out of scope: full host-recovery test (needs Resume's own code-reuse flow, not guest reconnect)

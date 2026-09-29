@@ -15,6 +15,7 @@
     "test:zonepanel": "node --test tests/zonePanel.browser.mjs",
     "test:headeractions": "node --test tests/headerActions.browser.mjs",
     "test:pileelement": "node --test tests/pileElement.browser.mjs",
+    "test:reconnect": "node --test tests/reconnect.browser.mjs",
     "test:jevtable": "node --test tests/jevTable.browser.mjs",
     "test:spectator": "node --test tests/spectator.browser.mjs",
     "test:addbot": "node --test tests/addBot.browser.mjs",

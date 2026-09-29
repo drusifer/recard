@@ -70,6 +70,36 @@ D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rul
 
 ---
 
+### D164. The reconnect flow's clock is injectable; a live test proves it, fast
+
+Closes the gap D163 named on delivery: no live/E2E test of reconnect
+either side of that change. Direct user request: "tighten up the delays
+... In general we want all timeouts to be overridable in unit tests or
+integration tests so we don't create test suites that take a long time
+to run" - then, mid-build, "another option is to override the clock for
+tests that are dependent on exact clock sequences." **Chose clock
+injection** (`{ setTimeout, clearTimeout }`, `reconnectClock`, swappable
+via `__recardHarness.setReconnectClock`) over shrinking
+`RECONNECT_DELAYS_MS`/`ATTEMPT_TIMEOUT_MS` themselves: production's real
+~51s budget is a deliberate Smith Gate 2 floor (a human reading and
+deciding on a reload-confirm dialog), not network flakiness - a test
+should prove that real schedule, compressed, not a different one.
+
+**Found only by running it:** the real `xstate` npm package cannot be
+imported by `src/main.js` at all (see D163) - caught by
+`test-hostsetup` timing out on an unrelated-looking element-fill
+failure, actually a page-load JS error. Separately here: closing a
+guest's HOST browser context (`context.close()`) does not reliably
+surface as a WebRTC disconnect within any useful window (watched 30s,
+nothing) - `__recardHarness.disconnect()` (`session.close()`/
+`peer.destroy()`, a real, deterministic teardown) replaced it.
+
+**Rejected:** Playwright's own `page.clock` virtual-time API (untested
+in this codebase, risk of freezing unrelated live timers - the motion
+flush interval, focus-zoom's hover timer - on a page mid real WebRTC
+session); shrinking the production delays (would fight the Smith Gate 2
+reasoning, and clock injection already gets tests to ~3-7s without it).
+
 ### D163. The guest's reconnect flow is a hand-written machine, XState's shape without the package
 
 `main.js`'s reconnect flags (`isReconnecting`, `reconnectAttempt`,

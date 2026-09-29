@@ -1227,6 +1227,18 @@ globalThis.__recardHarness = {
   // D138: table talk.
   say: (text, data) => say(text, data),
   talk: () => talkLog.entries(),
+  // D164: swaps the reconnect flow's `setTimeout`/`clearTimeout` - lets
+  // an integration test run the real RECONNECT_DELAYS_MS/ATTEMPT_TIMEOUT_MS
+  // schedule (unchanged) compressed, instead of waiting out a real ~51s
+  // budget for real. `clock` is `{ setTimeout, clearTimeout }`.
+  setReconnectClock: (clock) => { reconnectClock = clock; },
+  // A live test's way to make a host really disappear: destroys this
+  // page's own PeerJS peer outright (`session.close()`), which tears
+  // down every connection under it - the same "host really gone" a
+  // crashed tab produces, but deterministic and fast to detect, unlike
+  // relying on WebRTC's own failure timeout (which this environment does
+  // not reach in any useful window).
+  disconnect: () => session?.close(),
 };
 
 /**
@@ -1418,6 +1430,14 @@ const RECONNECT_DELAYS_MS = [1000, 2000, 4000, 6000, 8000, 10_000, 10_000, 10_00
 How long one attempt may hang before it counts as failed - see `attemptReconnect`.
 */
 const ATTEMPT_TIMEOUT_MS = 5000;
+// D164: `setTimeout`/`clearTimeout` for BOTH the inter-attempt delay and
+// the per-attempt timeout race, injectable so a test can run the REAL
+// schedule above (unchanged in production) compressed instead of
+// waiting out a real ~51s budget - "override the clock", not the
+// numbers. Reachable only via `setReconnectClock` on `__recardHarness`
+// (below), same "not a new trust surface" reasoning as every other hook
+// there: page-local, no server round-trip, harmless from devtools too.
+let reconnectClock = { setTimeout: setTimeout.bind(globalThis), clearTimeout: clearTimeout.bind(globalThis) };
 // D163: only the raw timer handle stays a plain variable - the retry
 // COUNT and whether we're even reconnecting now live in `sessionActor`
 // (`sessionLifecycle.js`), which is what makes the guards below
@@ -1427,7 +1447,7 @@ const ATTEMPT_TIMEOUT_MS = 5000;
 let reconnectTimer = null;
 
 function stopReconnecting() {
-  clearTimeout(reconnectTimer);
+  reconnectClock.clearTimeout(reconnectTimer);
   reconnectTimer = null;
 }
 
@@ -1450,7 +1470,7 @@ function scheduleReconnect() {
   const attempt = sessionActor.context().attempt;
   renderBanner(bannerElement,
     `Lost the host \u{2014} reconnecting\u{2026} (attempt ${attempt} of ${RECONNECT_DELAYS_MS.length})`);
-  reconnectTimer = setTimeout(attemptReconnect, delay);
+  reconnectTimer = reconnectClock.setTimeout(attemptReconnect, delay);
 }
 
 async function attemptReconnect() {
@@ -1467,7 +1487,7 @@ async function attemptReconnect() {
     // the budget can never be spent. Found by watching it never give up.
     myId = await Promise.race([
       attempt.ready(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('reconnect timeout')), ATTEMPT_TIMEOUT_MS)),
+      new Promise((_, reject) => reconnectClock.setTimeout(() => reject(new Error('reconnect timeout')), ATTEMPT_TIMEOUT_MS)),
     ]);
     session = attempt;
     wireGuestSession();

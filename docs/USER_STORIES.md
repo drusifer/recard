@@ -4541,3 +4541,34 @@ new infrastructure nobody asked for); any behavior change.
 or after this change. The confidence here is a careful line-by-line trace
 plus unit tests of the pure state logic, not an integration test of an
 actual dropped connection.
+
+### US-142: the reconnect flow's clock is overridable - a real, fast live test
+**As** someone verifying the guest reconnect flow works, **I want** a live
+test that proves it end-to-end without waiting out the real budget, **so
+that** the gap named in US-141 (no live/E2E reconnect test either side of
+that change) is closed.
+
+**AC:**
+1. `reconnectClock` (`{ setTimeout, clearTimeout }`, main.js) is
+   injectable via `__recardHarness.setReconnectClock` - both the
+   inter-attempt delay and the per-attempt join timeout use it.
+   `RECONNECT_DELAYS_MS`/`ATTEMPT_TIMEOUT_MS` themselves are UNCHANGED in
+   production (D164): "override the clock", not the numbers, so a test
+   proves the real schedule, compressed, not a substitute for it.
+2. `__recardHarness.disconnect()` tears down a page's own PeerJS peer for
+   real (`session.close()`). Closing the host's whole browser CONTEXT was
+   tried first and does not reliably surface as a WebRTC disconnect in
+   this environment (watched 30s with nothing happening) - a real finding,
+   not a guess.
+3. `tests/reconnect.browser.mjs` (`bobp make test-reconnect`, 2 cases,
+   real host+guest over real PeerJS): losing the host shows the
+   reconnecting banner; exhausting the budget shows "Could not reconnect"
+   at EXACTLY 8 attempts (a `MutationObserver` on `#banner` records every
+   text, not just the last) - mutation-proved: shifting the delay-table
+   index by 3 makes the suite fail. Runs in ~3-7s, not the real ~51s.
+4. check 1178; hostsetup/multiplayer/rtg green.
+
+**Out of scope:** a full "host comes back and the table resumes" test -
+`hostTable()`'s helper drives the real `#create-table` button, which has
+no way to claim a SPECIFIC code; that scenario is really the separate
+Resume feature (same host context reloading), not guest reconnect.
