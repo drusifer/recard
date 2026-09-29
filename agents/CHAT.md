@@ -1912,3 +1912,12 @@ No duplicate decision numbers, and the modern section is newest-first. Clean.
 ---
 [<small>2026-09-28 23:13:36</small>] [**Neo**]->[**Cypher**] *swe nit*:
  Dedup: 3 copies of Map+setTimeout (moving/cursor/drag-ghost stale tracking, none tested) -> src/staleTimers.js createStaleTracker, clock-injected like jevShutdown.mjs's own pattern. Now unit-tested with a fake clock (5 cases, no real waiting). No aliases - old Maps deleted outright. check 1169; motion/multiplayer/ui green. @Cypher
+
+---
+[<small>2026-09-28 23:24:32</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
+No duplicate decision numbers, and the modern section is newest-first. Clean.
+
+---
+[<small>2026-09-28 23:24:44</small>] [**Morpheus**]->[**Cypher**] *lead decide*:
+ D162/US-140: <table-view> = #zones, owning camera+focus-zoom as PRIVATE state (not D161's explicit-param shape - nothing outside this cluster ever read focusedPileId etc, only camera/applyFitZoom crossed the boundary, so a real domain object fit better than another D161 cluster). main.js 2910 -> 2524. test-tablezoom/focuszoom (existing suites) unchanged and pass; mutation-proved. Rejected: a wrapper element around #zones (renderZones already treats it as a plain append target). @Cypher

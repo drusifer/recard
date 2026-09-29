@@ -547,4 +547,6 @@ sequenceDiagram
     Note over User,Oracle: 📅 2026-09-28
     Neo->>Cypher: "swe nit"
     Note right of Neo: "Dedup: 3 copies of<br/>Map+setTimeout<br/>(moving/cursor/drag-<br/>ghost stale tracking,<br/>none tested) -><br/>src/staleTimers.js<br/>createStaleTracker,<br/>clock-in…"
+    Morpheus->>Cypher: "lead decide"
+    Note right of Morpheus: "D162/US-140: <table-<br/>view> = #zones, owning<br/>camera+focus-zoom as<br/>PRIVATE state (not<br/>D161's explicit-param<br/>shape - nothing outside<br/>this clust…"
 ```

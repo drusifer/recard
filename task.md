@@ -2325,3 +2325,15 @@ NO test at all. Extracted src/staleTimers.js's createStaleTracker (refresh/cance
 clock-injected like tools/jev/shutdown.mjs's own pattern - now unit-testable with a fake clock,
 no real waiting (5 tests). No aliases left; the three old Maps are gone outright. check 1169;
 motion, multiplayer, ui green.
+
+# main.js: the Table domain object (US-140, D162) — 2026-09-28
+
+- [x] src/components/TableView.js: <table-view> = #zones, owns camera + focus-zoom (private state,
+      not D161's explicit-param shape - nothing outside this cluster read it)
+- [x] index.html: <div id="zones"> -> <table-view id="zones">
+- [x] main.js: 2910 -> 2524; call sites -> zonesElement.applyFitZoom()/.camera/.setCanvasSize()/.reapplyFocusZoom()
+- [x] gate: check 1169; test-tablezoom 7/7, test-focuszoom 11/11 (unchanged suites); mutation-proved
+      (drag-from-inside-zoomed-pile guard); ui/rtg/hostsetup/newgame/multiplayer/motion/gin/jevtable green
+- [ ] NEXT (asked, not yet answered): could XState drive the table simulator's own run loop -
+      the client's screen/session lifecycle (fresh/host-setup/live/reconnecting/ended), the same
+      way games/<game>/turn.yaml already drives a Jev bot's turn? Analysis first, no code yet.

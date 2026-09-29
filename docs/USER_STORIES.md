@@ -4473,3 +4473,32 @@ per call site, but no redesign of who owns what.
 **Out of scope:** any behavior change; a shared context object (the
 user's call, D161); host-setup/session/action-dispatch/cursor-motion
 clusters unless the pilot's plumbing cost is acceptable.
+
+### US-140: the table is `<table-view>` - a domain object, not scattered main.js closures
+**As** someone changing table zoom/pan or focus-zoom, **I want** the table
+itself to be a real object, **so that** its state is encapsulated rather
+than living as `main.js` `let`s only that cluster happened to touch.
+
+**AC:**
+1. `<table-view>` (`src/components/TableView.js`) IS `#zones`: the same
+   element, now also owning the zoom-wheel/pan `TableCamera` and the
+   hover-to-grow focus-zoom, moved out of `main.js` unchanged. Unlike
+   D161's clusters, this state is genuinely private (nothing outside this
+   cluster ever read `focusedPileId`/`isDragInProgress`/etc.), so it lives
+   as private instance fields, not an explicit-param getter.
+2. Public surface: `camera` (read by `buildZoneOptions`/`renderScoreZone`
+   for panel drag/resize math), `applyFitZoom()`, `setCanvasSize(size)`,
+   `reapplyFocusZoom()` - everything else stays private (`#`).
+3. `main.js` calls these on the same `zonesElement` reference it already
+   had (`document.querySelector('#zones')`); no new query. Deleted from
+   `main.js` as it moves (2910 -> 2524 lines); no aliases.
+4. `renderZones` still just appends `<zone-panel>` children into it -
+   unrelated to the camera/focus-zoom, no conflict with either.
+5. `test-tablezoom` (7) and `test-focuszoom` (11) - the two suites that
+   already covered exactly this behavior live - pass unchanged; a
+   mutated guard (drag-from-inside-a-zoomed-pile protection) fails them,
+   proving the port is faithful. check 1169 + ui/rtg/hostsetup/newgame/
+   multiplayer/motion/gin/jevtable green.
+
+**Out of scope:** `playerAnchorRect`/the card-drag anchoring math (motion
+protocol, not table camera - stays in main.js); any behavior change.

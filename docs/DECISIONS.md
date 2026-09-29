@@ -70,6 +70,25 @@ D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rul
 
 ---
 
+### D162. The table is `<table-view>` - a Web Component, not main.js closures
+
+`main.js`'s zoom-wheel/pan camera and hover-to-grow focus-zoom (~340
+lines) were the largest remaining self-contained cluster after D161's
+pilot (US-139). Unlike D161's clusters (`session`/`role`/`gameState` -
+read by many other parts of `main.js`), NOTHING outside this cluster
+ever read `focusedPileId`/`isDragInProgress`/`hoverIntentTimer`/
+`clearFocusPointerWatchers` - only `tableCamera` and `applyFitZoom`
+crossed the boundary. That made it a genuine domain object, not just
+another D161-shaped extraction: `<table-view>` (the `#zones` element
+itself) owns that state as private instance fields and exposes only
+`camera`, `applyFitZoom()`, `setCanvasSize()`, `reapplyFocusZoom()`.
+
+**Rejected:** D161's explicit-param-getter shape (main.js still owns
+the `let`s) - would have been pure overhead here, since nothing else
+needed to read that state; a NEW element wrapping `#zones` rather than
+`#zones` becoming the component - `renderZones` already treats it as a
+plain append target, no reason to add a wrapper layer.
+
 ### D161. `main.js` splits by cluster with explicit params, not a shared context object
 
 `main.js` (2946 lines, ~147 functions) is not `ui.js`: ~40 pieces of

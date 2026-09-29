@@ -222,8 +222,12 @@
              -> zone" - every pile/zone panel (shared, personal, AND the
              deck) is a direct child of this one container now, no
              `#table-center`/`#table-area`/`#seat-zones` split. Rebuilt
-             wholesale every render by `ui.js`'s `renderZones`/`main.js`. -->
-        <div id="zones"></div>
+             wholesale every render by `main.js`'s `renderZones`.
+             `<table-view>` (src/components/TableView.js) is the table
+             itself - the same element, now also owning the zoom wheel/
+             pan camera and hover-to-grow focus-zoom, not just a plain
+             div main.js wired from outside. -->
+        <table-view id="zones"></table-view>
         <!-- US-41: a failed deal reports beside the deck, where the
              click that caused it happened. Outside `#zones` because that
              container is rebuilt wholesale every render. -->

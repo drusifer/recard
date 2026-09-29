@@ -4,9 +4,7 @@ import { breakInto } from './pileables/ChipPileable.js';
 import { homePileKindFor } from './pileables/pileableTypes.js';
 import { makeStateMessage, makeMotionMessage, createMotionThrottler, cardDragPayload } from './protocol.js';
 import { renderShareCode, wireCopyCode } from './qrcode.js';
-import {
-  TABLE_ZOOM_MIN, TABLE_ZOOM_MAX, zoomFromWheelDrag, TableCamera, TABLE_CANVAS_SIZE, computeFitZoom,
-} from './tableZoom.js';
+import { TABLE_CANVAS_SIZE } from './tableZoom.js';
 import {
   renderRoster,
   renderRulesPanel,
@@ -19,13 +17,11 @@ import {
   updateDragGhost,
   removeDragGhost,
 } from './ui.js';
-import { pileDragFromDrop, pileElement } from './dragDrop.js';
+import { pileDragFromDrop } from './dragDrop.js';
 import { wirePanelLayout } from './panelInteraction.js';
 import { renderDeckStack } from './deckStack.js';
 import { renderZones } from './renderZones.js';
 import { createStaleTracker } from './staleTimers.js';
-import { PILE_MENU_OPENED_EVENT } from './components/ActionMenu.js';
-import { clampOverlayPosition, clampFocusZoomScale, HOVER_INTENT_MS } from './focusZoom.js';
 import { PRESETS, filterDeckChoicePiles } from './presets.js';
 import { RULES_REFERENCE } from './rulesReference.js';
 import { seatedOrder } from './seating.js';
@@ -45,6 +41,7 @@ import { wireLayoutControls } from './layoutSave.js';
 // not a `#zones` panel) calls it directly on a plain div, no component
 // needed there.
 import './components/ScoreZone.js';
+import './components/TableView.js';
 import './components/ZonePanel.js';
 import './components/PilePanel.js';
 import './components/FanPile.js';
@@ -93,35 +90,13 @@ zonesElement.addEventListener('drop', (event) => {
   const pileId = pileDragFromDrop(event.dataTransfer);
   if (pileId) performMovePile(pileId, null);
 });
-// *fix (direct user request, 2026-09-17): "we need a unifying domain
-// object" for converting between screen and local pixel space under
-// the table's own zoom/pan - one shared instance, not scattered
-// closure state, so `wireTableZoomControls` (below) and every render's
-// own `options` bag (`buildZoneOptions`) reference the SAME camera.
-// Declared before `wireTableZoomControls()` runs (right below), which
-// reads it immediately.
-const tableCamera = new TableCamera();
-// D132 revised (2026-09-17): `applyFitZoom` (assigned inside
-// `wireTableZoomControls`) is called again after every `renderZones` -
-// `#screen-game`/`.table-surface` measure zero-size right up until the
-// game screen is actually shown (host/join forms render first), so the
-// ONE call `wireTableZoomControls` makes at module load time can't yet
-// see real layout. A `resize` listener alone catches a later WINDOW
-// resize but not "the table just became visible for the first time,
-// window untouched" - the actual first-paint case.
-let applyFitZoom = () => {};
-// D134 (2026-09-18, direct user request: "reasonable zoom level ...
-// for all the presets"): a preset MAY declare its own `tableCanvasSize`
-// (`gameConfig.tableCanvasSize`, threaded through by `configsForPreset`
-// same as `cardSize` already is) when `TABLE_CANVAS_SIZE`'s default
-// footprint doesn't suit it - Recard the Gathering's 15-deck table
-// needs real room a 2-seat card game doesn't. `renderGameFromView`
-// updates this on every render (a `New Game` can switch presets
-// without recreating the table); `applyFitZoom` reads it instead of
-// the constant directly.
-let currentTableCanvasSize = TABLE_CANVAS_SIZE;
-wireTableZoomControls();
-wireFocusZoom();
+// US-1xx: `<table-view>` (the `#zones` element itself, `TableView.js`)
+// owns the camera and focus-zoom now - it wires both the moment it
+// connects (module load; `#zones` is static markup, already in the DOM
+// by the time this module's imports run). `tableView.applyFitZoom()` is
+// still called again after every `renderZones` (see there for why:
+// `#screen-game`/`.table-surface` measure zero-size until the game
+// screen is actually shown).
 // *nit (2026-08-27), direct user request ("save space"): one
 // consolidated Score panel for every seated player, not one whole panel
 // per player - a single fixed id is enough again, same as before the
@@ -694,7 +669,7 @@ function finishRestore() {
   broadcastViews();
   if (latestView) renderGameFromView(latestView);
   showScreen(screens, 'game');
-  applyFitZoom(); // the surface just became visible - see applyFitZoom's own declaration
+  zonesElement.applyFitZoom(); // the surface just became visible - see applyFitZoom's own declaration
 }
 
 function startGame() {
@@ -705,7 +680,7 @@ function startGame() {
   // error (see `DEAL`'s own comment, state.js).
   dispatch({ type: 'DEAL', cardsPerPlayer, pileId: DECK_PILE_ID });
   showScreen(screens, 'game');
-  applyFitZoom(); // the surface just became visible - see applyFitZoom's own declaration
+  zonesElement.applyFitZoom(); // the surface just became visible - see applyFitZoom's own declaration
 }
 
 document.querySelector('#deal-btn').addEventListener('click', startGame);
@@ -914,7 +889,7 @@ async function resumeHostedTable() {
     }
     broadcastViews();
     showScreen(screens, 'game');
-    applyFitZoom(); // the surface just became visible - see applyFitZoom's own declaration
+    zonesElement.applyFitZoom(); // the surface just became visible - see applyFitZoom's own declaration
   } else {
     const shareContainer = document.querySelector('#share-code-container');
     renderShareCode(shareContainer, { code: myId });
@@ -1100,7 +1075,7 @@ function cancelNewGameFlow() {
   document.querySelector('#host-form').hidden = true;
   document.querySelector('#host-share').hidden = false;
   showScreen(screens, 'game');
-  applyFitZoom(); // the surface just became visible - see applyFitZoom's own declaration
+  zonesElement.applyFitZoom(); // the surface just became visible - see applyFitZoom's own declaration
   // Undoes any preview drift from changing the preset dropdown while
   // this picker was open (`onPresetSelected` applies a card size live,
   // for the picker's OWN preview) - Cancel means the table underneath
@@ -1570,7 +1545,7 @@ function wireGuestSession() {
     latestView = message.payload;
     renderGameFromView(latestView);
     showScreen(screens, 'game');
-    applyFitZoom(); // the surface just became visible - see applyFitZoom's own declaration
+    zonesElement.applyFitZoom(); // the surface just became visible - see applyFitZoom's own declaration
   });
 
   // D32: losing the host is retryable. `forgetSession` is deliberately
@@ -1606,7 +1581,7 @@ function endSessionForGood(message, { retryable = false } = {}) {
     const nameById = new Map(latestView.players.map((p) => [p.id, p.id === myId ? 'You' : p.name]));
     const frozenOptions = {
       resolveOwnerName: (ownerId) => nameById.get(ownerId) ?? ownerId,
-      camera: tableCamera,
+      camera: zonesElement.camera,
     };
     // UX follow-up (direct user request): "a Deck is a specific kind of
     // Pile" - the deck is a real pile in `latestView.piles` now, so this
@@ -1620,8 +1595,8 @@ function endSessionForGood(message, { retryable = false } = {}) {
     // player with a score, one consolidated panel), just no
     // adjust/set wiring - the session is over.
     const frozenSeated = seatedOrder(latestView.players, myId);
-    renderScoreZone(zonesElement, frozenSeated, latestView.scores, { camera: tableCamera });
-    reapplyFocusZoom();
+    renderScoreZone(zonesElement, frozenSeated, latestView.scores, { camera: zonesElement.camera });
+    zonesElement.reapplyFocusZoom();
   }
   renderRosterOnly();
 }
@@ -1646,350 +1621,6 @@ function currentView() {
 // compat shim - the wheel is the only control now.
 // Dragging the wheel UP (negative pointer delta) zooms in, DOWN zooms
 // out (`zoomFromWheelDrag`).
-function wireTableZoomControls() {
-  const zonesElement = document.querySelector('#zones');
-  const wheelElement = document.querySelector('#table-zoom-wheel');
-  if (!zonesElement || !wheelElement) return;
-  wheelElement.setAttribute('aria-valuemin', String(TABLE_ZOOM_MIN));
-  wheelElement.setAttribute('aria-valuemax', String(TABLE_ZOOM_MAX));
-
-  // D132/D134: `TABLE_CANVAS_SIZE` (`tableZoom.js`) is the DEFAULT -
-  // set here once for whatever renders before a real table exists
-  // (style.css's own `1280px`/`760px` are fallbacks below THAT, for a
-  // page that somehow paints before even this runs). `applyFitZoom`
-  // below re-sets both vars from `currentTableCanvasSize` on every
-  // call, once a preset's own size is known.
-  zonesElement.style.setProperty('--table-canvas-w', `${TABLE_CANVAS_SIZE.width}px`);
-  zonesElement.style.setProperty('--table-canvas-h', `${TABLE_CANVAS_SIZE.height}px`);
-
-  // *fix (2026-09-17): reads/writes the shared `tableCamera` (module
-  // scope) instead of owning its own closure state, so the SAME
-  // zoom/pan this function applies visually is also what `ui.js`'s
-  // panel drag/resize convert screen deltas against (`buildZoneOptions`
-  // passes the same instance through as `options.camera`).
-  function applyPan(pan) {
-    tableCamera.setPan(pan);
-    zonesElement.style.setProperty('--table-pan-x', `${tableCamera.pan.x}px`);
-    zonesElement.style.setProperty('--table-pan-y', `${tableCamera.pan.y}px`);
-  }
-
-  function applyZoom(value) {
-    tableCamera.setZoom(value);
-    wheelElement.setAttribute('aria-valuenow', String(tableCamera.zoom));
-    zonesElement.style.setProperty('--table-zoom', String(tableCamera.zoom));
-    applyPan(tableCamera.pan);
-  }
-
-  const tableSurface = document.querySelector('.table-surface');
-
-  // D132 revised (2026-09-17): the STARTING zoom is computed to fit
-  // `TABLE_CANVAS_SIZE` into whatever `.table-surface` actually
-  // measures, instead of a flat constant - see `computeFitZoom`'s own
-  // doc comment for why a flat default couldn't clear `lint:design`'s
-  // zone-overlap check at every viewport. Re-applied on resize UNTIL
-  // the player drags/keys the wheel themselves (`hasUserSetZoom`) -
-  // once they've made a deliberate choice, a resize (or the mobile-
-  // rotation equivalent) must not silently override it.
-  let hasUserSetZoom = false;
-  applyFitZoom = () => {
-    zonesElement.style.setProperty('--table-canvas-w', `${currentTableCanvasSize.width}px`);
-    zonesElement.style.setProperty('--table-canvas-h', `${currentTableCanvasSize.height}px`);
-    if (hasUserSetZoom || !tableSurface) return;
-    const { width, height } = tableSurface.getBoundingClientRect();
-    if (width === 0 || height === 0) return; // not yet laid out (e.g. still on the host/join screen)
-    applyZoom(computeFitZoom(currentTableCanvasSize, { width, height }));
-  };
-  applyFitZoom();
-  window.addEventListener('resize', applyFitZoom);
-
-  let panStart = null;
-  tableSurface?.addEventListener('pointerdown', (event) => {
-    // Only the empty table background starts a pan - a pointerdown on
-    // any pile/zone/card/button inside it (a descendant target) must
-    // reach ITS OWN handler (drag-and-drop, the stack gear, a card
-    // click) untouched. `#table-surface`/`#zones` themselves are the
-    // only two valid targets, since `#zones` is the direct, otherwise-
-    // empty flex container every pile/zone panel lives inside.
-    if (event.target !== tableSurface && event.target !== zonesElement) return;
-    panStart = { x: event.clientX - tableCamera.pan.x, y: event.clientY - tableCamera.pan.y };
-    tableSurface.setPointerCapture(event.pointerId);
-  });
-  tableSurface?.addEventListener('pointermove', (event) => {
-    if (!panStart) return;
-    applyPan({ x: event.clientX - panStart.x, y: event.clientY - panStart.y });
-  });
-  tableSurface?.addEventListener('pointerup', () => { panStart = null; });
-  tableSurface?.addEventListener('pointercancel', () => { panStart = null; });
-
-  let dragStartY = null;
-  let zoomAtDragStart = tableCamera.zoom;
-  wheelElement.addEventListener('pointerdown', (event) => {
-    hasUserSetZoom = true;
-    dragStartY = event.clientY;
-    zoomAtDragStart = tableCamera.zoom;
-    wheelElement.setPointerCapture(event.pointerId);
-  });
-  wheelElement.addEventListener('pointermove', (event) => {
-    if (dragStartY === null) return;
-    applyZoom(zoomFromWheelDrag(zoomAtDragStart, event.clientY - dragStartY));
-  });
-  wheelElement.addEventListener('pointerup', () => { dragStartY = null; });
-  wheelElement.addEventListener('pointercancel', () => { dragStartY = null; });
-  // Keyboard equivalent (`role="slider"` implies arrow-key support) -
-  // one `WHEEL_DRAG_RANGE_PX`-scaled "notch" per press, same direction
-  // convention as the drag (up arrow zooms in).
-  wheelElement.addEventListener('keydown', (event) => {
-    if (event.key === 'ArrowUp') { hasUserSetZoom = true; applyZoom(zoomFromWheelDrag(tableCamera.zoom, -20)); }
-    else if (event.key === 'ArrowDown') { hasUserSetZoom = true; applyZoom(zoomFromWheelDrag(tableCamera.zoom, 20)); }
-    else return;
-    event.preventDefault();
-  });
-}
-
-// US-117 phase 113 (D131): hover/click a Pile to grow it in place as a
-// `position: fixed` overlay anchored at its own rect - table underneath
-// untouched. Tracked by PILE ID, not a DOM reference: `renderZones`
-// rebuilds `#zones` wholesale on every state-driven render (a comment
-// in `index.html` says so explicitly), which would silently orphan a
-// direct element reference the moment an unrelated player's move
-// triggers a re-render while a pile is focus-zoomed. `reapplyFocusZoom`
-// (called after every `renderZones`, same call sites phase 111 used)
-// discards whatever stale overlay survived from the OLD render and
-// re-grows the pile fresh from the NEW one, so the visible state never
-// drifts from what `focusedPileId` says is true.
-let focusedPileId = null;
-let isDragInProgress = false;
-let hoverIntentTimer = null;
-// *fix (2026-09-16): the pointer-watcher cleanup for whichever pile is
-// CURRENTLY focused (`applyFocusZoom` sets this, `shrinkFocusedPile`
-// always calls and clears it) - centralized so every path that ends a
-// focus-zoom (natural pointerleave, a click outside, a drag starting
-// elsewhere, a re-render's `reapplyFocusZoom`) tears down the same
-// listeners, instead of only the one path that happened to attach them.
-let clearFocusPointerWatchers = null;
-
-function focusZoomOverlay(pileId) {
-  return document.querySelector(`body > .pile-section.focus-zoomed[data-pile-id="${CSS.escape(pileId)}"]`);
-}
-
-function focusZoomPlaceholder(pileId) {
-  return document.querySelector(`.focus-zoom-placeholder[data-pile-id="${CSS.escape(pileId)}"]`);
-}
-
-// *fix (direct user bug report, 2026-09-16): a plain `pointerleave`
-// shrinks the pile even while the pointer left mid-drag (e.g. dragging
-// the Tighten/Loosen slider) - `event.buttons !== 0` means a button is
-// still held, so wait for release instead (`applyFocusZoom`'s
-// `onPointerUpAnywhere` catches that release). No closure needed, so
-// this lives at module scope rather than being rebuilt on every grow.
-function onPileLeave(event) {
-  if (event.buttons !== 0) return;
-  shrinkFocusedPile();
-}
-
-// Does the actual DOM work, unconditionally - both a fresh user-
-// triggered grow AND a post-render reapplication go through here.
-function applyFocusZoom(pileElementToGrow) {
-  const pileId = pileElementToGrow.dataset.pileId;
-  const rect = pileElementToGrow.getBoundingClientRect();
-  const placeholder = document.createElement('div');
-  placeholder.className = 'focus-zoom-placeholder';
-  placeholder.dataset.pileId = pileId;
-  placeholder.style.width = `${rect.width}px`;
-  placeholder.style.height = `${rect.height}px`;
-  pileElementToGrow.before(placeholder);
-
-  // Reparent FIRST, pinned at its EXACT original screen position and
-  // scale 1 - a pure DOM move with no visual change yet, not a guess.
-  // This is required, not a two-pass correction: a pile can render at
-  // a genuinely different NATURAL size once it's no longer squeezed by
-  // its old flex siblings in `#zones` (found live, on a small viewport
-  // - a hand's real unconstrained width differs from its flex-item
-  // width), so `rect` above cannot be trusted for the GROWN size, only
-  // for the anchor position. Measuring the true natural size only
-  // AFTER the move, before growing, is what makes the clamp math
-  // correct instead of approximately correct.
-  document.body.append(pileElementToGrow);
-  pileElementToGrow.classList.add('focus-zoomed');
-  pileElementToGrow.style.setProperty('--focus-left', `${rect.left}px`);
-  pileElementToGrow.style.setProperty('--focus-top', `${rect.top}px`);
-  pileElementToGrow.style.setProperty('--focus-scale', '1');
-
-  const naturalRect = pileElementToGrow.getBoundingClientRect();
-  const viewport = { width: window.innerWidth, height: window.innerHeight };
-  // *fix (found live, 2026-09-16): a wider pile header (the Tighten/
-  // Loosen slider) can push the FIXED `FOCUS_ZOOM_SCALE` past a small
-  // viewport - `clampFocusZoomScale` caps the EFFECTIVE scale so the
-  // grown box always fits, before `clampOverlayPosition` even runs.
-  const scale = clampFocusZoomScale(naturalRect, viewport);
-  const grownSize = { width: naturalRect.width * scale, height: naturalRect.height * scale };
-  const { left, top } = clampOverlayPosition(rect, grownSize, viewport);
-  pileElementToGrow.style.setProperty('--focus-left', `${left}px`);
-  pileElementToGrow.style.setProperty('--focus-top', `${top}px`);
-  pileElementToGrow.style.setProperty('--focus-scale', String(scale));
-
-  // Reparented out of `#zones`, so its pointer events no longer bubble
-  // to that container's delegated listeners below - attached directly
-  // here instead, a fresh pair every time this runs (including a
-  // post-render reapplication).
-  //
-  // *fix (direct user bug report, 2026-09-16): "interact with the
-  // [Tighten/Loosen] slider [and it] goes bonkers." Dragging the
-  // slider can carry the pointer briefly outside the pile's own
-  // (enlarged, fixed-position) box - a plain `pointerleave` shrank the
-  // pile mid-drag, reparenting it back into `#zones` while the slider
-  // was still being dragged. `event.buttons !== 0` means a button is
-  // still held (something inside the pile is still being interacted
-  // with) - wait for release instead of shrinking immediately. Once
-  // the pointer HAS left, though, a later `pointerleave` won't fire
-  // again on its own (the pointer isn't re-crossing the boundary), so
-  // a `pointerup` on the document catches "released while already
-  // outside" and shrinks then. `clearFocusPointerWatchers` (module-
-  // level) is how EVERY shrink path - not just these two listeners -
-  // tears them down; see `shrinkFocusedPile`.
-  const onPointerUpAnywhere = (event) => {
-    const overlay = focusZoomOverlay(pileId);
-    if (overlay && !overlay.contains(event.target)) shrinkFocusedPile();
-  };
-  pileElementToGrow.addEventListener('pointerleave', onPileLeave);
-  document.addEventListener('pointerup', onPointerUpAnywhere);
-  clearFocusPointerWatchers = () => {
-    pileElementToGrow.removeEventListener('pointerleave', onPileLeave);
-    document.removeEventListener('pointerup', onPointerUpAnywhere);
-  };
-  focusedPileId = pileId;
-}
-
-// The user-facing entry point (hover-intent/click) - a no-op if this
-// pile is already the focused one, unlike `applyFocusZoom` itself.
-// `isConnected` guards a delayed hover-intent callback whose captured
-// element got detached by an unrelated render finishing during the
-// wait (rare - a state broadcast landing inside the ~180ms window) -
-// without it this would reparent a dead, detached node into `<body>`
-// as an invisible ghost while the real pile renders normally elsewhere.
-function growPileInPlace(pileElementToGrow) {
-  if (isDragInProgress || !pileElementToGrow.isConnected) return;
-  const pileId = pileElementToGrow.dataset.pileId;
-  if (focusedPileId === pileId) return;
-  shrinkFocusedPile();
-  applyFocusZoom(pileElementToGrow);
-}
-
-function shrinkFocusedPile() {
-  if (!focusedPileId) return;
-  // *fix (2026-09-16): tear down `applyFocusZoom`'s pointer watchers
-  // here, unconditionally - this is the ONE function every shrink path
-  // (natural pointerleave, click-outside, a drag starting elsewhere,
-  // `reapplyFocusZoom`) already funnels through, so it is the one place
-  // that can guarantee they never outlive the pile they watched.
-  clearFocusPointerWatchers?.();
-  clearFocusPointerWatchers = null;
-  const overlay = focusZoomOverlay(focusedPileId);
-  const placeholder = focusZoomPlaceholder(focusedPileId);
-  if (overlay) {
-    overlay.classList.remove('focus-zoomed');
-    overlay.style.removeProperty('--focus-left');
-    overlay.style.removeProperty('--focus-top');
-    overlay.style.removeProperty('--focus-scale');
-    if (placeholder) placeholder.replaceWith(overlay);
-    else overlay.remove(); // its zone is gone too - nowhere to put it back
-  } else {
-    placeholder?.remove();
-  }
-  focusedPileId = null;
-}
-
-// Called after every `renderZones` (same call sites as phase 111's now-
-// removed auto-fit hook): a fresh render just discarded the DOM the
-// current focus-zoom was built on. Drop whatever's stale and re-grow
-// the same pile ID from the new render, or drop focus entirely if that
-// pile no longer exists (e.g. it emptied and was removed).
-function reapplyFocusZoom() {
-  if (!focusedPileId) return;
-  // *fix (2026-09-16): same pointer-watcher teardown `shrinkFocusedPile`
-  // does - this path discards the OLD overlay directly rather than
-  // calling that function, so it needs its own copy of the same
-  // cleanup, or the old watchers (particularly the document-level
-  // `pointerup` one) leak forever, one more per re-render while a pile
-  // stays focus-zoomed.
-  clearFocusPointerWatchers?.();
-  clearFocusPointerWatchers = null;
-  focusZoomOverlay(focusedPileId)?.remove();
-  focusZoomPlaceholder(focusedPileId)?.remove();
-  const fresh = pileElement(focusedPileId);
-  if (fresh) applyFocusZoom(fresh);
-  else focusedPileId = null;
-}
-
-function wireFocusZoom() {
-  const zonesElement = document.querySelector('#zones');
-  if (!zonesElement) return;
-
-  // *fix (standing backlog bug, filed 2026-09-13, root-caused
-  // 2026-09-17): right-clicking a card/stack to open its menu ALSO
-  // satisfies this hover-intent trigger. The menu opens and closes well
-  // within `HOVER_INTENT_MS`, but nothing cancelled the timer THAT
-  // hover armed - it fired later, unrelated to anything still open,
-  // growing an orphaned pile mid a later interaction (confirmed live:
-  // a card's own context menu closing left a pending timer that fired
-  // ~300ms afterward). `<action-menu>` dispatches `PILE_MENU_OPENED_EVENT`
-  // whenever it opens, specifically so this file -
-  // the one that owns `hoverIntentTimer` - can cancel it.
-  document.addEventListener(PILE_MENU_OPENED_EVENT, () => clearTimeout(hoverIntentTimer));
-
-  document.addEventListener('dragstart', (event) => {
-    isDragInProgress = true;
-    clearTimeout(hoverIntentTimer);
-    // *fix (direct user bug report, 2026-09-16): "drag a card out [of a
-    // zoomed pile] goes bonkers." A drag starting FROM INSIDE the
-    // currently-focused pile must NOT shrink it - `shrinkFocusedPile`
-    // reparents the pile back into `#zones`, which moves the dragged
-    // card's own ancestor chain while native HTML5 DnD has already
-    // captured that exact node as the drag source. Browsers handle a
-    // drag SOURCE being reparented mid-gesture very badly (the drag
-    // silently breaks). Only shrink an UNRELATED already-focused pile -
-    // e.g. starting a drag elsewhere on the board while a different
-    // pile sits zoomed - which is what this existed to do in the first
-    // place.
-    const overlay = focusedPileId ? focusZoomOverlay(focusedPileId) : null;
-    if (!overlay?.contains(event.target)) shrinkFocusedPile();
-  });
-  document.addEventListener('dragend', () => {
-    isDragInProgress = false;
-  });
-
-  zonesElement.addEventListener('pointerover', (event) => {
-    const target = event.target.closest('.pile-section[data-pile-id]');
-    if (!target || isDragInProgress) return;
-    clearTimeout(hoverIntentTimer);
-    hoverIntentTimer = setTimeout(() => growPileInPlace(target), HOVER_INTENT_MS);
-  });
-  // Only cancels a PENDING hover-intent timer for a pile that has not
-  // grown yet - an already-focused pile is reparented out of `#zones`
-  // by the time this could fire for it, so shrinking it is handled by
-  // the `pointerleave` listener `applyFocusZoom` attaches directly to
-  // the overlay, not here. Unconditionally calling `shrinkFocusedPile`
-  // in this handler would be a real bug: it would fire for ANY pile's
-  // pointerout, including one unrelated to whichever pile (if any) is
-  // actually focused right now.
-  zonesElement.addEventListener('pointerout', (event) => {
-    const target = event.target.closest('.pile-section[data-pile-id]');
-    if (!target) return;
-    if (!target.contains(event.relatedTarget)) clearTimeout(hoverIntentTimer);
-  });
-  zonesElement.addEventListener('click', (event) => {
-    const target = event.target.closest('.pile-section[data-pile-id]');
-    if (!target || isDragInProgress) return;
-    clearTimeout(hoverIntentTimer);
-    growPileInPlace(target);
-  });
-  document.addEventListener('click', (event) => {
-    if (!focusedPileId) return;
-    const overlay = focusZoomOverlay(focusedPileId);
-    if (overlay && !overlay.contains(event.target)) shrinkFocusedPile();
-  });
-}
-
 function renderRosterOnly() {
   const view = currentView();
   if (!view) return;
@@ -2132,11 +1763,11 @@ function buildZoneOptions(nameById) {
   return {
     viewerId: myId,
     // *fix (2026-09-17): threaded through to `wirePanelLayout` ->
-    // `attachPanelDrag`/`attachPanelResize` (ui.js), which need it to
-    // convert a screen-space pointer delta into the local-space delta
-    // a panel's own `left`/`top` actually use - see `tableCamera`'s
-    // own doc comment (module scope, above) for the full reasoning.
-    camera: tableCamera,
+    // `attachPanelDrag`/`attachPanelResize`, which need it to convert a
+    // screen-space pointer delta into the local-space delta a panel's
+    // own `left`/`top` actually use - see `TableView.js`'s `camera` for
+    // the full reasoning.
+    camera: zonesElement.camera,
     resolveOwnerName: (ownerId) => nameById.get(ownerId) ?? ownerId,
     // US-121/D142: each bot's own decisions, filtered out of the talk
     // log (the history IS the log), and which bubble this client has
@@ -2244,12 +1875,10 @@ function renderGameFromView(view) {
   // `configsForPreset` threads `tableCanvasSize` through the same way
   // as `cardSize`), read fresh every render since `New Game` can swap
   // presets without recreating the table.
-  currentTableCanvasSize = view.gameConfig?.tableCanvasSize ?? TABLE_CANVAS_SIZE;
-  // The table (and its real `.table-surface` size) only exists from
-  // here on - see `applyFitZoom`'s own declaration for why the single
-  // call `wireTableZoomControls` makes at load time can't do this job
-  // alone.
-  applyFitZoom();
+  // `setCanvasSize` re-fits immediately - the table (and its real
+  // `.table-surface` size) only exists from here on, so this is also
+  // the first call that can actually see real layout.
+  zonesElement.setCanvasSize(view.gameConfig?.tableCanvasSize ?? TABLE_CANVAS_SIZE);
   // *nit (2026-08-27), direct user request: "save space" - ONE
   // consolidated `<score-zone>` listing every seated player, instead of
   // one whole panel per player. No per-seat default position needed any
@@ -2264,7 +1893,7 @@ function renderGameFromView(view) {
     onSet: whenLive(setScore),
     ...zoneOptions,
   });
-  reapplyFocusZoom();
+  zonesElement.reapplyFocusZoom();
   renderRosterOnly();
   // US-123/D144: the table has just been redrawn - play the difference
   // (every card that changed place travels from where it was), then
