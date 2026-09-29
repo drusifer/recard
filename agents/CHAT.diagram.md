@@ -544,4 +544,7 @@ sequenceDiagram
     Note right of Neo: "US-139 pilot done:<br/>layout save -><br/>src/layoutSave.js,<br/>explicit read() getter<br/>for role/selectedPreset/<br/>gameState (D161's chosen<br/>pattern). main…"
     Neo->>Cypher: "swe nit"
     Note right of Neo: "Smell cleanup, not a new<br/>sprint: 15 of main.js's<br/>19 perform* action fns<br/>were copies of one of<br/>two boilerplate<br/>skeletons<br/>(isSessionEnded gua…"
+    Note over User,Oracle: 📅 2026-09-28
+    Neo->>Cypher: "swe nit"
+    Note right of Neo: "Dedup: 3 copies of<br/>Map+setTimeout<br/>(moving/cursor/drag-<br/>ghost stale tracking,<br/>none tested) -><br/>src/staleTimers.js<br/>createStaleTracker,<br/>clock-in…"
 ```

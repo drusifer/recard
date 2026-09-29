@@ -2317,3 +2317,11 @@ already used for whenLive); each collapsed to a 1-line body. main.js 2917 -> 291
 (net; helpers added 20 lines, 15 functions lost ~55). Behavior unchanged (same two
 shapes, not merged into one - the try/catch distinction is real, kept). check 1164;
 ui/rtg/hostsetup/newgame/multiplayer/motion green.
+
+# Nit: dedup stale-timer tracking (2026-09-28)
+
+Three near-identical Map+setTimeout trackers (roster "moving", remote cursor, drag ghost) had
+NO test at all. Extracted src/staleTimers.js's createStaleTracker (refresh/cancel/fireNow),
+clock-injected like tools/jev/shutdown.mjs's own pattern - now unit-testable with a fake clock,
+no real waiting (5 tests). No aliases left; the three old Maps are gone outright. check 1169;
+motion, multiplayer, ui green.

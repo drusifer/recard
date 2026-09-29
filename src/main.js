@@ -23,6 +23,7 @@ import { pileDragFromDrop, pileElement } from './dragDrop.js';
 import { wirePanelLayout } from './panelInteraction.js';
 import { renderDeckStack } from './deckStack.js';
 import { renderZones } from './renderZones.js';
+import { createStaleTracker } from './staleTimers.js';
 import { PILE_MENU_OPENED_EVENT } from './components/ActionMenu.js';
 import { clampOverlayPosition, clampFocusZoomScale, HOVER_INTENT_MS } from './focusZoom.js';
 import { PRESETS, filterDeckChoicePiles } from './presets.js';
@@ -436,9 +437,9 @@ onPresetSelected();
 
 const motionThrottler = createMotionThrottler();
 const movingIds = new Set();
-const moveTimers = new Map();
-const cursorTimers = new Map();
-const cardDragTimers = new Map();
+const moveTracker = createStaleTracker((id) => { movingIds.delete(id); renderRosterOnly(); }, MOTION_TTL_MS);
+const cursorTracker = createStaleTracker((id) => removeRemoteCursor(gameScreenElement, id), MOTION_TTL_MS);
+const dragTracker = createStaleTracker((id) => removeDragGhost(gameScreenElement, id), MOTION_TTL_MS);
 
 // --- Live cursor (US-22, D13): while the pointer is down anywhere on
 // the game screen, broadcast its position normalized to that screen's
@@ -2705,19 +2706,12 @@ function showDeckError(message) {
 
 // --- Motion (US-11): best-effort, cosmetic only. See protocol.js/ARCHITECTURE.md D4. ---
 function markMoving(playerId, active) {
-  clearTimeout(moveTimers.get(playerId));
-  moveTimers.delete(playerId);
   if (active) {
     movingIds.add(playerId);
-    moveTimers.set(
-      playerId,
-      setTimeout(() => {
-        movingIds.delete(playerId);
-        renderRosterOnly();
-      }, MOTION_TTL_MS),
-    );
+    moveTracker.refresh(playerId);
   } else {
     movingIds.delete(playerId);
+    moveTracker.cancel(playerId);
   }
 }
 
@@ -2727,11 +2721,7 @@ function resolvePlayerName(playerId) {
 }
 
 function markCursorStale(playerId) {
-  clearTimeout(cursorTimers.get(playerId));
-  cursorTimers.set(
-    playerId,
-    setTimeout(() => removeRemoteCursor(gameScreenElement, playerId), MOTION_TTL_MS),
-  );
+  cursorTracker.refresh(playerId);
 }
 
 // D19: finds a card's full data among whatever's currently visible to
@@ -2751,11 +2741,7 @@ function resolveVisibleCard(pileableId) {
 }
 
 function markCardDragStale(playerId) {
-  clearTimeout(cardDragTimers.get(playerId));
-  cardDragTimers.set(
-    playerId,
-    setTimeout(() => removeDragGhost(gameScreenElement, playerId), MOTION_TTL_MS),
-  );
+  dragTracker.refresh(playerId);
 }
 
 // US-29/D19: broadcasts live position while dragging, extending D13's
@@ -2818,8 +2804,7 @@ function applyIncomingMotion(playerId, message) {
   case 'card-drag': {
     if (playerId === myId) return; // never render my own drag ghost back at me
     if (!message.data.active) {
-      clearTimeout(cardDragTimers.get(playerId));
-      removeDragGhost(gameScreenElement, playerId);
+      dragTracker.fireNow(playerId);
       return;
     }
     const card = message.data.pileableId ? resolveVisibleCard(message.data.pileableId) : null;

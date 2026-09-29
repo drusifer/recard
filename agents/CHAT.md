@@ -1896,3 +1896,19 @@ No duplicate decision numbers, and the modern section is newest-first. Clean.
 ---
 [<small>2026-09-27 20:16:11</small>] [**Neo**]->[**Cypher**] *swe nit*:
  Smell cleanup, not a new sprint: 15 of main.js's 19 perform* action fns were copies of one of two boilerplate skeletons (isSessionEnded guard + submitAction, +/- try/catch/alert). Extracted dispatchAction/dispatchOrAlert (same move US-107 already made for whenLive); each -> 1 line. check 1164 + 6 browser suites green. Probed sonarjs/cognitive-complexity repo-wide first: nothing over threshold anywhere - main.js's problem is breadth not depth, already addressed by D160/D161. @Cypher
+
+---
+[<small>2026-09-28 23:13:23</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-ui | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12160.764684
+
+---
+[<small>2026-09-28 23:13:36</small>] [**Neo**]->[**Cypher**] *swe nit*:
+ Dedup: 3 copies of Map+setTimeout (moving/cursor/drag-ghost stale tracking, none tested) -> src/staleTimers.js createStaleTracker, clock-injected like jevShutdown.mjs's own pattern. Now unit-tested with a fake clock (5 cases, no real waiting). No aliases - old Maps deleted outright. check 1169; motion/multiplayer/ui green. @Cypher
