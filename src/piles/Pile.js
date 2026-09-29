@@ -54,6 +54,14 @@
 import { resolveDropTarget as resolveHaloTarget } from '../dropTarget.js';
 import { HORIZONTAL, VERTICAL } from '../pileables/Stackable.js';
 
+/** Every `sort*` action id's own `SORT_PILE.by` value (US-113 added
+ * `sortColor`/`sortCardType` alongside the original `sortRank`/
+ * `sortSuit`/`sortDenom`) - a lookup table `performAction` reads once,
+ * rather than one `if` per id. */
+const SORT_BY_FOR_ACTION = {
+  sortDenom: 'denom', sortRank: 'rank', sortSuit: 'suit', sortColor: 'color', sortCardType: 'cardType',
+};
+
 /**
  * How far a pile's cards overlap each other, as a fraction of a card's
  * width - 0 is edge-to-edge with no overlap, 0.85 is a tight stack
@@ -146,6 +154,31 @@ function orientationActions(cards = []) {
 }
 
 export class Pile {
+  /**
+   * This class's OWN `performAction`/`performStackAction` registries -
+   * every subclass that calls `registerActions`/`registerStackActions`
+   * gets its own fresh `Map` (own property, not inherited/shared), so
+   * `DeckPile.registerActions({...})` never touches `Pile`'s own table.
+   * `performAction` checks the instance's actual class first, then
+   * falls back to `Pile.actions` explicitly - see its own doc comment.
+   */
+  static actions = new Map();
+
+  static stackActions = new Map();
+
+  /** Adds entries to this class's OWN `actions` registry - called once,
+   * right after each class body, not per instance. `build(pile,
+   * context) => { action, guard }|undefined`, one per actionId. */
+  static registerActions(entries) {
+    for (const [actionId, build] of Object.entries(entries)) this.actions.set(actionId, build);
+  }
+
+  /** Same shape as `registerActions`, for `performStackAction`'s own
+   * registry - `build(pile, stackKey, value) => { action, guard }|undefined`. */
+  static registerStackActions(entries) {
+    for (const [actionId, build] of Object.entries(entries)) this.stackActions.set(actionId, build);
+  }
+
   /** Per-card `{owner, faceUp}` visibility - "Open" when every card is
    * face-up, "Mixed" when they differ. The base default; `DeckPile`
    * (hidden) and `HandPile` (in-hand) override it. Stays a static class
@@ -473,6 +506,66 @@ export class Pile {
   }
 
   /**
+   * The write side of `pileActions()`/`disabledActions()` - what
+   * actually happens when one of this pile's OWN offered actions
+   * fires. A REGISTRY, not an if-chain: `DeckPile`/`ChipPile` call
+   * their own `registerActions({...})` once, at class-definition time
+   * (below each class body, same as `Pile`'s own), for their specific
+   * actions (`draw`/`deal`.../`break`); this method checks the actual
+   * class's own table FIRST, then the base `Pile` table - the same
+   * "subclass tries first, base class handles the generic case" shape
+   * `pileActions()` itself already uses via `this.constructor.
+   * convertibleKinds?.()`, just as a lookup instead of a fallthrough
+   * call. Mirrors `state.js`'s own `ACTIONS` object (`action.type` ->
+   * its reducer function) - this is that same idea's read-then-decide,
+   * client-side counterpart.
+   *
+   * Each registry entry is `(pile, context) => descriptor|undefined` -
+   * a plain function, PURE: it returns the wire `action` plus which of
+   * the caller's few dispatch STRATEGIES to send it through (`guard`),
+   * rather than calling anything itself. A new pile kind is one new
+   * file + one `registerActions` call; a new action reusing an existing
+   * guard is one new entry in whichever table offers it; even a
+   * genuinely new dispatch STRATEGY is one new `guard` name plus one
+   * `if` in the caller's own interpreter (`tableActions.js`) - never a
+   * new capability threaded through every pile file's own signature.
+   *
+   * `'split'` is deliberately NOT registered here - opening the Split
+   * picker is real client-LOCAL UI state (which pile is currently
+   * raised into it), not a dispatch at all; the caller handles it
+   * before ever reaching a pile instance.
+   *
+   * @param {string} actionId
+   * @param {{ pileId: string, value?: unknown }} context
+   * @returns {{ action: object, guard: 'alert'|'silent' }|undefined}
+   */
+  performAction(actionId, context) {
+    const build = this.constructor.actions.get(actionId) ?? Pile.actions.get(actionId);
+    return build?.(this, context);
+  }
+
+  /** The write side of a pile's own title bar: rename (double-click the
+   * title) - wired directly (`<header-actions>`'s own `onRename`), not
+   * through `performAction`'s actionId registry, since a pile's title
+   * bar is not one of the actions `pileActions()` offers. Pure, same
+   * shape as `performAction`; mirrors `Zone.rename`. */
+  rename(pileId, name) {
+    return { action: { type: 'RENAME_PILE', pileId, name }, guard: 'alert' };
+  }
+
+  /**
+   * D129: a stack's own gear emblem - every action it offers acts on
+   * ONE stack, addressed by its key. Its own registry (`stackActions`),
+   * same shape as `performAction`'s - generic across every pile kind
+   * that has stacks (`static supportsStackTap` decides whether tap/
+   * untap are even OFFERED), so no subclass has needed its own table yet.
+   */
+  performStackAction(stackKey, actionId, value) {
+    const build = this.constructor.stackActions.get(actionId) ?? Pile.stackActions.get(actionId);
+    return build?.(this, stackKey, value);
+  }
+
+  /**
    * Which of this pile's own offered actions are disabled by its
    * current state (e.g. `DeckPile`'s `deal` at zero cards). `remove`
    * (D62) is empty-only at the reducer - disabled here too instead of
@@ -578,5 +671,40 @@ export class Pile {
       cards: [...joined.cards.slice(0, offset), joined.card, ...joined.cards.slice(offset)],
       stacks: { ...base.stacks, [joined.stackId]: { direction: joined.direction } },
     };
+  }
+
+  /**
+   * Every action every pile kind offers unless its own class registers
+   * something more specific (`DeckPile`'s own static block, `ChipPile`'s
+   * own). A static INITIALIZER block, not a call sitting at the
+   * module's top level (lint: `unicorn/no-top-level-side-effects`) -
+   * the idiomatic way to populate a class's own static state from
+   * within its own declaration. `sort*` is a loop over
+   * `SORT_BY_FOR_ACTION`, not five near-identical entries - the same
+   * "one small table, not N near-identical `if`s" reasoning
+   * `pileActions()`'s own doc comment already gives.
+   */
+  static {
+    this.registerActions({
+      take: (pile) => ({ action: { type: 'TAKE_PILE', pileId: pile.id }, guard: 'alert' }),
+      hide: (pile) => ({ action: { type: 'SET_PILE_ORIENTATION', pileId: pile.id, faceUp: false }, guard: 'alert' }),
+      show: (pile) => ({ action: { type: 'SET_PILE_ORIENTATION', pileId: pile.id, faceUp: true }, guard: 'alert' }),
+      remove: (pile) => ({ action: { type: 'REMOVE_PILE', pileId: pile.id }, guard: 'alert' }),
+      untapAll: (pile) => ({ action: { type: 'UNTAP_ALL', pileId: pile.id }, guard: 'alert' }),
+      // Tighten/Loosen slider: the slider's own absolute value, directly
+      // - no `stackKey` means every stack (the pile-level slider). Never
+      // throws in practice - `'silent'`, not the alert-on-throw guard.
+      spread: (pile, { value }) => ({ action: { type: 'SET_STACK_SPREAD', pileId: pile.id, value }, guard: 'silent' }),
+      changePileType: (pile, { value }) => ({ action: { type: 'CHANGE_PILE_TYPE', pileId: pile.id, kind: value }, guard: 'alert' }),
+    });
+    for (const [actionId, by] of Object.entries(SORT_BY_FOR_ACTION)) {
+      this.actions.set(actionId, (pile) => ({ action: { type: 'SORT_PILE', pileId: pile.id, by }, guard: 'alert' }));
+    }
+    this.registerStackActions({
+      spreadStack: (pile, stackKey, value) => ({ action: { type: 'SET_STACK_SPREAD', pileId: pile.id, value, stackKey }, guard: 'silent' }),
+      flipStack: (pile, stackKey) => ({ action: { type: 'FLIP_STACK', pileId: pile.id, stackKey }, guard: 'silent' }),
+      tapStack: (pile, stackKey) => ({ action: { type: 'SET_STACK_ORIENTATION', pileId: pile.id, stackKey, orientation: 'landscape' }, guard: 'silent' }),
+      untapStack: (pile, stackKey) => ({ action: { type: 'SET_STACK_ORIENTATION', pileId: pile.id, stackKey, orientation: 'portrait' }, guard: 'silent' }),
+    });
   }
 }

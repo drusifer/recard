@@ -32,6 +32,12 @@ import { breakInto } from '../pileables/ChipPileable.js';
 import { sortActionsFor } from '../pileables/pileableTypes.js';
 
 export class ChipPile extends GroupedPile {
+  // A static field is INHERITED BY REFERENCE unless redeclared, however
+  // many levels up (`GroupedPile`, then `Pile`) - without this,
+  // `ChipPile.registerActions(...)` (below the class body) would
+  // silently mutate `Pile`'s own shared Map instead of getting its own.
+  static actions = new Map();
+
   /** A chip's group/sort key is its denomination, highest first
    * (`GroupedPile`'s comparator sorts descending, `undefined` last). */
   static sortValue(chip) {
@@ -77,5 +83,33 @@ export class ChipPile extends GroupedPile {
     const cards = context.cards ?? this.cards;
     if (cards.every((chip) => breakInto(chip.denom) === undefined)) disabled.push('break');
     return disabled;
+  }
+
+  /**
+   * *fix (direct user request): "actions for braking large denom to
+   * smaller denom" - picks its own target, the LARGEST breakable chip in
+   * the tray, which is what a player reaching for change actually wants
+   * and saves them hunting for one to click. Needs `pile.cards` (a real
+   * instance, not the kind-only stub read-side checks use) - the one
+   * reason `break` cannot be a base-`Pile` generic action. A static
+   * INITIALIZER block, not a module-top-level call (lint:
+   * `unicorn/no-top-level-side-effects`).
+   *
+   * `undefined` when there is nothing TO break (every chip already the
+   * smallest denomination) - a recognized action with nothing to do,
+   * same as the original's silent no-op; `Pile.performAction`'s own
+   * fallback to the base table only fires for an actionId this registry
+   * has no entry for AT ALL, which `break` always does. Never throws in
+   * practice (`'silent'`).
+   */
+  static {
+    this.registerActions({
+      break: (pile) => {
+        const biggest = pile.cards
+          .filter((chip) => chip.pileableType === 'chip' && breakInto(chip.denom) !== undefined)
+          .toSorted((a, b) => b.denom - a.denom)[0];
+        return biggest ? { action: { type: 'BREAK_CHIP', pileId: pile.id, pileableId: biggest.id }, guard: 'silent' } : undefined;
+      },
+    });
   }
 }

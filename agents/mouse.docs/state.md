@@ -1,5 +1,37 @@
 # Agent State
 
+## Current Task (2026-09-29) - D165/US-143 pile/zone dispatch cluster DONE, not yet committed at save time
+
+main.js's dispatch cluster (paused at D161) landed as src/tableActions.js + Pile/Zone class registries,
+through 3 rounds of user review: io-injected -> pure {action,guard} descriptors (tableActions.js's
+dispatch() the only interpreter) -> if-chains replaced by static registries (registerActions, static{}
+blocks) mirroring state.js's own ACTIONS object. No Action class hierarchy - checked first, none existed
+to extend. New pile kind = 1 file + 1 static block; new action = 1 registry entry; new dispatch
+STRATEGY = 1 guard name + 1 if in tableActions.js, main.js never touched. check 1178 + 8 browser suites
+green; reshuffleDeal mutation-proved through the full lookup.
+
+Remaining main.js paused clusters: NONE left of consequence - host-setup/new-game (~1000 lines) is the
+last one from the original D161 pause list, not yet started, no explicit go from the user yet.
+
+## Current Task (2026-09-29) - Status report given; ui.js/main.js refactor arc PAUSED cleanly, nothing blocked
+
+Tree clean, HEAD fab5c4e (dev+main). Arc since 09-26 (all Tier 2, all shipped+pushed+gated):
+US-133..138/D160: ui.js 2947 -> 268 (action-menu, dragDrop, zone-panel+panelInteraction,
+header-actions+actionControls, PileElement+pileCards, deckStack, renderZones).
+US-139..142/D161-164: main.js 2946 -> 2524 (layoutSave pilot; perform*/staleTimers dedup nits;
+<table-view> domain object; sessionLifecycle XState-shaped machine; overridable reconnect
+clock + live test closing the reconnect coverage gap).
+Every story gated: bobp make check + the specific live browser suites touched, green each time;
+several mutation-proved. No skipped gates, no known regressions.
+
+## Next Steps
+1. main.js's two remaining large clusters (pile/zone/stack action dispatch ~700 lines, host-setup/
+   new-game ~1000 lines) are PAUSED, not queued - real plumbing cost each (D161's explicit-param
+   pattern), needs explicit user go before starting either.
+2. Two old decisions still wait on the user in docs/BACKLOG.md: RtG's 5s quit grace vs its safe
+   points; a bot that ignores SIGTERM (~11s worst-case shutdown).
+3. Cold start: read this file + docs/BACKLOG.md top + task.md tail, then ask the user what's next.
+
 ## Current Task (2026-09-25) - US-130 planned in task.md (4 phases; 1-3 done pre-protocol, said so)
 
 task.md sprint 'A hosted table for any game'. Open: T3.3 test bound, T4.x UAT/review/groom.

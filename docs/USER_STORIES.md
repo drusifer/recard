@@ -4572,3 +4572,36 @@ that change) is closed.
 `hostTable()`'s helper drives the real `#create-table` button, which has
 no way to claim a SPECIFIC code; that scenario is really the separate
 Resume feature (same host context reloading), not guest reconnect.
+
+### US-143: pile/zone/stack actions dispatch through their own class
+**As** someone adding a new pile kind or a new action, **I want** the
+dispatch for what an action MEANS to live on the Pile/Zone class that
+offers it, as a small registry, **so that** a new kind or action is one
+or two files, never a shotgunned change across the whole cluster.
+
+**AC:**
+1. `Pile.performAction`/`performStackAction` look up the actionId in a
+   REGISTRY (`static actions`/`stackActions`, a `Map`), the instance's
+   own class first, falling back to the base `Pile`'s. `DeckPile`/
+   `ChipPile` populate their own via `static { this.registerActions({...}) }`
+   - a static initializer block, not a module-top-level call.
+2. Every registry entry is a PURE function - `(pile, context) =>
+   { action, guard }|undefined`. `guard` (`'alert'`/`'silent'`/
+   `'deckError'`) names which of a small closed set of dispatch
+   strategies to use; `src/tableActions.js`'s `dispatch()` is the ONLY
+   place that interprets `guard` and calls `submitAction`/
+   `dispatchAction`/`dispatchOrAlert`/`showDeckError`.
+3. `Zone.rename`/`remove`/`acceptDroppedPile`/`acceptDroppedCard` are
+   the same pure shape (no registry - each is its own distinct UI
+   callback slot, not one shared actionId dispatch, so a lookup table
+   wouldn't fit the same way it does for piles).
+4. No Action class hierarchy - checked first: `state.js`'s own reducer
+   side has no such thing either (`ACTIONS`, a flat object of
+   `type -> function`, the same shape this mirrors). Small registered
+   functions, not a new file per action.
+5. check 1178 + 8 browser suites green; the one live-exercised deck
+   action (`reshuffleDeal`) mutation-proved through the full lookup.
+
+**Out of scope:** `performMergePile` (pile-to-pile, no single owning
+instance) and `performRenamePile`'s caller wiring - unchanged, still
+plain `tableActions.js` functions.

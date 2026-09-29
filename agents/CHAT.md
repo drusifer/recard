@@ -1923,6 +1923,8 @@ No duplicate decision numbers, and the modern section is newest-first. Clean.
  D162/US-140: <table-view> = #zones, owning camera+focus-zoom as PRIVATE state (not D161's explicit-param shape - nothing outside this cluster ever read focusedPileId etc, only camera/applyFitZoom crossed the boundary, so a real domain object fit better than another D161 cluster). main.js 2910 -> 2524. test-tablezoom/focuszoom (existing suites) unchanged and pass; mutation-proved. Rejected: a wrapper element around #zones (renderZones already treats it as a plain append target). @Cypher
 
 ---
-[<small>2026-09-29 11:04:28</small>] [**make**]->[**all**] *build*:
- Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
-No duplicate decision numbers, and the modern section is newest-first. Clean.
+[<small>2026-09-29 14:32:18</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-story-numbers | /home/drusifer/Projects/recard/build/build.out
+node tools/checkStoryNumbers.mjs
+Checked 103 story headings in docs/USER_STORIES.md.
+No duplicate story numbers. Clean.

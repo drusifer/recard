@@ -8,6 +8,10 @@ import { Pile } from './Pile.js';
 export class DeckPile extends Pile {
   static visibility = 'hidden';
   static component = 'deck-stack';
+  // A static field is INHERITED BY REFERENCE unless redeclared - without
+  // this, `DeckPile.registerActions(...)` (below the class body) would
+  // silently mutate `Pile`'s own shared Map instead of getting its own.
+  static actions = new Map();
   /**
    * *nit (direct user request): "drag and drop on all piles including
    * Deck and Discard" - reverses Sprint 23's Gate 1 exclusion (D55),
@@ -111,5 +115,33 @@ export class DeckPile extends Pile {
    * Pile rule, which now reads the override above. */
   canRemove(card, viewerId, action) {
     return action === 'draw' || super.canRemove(card, viewerId, action);
+  }
+
+  /**
+   * US-41/D29: every deck-specific action - the deck's pile anchor is
+   * the ONE thing that dispatches these, having absorbed both the
+   * legacy strip's deal/reshuffleDeal and the legacy shuffle row.
+   * `changePileType`/`split` are not registered here - `Pile.performAction`
+   * falls back to the base class's own table for those. A static
+   * INITIALIZER block, not a module-top-level call (lint:
+   * `unicorn/no-top-level-side-effects`).
+   *
+   * `deal`/`reshuffleDeal`'s `value` is the count to deal - the CALLER
+   * resolves that (what's currently typed into the box, `tableActions.js`)
+   * before ever calling `performAction`, same as it always did.
+   *
+   * `draw`/`shuffle` never throw in practice (`'silent'`); `deal`/
+   * `reshuffleDeal`/`reset` validate at the reducer and report beside the
+   * deck (`'deckError'`, D-29 UX: "fail the way it already does - a clear
+   * message, no partial deal"), not the base class's `'alert'`.
+   */
+  static {
+    this.registerActions({
+      draw: (pile) => ({ action: { type: 'DRAW', pileId: pile.id }, guard: 'silent' }),
+      shuffle: (pile) => ({ action: { type: 'SHUFFLE_DECK', pileId: pile.id }, guard: 'silent' }),
+      reset: () => ({ action: { type: 'RESET' }, guard: 'deckError' }),
+      deal: (pile, { value }) => ({ action: { type: 'DEAL_MORE', cardsPerPlayer: value, pileId: pile.id }, guard: 'deckError' }),
+      reshuffleDeal: (pile, { value }) => ({ action: { type: 'RESHUFFLE_DEAL', cardsPerPlayer: value, pileId: pile.id }, guard: 'deckError' }),
+    });
   }
 }

@@ -1,8 +1,7 @@
 import { Session } from './session.js';
 import { createSessionLifecycle } from './sessionLifecycle.js';
+import { createTableActions } from './tableActions.js';
 import { createInitialState, reduce, viewFor, reseatOwner, DECK_PILE_ID } from './state.js';
-import { breakInto } from './pileables/ChipPileable.js';
-import { homePileKindFor } from './pileables/pileableTypes.js';
 import { makeStateMessage, makeMotionMessage, createMotionThrottler, cardDragPayload } from './protocol.js';
 import { renderShareCode, wireCopyCode } from './qrcode.js';
 import { TABLE_CANVAS_SIZE } from './tableZoom.js';
@@ -89,7 +88,7 @@ zonesElement.addEventListener('dragover', (event) => event.preventDefault());
 zonesElement.addEventListener('drop', (event) => {
   event.preventDefault();
   const pileId = pileDragFromDrop(event.dataTransfer);
-  if (pileId) performMovePile(pileId, null);
+  if (pileId) tableActions.performMovePile(pileId, null);
 });
 // US-1xx: `<table-view>` (the `#zones` element itself, `TableView.js`)
 // owns the camera and focus-zoom now - it wires both the moment it
@@ -103,10 +102,6 @@ zonesElement.addEventListener('drop', (event) => {
 // per player - a single fixed id is enough again, same as before the
 // short-lived per-player-panel design it replaces.
 const SCORE_PANEL_ID = 'score';
-// Every id `deckPile.pileActions` can ever offer - `zoneOpts.onPileAction`
-// (below) uses this to route a click to `dealFromDeck` instead of the
-// hand's `pass`, without needing to know which pile kind is asking.
-const DECK_ACTION_IDS = new Set(['draw', 'deal', 'reshuffleDeal', 'reset', 'shuffle']);
 let role = null; // 'host' | 'join'
 let session = null;
 let myId = null;
@@ -1696,63 +1691,6 @@ function renderRosterOnly() {
 // `selectedPreset` knows (presets/GameConfig.piles/zones are already
 // host-only concepts in this codebase, not part of replicated state).
 
-/** Every `sort*` action id's own `SORT_PILE.by` value (US-113 added
- * `sortColor`/`sortCardType` alongside the original `sortRank`/
- * `sortSuit`/`sortDenom`) - a lookup table `handlePileAction` reads
- * once, rather than one `if` per id. */
-const SORT_BY_FOR_ACTION = {
-  sortDenom: 'denom', sortRank: 'rank', sortSuit: 'suit', sortColor: 'color', sortCardType: 'cardType',
-};
-
-/**
- * Every pile-level action button dispatches through here (`<pile-panel>`,
- * ui.js, one callback regardless of which pile kind offered the
- * action). A plain top-level function, not inlined in `renderGameFromView`
- * - keeps that already-large function's own complexity from absorbing
- * every branch of what is really a separate, self-contained dispatch
- * table. Every deck action (`dealFromDeck` already handles draw/deal/
- * reshuffleDeal/shuffle generically) is the one real dispatch table
- * beyond this. `pass` was removed outright (direct user request, "not a
- * requirement") - see its own git history for the full removal
- * (TOGGLE_PASS, `state.passed`, the roster's Passed tag).
- */
-function handlePileAction(pileId, actionId, value) {
-  // D92 (direct user request, "THERE SHOULD BE NO CANONICAL PILES"):
-  // no `pile.kind === 'deck'` gate here any more - `DECK_ACTION_IDS`
-  // membership already uniquely identifies these four action ids
-  // (`DeckPile.pileActions()` is what decides which pile kind's header
-  // offers them in the first place), and the pileId itself is what
-  // `dealFromDeck` targets now, not an assumed singleton.
-  if (DECK_ACTION_IDS.has(actionId)) return dealFromDeck(pileId, actionId, lastDealCount);
-  if (actionId === 'take') return performTakePile(pileId);
-  if (actionId === 'hide') return performSetPileOrientation(pileId, false);
-  if (actionId === 'show') return performSetPileOrientation(pileId, true);
-  if (actionId === 'remove') return performRemovePile(pileId);
-  if (actionId === 'untapAll') return performUntapAll(pileId);
-  // Tighten/Loosen slider (direct user request, 2026-09-13): one
-  // `spread` action, `value` is the slider's absolute position - see
-  // `performSetSpread`/`SET_STACK_SPREAD`. D129: no `stackKey` means
-  // every stack.
-  if (actionId === 'spread') return performSetSpread(pileId, value);
-  if (actionId === 'break') return performBreakChip(pileId);
-  // One small table, not five `if`s - every `sort*` action id differs
-  // ONLY in which `SORT_PILE.by` value it forwards (US-113 added two
-  // more, which is what pushed the old if-chain over the cognitive-
-  // complexity threshold; a lookup doesn't grow that way).
-  if (Object.hasOwn(SORT_BY_FOR_ACTION, actionId)) return performSortPile(pileId, SORT_BY_FOR_ACTION[actionId]);
-  // D92 (direct user request: "split should always fan the pile to
-  // allow the guided picker" - deck included, no kind branch here at
-  // all any more).
-  if (actionId === 'split') return toggleSplitPicker(pileId);
-  // *nit (direct user request): a real menu now (`ui.js`'s
-  // `buildEnumActionMenu`) picks the target kind directly - `value` is
-  // that choice, forwarded straight through. Replaces the old "advance
-  // to the next kind in CHANGE_PILE_TYPE_CYCLE" cycling math (D71/
-  // US-74) entirely; a menu makes "which kind is next" moot; a viewer
-  // picks the one they want.
-  if (actionId === 'changePileType') return performChangePileType(pileId, value);
-}
-
 // US-107 (D114-adjacent, cognitive-complexity pass): extracted straight
 // out of `renderGameFromView`, unchanged - just moved out from under it,
 // since sonarjs's dispatch-table false-positive read every callback
@@ -1802,35 +1740,35 @@ function buildZoneOptions(nameById) {
     // open - the bubble hangs off its owner's seat panel.
     thoughts: decisionsBySpeaker(talkLog.entries()),
     openThoughtId,
-    onReveal: (pileableId) => revealCard(pileableId),
-    onRotate: (pileableId) => rotateCard(pileableId),
-    onPickup: (pileableId) => pickupCard(pileableId),
-    onMoveCard: (pileableId, toPileId, placement) => moveCard(pileableId, toPileId, placement),
+    onReveal: tableActions.revealCard,
+    onRotate: tableActions.rotateCard,
+    onPickup: tableActions.pickupCard,
+    onMoveCard: tableActions.moveCard,
     onCardLift: (pileableId, active) => motionThrottler.schedule('card-lift', { pileableId, active }),
-    onDropCard: (pileableId, toPileId, placement) => dropCardOnPile(pileableId, toPileId, placement),
+    onDropCard: tableActions.dropCardOnPile,
     // D91: `<pile-panel>` checks `splitPicker?.pileId === pile.id`
     // to switch that one pile into the picker row; `onSplitCommit` is
     // only ever called FROM that row (a click on a chosen gap), so it
     // doesn't need its own pileId param - `splitPicker.pileId` already
     // says which pile.
-    splitPicker,
-    onSplitCommit: whenLive(performSplitCommit),
+    splitPicker: tableActions.splitPicker,
+    onSplitCommit: whenLive(tableActions.performSplitCommit),
     // UX follow-up (direct user request): "like zones, Piles are
     // Actionable and should have a title bar with action buttons for
     // that pile type" - every pile's heading is a real action header now
-    // (`<pile-panel>`). Dispatch table itself is `handlePileAction`
-    // above (its own doc comment has the rest).
-    onPileAction: whenLive(handlePileAction),
+    // (`<pile-panel>`). Dispatch table itself is `tableActions.handlePileAction`
+    // (`src/tableActions.js`, its own doc comment has the rest).
+    onPileAction: whenLive(tableActions.handlePileAction),
     // D129: one stack's own actions, from its gear emblem.
-    onStackAction: whenLive(handleStackAction),
+    onStackAction: whenLive(tableActions.handleStackAction),
     // *nit (2026-08-26): "allow user to rename zones and piles - any
     // user can edit - persisted by host." Same `sessionEnded` gate
     // every other dispatching handler in this object already uses.
-    onRenamePile: whenLive(performRenamePile),
-    onRenameZone: whenLive(performRenameZone),
-    onRemoveZone: whenLive(performRemoveZone),
+    onRenamePile: whenLive(tableActions.performRenamePile),
+    onRenameZone: whenLive(tableActions.performRenameZone),
+    onRemoveZone: whenLive(tableActions.performRemoveZone),
     // (bloop: piles/zones/cards are all Movable)
-    onMovePile: whenLive(performMovePile),
+    onMovePile: whenLive(tableActions.performMovePile),
     // (direct user request) - dropping a pile directly onto another pile
     // merges its cards into the target and removes it once empty, no
     // matter which zone either one is in ("remove the weird zone
@@ -1838,8 +1776,8 @@ function buildZoneOptions(nameById) {
     // split; `REORDER_PILE`, state.js, is unused from the UI now but
     // left in place, not deleted - a real, tested, independently-useful
     // action, just without a live trigger since this was its only one).
-    onMergePile: whenLive(performMergePile),
-    onDropCardOnZone: whenLive(performCreatePileWithCard),
+    onMergePile: whenLive(tableActions.performMergePile),
+    onDropCardOnZone: whenLive(tableActions.performCreatePileWithCard),
     // US-41/D29: dealing lives on the deck, where the cards are - the
     // whole point of the story. Read/written here since the deck now
     // renders through the exact same generic pile pipeline (`<deck-
@@ -1934,19 +1872,6 @@ function renderGameFromView(view) {
   }
 }
 
-// *nit (show/hide): one dispatcher for both directions - `FLIP`
-// reads the card's current facing and toggles it, so the caller (a tap,
-// or the menu's `reveal`/`hide` entry) never has to say which way.
-function revealCard(pileableId) {
-  if (isSessionEnded()) return;
-  submitAction({ type: 'FLIP', pileableId });
-}
-
-function rotateCard(pileableId) {
-  if (isSessionEnded()) return;
-  submitAction({ type: 'ROTATE', pileableId });
-}
-
 // UX follow-up (direct user request): panel positions/sizes are LOCAL,
 // per-browser preference now, not replicated game state - every table
 // starts from the same computed default arrangement, and each viewer's
@@ -1969,247 +1894,6 @@ function resizePanel(id, w, h) {
   savePanelSize(localStorage, id, w, h);
 }
 
-function pickupCard(pileableId) {
-  if (isSessionEnded()) return;
-  submitAction({ type: 'PICKUP', pileableId });
-}
-
-function moveCard(pileableId, toPileId, placement = {}) {
-  if (isSessionEnded()) return;
-  const { targetCardId, side, layout } = placement;
-  submitAction({ type: 'MOVE', pileableId, toPileId, targetCardId, side, layout });
-}
-
-// US-28: dropping a dragged card on a pile moves it there - the drop
-// target doesn't know or care where it came from, it just hands back a
-// card id and a destination.
-// US-32/33: `placement` (from ui.js's drop-region hit test) carries the
-// stack/overlap intent through unchanged - this function still doesn't
-// need to know which mode was chosen, only to forward it.
-//
-// D102: this used to branch on "did it come from my hand?" and dispatch
-// PLAY instead, because only PLAY applied the leaving-a-hand public/
-// face-up transform. `transferCard` (`state.js`) applies that from the
-// transition now, so a hand-sourced drag is an ordinary MOVE and
-// the branch is gone - including the same-hand reorder case, which the
-// reducer distinguishes structurally (a hand DESTINATION re-stamps the
-// card as a hand card and never reaches the leaving-a-hand rule).
-function dropCardOnPile(pileableId, targetPileId, placement = {}) {
-  if (isSessionEnded()) return;
-  const view = currentView();
-  if (!view) return;
-  // UX follow-up (direct user request): the hand pile is a real,
-  // addressable pile now (`view.piles`), so a table card dropped onto
-  // it needs PICKUP's own semantics (strips owner/faceUp/layout), not a
-  // generic MOVE - dropping this into the plain `moveCard` branch
-  // would leave those table-only fields sitting on a card that's
-  // supposed to be a plain hand card.
-  const targetPile = view.piles.find((p) => p.id === targetPileId);
-  if (targetPile?.kind === 'hand' && targetPile.ownerId === myId) {
-    pickupCard(pileableId);
-    return;
-  }
-  moveCard(pileableId, targetPileId, placement);
-}
-
-// UX follow-up (direct user request): the Add Zone control (name input,
-// kind selector, button, its transient error text) is removed from the
-// bottom of the screen. CREATE_ZONE stays a real, dispatchable,
-// fully-tested reducer action - only this manual UI entry point is gone.
-
-// Sprint 12 (T56.1): named so the deck's pile anchor calls the same
-// implementation the legacy shuffle button did. D92 (direct user
-// request, "THERE SHOULD BE NO CANONICAL PILES"): `pileId` is the real
-// target now - no host/guest branch needed, `shuffle` is host-only at
-// the offer layer (`DeckPile.pileActions`) already.
-/**
- * *fix (direct user request): "actions for braking large denom to
- * smaller denom". A pile-level button, so it picks its own target - the
- * LARGEST breakable chip in the tray, which is what a player reaching
- * for change actually wants and saves them hunting for one to click.
- */
-function performBreakChip(pileId) {
-  if (isSessionEnded()) return;
-  const pile = currentView()?.piles.find((p) => p.id === pileId);
-  const biggest = (pile?.cards ?? [])
-    .filter((chip) => chip.pileableType === 'chip' && breakInto(chip.denom) !== undefined)
-    .toSorted((a, b) => b.denom - a.denom)[0];
-  if (!biggest) return;
-  submitAction({ type: 'BREAK_CHIP', pileId, pileableId: biggest.id });
-}
-
-/**
- * Tighten/Loosen slider (direct user request, 2026-09-13): dispatches
- * the slider's own absolute value directly - see `SET_STACK_SPREAD`'s
- * own doc comment for why this is a value, not the signed-delta shape
- * `ADJUST_PILE_SPREAD` used for the old +/- buttons.
- */
-function performSetSpread(pileId, value, stackKey) {
-  dispatchAction({ type: 'SET_STACK_SPREAD', pileId, value, stackKey });
-}
-
-/**
- * D129 (direct user request): a stack's own gear emblem. Every action
- * it offers acts on ONE stack, addressed by its key - the same
- * dispatch shape as the pile-level pair, with the key supplied.
- */
-function handleStackAction(pileId, stackKey, actionId, value) {
-  if (actionId === 'spreadStack') { performSetSpread(pileId, value, stackKey); return; }
-  if (actionId === 'flipStack') { performFlipStack(pileId, stackKey); return; }
-  if (actionId === 'tapStack') { performSetStackOrientation(pileId, stackKey, 'landscape'); return; }
-  if (actionId === 'untapStack') performSetStackOrientation(pileId, stackKey, 'portrait');
-}
-
-/** D129 (direct user request): the stack-scoped sibling of `UNTAP_ALL`,
- * dispatched by a stack's own gear Tap/Untap buttons. Replicated like
- * every other presentation-adjacent change here - see
- * `performFlipStack`'s own comment. */
-function performSetStackOrientation(pileId, stackKey, orientation) {
-  dispatchAction({ type: 'SET_STACK_ORIENTATION', pileId, stackKey, orientation });
-}
-
-function performFlipStack(pileId, stackKey) {
-  dispatchAction({ type: 'FLIP_STACK', pileId, stackKey });
-}
-
-function performShuffle(pileId) {
-  dispatchAction({ type: 'SHUFFLE_DECK', pileId });
-}
-
-// Sprint 12 (D34/D35/D36, T54.1): named so the deck's pile anchor - both
-// its click/tap shortcut and its drag-onto-hand drop - calls the same
-// implementation the legacy button did, rather than a second one. D92:
-// `pileId` is the real target now, no hardcoded deck constant.
-function performDraw(pileId) {
-  dispatchAction({ type: 'DRAW', pileId });
-}
-
-function performTakePile(pileId) {
-  dispatchOrAlert({ type: 'TAKE_PILE', pileId });
-}
-
-function performSetPileOrientation(pileId, faceUp) {
-  dispatchOrAlert({ type: 'SET_PILE_ORIENTATION', pileId, faceUp });
-}
-
-// *nit (2026-08-26): rename, any player - same dispatch shape as every
-// other pile-affecting action above. `window.alert` on failure matches
-// `performTakePile`'s own precedent for a reducer throw the UI itself
-// can't prevent in advance (here: a concurrent delete of the pile/zone
-// between the dblclick and the commit).
-function performRenamePile(pileId, name) {
-  dispatchOrAlert({ type: 'RENAME_PILE', pileId, name });
-}
-
-function performRenameZone(zoneId, name) {
-  dispatchOrAlert({ type: 'RENAME_ZONE', zoneId, name });
-}
-
-// US-71/72/73 (D62/D63): same host-local/guest-relay + try/catch +
-// `window.alert` precedent as every pile/zone action above - the
-// reducer's empty-only/exemption throws are the real gate, this is
-// just how they reach the user (Gate 1 Nielsen #9).
-function performRemovePile(pileId) {
-  dispatchOrAlert({ type: 'REMOVE_PILE', pileId });
-}
-
-function performRemoveZone(zoneId) {
-  dispatchOrAlert({ type: 'REMOVE_ZONE', zoneId });
-}
-
-// D79 (US-82): the untap step. Same host-authoritative / guest-relay
-// dispatch shape as every other pile action here.
-function performUntapAll(pileId) {
-  dispatchOrAlert({ type: 'UNTAP_ALL', pileId });
-}
-
-// D91: same dispatch shape as every other pile action here - `by` is
-// forwarded straight through to `SORT_PILE` (state.js), which does the
-// actual rank/suit ordering.
-function performSortPile(pileId, by) {
-  dispatchOrAlert({ type: 'SORT_PILE', pileId, by });
-}
-
-// D91: commits the Split picker (`splitPicker`, above) at the gap the
-// player clicked - always `SPLIT_PILE`. Clears the picker either way,
-// success or a reducer throw (Cancel-by-closing is already free via
-// the button toggle in `handlePileAction`; a FAILED commit shouldn't
-// leave the row stuck open on a picker the player just acted on).
-function performSplitCommit(index) {
-  if (!splitPicker || isSessionEnded()) return;
-  const { pileId } = splitPicker;
-  splitPicker = null;
-  try { submitAction({ type: 'SPLIT_PILE', pileId, index }); }
-  catch (error) { globalThis.alert(error.message); rerender(); }
-}
-
-function performChangePileType(pileId, kind) {
-  dispatchOrAlert({ type: 'CHANGE_PILE_TYPE', pileId, kind });
-}
-
-// (bloop: piles/zones/cards are all Movable) - reparent a pile
-// (`targetZoneId: null` ungroups into a fresh standalone Zone, D55's
-// existing design). Same dispatch shape as every other pile-affecting
-// action above.
-function performMovePile(pileId, targetZoneId) {
-  dispatchOrAlert({ type: 'MOVE_PILE', pileId, targetZoneId });
-}
-
-// (direct user request) - "all piles can be dropped into any other
-// pile... cards added to the target, dropped pile removed once empty."
-// Same dispatch shape as every other pile-affecting action above.
-function performMergePile(pileId, targetPileId) {
-  dispatchOrAlert({ type: 'MERGE_PILE', pileId, targetPileId });
-}
-
-
-// A card dropped on a Zone's own empty space spawns a brand-new pile
-// there, seeded with that card - one atomic dispatch (`CREATE_PILE`,
-// `state.js`) rather than create-then-move as two separate actions,
-// which would race a guest's own relayed send against the host's
-// broadcast of the intermediate state.
-function performCreatePileWithCard(pileableId, zoneId) {
-  if (isSessionEnded()) return;
-  const view = currentView();
-  if (!view) return;
-  // D102: this used to branch on `view.myHand` first to find a
-  // hand-sourced card's pile, because the hand-vs-table distinction
-  // decided PLAY-vs-MOVE. There is no such distinction any more, and a
-  // hand IS one of `view.piles` (D84) with its real cards - so the
-  // plain "which pile holds this card" lookup already covers both.
-  const fromPileId = view.piles.find((p) => p.cards.some((c) => c.id === pileableId))?.id;
-  if (!fromPileId) return;
-
-  // *nit (direct user request): "drops in chipstacks should add the
-  // chips to the existing piles". A pileable that names a home pile kind
-  // (`homePileKindFor` - only chips do) joins the one already in this
-  // zone instead of starting another beside it. Dropping on a zone's
-  // empty space to CREATE a pile stays the behaviour for everything
-  // else, because for cards that gesture is the point.
-  //
-  // This is also what "chip piles keep duplicating" was: every near-miss
-  // around a tray landed on the zone's drop gutter and made a new pile.
-  const home = homePileKindFor(view.piles.flatMap((p) => p.cards).find((c) => c.id === pileableId));
-  // Deliberately NOT excluding `fromPileId`: the tray a chip came from is
-  // usually the very tray it should return to, and excluding it was why
-  // the first version still spawned a pile on every gutter drop. A chip
-  // dropped on empty space goes back to its tray and re-sorts, which is
-  // the "snapped to position" behaviour asked for.
-  const existing = home && view.piles.find((p) => p.kind === home && p.zoneId === zoneId);
-  if (existing) {
-    moveCard(pileableId, existing.id);
-    return;
-  }
-  try { submitAction({ type: 'CREATE_PILE', zoneId, fromPileId, pileableId }); }
-  catch (error) { globalThis.alert(error.message); }
-}
-
-// D51/D67: a dragged table card (or, since D67, the deck's own exposed
-// top card - same mechanism, no special case) landing on the hand pile
-// is `dropCardOnPile`'s own kind==='hand' check - generic, handled by
-// whichever zone-panel the drop actually lands on, not a bespoke
-// listener on a dedicated hand element any more.
-
 // --- Deal More (US-24): host-only, adds to existing hands without a
 // reset. Deliberately a different label/section/style than "Deal &
 // Start" so a mid-game host can't mis-tap into a reset (Smith Gate 1). ---
@@ -2226,6 +1910,22 @@ function performCreatePileWithCard(pileableId, zoneId) {
  *  just whichever preset the dropdown starts on, same source of truth
  *  `Create Table`'s own re-sync (below) already uses. */
 let lastDealCount = selectedPreset.cardsPerPlayer;
+
+// US-1xx: every player-triggered game action (`src/tableActions.js`) -
+// a small, explicit interface, not a redesign of who owns what. Function
+// declarations below are hoisted, so this can sit here, next to the one
+// piece of state it shares with host-setup, rather than needing to be
+// textually after every dependency it closes over.
+const tableActions = createTableActions({
+  currentView,
+  submitAction,
+  dispatchAction,
+  dispatchOrAlert,
+  isSessionEnded,
+  getMyId: () => myId,
+  getLastDealCount: () => lastDealCount,
+  rerender,
+});
 
 // --- New Game (US-116): host swaps to a different preset, same table ---
 
@@ -2274,18 +1974,6 @@ function noticeForcedSpectator(view) {
   renderBanner(bannerElement, message, { tone: 'info' });
 }
 
-// D91/D92 (direct user request, "we're missing... split pile" / "split
-// should always fan the pile"): which pile (if any) is currently
-// raised into the Split picker (`PileElement`'s split picker, used by
-// `<pile-panel>` AND `<deck-stack>` identically - no kind distinction)
-// - real CLIENT-LOCAL UI state, same reasoning as `lastDealCount`
-// above: this app tears down and rebuilds every pile's DOM on every
-// broadcast, so a "stay raised until toggled off or committed" mode
-// has nowhere else to live. Never sent to the reducer - only the
-// eventual `SPLIT_PILE` dispatch (`performSplitCommit`, below) is a
-// real state change.
-let splitPicker = null; // { pileId: string } | null
-
 /** Forces an immediate re-render off the CURRENT view for a purely
  * local UI-state change (the split picker opening/closing) that has no
  * server round trip to wait for - `currentView()` already handles the
@@ -2293,72 +1981,6 @@ let splitPicker = null; // { pileId: string } | null
 function rerender() {
   const view = currentView();
   if (view) renderGameFromView(view);
-}
-
-/** Opens (or, clicked again on the same pile, closes) the Split picker
- * for `pileId` - purely local, no dispatch. Switching to a DIFFERENT
- * pile's picker just replaces it outright, same "only one at a time"
- * simplification `lastDealCount` already makes for deal count. A plain
- * function rather than inlined in `handlePileAction` - keeps that
- * dispatcher a flat list of single-condition ifs, matching every other
- * entry in it. */
-function toggleSplitPicker(pileId) {
-  splitPicker = splitPicker?.pileId === pileId ? null : { pileId };
-  rerender();
-}
-
-/**
- * US-41/D29, Phase 56 (T56.1): every deck pile-level action - the deck's
- * pile anchor is the ONE thing that calls this now, having absorbed
- * both the legacy strip's deal/reshuffleDeal and the legacy shuffle
- * row.
- *
- * D114 (US-106, direct user correction): "reshuffle and re-deal" used to
- * BE `RESET` then `DEAL` - a full game wipe wearing a smaller action's
- * name. They are two genuinely different operations now, each its own
- * reducer action, each targeting the pile that was actually clicked -
- * no more hardcoded `DECK_PILE_ID` assumption for either (that
- * assumption never held for a multi-deck preset like RtG anyway).
- */
-function dealFromDeck(pileId, action, count) {
-  if (isSessionEnded()) return;
-  if (action === 'draw') return performDraw(pileId);
-  if (action === 'shuffle') return performShuffle(pileId);
-  // The try/catch only ever catches on the host side - a guest never
-  // runs the reducer itself (see `submitAction`).
-  if (action === 'reset') {
-    try {
-      submitAction({ type: 'RESET' });
-    } catch (error) {
-      showDeckError(error.message);
-    }
-    return;
-  }
-  lastDealCount = count;
-  const dealAction = action === 'reshuffleDeal'
-    ? { type: 'RESHUFFLE_DEAL', cardsPerPlayer: count, pileId }
-    : { type: 'DEAL_MORE', cardsPerPlayer: count, pileId };
-  try {
-    submitAction(dealAction);
-  } catch (error) {
-    // US-41 AC: "fail the way it already does - a clear message, no
-    // partial deal". It did NOT already do that: the reducer's throw ran
-    // straight out of the click handler as an uncaught error, so the host
-    // saw nothing at all. Only visible now because moving the control
-    // somewhere reachable made it easy to hit.
-    showDeckError(error.message);
-  }
-}
-
-/**
-Transient, beside the deck - where the click that caused it happened.
-*/
-function showDeckError(message) {
-  const element = document.querySelector('#deck-error');
-  element.textContent = message;
-  element.hidden = false;
-  clearTimeout(showDeckError.timer);
-  showDeckError.timer = setTimeout(() => { element.hidden = true; }, 4000);
 }
 
 // --- Motion (US-11): best-effort, cosmetic only. See protocol.js/ARCHITECTURE.md D4. ---

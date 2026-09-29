@@ -70,6 +70,64 @@ D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rul
 
 ---
 
+### D165. Pile/zone actions dispatch through their own class, as a registry of pure descriptors
+
+`main.js`'s ~700-line pile/zone/stack action dispatch cluster (the last
+piece paused at D161) moved to `src/tableActions.js` + the `Pile`/`Zone`
+class hierarchies, through three rounds of the user's own review before
+landing:
+
+1. **First pass**: `tableActions.js` resolved a real `Pile`/`Zone`
+   instance (`pileInstanceFor`) and called `performAction(actionId,
+   context, io)` on it, `io` a bag of dispatch primitives
+   (`submitAction`/`dispatchAction`/`dispatchOrAlert`/...) the pile/zone
+   method called directly. Flagged: "I'm not sure we should expose IO
+   like that... handled on the edges."
+2. **Second pass, driven by "what makes it easiest to add new pile
+   types and new action types without shotgunning files"**: `Pile`/
+   `Zone` methods became PURE - they return `{ action, guard }` (the
+   wire action, plus which of a small closed set of dispatch
+   strategies - `'alert'`/`'silent'`/`'deckError'` - to send it
+   through) instead of calling anything. `tableActions.js`'s own
+   `dispatch()` is the ONLY place that ever calls `submitAction`/
+   `dispatchAction`/`dispatchOrAlert`/`showDeckError`. A brand-new
+   dispatch strategy is one new `guard` name plus one `if` in that one
+   interpreter - never a new capability threaded through `io` and
+   therefore through every pile/zone file's own signature and through
+   `main.js`'s factory call, which is what the first pass would have
+   cost as the vocabulary of actions grew.
+3. **Third pass**: the if-chains inside `performAction`/
+   `performStackAction` became REGISTRIES - `Pile.registerActions({...})`/
+   `registerStackActions({...})`, called once per class from a `static {}`
+   initializer block (not a module-top-level call - `unicorn/
+   no-top-level-side-effects`), mirroring `state.js`'s own `ACTIONS`
+   object (`action.type` -> its reducer function) - this is that same
+   idea's read-then-decide, client-side counterpart. Checked first: this
+   codebase has no separate "Action" class/type system to reuse or
+   extend (`state.js`'s actions are plain `{type, ...}` data with a flat
+   function registry) - a full Action class hierarchy would have been
+   new, unjustified surface; small registered functions match the
+   existing precedent exactly. `performAction` checks the actual
+   class's own table first, falls back to `Pile`'s. **Real JS gotcha
+   hit and fixed**: a static field is inherited BY REFERENCE unless
+   redeclared - `DeckPile`/`ChipPile` each need their own `static
+   actions = new Map()` or `registerActions` would silently mutate
+   `Pile`'s shared one.
+
+**New pile/zone kind, after all three passes**: one file, one
+`static actions = new Map()`, one `static { this.registerActions({...}) }`
+block. **New action reusing an existing guard**: one entry in whichever
+class's registry offers it. **New action needing a new dispatch
+strategy**: one new `guard` name, one `if` in `tableActions.js`'s
+`dispatch()`. `main.js` never changes for any of the three.
+
+Verified: `check` 1178; `ui`/`rtg`/`hostsetup`/`newgame`/`multiplayer`/
+`motion`/`gin`/`jevtable` browser suites green; the one deck action a
+live suite exercises (`reshuffleDeal`) is mutation-proved through the
+full registry lookup, not just asserted.
+
+---
+
 ### D164. The reconnect flow's clock is injectable; a live test proves it, fast
 
 Closes the gap D163 named on delivery: no live/E2E test of reconnect

@@ -2359,3 +2359,18 @@ motion, multiplayer, ui green.
       exact-8-attempts assertion mutation-proved (delay-index+3 caught)
 - [x] gate: check 1178; hostsetup/multiplayer/rtg green
 - [ ] Out of scope: full host-recovery test (needs Resume's own code-reuse flow, not guest reconnect)
+
+# Pile/zone action dispatch through their own class (US-143, D165) — 2026-09-29
+
+- [x] Round 1: resolve real Pile/Zone instance, performAction(actionId, context, io) calls dispatch directly
+- [x] Round 2 (user: "not sure we should expose IO like that... edges"; "easiest to add pile/action
+      types without shotgunning?"): PURE descriptors {action, guard} - tableActions.js's dispatch()
+      is the only interpreter; main.js's factory call never grows for a new action/strategy
+- [x] Round 3 (user: "register method... belongs with the action objects. types for actions?"):
+      if-chains -> static registries (registerActions/registerStackActions), static {} blocks
+      (not top-level calls - lint). Checked: no Action class precedent exists (state.js's ACTIONS
+      is a flat function registry too) - mirrored that shape, no new file-per-action.
+- [x] Real gotcha caught+fixed: static fields inherit BY REFERENCE - DeckPile/ChipPile each need
+      their own `static actions = new Map()` or registerActions mutates Pile's shared one
+- [x] gate: check 1178; ui/rtg/hostsetup/newgame/multiplayer/motion/gin/jevtable green;
+      reshuffleDeal mutation-proved through the full registry lookup
