@@ -70,6 +70,40 @@ D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rul
 
 ---
 
+### D163. The guest's reconnect flow is a hand-written machine, XState's shape without the package
+
+`main.js`'s reconnect flags (`isReconnecting`, `reconnectAttempt`,
+`isSessionEnded`) became `src/sessionLifecycle.js`'s `live` /
+`reconnecting` / `ended` machine - direct user request ("could XState be
+useful... replace some complex JS with simple YAML"), narrowed in
+discussion first: the render loop itself isn't a decision loop (nothing
+to model - it just renders whatever view arrives), but the reconnect
+flags ARE a real state machine hiding in booleans. The YAML layer
+`games/<game>/turn.yaml` uses doesn't transfer either: that exists so a
+non-engineer game AUTHOR can write turn logic from a checked library;
+nobody but an engineer ever touches reconnect code, so there is no
+second audience to write YAML for.
+
+**Then a real constraint, found only by loading the page:** the actual
+`xstate` package cannot be imported by `src/main.js` at all -
+`index.html` loads it with no bundler and no import map, and the one
+third-party browser dependency in this codebase (PeerJS) is a CDN
+`<script>` global, never an ES import of an npm package.
+`tools/jev/machine.mjs` uses real `xstate`, but that runs under Node,
+where `node_modules` resolution is normal; `src/` never has been. Caught
+by `bobp make test-hostsetup` timing out - a page-load JS error broke
+every subsequent interaction, not just the new code.
+
+**Chose:** keep the exact machine design (states, events, transitions,
+guards - already written and unit-tested) but implement it as a small
+dependency-free module (`createSessionLifecycle`) instead of wrapping
+`xstate`'s `createActor`/`createMachine`.
+
+**Rejected:** an import map for `xstate` (new browser-loading
+infrastructure, unrequested, for one small internal machine); bundling
+xstate into a served file (breaks the project's "no build step" browser
+path further than PeerJS's one CDN exception already does).
+
 ### D162. The table is `<table-view>` - a Web Component, not main.js closures
 
 `main.js`'s zoom-wheel/pan camera and hover-to-grow focus-zoom (~340

@@ -1,4 +1,5 @@
 import { Session } from './session.js';
+import { createSessionLifecycle } from './sessionLifecycle.js';
 import { createInitialState, reduce, viewFor, reseatOwner, DECK_PILE_ID } from './state.js';
 import { breakInto } from './pileables/ChipPileable.js';
 import { homePileKindFor } from './pileables/pileableTypes.js';
@@ -114,7 +115,12 @@ let gameState = null; // authoritative, host only
 let latestView = null; // last view received from host, join only
 // D138: table talk - not game state; host-ordered, relayed to everyone.
 const talkLog = createTalkLog();
-let isSessionEnded = false;
+// D163: the guest's connection to the host - live, reconnecting (with
+// a retry count), or ended for good - as a real machine instead of
+// scattered flags. `isSessionEnded()` reads its terminal state; every
+// old `if (isSessionEnded) return` guard becomes a call to it.
+const sessionActor = createSessionLifecycle();
+const isSessionEnded = () => sessionActor.matches('ended');
 
 // *fix (direct user report: rejoining as the "joiner" left them looking
 // at their own hand as if it were an opponent's). A guest's tab simply
@@ -429,7 +435,7 @@ globalThis.addEventListener('pointerup', () => {
   isPointerActive = false;
 });
 gameScreenElement.addEventListener('pointermove', (event) => {
-  if (!isPointerActive || isSessionEnded) return;
+  if (!isPointerActive || isSessionEnded()) return;
   const rect = gameScreenElement.getBoundingClientRect();
   const x = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
   const y = Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height));
@@ -722,7 +728,7 @@ function scheduleAutoStartCheck() {
 }
 
 function maybeAutoStart() {
-  if (role !== 'host' || !expectedPlayers || isSessionEnded) return;
+  if (role !== 'host' || !expectedPlayers || isSessionEnded()) return;
   // `showScreen` hides `#screen-host`, NOT `#host-share` (which is a div
   // inside it), so checking `#host-share.hidden` here was dead code -
   // it never became true. The game screen being visible is the real
@@ -1127,14 +1133,14 @@ document.querySelector('#start-new-game-btn').addEventListener('click', () => {
 // to the user as a real functionality gap, not silently dropped.
 
 function adjustScore(targetPlayerId, delta) {
-  if (isSessionEnded) return;
+  if (isSessionEnded()) return;
   submitAction({ type: 'ADJUST_SCORE', targetPlayerId, delta });
 }
 
 // *nit (2026-08-27), direct user request: "update the score by typing it
 // dispatch here (`adjustScore` above, `performCreatePileWithCard`, ...).
 function setScore(targetPlayerId, value) {
-  if (isSessionEnded) return;
+  if (isSessionEnded()) return;
   try { submitAction({ type: 'SET_SCORE', targetPlayerId, value }); }
   catch (error) { globalThis.alert(error.message); }
 }
@@ -1187,7 +1193,7 @@ function submitAction(action) {
  * copy per action.
  */
 function dispatchAction(action) {
-  if (isSessionEnded) return;
+  if (isSessionEnded()) return;
   submitAction(action);
 }
 
@@ -1199,7 +1205,7 @@ function dispatchAction(action) {
  * presentation-only action (spread, flip, shuffle...) ever needed.
  */
 function dispatchOrAlert(action) {
-  if (isSessionEnded) return;
+  if (isSessionEnded()) return;
   try { submitAction(action); }
   catch (error) { globalThis.alert(error.message); }
 }
@@ -1357,7 +1363,7 @@ function forgetPeer(id) {
 
 let saveTimer = null;
 function scheduleSave() {
-  if (role !== 'host' || isSessionEnded) return;
+  if (role !== 'host' || isSessionEnded()) return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     if (gameState) saveGame(localStorage, gameState, myId, myName);
@@ -1412,37 +1418,38 @@ const RECONNECT_DELAYS_MS = [1000, 2000, 4000, 6000, 8000, 10_000, 10_000, 10_00
 How long one attempt may hang before it counts as failed - see `attemptReconnect`.
 */
 const ATTEMPT_TIMEOUT_MS = 5000;
-let reconnectAttempt = 0;
+// D163: only the raw timer handle stays a plain variable - the retry
+// COUNT and whether we're even reconnecting now live in `sessionActor`
+// (`sessionLifecycle.js`), which is what makes the guards below
+// structural instead of manual: `HOST_LOST` is only handled from
+// `live`, so a stray/duplicate one while already reconnecting (or
+// already ended) is simply not handled - no `if` needed here for it.
 let reconnectTimer = null;
-let isReconnecting = false;
 
 function stopReconnecting() {
   clearTimeout(reconnectTimer);
   reconnectTimer = null;
-  isReconnecting = false;
-  reconnectAttempt = 0;
 }
 
 function beginReconnecting() {
-  if (isReconnecting || isSessionEnded) return;
-  isReconnecting = true;
-  reconnectAttempt = 0;
+  if (!sessionActor.matches('live')) return;
+  sessionActor.send({ type: 'HOST_LOST' });
   scheduleReconnect();
 }
 
 function scheduleReconnect() {
-  const delay = RECONNECT_DELAYS_MS[reconnectAttempt];
+  const delay = RECONNECT_DELAYS_MS[sessionActor.context().attempt];
   if (delay === undefined) {
     // Budget spent. Say so and stop - a loop with no end is a battery
     // cost the player never agreed to, and an app that looks busy forever
     // is worse than one that admits it failed (Smith Gate 1 answer 1).
-    isReconnecting = false;
     endSessionForGood('Could not reconnect to the host.', { retryable: true });
     return;
   }
-  reconnectAttempt += 1;
+  sessionActor.send({ type: 'RETRY' });
+  const attempt = sessionActor.context().attempt;
   renderBanner(bannerElement,
-    `Lost the host \u{2014} reconnecting\u{2026} (attempt ${reconnectAttempt} of ${RECONNECT_DELAYS_MS.length})`);
+    `Lost the host \u{2014} reconnecting\u{2026} (attempt ${attempt} of ${RECONNECT_DELAYS_MS.length})`);
   reconnectTimer = setTimeout(attemptReconnect, delay);
 }
 
@@ -1465,6 +1472,7 @@ async function attemptReconnect() {
     session = attempt;
     wireGuestSession();
     stopReconnecting();
+    sessionActor.send({ type: 'RECONNECTED' });
     renderBanner(bannerElement, '');
     showGameCode(remembered.code);
   } catch {
@@ -1553,10 +1561,10 @@ function wireGuestSession() {
   // they become useful, which is why reconnecting was impossible before
   // this sprint. It moves to `endSessionForGood`, where the session
   // really is over.
-  session.on('host-lost', () => {
-    if (isSessionEnded) return;
-    beginReconnecting();
-  });
+  // `beginReconnecting`'s own guard (only `live` handles `HOST_LOST`)
+  // already covers "already ended" and "already reconnecting" - no
+  // wrapper needed here.
+  session.on('host-lost', beginReconnecting);
 
   session.on('session-ended', () => endSessionForGood('Host disconnected — session ended.'));
 }
@@ -1567,11 +1575,11 @@ function wireGuestSession() {
  * so outright. Only here does the remembered table get dropped.
  */
 function endSessionForGood(message, { retryable = false } = {}) {
-  if (isSessionEnded) return;
+  if (isSessionEnded()) return;
   stopReconnecting();
+  sessionActor.send({ type: 'SESSION_ENDED' });
   forgetSession(localStorage);
   renderBanner(bannerElement, retryable ? `${message} Reload to try again.` : message);
-  isSessionEnded = true;
   // Re-render with no action handlers so every control (hand cards,
   // reveal/pickup buttons) is inert, and force the roster to reflect
   // reality instead of the last-known (now stale) connection states
@@ -1627,11 +1635,11 @@ function renderRosterOnly() {
   scheduleAutoStartCheck(); // US-42: the roster changing is exactly when to re-check
   maybeResumeRestored();    // US-45: and when to re-check who is back
   let players = rosterWithCounts(view);
-  if (isSessionEnded) players = players.map((p) => ({ ...p, connection: 'disconnected' }));
+  if (isSessionEnded()) players = players.map((p) => ({ ...p, connection: 'disconnected' }));
   const options = {
     movingIds,
     scores: view.scores,
-    onAdjustScore: isSessionEnded ? null : adjustScore,
+    onAdjustScore: isSessionEnded() ? null : adjustScore,
     myId,
   };
   const hostRosterElement = document.querySelector('#host-roster');
@@ -1756,7 +1764,7 @@ function handlePileAction(pileId, actionId, value) {
 // hold the real function reference directly - no arity-preserving arrow
 // wrapper needed either.
 function whenLive(handler) {
-  return isSessionEnded ? null : handler;
+  return isSessionEnded() ? null : handler;
 }
 
 function buildZoneOptions(nameById) {
@@ -1910,12 +1918,12 @@ function renderGameFromView(view) {
 // reads the card's current facing and toggles it, so the caller (a tap,
 // or the menu's `reveal`/`hide` entry) never has to say which way.
 function revealCard(pileableId) {
-  if (isSessionEnded) return;
+  if (isSessionEnded()) return;
   submitAction({ type: 'FLIP', pileableId });
 }
 
 function rotateCard(pileableId) {
-  if (isSessionEnded) return;
+  if (isSessionEnded()) return;
   submitAction({ type: 'ROTATE', pileableId });
 }
 
@@ -1942,12 +1950,12 @@ function resizePanel(id, w, h) {
 }
 
 function pickupCard(pileableId) {
-  if (isSessionEnded) return;
+  if (isSessionEnded()) return;
   submitAction({ type: 'PICKUP', pileableId });
 }
 
 function moveCard(pileableId, toPileId, placement = {}) {
-  if (isSessionEnded) return;
+  if (isSessionEnded()) return;
   const { targetCardId, side, layout } = placement;
   submitAction({ type: 'MOVE', pileableId, toPileId, targetCardId, side, layout });
 }
@@ -1967,7 +1975,7 @@ function moveCard(pileableId, toPileId, placement = {}) {
 // reducer distinguishes structurally (a hand DESTINATION re-stamps the
 // card as a hand card and never reaches the leaving-a-hand rule).
 function dropCardOnPile(pileableId, targetPileId, placement = {}) {
-  if (isSessionEnded) return;
+  if (isSessionEnded()) return;
   const view = currentView();
   if (!view) return;
   // UX follow-up (direct user request): the hand pile is a real,
@@ -2001,7 +2009,7 @@ function dropCardOnPile(pileableId, targetPileId, placement = {}) {
  * for change actually wants and saves them hunting for one to click.
  */
 function performBreakChip(pileId) {
-  if (isSessionEnded) return;
+  if (isSessionEnded()) return;
   const pile = currentView()?.piles.find((p) => p.id === pileId);
   const biggest = (pile?.cards ?? [])
     .filter((chip) => chip.pileableType === 'chip' && breakInto(chip.denom) !== undefined)
@@ -2108,7 +2116,7 @@ function performSortPile(pileId, by) {
 // the button toggle in `handlePileAction`; a FAILED commit shouldn't
 // leave the row stuck open on a picker the player just acted on).
 function performSplitCommit(index) {
-  if (isSessionEnded || !splitPicker) return;
+  if (!splitPicker || isSessionEnded()) return;
   const { pileId } = splitPicker;
   splitPicker = null;
   try { submitAction({ type: 'SPLIT_PILE', pileId, index }); }
@@ -2141,7 +2149,7 @@ function performMergePile(pileId, targetPileId) {
 // which would race a guest's own relayed send against the host's
 // broadcast of the intermediate state.
 function performCreatePileWithCard(pileableId, zoneId) {
-  if (isSessionEnded) return;
+  if (isSessionEnded()) return;
   const view = currentView();
   if (!view) return;
   // D102: this used to branch on `view.myHand` first to find a
@@ -2293,7 +2301,7 @@ function toggleSplitPicker(pileId) {
  * assumption never held for a multi-deck preset like RtG anyway).
  */
 function dealFromDeck(pileId, action, count) {
-  if (isSessionEnded) return;
+  if (isSessionEnded()) return;
   if (action === 'draw') return performDraw(pileId);
   if (action === 'shuffle') return performShuffle(pileId);
   // The try/catch only ever catches on the host side - a guest never
@@ -2491,7 +2499,7 @@ setInterval(() => {
   // of null (reading 'players')". The precondition was incomplete, not
   // `relayMotion`; guarding it there instead would leave the same hole
   // for every future reader of `gameState` in this loop.
-  if (!session || !gameState || isSessionEnded) return;
+  if (!session || !gameState || isSessionEnded()) return;
   for (const { key, data } of motionThrottler.drain()) {
     const message = makeMotionMessage(key, data);
     applyIncomingMotion(myId, message);

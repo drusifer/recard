@@ -4502,3 +4502,42 @@ than living as `main.js` `let`s only that cluster happened to touch.
 
 **Out of scope:** `playerAnchorRect`/the card-drag anchoring math (motion
 protocol, not table camera - stays in main.js); any behavior change.
+
+### US-141: the guest's reconnect flow is a machine, not three flags
+**As** someone reading or changing how a guest reconnects to a lost host,
+**I want** `isReconnecting`/`reconnectAttempt`/`isSessionEnded` to be one
+real machine, **so that** which combinations are legal is structural, not
+implicit in which function happens to check which flag.
+
+**AC:**
+1. `src/sessionLifecycle.js` (`createSessionLifecycle`): states `live` /
+   `reconnecting` (context: `attempt`) / `ended` (terminal). Borrows
+   XState's SHAPE, not the `xstate` package - `src/` is loaded straight
+   by the browser with no bundler/import map (the one third-party
+   browser dependency, PeerJS, is a CDN `<script>` global, never an ES
+   import of an npm package), unlike `tools/jev/machine.mjs` which runs
+   under Node.
+2. `main.js`'s reconnect functions are unchanged in their network/async
+   logic (`attemptReconnect`, the join/timeout race, all untouched);
+   only the STATE bookkeeping moves to `sessionActor.send`/`.matches`/
+   `.context()`. `isSessionEnded()` (was a bare flag) replaces ~20 read
+   sites; `beginReconnecting`'s own structural guard (only `live` handles
+   `HOST_LOST`) replaces a manual `if (isReconnecting || isSessionEnded)`.
+3. `SESSION_ENDED` is handled from every state (root-level), matching
+   that a host can end the session outright without a guest ever having
+   been in `reconnecting` first.
+4. 9 unit tests trace every transition against the ORIGINAL code's exact
+   semantics (delay-table indexing, attempt count on display, idempotent
+   re-entry) - the first tests this logic has ever had; no browser suite
+   exercised live reconnect before or after. check 1178; hostsetup,
+   newgame, multiplayer, ui, rtg, tablezoom, focuszoom, motion green
+   (confirms nothing ELSE broke - not reconnect-specific coverage).
+
+**Out of scope:** `role`/screens (set once, never really a machine);
+using the real `xstate` package client-side (would need an import map -
+new infrastructure nobody asked for); any behavior change.
+
+**Risk, named not hidden:** reconnect itself has no live/E2E test, before
+or after this change. The confidence here is a careful line-by-line trace
+plus unit tests of the pure state logic, not an integration test of an
+actual dropped connection.

@@ -2337,3 +2337,14 @@ motion, multiplayer, ui green.
 - [ ] NEXT (asked, not yet answered): could XState drive the table simulator's own run loop -
       the client's screen/session lifecycle (fresh/host-setup/live/reconnecting/ended), the same
       way games/<game>/turn.yaml already drives a Jev bot's turn? Analysis first, no code yet.
+
+# main.js: reconnect flags -> a real machine (US-141, D163) — 2026-09-29
+
+- [x] src/sessionLifecycle.js: XState's SHAPE, not the package (browser has no bundler/import
+      map - found by test-hostsetup timing out on a page-load JS error: "xstate" can't resolve
+      client-side; tools/jev/machine.mjs's real xstate runs under Node, never src/)
+- [x] main.js: isReconnecting/reconnectAttempt/isSessionEnded -> sessionActor.send/.matches/.context()
+- [x] 9 unit tests, traced against the original code's exact semantics (delay-table indexing,
+      display counts, idempotent re-entry) - first tests this logic has ever had
+- [x] gate: check 1178; hostsetup/newgame/multiplayer/ui/rtg/tablezoom/focuszoom/motion green
+- [ ] Named risk: no live/E2E test of an actual dropped connection, before or after
