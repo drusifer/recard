@@ -4605,3 +4605,39 @@ or two files, never a shotgunned change across the whole cluster.
 **Out of scope:** `performMergePile` (pile-to-pile, no single owning
 instance) and `performRenamePile`'s caller wiring - unchanged, still
 plain `tableActions.js` functions.
+
+### US-144: main.js's host-setup/new-game cluster becomes its own module
+**As** the developer maintaining main.js, **I want** the host-setup/new-game
+cluster - deck/preset preview, Create Table, Resume/restore-waiting,
+auto-start, and New Game - extracted out of main.js's ~2170 lines into its
+own module, **so that** the last cluster from D161's original pause list is
+closed out the same way the table-camera, reconnect and dispatch clusters
+already were, with no behavior change.
+
+**AC:**
+1. Pure/derivation logic (`describeDeckConfig`, `describeConfiguredZones`,
+   deck-choice grouping/rendering, `chosenDeckIds`, `configsForPreset`)
+   moves out first and gains unit tests - most of it has none today.
+2. Host-session wiring (roster seating, `wireHostSession`) and the
+   resume/restore-waiting machinery (`offerRestore`, `resumeHostedTable`,
+   `stillMissing`, `renderWaitingForReturners`, `maybeResumeRestored`,
+   `finishRestore`) move out behind explicit calls - `gameState`/`session`/
+   `myId`/`peerToKey`/`identityAnnounced` are read or written via getters
+   passed in, matching D161's pattern, because all of them are also read by
+   code that stays in main.js (dispatch, talk, motion) and can't be
+   privatized without relocating a shared dependency rather than
+   encapsulating one.
+3. `startGame`, the auto-start pair (`scheduleAutoStartCheck`/
+   `maybeAutoStart`), and the New Game flow (`startNewGameFlow`/
+   `cancelNewGameFlow` + their two button handlers) move out last, since
+   they call into everything above.
+4. No behavior change. Existing `test-hostsetup`/`test-newgame` suites (and
+   any others the cluster touches) pass unmodified except where a test was
+   asserting an implementation detail the move legitimately changes.
+5. main.js's line count drops by roughly the ~990 lines this cluster
+   occupies today; `bobp make check` (lint + full unit suite + gitleaks)
+   stays green throughout.
+
+**Out of scope:** any behavior change to host setup, resume, or new-game
+(this is D161's pause-list cleanup, not a feature); the create-table/
+new-game DOM wiring for screens other than `#screen-host`/`#screen-game`.

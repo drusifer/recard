@@ -193,6 +193,16 @@ src/pileCards.js        a pile's cards, stacks and card/stack menus (+ deckStack
                          actionControls.js, renderZones.js, menuPosition.js)
 src/main.js              wires session + state + ui together; owns local-only
                          view state (table zoom/pan, focus-zoom)
+src/hostSetup.js         host-setup/new-game cluster (D161-166): deck/preset preview,
+                         createTable/resumeHostedTable/restore-waiting, startGame/
+                         auto-start, New Game - createHostSession(read, patch) is the
+                         explicit-param boundary back into main.js's own state
+src/sessionLifecycle.js  a guest's connection to the host as a real machine (XState's
+                         SHAPE only - src/ has no bundler, D163)
+src/tableActions.js      pile/zone/stack action dispatch - Pile/Zone own static action
+                         registries, this is the ONLY interpreter of their descriptors (D165)
+src/layoutSave.js        Save/Save As/Reset Layout button wiring (D161's pilot cluster)
+src/staleTimers.js       shared Map+setTimeout tracker (moving/cursor/drag-ghost), clock-injected
 src/components/          registered Web Components - see docs/UI_ARCHITECTURE.md
 src/seating.js           pure per-viewer seat rotation + seat geometry
 src/handOrder.js         pure client-side hand sort/manual-reorder reconcile

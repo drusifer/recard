@@ -70,6 +70,54 @@ D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rul
 
 ---
 
+### D166. Host-setup/new-game cluster: D161's explicit-param pattern, not a new domain object
+
+The last cluster on D161's original pause list (US-144) - deck/preset
+preview, Create Table, Resume/restore-waiting, auto-start, New Game,
+~990 lines - reassessed the same way D162/D163 each reassessed their own
+cluster before starting, per D161's "pilot, then reassess" plan.
+
+At first glance this looks like D163's shape: several pieces of state
+(`peerToKey`, `identityAnnounced`, `awaitedReturners`, `isResumePending`,
+`expectedPlayers`, `requestedRole`) that only this cluster's functions
+seem to touch, which is exactly the property that made a private-state
+machine (`sessionLifecycle.js`) the right call for reconnect flags, and
+private fields the right call for `<table-view>`'s camera (D162).
+
+Checked instead of assumed: `peerToKey`/`identityAnnounced` are also read
+by `dispatch()`, `publishTalk()` and `applyIncomingMotion()` - none of
+which are part of this cluster and all of which stay in `main.js`. Moving
+either map inside a new host-setup object would not encapsulate a private
+concept; it would relocate a dependency three other clusters still need,
+trading one cross-module reach-in for another. `gameState`/`session`/
+`myId` cross the same way, already - the entire rest of `main.js` reads
+them.
+
+**Decision:** extract with D161's original explicit-param pattern (module
+functions taking `gameState`/`session`/`myId`/`peerToKey`/
+`identityAnnounced` and the rest via getters, `layoutSave.js`'s own
+pilot shape), not a new class or machine. `awaitedReturners`/
+`isResumePending`/`expectedPlayers`/`requestedRole` - genuinely private,
+read by nothing outside this cluster - move into the new module as real
+private state (a `let` per field, same as they are in `main.js` today);
+only the state that crosses the boundary stays a getter/setter pair.
+
+Rejected: a `HostSetup` domain object mirroring `TableView`/
+`sessionLifecycle.js` - the state that made those a good fit
+(`camera`/`focusedPileId`, the reconnect flags) genuinely didn't cross
+their own cluster's boundary; here, the state that looks the same way at
+first glance actually does cross it, so the same shape would misrepresent
+where the real boundary is.
+
+Phases (US-144): (1) pure/derivation helpers - `describeDeckConfig`,
+`describeConfiguredZones`, deck-choice grouping/rendering,
+`chosenDeckIds`, `configsForPreset` - unit-tested, most have no coverage
+today; (2) host-session wiring + resume/restore-waiting machinery;
+(3) `startGame`/auto-start/New Game flow, which call into (1) and (2).
+No behavior change; `bobp make check` stays green throughout.
+
+---
+
 ### D165. Pile/zone actions dispatch through their own class, as a registry of pure descriptors
 
 `main.js`'s ~700-line pile/zone/stack action dispatch cluster (the last

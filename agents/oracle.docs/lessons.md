@@ -714,3 +714,21 @@ This file contains critical lessons and rules derived from past errors, technica
   other game-file error is relative (D154's convention).
 - **`bobp make` swallows a target's output**, so `bobp make help | grep`
   finds nothing. Read `build/build.out`.
+- **State that "looks private" to one cluster can be shared elsewhere -
+  check every read site before privatizing.** D166 (US-144): `peerToKey`/
+  `identityAnnounced` were only ever WRITTEN inside the host-setup
+  cluster being extracted, which looked exactly like D163's reconnect
+  flags (genuinely private, became real machine state). But `dispatch()`/
+  `publishTalk()`/`applyIncomingMotion()` - outside the cluster - also
+  READ them. Privatizing would have relocated a shared dependency, not
+  encapsulated one. Grep every reference, not just the writes, before
+  choosing "private state" over "crosses the boundary."
+- **A real browser's `confirm()`/`alert()` blocks until a test answers
+  it - Playwright auto-DISMISSES by default, so an unhandled `confirm()`
+  silently returns `false`.** Writing `tests/resume.browser.mjs` hit
+  this directly: the click appeared to do nothing, no console error,
+  because `offerRestore()`'s confirm was answered "no" before the test
+  ever noticed a dialog existed. `page.once('dialog', (d) => d.accept())`
+  registered *before* the triggering click is required any time new code
+  reaches a `globalThis.confirm`/`alert` (see also `newGame.browser.mjs`,
+  `rtgPlaythrough.browser.mjs`).

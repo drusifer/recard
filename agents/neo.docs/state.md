@@ -1,6 +1,44 @@
 # Agent State
 
-## Current Task (2026-09-25) - US-130: impl + 2 real bugs found by the browser test going intermittently red
+## Current Task (2026-09-29) - US-144/D166 ALL 3 PHASES DONE, sprint closed
+
+main.js's host-setup/new-game cluster (D161's last pause-list item) moved to src/hostSetup.js
+in full, via `/sprint till done`. main.js 2174 -> 1412.
+
+- **Phase 1**: pure/derivation helpers (describeDeckConfig/describeConfiguredZones/deckColorDots/
+  groupDeckChoicesByColor/renderDeckChoiceLabel/renderDeckChoices/chosenDeckIds/configsForPreset).
+  10 new unit tests (tests/hostSetup.test.js) - first coverage this logic ever had.
+- **Phase 2**: seatRosterEntry/wireHostSession/offerRestore/resumeHostedTable/stillMissing/
+  renderWaitingForReturners/maybeResumeRestored/finishRestore -> `createHostSession(read, patch)`.
+  D166: role/session/myId/myName/gameState/lastDealCount/selectedPreset/requestedRole cross the
+  boundary via read()/patch() (they're read by code staying in main.js); awaitedReturners/
+  isResumePending are real private closure state. NEW tests/resume.browser.mjs (2 tests) - the
+  Resume flow (US-37/39/43/45) had ZERO browser coverage before this, closed while touching the
+  exact code. Hit and fixed a real test-authoring gotcha: Playwright auto-DISMISSES `confirm()`
+  unless `page.once('dialog', d => d.accept())` is registered first - filed as a lesson.
+  peerToKey/identityAnnounced stay in main.js (shared with dispatch/publishTalk/
+  applyIncomingMotion, which are outside this cluster) - passed by reference, not privatized.
+- **Phase 3**: startGame/scheduleAutoStartCheck/maybeAutoStart (expectedPlayers/autoStartTimer
+  now private) + createTable (was the `#create-table` click handler) + New Game flow
+  (startNewGameFlow/cancelNewGameFlow/startNewGame), all into the same createHostSession factory.
+
+Verification held throughout: `bobp make check` clean every phase; hostsetup/newgame/resume/
+multiplayer/reconnect/rtg/spectator/tablezoom all green at the end. Zero fix loops.
+
+Sprint closed: Oracle groom (ARCHITECTURE.md module-map drift fixed for 5 files missing since
+D161; 2 lessons filed; BACKLOG.md's stale "no way to resume" entry corrected), Smith user-test
+passed, full retro posted, Cypher `*pm launch`. 386 never-archived CHAT.md messages (6 prior
+sprints) archived to agents/chat_archive/CHAT_MAINJS_AND_JEV_SPLIT.md in the same pass.
+
+**NOT committed** - see agents/cypher.docs/state.md for the working-tree file list; ask the user
+before committing/pushing.
+
+## Next Steps
+Nothing assigned. D160/161's whole main.js/ui.js split arc is done - await the user's next
+direction, or pick up docs/BACKLOG.md's Technical/testing section (multi-player harness
+follow-ups, Gin bot tuning, read()/patch() consolidation candidate from this sprint's own retro).
+
+## Previous - (2026-09-25) - US-130: impl + 2 real bugs found by the browser test going intermittently red
 
 1) Playwright's own SIGINT handler process.exit(130)s ahead of our shutdown -> handleSIGINT:false.
 2) That EXPOSED two more: shutdown ran twice at once (main flow + SIGINT handler) and

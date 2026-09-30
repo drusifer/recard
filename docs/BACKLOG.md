@@ -82,10 +82,15 @@ or a live-verification session) versus being pickable directly.
   (Oracle, 2026-09-20): `<thought-bubble>`, `<add-bot>` and the
   spectator roster marking. Filed rather than claimed done.
 
-- **Reconnect-to-session after refresh/drop** — if a client's own tab
-  reloads (or the host's does), there is no way to resume the session;
-  a known v1 limitation, standing since the original architecture
-  (`docs/DECISIONS.md` D6).
+- ~~**Reconnect-to-session after refresh/drop**~~ RESOLVED, this entry is
+  stale (Oracle groom, 2026-09-29): a guest's own tab reloading/dropping
+  is D32/D163/D164's reconnect machine; the HOST's reloading is US-37/
+  US-39/US-43/US-45's Resume (`resumeHostedTable`, now unit-of-work
+  `src/hostSetup.js`, D166) - both existed well before this entry was
+  last touched, and Resume had zero browser-test coverage until this
+  groom's own sprint added `tests/resume.browser.mjs`. Left in place
+  rather than deleted, since the original D6 v1 limitation it describes
+  really was true once.
 - **Builder screen** — standing idea, not yet scoped into stories.
 - **Flip as a radio box with preview icons** (Neo, queued) — replace
   the single Flip action with a radio control listing orientations
@@ -140,6 +145,13 @@ or a live-verification session) versus being pickable directly.
 
 ## Technical / testing
 
+- **`read()`/`patch()` cross-module-boundary helper is duplicated twice**
+  (Morpheus, US-144 retro, 2026-09-29): `layoutSave.js`'s `read()`-only
+  shape and `hostSetup.js`'s `read()`+`patch()` pair solve the same
+  problem (a `main.js` `let` a moved cluster needs to read, sometimes
+  write) with slightly different signatures. Fine at two call sites; if
+  a third cluster ever needs this, worth a small shared factory instead
+  of a third bespoke pair.
 - **Multi-player harness follow-ups** (US-118 retro, 2026-09-18):
   extend `tests/harness/multiplayer.mjs` to assert `motion` messages
   (unblocks the remote-cursor redesign); `waitForView` predicates run

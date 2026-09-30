@@ -2374,3 +2374,34 @@ motion, multiplayer, ui green.
       their own `static actions = new Map()` or registerActions mutates Pile's shared one
 - [x] gate: check 1178; ui/rtg/hostsetup/newgame/multiplayer/motion/gin/jevtable green;
       reshuffleDeal mutation-proved through the full registry lookup
+
+# main.js: host-setup/new-game cluster (US-144, D166) — 2026-09-29
+
+Phase 1: pure/derivation helpers
+- [x] Extract describeDeckConfig/describeConfiguredZones/deckColorDots/groupDeckChoicesByColor/
+      renderDeckChoiceLabel/renderDeckChoices/chosenDeckIds/configsForPreset into src/hostSetup.js
+- [x] 10 unit tests (most had none today) - TDD, tests before the move
+- [x] gate: bobp make check; hostsetup 7/7, newgame 5/5 green; main.js 2174 -> 1940
+
+Phase 2: host-session wiring + resume/restore-waiting
+- [x] Extract seatRosterEntry/wireHostSession into hostSetup.js - createHostSession(read, patch)
+      pattern (gameState/session/myId/myName/lastDealCount cross the boundary via read()/patch();
+      peerToKey/identityAnnounced passed by reference, shared with dispatch/publishTalk/
+      applyIncomingMotion which stay in main.js)
+- [x] Extract offerRestore/resumeHostedTable/stillMissing/renderWaitingForReturners/
+      maybeResumeRestored/finishRestore - awaitedReturners/isResumePending are real
+      private closure state inside hostSetup.js (nothing outside this cluster reads them)
+- [x] NEW tests/resume.browser.mjs (2 tests, 3x stress-clean) - this flow had ZERO coverage
+      before (D164's own noted gap), closed while touching this exact code
+- [x] gate: bobp make check; hostsetup/newgame/multiplayer/reconnect/resume all green;
+      main.js 1940 -> 1653
+
+Phase 3: startGame/auto-start/New Game flow
+- [x] Extract startGame/scheduleAutoStartCheck/maybeAutoStart (expectedPlayers/autoStartTimer
+      become private state) and startNewGameFlow/cancelNewGameFlow + their two button handlers
+- [x] main.js's Create Table button handler rewired to call into hostSetup.js (createTable)
+- [x] gate: bobp make check; hostsetup/newgame/resume/multiplayer/rtg/spectator all green
+- [x] main.js 2174 -> 1412 (762 lines out, roughly the ~990-line estimate net of new
+      tests/docs added elsewhere)
+
+**US-144/D166 COMPLETE** - all 3 phases shipped, D161's original pause-list fully closed.
