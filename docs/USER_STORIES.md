@@ -4685,3 +4685,48 @@ Flip occupies today, as an inline choice list - no new popover/dialog.
 (e.g. refusing Fan on a Battlefield) - the user's answer was every
 direction, everywhere; a Battlefield fanned out is unusual but not
 prevented. Touch/mobile - desktop-only per standing UI-pass convention.
+
+### US-146: Remote-cursor redesign - glide onto the pile it enters, not raw pixels
+**As** someone watching another player's cursor on a shared table, **I want**
+it to glide onto whichever pile it's actually interacting with, **so that**
+their pointer's meaning survives across two browsers with completely
+different panel layouts (D68's own standing problem: an absolute screen
+fraction has no correct meaning on a receiver's differently-arranged
+screen - D13's cursor never got that fix, only card-drag did).
+
+User's own verification answer: no live human-watched session - build a
+dedicated HARNESS test player (not a Jev/AI bot) that can be driven
+programmatically to hover a given pile, and drive TWO of them (one
+sender, one receiver) through the real WebRTC protocol - genuinely
+cross-client, repeatable, no human required to watch it.
+
+**AC:**
+1. No back-compat: raw-coordinate cursor mirroring (`x`/`y` fractions of
+   the sender's own screen) is replaced outright by a `pileId` broadcast -
+   which pile (if any) the sender's pointer is currently over, found via
+   `elementFromPoint(...).closest('[data-pile-id]')`, sent only on CHANGE
+   (enter/leave a pile), not per pointermove tick. Still only while a
+   gesture is active (`isPointerActive`, unchanged from D13).
+2. A receiver resolves that `pileId` against its OWN rendering (each
+   viewer's own panel layout is genuinely local, D61/D68) and animates
+   the cursor dot to that pile's own on-screen position - a CSS
+   transition on `left`/`top`, not a JS animation loop, so the browser
+   does the interpolation.
+3. No target (pointer over empty table, or a pile this viewer doesn't
+   render) hides the cursor - there is nothing correct to glide to.
+4. A new harness test player (`tools/jev/`-adjacent or test-only,
+   Mouse/Morpheus to place) can be told "hover pile X" and does so for
+   real (a real pointerdown+pointermove over that pile's real DOM), so
+   `tests/harness/multiplayer.mjs` can drive one peer and assert the
+   OTHER peer's `.remote-cursor` lands on the right pile - real
+   cross-client proof, repeatable, `bobp make test-*`.
+5. `bobp make check` + the existing multiplayer/reconnect suites stay
+   green; the old exact-pixel cursor test (if any) is rewritten against
+   the new target-based behavior, not kept alongside it.
+
+**Out of scope:** zones as a hover target (only piles carry a stable
+`data-pile-id` today; a zone is a container, not something a drag
+actually lands ON) - pickable later if a real need shows up. Pinch/touch
+motion - desktop-only per standing convention. The card-drag ghost
+(`updateDragGhost`) is a separate, already-correct mechanism (D68's own
+fix) and is untouched.

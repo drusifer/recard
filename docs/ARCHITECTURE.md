@@ -242,9 +242,13 @@ and drives them by protocol actions through `window.__recardHarness`
 -> `submitAction`, the same funnel every UI button uses. Tests await
 convergence on each peer's structured view and inspect the DOM through
 one `query()` helper. First scenario: `tests/multiplayer.browser.mjs`
-(`npm run test:multiplayer`). It covers cross-client STATE; `motion`
-messages (live drag/cursor sync) aren't asserted yet. The harness also
-supplies the static server and Chromium launcher every browser test
+(`npm run test:multiplayer`). It covers cross-client STATE; card-drag
+`motion` sync isn't asserted yet, but the remote cursor now is
+(`tests/remoteCursor.browser.mjs`, US-146/D168) via `HarnessPeer`'s
+`pointerDown`/`hoverPile`/`pointerUp` - a real mouse-event test player,
+not a synthetic dispatch, built specifically so a live cross-client
+interaction redesign never again needs a human to watch it. The harness
+also supplies the static server and Chromium launcher every browser test
 file uses.
 
 The same harness is exposed to agents as an MCP server (US-119, D136):

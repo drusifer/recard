@@ -70,6 +70,48 @@ D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rul
 
 ---
 
+### D168. Remote cursor broadcasts a `pileId`, not raw coordinates; a harness test player drives it
+
+US-146: D13's live cursor never got the fix D68 later gave the card-drag
+ghost - an absolute screen fraction has no correct meaning on a
+receiver's own, genuinely-local panel layout (D61). Real coordinates
+only ever looked right by accident, on two browsers arranged the same way.
+
+**Decision:** the sender detects which pile (if any) the pointer is over
+- `document.elementFromPoint(x, y).closest('[data-pile-id]')` - and
+broadcasts that `pileId` (or `null`) only on CHANGE, not per throttled
+tick (a strictly lower message rate than before, still under the
+existing `cursor` motion key). A receiver resolves the id against its
+OWN DOM (`gameScreenElement.querySelector('[data-pile-id="..."]')`),
+computes that pile's own on-screen center, and lets the ALREADY-EXISTING
+`.remote-cursor` CSS transition (`left`/`top`, previously 0.08s - tuned
+for smoothing jittery raw coordinates) carry it there - widened to 0.2s
+`ease-out` per Smith's Gate 1 condition (quick, not showy). No new
+animation machinery: the transition plumbing already existed for a
+different reason and fits this purpose directly.
+
+No `pileId` (empty table, or a pile this viewer doesn't render) hides
+the cursor outright - there is nothing correct to glide to, matching
+Smith's accepted trade-off.
+
+**Verification, the user's own call**: no live human-watched session.
+`tests/harness/multiplayer.mjs`'s `HarnessPeer` gains `hoverPile(pileId)`
+- real `page.mouse.move`/`down` over that pile's own bounding box, not a
+synthetic event dispatch, so it drives the SAME `pointermove` listener a
+real user would. Two harness peers (real WebRTC, real browser pages)
+prove this cross-client for real: one hovers, the other's `.remote-cursor`
+is asserted to land on the right pile - repeatable, `bobp make
+test-multiplayer`, no human required to watch it.
+
+**Rejected:** zones as a hover target - only piles carry a stable
+`data-pile-id` in the DOM today; a zone is a container a drag doesn't
+land ON, so "which zone" has no analogous natural detection point
+without inventing one. Keeping raw coordinates and just widening the
+transition - patches the symptom (jitter) but not the actual defect
+(a fraction of MY screen means nothing on YOUR differently-arranged one).
+
+---
+
 ### D167. Flip becomes `SET_STACK_DIRECTION`, an EnumAction reusing `changePileType`'s own control
 
 US-145: the user's own design answers (all 3 directions everywhere, mini

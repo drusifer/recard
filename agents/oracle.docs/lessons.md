@@ -756,6 +756,18 @@ This file contains critical lessons and rules derived from past errors, technica
   that reproduces what clipping actually breaks, and is now the pattern
   to reach for whenever a popup nests another popup/disclosure inside
   it, not `count()`/`isVisible()` alone.
+- **"Needs a live human to watch it" can sometimes be replaced by a real
+  (not synthetic) test player, not just accepted as a blocker.** US-146's
+  remote-cursor redesign had been queued since 2026-09-16 needing either
+  a live 2-person session or an explicit "ship it unverified." The user's
+  own answer broke that false binary: a dedicated harness test player
+  (`HarnessPeer.pointerDown`/`hoverPile`/`pointerUp`) drives real
+  `page.mouse` events over a real DOM position - genuinely exercising
+  the sender's own `pointermove` listener, not a synthetic dispatch -
+  across two real peers on the real protocol. That's neither "trust it
+  blind" nor "make a human watch every time": it's a repeatable,
+  automated proof of a live cross-client interaction. Worth reaching for
+  this pattern before accepting "needs a human" as the only two options.
 - **A real browser's `confirm()`/`alert()` blocks until a test answers
   it - Playwright auto-DISMISSES by default, so an unhandled `confirm()`
   silently returns `false`.** Writing `tests/resume.browser.mjs` hit

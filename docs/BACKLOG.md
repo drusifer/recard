@@ -116,15 +116,13 @@ or a live-verification session) versus being pickable directly.
   generalizing that same owner/opponent rendering split to piles inside
   a `PerPlayerZone` generally, not just the built-in Hand kind - a
   rendering-class change, not a data-model one, and pickable directly.
-- **Remote-cursor redesign** (Neo, queued; no back-compat) — replace
-  exact-coordinate/transform cursor mirroring with an animate-to-target
-  model (glide onto whatever pile/zone the other client's pointer just
-  entered, rather than following live pixel coordinates). Needs either
-  a live 2-person test session with the user watching, or an explicit
-  "ship it unverified, I accept the risk". The multi-player harness
-  (US-118/D135, `tests/harness/multiplayer.mjs`) now covers
-  cross-client STATE; motion/cursor assertions would need it extended
-  to `motion` messages.
+- ~~**Remote-cursor redesign**~~ SHIPPED (US-146/D168, 2026-09-30): the
+  sender broadcasts which PILE the pointer is over (not raw coordinates);
+  a receiver resolves that against its own DOM and glides the cursor
+  there via the pre-existing `.remote-cursor` CSS transition. Verified
+  the user's own way: no live human session - a dedicated harness test
+  player (`HarnessPeer.pointerDown`/`hoverPile`/`pointerUp`, real mouse
+  events) drove two real peers, `tests/remoteCursor.browser.mjs`.
 - **Pinch-to-zoom for the table-zoom wheel** (Neo) — the math exists
   and is unit-tested (`zoomFromPinch`, `src/tableZoom.js`) but is not
   wired to a live touch listener; no touch device available to verify
@@ -158,8 +156,9 @@ or a live-verification session) versus being pickable directly.
   a third cluster ever needs this, worth a small shared factory instead
   of a third bespoke pair.
 - **Multi-player harness follow-ups** (US-118 retro, 2026-09-18):
-  extend `tests/harness/multiplayer.mjs` to assert `motion` messages
-  (unblocks the remote-cursor redesign); `waitForView` predicates run
+  extend `tests/harness/multiplayer.mjs` to assert `motion` messages -
+  DONE for the remote cursor (US-146/D168, `pointerDown`/`hoverPile`/
+  `pointerUp`); card-drag `motion` sync is still unasserted. `waitForView` predicates run
   in-page and silently can't capture closures - a trap for test
   authors; `createTable` without `cardsPerPlayer` times out instead of
   failing fast; concurrent `bobp make` runs clobber each other's

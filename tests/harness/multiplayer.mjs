@@ -152,6 +152,27 @@ class HarnessPeer {
   }
 
   /**
+   * US-146/D168 test player: a real mouse-down/move/up sequence over a
+   * pile's own DOM position - not a synthetic event dispatch - so it
+   * drives `main.js`'s real `pointerdown`/`pointermove` listener exactly
+   * the way a person dragging over the table would. Three steps, not
+   * one, so a test can hover several piles across the SAME gesture,
+   * matching what a real drag does.
+   */
+  pointerDown() {
+    return this.page.mouse.down();
+  }
+
+  async hoverPile(pileId) {
+    const box = await this.page.locator(`[data-pile-id="${pileId}"]`).first().boundingBox();
+    await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  }
+
+  pointerUp() {
+    return this.page.mouse.up();
+  }
+
+  /**
    * This player's WebRTC protocol traffic (US-119), `{ type, limit }`.
    */
   traffic(options) {

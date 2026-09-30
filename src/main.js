@@ -240,24 +240,34 @@ const moveTracker = createStaleTracker((id) => { movingIds.delete(id); renderRos
 const cursorTracker = createStaleTracker((id) => removeRemoteCursor(gameScreenElement, id), MOTION_TTL_MS);
 const dragTracker = createStaleTracker((id) => removeDragGhost(gameScreenElement, id), MOTION_TTL_MS);
 
-// --- Live cursor (US-22, D13): while the pointer is down anywhere on
-// the game screen, broadcast its position normalized to that screen's
-// own bounding box (0-1 on each axis) - the only value that means the
-// same thing across devices with different viewport sizes. ---
+// --- Live cursor (US-22/D13, redesigned US-146/D168): while the pointer
+// is down anywhere on the game screen, broadcast which PILE (if any) it
+// is currently over - never raw coordinates. A fraction of the sender's
+// own screen has no correct meaning on a receiver's own, genuinely local
+// panel layout (D61/D68); a pile id does, resolved against the
+// receiver's OWN DOM in `applyIncomingMotion` below. ---
 const gameScreenElement = document.querySelector('#screen-game');
 let isPointerActive = false;
+// The pile last broadcast this gesture (or `null` for "no pile") - only
+// sent again on CHANGE, so entering/leaving a pile is one message, not
+// one per throttled tick. Reset on pointerup so the NEXT gesture always
+// sends its own first pile fresh, even if it happens to start over the
+// same one the last gesture ended on (whose broadcast a receiver's own
+// staleness timer may since have cleared).
+let lastHoveredPileId = null;
 gameScreenElement.addEventListener('pointerdown', () => {
   isPointerActive = true;
 });
 globalThis.addEventListener('pointerup', () => {
   isPointerActive = false;
+  lastHoveredPileId = null;
 });
 gameScreenElement.addEventListener('pointermove', (event) => {
   if (!isPointerActive || isSessionEnded()) return;
-  const rect = gameScreenElement.getBoundingClientRect();
-  const x = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
-  const y = Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height));
-  motionThrottler.schedule('cursor', { x, y });
+  const pileId = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-pile-id]')?.dataset.pileId ?? null;
+  if (pileId === lastHoveredPileId) return;
+  lastHoveredPileId = pileId;
+  motionThrottler.schedule('cursor', { pileId });
 });
 
 // --- Landing ---
@@ -1308,9 +1318,20 @@ function applyIncomingMotion(playerId, message) {
   }
   case 'cursor': {
     if (playerId === myId) return; // never render my own cursor back at me
-    updateRemoteCursor(gameScreenElement, playerId, resolvePlayerName(playerId), message.data.x, message.data.y);
+    // US-146/D168: resolved against THIS viewer's own DOM - a pile id
+    // means the same thing everywhere, unlike a raw screen fraction did.
+    // No id, or a pile this viewer doesn't render at all, removes the
+    // cursor outright - there is nothing correct to glide to.
+    const pileElement = message.data.pileId
+      ? gameScreenElement.querySelector(`[data-pile-id="${CSS.escape(message.data.pileId)}"]`)
+      : null;
+    if (!pileElement) {
+      removeRemoteCursor(gameScreenElement, playerId);
+      break;
+    }
+    updateRemoteCursor(gameScreenElement, playerId, resolvePlayerName(playerId), pileElement);
     markCursorStale(playerId);
-  
+
   break;
   }
   case 'card-lift': {

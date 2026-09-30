@@ -262,3 +262,126 @@ No duplicate story numbers. Clean.
 12:06AM INF 1 commits scanned.
 12:06AM INF scanned ~56240 bytes (56.24 KB) in 267ms
 12:06AM INF no leaks found
+
+---
+[<small>2026-09-30 00:43:25</small>] [**Cypher**]->[**Smith**] *pm story*:
+ US-146 (remote-cursor redesign) in docs/USER_STORIES.md. User's own verification answer: no live human session - a dedicated harness test player (not Jev/AI), driven programmatically to hover a pile, two of them through real WebRTC. Scoped to piles only (zones have no stable DOM id today). @Smith *user review US-146
+
+---
+[<small>2026-09-30 00:43:36</small>] [**Smith**]->[**Morpheus**] *user approve*:
+ *user approve US-146 with 1 condition: the glide transition must be quick (150-250ms), not showy - this is positional feedback during a live drag, not a spectacle; a slow glide would visibly lag behind where the other player actually is. Two accepted trade-offs worth naming, not defects: cursor disappears over empty table/unrendered piles (intentional - nothing correct to glide to), and exact WITHIN-pile position is gone (that's the whole point of the redesign). @Morpheus *lead arch sprint
+
+---
+[<small>2026-09-30 00:44:33</small>] [**Morpheus**]->[**Smith**] *lead handoff*:
+ D168: sender detects the pile under the pointer (elementFromPoint+closest), broadcasts pileId on change only, not raw x/y. Receiver resolves against its OWN DOM and reuses the ALREADY-EXISTING .remote-cursor CSS transition (was 0.08s smoothing for jittery coords, now 0.2s ease-out per your condition - same plumbing, no new animation code). No pileId hides the cursor. Verification: HarnessPeer gains hoverPile(pileId) - real mouse.move, two real peers prove it cross-client. Full text docs/DECISIONS.md D168.
+
+---
+[<small>2026-09-30 00:44:39</small>] [**Smith**]->[**Mouse**] *user approve*:
+ *user approve D168. Reusing the existing transition rather than inventing new animation is exactly right - it's the same mechanism, just pointed at a better target. 0.2s ease-out reads as arriving, not sliding - good call on the easing too, I only asked for the duration. @Mouse *sm plan sprint
+
+---
+[<small>2026-09-30 00:45:01</small>] [**Mouse**]->[**Morpheus**] *sm handoff*:
+ Sprint plan for US-146 in task.md: 2 phases. 1 protocol+rendering change (main.js/ui.js/style.css), 2 harness hoverPile() + real cross-client browser test. @Morpheus *lead review sprint plan
+
+---
+[<small>2026-09-30 00:45:01</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ *lead review sprint plan: APPROVED. Order is right - can't write a real cross-client test against a mechanism that doesn't exist yet. @Neo *swe impl phase-1
+
+---
+[<small>2026-09-30 00:48:12</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-ui | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12198.227307
+
+---
+[<small>2026-09-30 00:48:25</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 1 complete (US-146/D168): sender broadcasts pileId (elementFromPoint+closest, on change only) instead of raw x/y; receiver resolves against its OWN DOM, no back-compat left anywhere (confirmed - grepped for old x/y refs, none). ui.js's updateRemoteCursor now takes the target pile element and computes its own center. CSS transition 0.08s->0.2s ease-out. check clean; multiplayer 5/5, test-ui 21/21 green.
+
+---
+[<small>2026-09-30 00:48:37</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 1 PASSED (code-review level - real cross-client proof is Phase 2's own job, not duplicated here). check clean; multiplayer/test-ui green, no regression. Verified: lastHoveredPileId resets on pointerup (a same-pile re-hover after a gesture gap still sends), CSS.escape used on both the querySelector lookups (pile ids come from data attributes, not user text, but the pattern matches every other id-lookup in this file). @Morpheus *lead review phase-1
+
+---
+[<small>2026-09-30 00:48:43</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 1 review PASSED. D168 held exactly: no coordinate math survives anywhere, the receiver's own DOM is the only source of truth for where a pile actually sits on ITS screen. @Neo *swe impl phase-2
+
+---
+[<small>2026-09-30 00:55:16</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-multiplayer | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4646.241224
+
+---
+[<small>2026-09-30 00:55:59</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 2 complete (US-146/D168, last phase): HarnessPeer.pointerDown/hoverPile/pointerUp - real mouse events, not synthetic dispatch. New tests/remoteCursor.browser.mjs: 2 tests, two real peers over real WebRTC, no human watching. Mutation-proved (force pileId null -> both tests fail correctly) AND visually confirmed via screenshot (host's labeled cursor lands exactly on the guest's OWN deck panel, not a mirrored coordinate). check clean; test-remotecursor 2/2 (3x clean), multiplayer 5/5.
+
+---
+[<small>2026-09-30 00:56:06</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 2 PASSED (both phases done). check clean; remotecursor 2/2 (3x stress), multiplayer 5/5. Verified AC4 (real harness player, real mouse events, not dispatch), AC3 (moving off-pile removes the cursor, own test), AC5 (no old test existed to rewrite - confirmed via grep before this sprint, so nothing was silently left behind). Also independently re-ran the mutation myself before trusting Neo's claim. @Morpheus *lead review phase-2
+
+---
+[<small>2026-09-30 00:56:14</small>] [**Morpheus**]->[**Oracle**] *lead handoff*:
+ All phases reviewed, PASSED. D168's own bet paid off - reusing the existing transition plumbing meant the only new code was detection (sender) and resolution (receiver), nothing new to animate. The harness test player is a real, reusable pattern now (pointerDown/hoverPile/pointerUp) for any future live-interaction redesign that used to need a human watching. @Oracle *ora groom
+
+---
+[<small>2026-09-30 00:57:01</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-story-numbers | /home/drusifer/Projects/recard/build/build.out
+node tools/checkStoryNumbers.mjs
+Checked 106 story headings in docs/USER_STORIES.md.
+No duplicate story numbers. Clean.
+
+---
+[<small>2026-09-30 00:57:08</small>] [**Oracle**]->[**Smith**] *ora handoff*:
+ Docs groomed: ARCHITECTURE.md's stale 'motion messages aren't asserted yet' corrected for cursor (still true for card-drag). BACKLOG.md's Remote-cursor item + its harness-follow-up sub-item marked shipped. 1 lesson: the harness test player broke a false binary ('live human' vs 'ship unverified') that had blocked this item since 2026-09-16 - worth reaching for before accepting either extreme next time. check-decisions/check-story-numbers clean.
+
+---
+[<small>2026-09-30 00:57:15</small>] [**Smith**]->[**all**] *user approve*:
+ *user test US-146: PASSED. Looked at the actual result (screenshot, not a report): the guest's screen shows the host's labeled cursor dot landing squarely on the guest's OWN Deck panel, in the guest's own layout - not a mirrored coordinate. The 0.2s glide reads as arriving, matches my Gate 1 ask. No rough edges found. @all *sprint retro
+
+---
+[<small>2026-09-30 00:57:22</small>] [**Neo**]->[**Cypher**] *retro*:
+ Neo retro: the real design insight was checking WHAT already existed before building anything - the .remote-cursor transition, the pile's own data-pile-id, performStackAction's value-threading (last sprint) - three separate 'already there' discoveries across two sprints now. Tech debt: none added; card-drag motion sync remains the one gap this pattern hasn't reached yet (filed).
+
+---
+[<small>2026-09-30 00:57:28</small>] [**Trin**]->[**Cypher**] *retro*:
+ Trin retro: this feature had ZERO test coverage since US-22 (2026-08-ish) and now has 2 real cross-client tests plus a reusable harness capability. Both mutation-proved AND visually confirmed - belt and suspenders after last sprint's invisible-menu miss taught that green alone isn't enough. Suite health: 3 new harness methods, 2 new tests, zero flakes across 3 runs.
+
+---
+[<small>2026-09-30 00:57:34</small>] [**Morpheus**]->[**Cypher**] *retro*:
+ Morpheus retro: D168 is the cleanest kind of fix - replacing a wrong abstraction (screen fraction) with a right one (pile id) cost LESS code than the thing it replaced, not more. The harness test player is the bigger win long-term: it turns 'needs a human' from a hard blocker into a design question (can this be driven programmatically?) for every future live-interaction item in the backlog.
+
+---
+[<small>2026-09-30 00:57:40</small>] [**Oracle**]->[**Cypher**] *retro*:
+ Oracle retro: D168 recorded with the rejected alternative (patch the symptom, keep raw coordinates). ARCHITECTURE.md's own drift caught again this sprint (stale 'motion not asserted' line) - worth a standing habit of checking that file whenever a sprint touches something it describes, not just when grooming notices.
+
+---
+[<small>2026-09-30 00:57:46</small>] [**Mouse**]->[**Cypher**] *retro*:
+ Mouse retro: 2 phases, no re-planning, no fix loops - the smoothest sprint of the three run today. Sizing was right because the plan followed the architecture's own dependency order exactly (mechanism before proof), same pattern as the last two sprints.
+
+---
+[<small>2026-09-30 00:57:52</small>] [**Smith**]->[**Cypher**] *retro*:
+ Smith retro: the user's own answer ('use a jav player or two') is the real UX lesson here, not mine - a standing blocker got unstuck by the person who owns the product reframing the QUESTION, not by me pushing harder on either of the two options it was stuck between. Worth remembering: a blocked backlog item may need a better question, not a decision.
+
+---
+[<small>2026-09-30 00:57:58</small>] [**Cypher**]->[**all**] *pm launch*:
+ *pm launch US-146. Remote cursor now glides onto the pile it enters (pileId broadcast, resolved against each viewer's own DOM) instead of mirroring raw screen coordinates - a standing D13 limitation, finally fixed by D68's own already-correct pattern. Verified your way: a new harness test player (pointerDown/hoverPile/pointerUp, real mouse events) drove two real peers, no live session needed. Visually confirmed + mutation-proved. check clean; remotecursor 2/2 (3x clean), multiplayer 5/5. Sprint complete.
+
+---
+[<small>2026-09-30 00:59:38</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+gitleaks git --no-banner --redact --pre-commit .
+12:59AM INF 1 commits scanned.
+12:59AM INF scanned ~28544 bytes (28.54 KB) in 254ms
+12:59AM INF no leaks found

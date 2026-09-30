@@ -2445,3 +2445,28 @@ Phase 2: UI wiring - the enum control + preview icons
       for the preview-alongside-label requirement (AC2/Smith's condition)
 - [x] gate: bobp make check; test-ui 21/21 (3x stress-clean), test-rtg 16/16, headeractions 9/9,
       zonepanel 6/6 all green
+
+# Remote-cursor redesign (US-146, D168) — 2026-09-30
+
+Phase 1: protocol + rendering change
+- [x] main.js: pointermove sender detects the pile under the pointer (elementFromPoint+closest
+      on [data-pile-id]), broadcasts pileId on CHANGE only (lastHoveredPileId, reset on pointerup)
+- [x] main.js: applyIncomingMotion's 'cursor' case resolves pileId against the receiver's OWN
+      DOM; no pileId (or pile not rendered here) removes the cursor
+- [x] ui.js: updateRemoteCursor takes the target pile ELEMENT (not x/y), computes its own
+      on-screen center relative to the container
+- [x] style.css: .remote-cursor transition 0.08s -> 0.2s ease-out (Smith's condition)
+- [x] No back-compat: confirmed no leftover message.data.x/y references anywhere
+- [x] gate: bobp make check; test-multiplayer 5/5, test-ui 21/21 green
+
+Phase 2: harness test player + real cross-client proof
+- [x] tests/harness/multiplayer.mjs: HarnessPeer.pointerDown/hoverPile(pileId)/pointerUp - real
+      page.mouse down+move+up over a pile's own bounding box (not synthetic event dispatch)
+- [x] tests/remoteCursor.browser.mjs (new file): two real peers, host hovers the deck, guest's
+      own .remote-cursor is asserted to land on the GUEST's own deck panel position (not a
+      mirrored host-side coordinate); a second test proves moving off every pile removes it
+- [x] Mutation-proved: forcing pileId to always null fails both tests with the exact right
+      symptom (cursor never appears / never found to remove)
+- [x] Visually confirmed (screenshot, not just green tests): guest's screen shows the host's
+      labeled cursor dot centered exactly on the guest's own Deck panel
+- [x] gate: bobp make check; test-remotecursor 2/2 (3x stress-clean), test-multiplayer 5/5 green

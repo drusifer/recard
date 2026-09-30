@@ -70,11 +70,25 @@ Worth remembering: this is the sprint protocol's fix-loop working exactly as des
 own "always look, never read a test report" standing rule is what caught it, not a script.
 
 Plus a same-day nit (2026-09-30): stack gear icon moved top-right -> top-left, direct user
-request. .stack-gear right->left, verified geometrically + test-ui/test-rtg green.
+request. .stack-gear right->left, verified geometrically + test-ui/test-rtg green. (Both of the
+above already committed+pushed to dev/main as aed4eaa.)
+
+## Current Task (2026-09-30, later) - US-146/D168 SHIPPED (remote-cursor redesign)
+
+`/sprint move protocol backlog item` -> the "Remote-cursor redesign" backlog item, blocked since
+2026-08-16 on "needs a live human OR ship unverified." User reframed the question: "use a jav
+player or two" -> a dedicated harness test player (HarnessPeer.pointerDown/hoverPile/pointerUp,
+real mouse events, not synthetic dispatch), not a live session and not blind trust. Sender now
+broadcasts which pile the pointer is over (elementFromPoint+closest), receiver resolves against
+its OWN DOM and reuses the pre-existing .remote-cursor CSS transition (widened to 0.2s ease-out).
+No back-compat (user's own mid-sprint reminder - confirmed clean, no leftover x/y refs anywhere).
+2 new cross-client tests (tests/remoteCursor.browser.mjs), mutation-proved AND visually confirmed
+via screenshot. Smith's own retro line worth remembering: "a blocked backlog item may need a
+better question, not a decision."
 
 ## Next Steps
-1. User asked to commit + push all (dev + main) once done - covers US-144/D166, US-145/D167,
-   and the gear-reposition nit, all in one working tree.
+1. User's standing instruction: commit + push all (dev + main). Covers US-146/D168 - the only
+   thing still uncommitted (US-144/D166, US-145/D167, and the gear nit are already pushed).
 2. **Waiting on the user** (docs/BACKLOG.md, been open since the US-130 era): RtG's 5s quit grace vs
    its safe points; a bot that ignores SIGTERM (~11s worst-case shutdown).
 3. Cold start: read this file, then docs/BACKLOG.md top, then task.md tail, then ask what's next.

@@ -159,11 +159,16 @@ export function setCardLifted(pileableId, active) {
 }
 
 /**
- * Live remote cursor (US-22, D13): a small labeled dot positioned via
- * normalized (0-1) coordinates within `container` (the caller passes the
- * game screen element, matching how the position was captured).
+ * Live remote cursor (US-22/D13, redesigned US-146/D168): a small labeled
+ * dot that glides onto `pileElement`'s own on-screen center - resolved
+ * from THIS viewer's own DOM (the caller already looked `pileElement` up
+ * by id against its own rendering), never a coordinate carried over the
+ * wire. Positioned as a `container`-relative percentage (the existing
+ * normalized-position convention `updateDragGhost` also uses) so the
+ * `.remote-cursor` CSS transition animates the glide the same way it
+ * always has - only what it's aimed at has changed.
  */
-export function updateRemoteCursor(container, playerId, name, x, y) {
+export function updateRemoteCursor(container, playerId, name, pileElement) {
   let element = container.querySelector(`[data-cursor-id="${CSS.escape(playerId)}"]`);
   if (!element) {
     element = document.createElement('div');
@@ -175,6 +180,10 @@ export function updateRemoteCursor(container, playerId, name, x, y) {
     element.append(label);
     container.append(element);
   }
+  const containerRect = container.getBoundingClientRect();
+  const pileRect = pileElement.getBoundingClientRect();
+  const x = (pileRect.left + pileRect.width / 2 - containerRect.left) / containerRect.width;
+  const y = (pileRect.top + pileRect.height / 2 - containerRect.top) / containerRect.height;
   element.style.left = `${x * 100}%`;
   element.style.top = `${y * 100}%`;
 }

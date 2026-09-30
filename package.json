@@ -12,6 +12,7 @@
     "test:tablezoom": "node --test tests/tableZoom.browser.mjs",
     "test:focuszoom": "node --test tests/focusZoom.browser.mjs",
     "test:multiplayer": "node --test tests/multiplayer.browser.mjs",
+    "test:remotecursor": "node --test tests/remoteCursor.browser.mjs",
     "test:actionmenu": "node --test tests/actionMenu.browser.mjs",
     "test:zonepanel": "node --test tests/zonePanel.browser.mjs",
     "test:headeractions": "node --test tests/headerActions.browser.mjs",

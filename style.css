@@ -2177,7 +2177,12 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 
 /* Live remote cursor (US-22): light and labeled, not visually heavy even
-   with several players moving things at once (Smith Gate 1). */
+   with several players moving things at once (Smith Gate 1).
+   US-146/D168: the transition itself already existed (0.08s linear, tuned
+   to smooth jittery raw-coordinate updates) - widened to 0.2s ease-out
+   per Smith's Gate 1 condition ("quick, not showy") now that it carries
+   real meaning: a glide onto the pile the cursor entered, not just
+   smoothing between two nearby points. Same mechanism, better target. */
 .remote-cursor {
   position: absolute;
   z-index: 5;
@@ -2186,7 +2191,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   border-radius: 999px;
   background: var(--accent);
   pointer-events: none;
-  transition: left 0.08s linear, top 0.08s linear;
+  transition: left 0.2s ease-out, top 0.2s ease-out;
 }
 
 .remote-cursor-label {
