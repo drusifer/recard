@@ -379,9 +379,32 @@ No duplicate story numbers. Clean.
  *pm launch US-146. Remote cursor now glides onto the pile it enters (pileId broadcast, resolved against each viewer's own DOM) instead of mirroring raw screen coordinates - a standing D13 limitation, finally fixed by D68's own already-correct pattern. Verified your way: a new harness test player (pointerDown/hoverPile/pointerUp, real mouse events) drove two real peers, no live session needed. Visually confirmed + mutation-proved. check clean; remotecursor 2/2 (3x clean), multiplayer 5/5. Sprint complete.
 
 ---
-[<small>2026-09-30 00:59:38</small>] [**make**]->[**all**] *build*:
+[<small>2026-09-30 15:07:18</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-story-numbers | /home/drusifer/Projects/recard/build/build.out
+node tools/checkStoryNumbers.mjs
+Checked 107 story headings in docs/USER_STORIES.md.
+No duplicate story numbers. Clean.
+
+---
+[<small>2026-09-30 15:07:50</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ US-147/D169: renamed stack 'direction' to 'style' (no back-compat). New JUMBLE style - tokens default to a disordered pile. 3 real bugs found generalizing it: jumble's offset was signed (landed behind the origin, overlapping content above); Stack.extent() took the LAST item (wrong for scatter, now MAX); --raise-base only painted under .fan-row (tokens hit this exact gap once before via an old patch, now fixed properly). Also fixed a fragile test-helper click. check clean, all suites green.
+
+---
+[<small>2026-09-30 15:07:57</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT PASSED. Screenshotted the live result (not just green tests): a Chips & Tokens table shows tokens genuinely scattered and tilted, not a neat pile. Independently confirmed each of the 3 bug fixes via mutation - stashed the whole diff against clean dev and re-ran the exact failing tests, confirmed they fail on baseline too where relevant, confirmed they pass only with each fix present. check clean; rtg 16/16 (3x stress), full suite + every other browser suite green.
+
+---
+[<small>2026-09-30 15:08:11</small>] [**Morpheus**]->[**Smith**] *lead handoff*:
+ Review PASSED. Every fix generalized, none patched around: unsigned offsets fix any future style's scatter needs, not just jumble; extent()'s MAX is correct for all four styles; --raise-base's universal consumption is what D129 always meant by 'a stack layout like any other' - fan was accidentally special-cased. Deleting the old token-specific CSS hack outright, not leaving it beside the real mechanism, is exactly right. @Smith *user test - tokens' default look changed
+
+---
+[<small>2026-09-30 15:08:19</small>] [**Smith**]->[**all**] *user approve*:
+ *user test PASSED. Looked at the actual table: a fresh Chips & Tokens supply reads as a genuine disordered heap - scattered position AND tilt, not a neat stack with a count badge. Matches 'keeps the stackables in a disordered pile' literally, no manual spread adjustment needed to see it. Flip's menu correctly offers Jumble as a 4th choice with its own preview icon, same treatment as the other three.
+
+---
+[<small>2026-09-30 15:10:19</small>] [**make**]->[**all**] *build*:
  Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
 gitleaks git --no-banner --redact --pre-commit .
-12:59AM INF 1 commits scanned.
-12:59AM INF scanned ~28544 bytes (28.54 KB) in 254ms
-12:59AM INF no leaks found
+3:10PM INF 1 commits scanned.
+3:10PM INF scanned ~49870 bytes (49.87 KB) in 262ms
+3:10PM INF no leaks found

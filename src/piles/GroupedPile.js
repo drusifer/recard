@@ -77,9 +77,11 @@ export class GroupedPile extends Pile {
   static component = 'chip-tray';
 
   /** A tray is COLUMNS of stacked pieces, so its stacks run vertically
-   * (D129) - overridden once here for every grouped kind (chips,
-   * tokens, lands) rather than restated by each subclass. */
-  static stackDirection = VERTICAL;
+   * (D129) - overridden once here for every kind that actually extends
+   * this class (chips, lands) rather than restated by each subclass.
+   * `TokenPile` does NOT extend `GroupedPile` (see its own comment) and
+   * sets its own style (`jumble`, US-147) directly. */
+  static stackStyle = VERTICAL;
 
   /** Tighter stacking than a card fan may go (`Pile.maxSpread`, 0.85) -
    * a grouped supply reads by its TOP piece plus the coloured/valued
@@ -134,8 +136,8 @@ export class GroupedPile extends Pile {
     return {
       ...inserted,
       cards: withStackIds(this.constructor, sortedByGroupValue(this.constructor, inserted.cards)),
-      // D129: a grouped tray's stacks ALL run the kind's own direction,
-      // so the drop's direction hint is discarded exactly as its
+      // D129: a grouped tray's stacks ALL run the kind's own style,
+      // so the drop's layout hint is discarded exactly as its
       // membership hint already is - "organize by group" IS the
       // placement here. Without this, dropping a card onto one already
       // in a column recorded that column as horizontal (the base class

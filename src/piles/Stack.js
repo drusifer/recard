@@ -13,12 +13,13 @@
  * membership is a foreign key on the child rather than a nested
  * `pile.stacks` array that could disagree with it.
  *
- * A Stack owns the direction and spread and asks each Stackable where
- * it goes; it never computes an offset itself. The PILE chooses the
- * direction - a cascade is vertical, a run is horizontal - so that stays
- * polymorphic in the `Pile` hierarchy where the rest of the pile-kind
- * behaviour already lives, rather than becoming a flag anything
- * branches on here.
+ * A Stack owns the style and spread and asks each Stackable where it
+ * goes; it never computes an offset itself. The PILE chooses the style
+ * - a cascade is vertical, a run is horizontal, a token supply is a
+ * jumble (US-147) - so that stays polymorphic in the `Pile` hierarchy
+ * where the rest of the pile-kind behaviour already lives, rather than
+ * becoming a flag anything branches on here. (Renamed from "direction"
+ * - a style with no axis at all, like jumble, was never a direction.)
  *
  * This replaces `GroupedPile`'s render-time `groupByValue` derivation
  * and the per-card `layout: 'column'` flag, both of which it subsumes:
@@ -47,12 +48,12 @@ export const DEFAULT_STACK_KEY = '_default';
 export const stackKeyFor = (stackId) => (stackId === undefined ? DEFAULT_STACK_KEY : String(stackId));
 
 export class Stack {
-  /** @param {{id?: string, pileables: object[], direction: string,
+  /** @param {{id?: string, pileables: object[], style: string,
    *   spread?: number}} options - `pileables` are plain records, in the
    *   pile's own order; revived here so callers keep passing records. */
-  constructor({ id, pileables = [], direction = VERTICAL, spread = 0 } = {}) {
+  constructor({ id, pileables = [], style = VERTICAL, spread = 0 } = {}) {
     this.id = id;
-    this.direction = direction;
+    this.style = style;
     this.spread = spread;
     this.pileables = pileables.map((record) => pileableFor(record));
   }
@@ -73,15 +74,16 @@ export class Stack {
         // layout has to know how many it is placing.
         count: this.pileables.length,
         spread: this.spread,
-        direction: this.direction,
+        style: this.style,
       }),
     }));
   }
 
   /**
-   * How far the LAST thing in this stack sits from the origin, in the
-   * same stride multipliers - so the space the stack occupies is this
-   * plus exactly one thing, which the caller's CSS adds:
+   * How far the FARTHEST thing in this stack sits from the origin, on
+   * each axis independently, in the same stride multipliers - so the
+   * space the stack occupies is this plus exactly one thing, which the
+   * caller's CSS adds:
    *   `height: calc(var(--stack-extent-y) * (var(--card-h) +
    *      var(--card-gap)) + var(--card-h))`
    *
@@ -90,18 +92,33 @@ export class Stack {
    * viewport and tripped `lint:design`'s no-scroll invariant - so this
    * is deliberately derived from the SAME `layout()` the rendering
    * uses, never computed a second way from the count.
+   *
+   * MAX across every thing, not just the LAST one (US-147): true by
+   * construction for the three styles that lay things out along one
+   * monotonically-increasing axis (a later index is always farther),
+   * but jumble's per-index scatter (`Stackable.offsetIn`) is NOT
+   * monotonic - an earlier index can land farther out than the last
+   * one. Taking the last item's offset under-measured the box, and a
+   * jumbled thing that landed farther out than "the last one happened
+   * to" rendered outside the space the pile actually reserved for it
+   * (found live: RtG's token supply overlapped its own title bar).
+   * Correct for every style, not jumble-specific - a change worth
+   * making generally, not a special case bolted on beside it.
    */
   extent() {
     if (this.pileables.length === 0) return { x: 0, y: 0 };
-    const { x, y } = this.layout().at(-1);
-    return { x, y };
+    const offsets = this.layout();
+    return {
+      x: Math.max(...offsets.map((o) => o.x)),
+      y: Math.max(...offsets.map((o) => o.y)),
+    };
   }
 
   // US-145/D167: `flippedDirection()` (an implicit toggle) lived here -
-  // deleted outright once `SET_STACK_DIRECTION` (state.js) took an
-  // explicit target direction instead, which is what let the gear menu's
-  // Flip entry become a genuine 3-way Column/Row/Fan choice rather than
-  // a single "flip to the other one" button.
+  // deleted outright once `SET_STACK_STYLE` (state.js) took an
+  // explicit target style instead, which is what let the gear menu's
+  // Flip entry become a genuine multi-way Column/Row/Fan/Jumble choice
+  // rather than a single "flip to the other one" button.
 
   /**
    * What this stack offers in its own action menu, and which of those
@@ -154,13 +171,14 @@ export class Stack {
  * own, which is what keeps every ordinary single-stack pile a
  * single-stack pile with no placement data at all.
  *
- * DIRECTION IS PER STACK (direct user request: "make direction per
- * stack so we can all use one happy layout"). `pile.stacks` is a small
- * metadata map keyed by `stackId` - `{ [stackId]: { direction } }` -
- * and `direction` here is only the PILE'S DEFAULT, used by any stack
- * that never chose one.
+ * STYLE IS PER STACK (direct user request: "make direction per stack so
+ * we can all use one happy layout"; renamed "direction" -> "style",
+ * US-147, once a style with no axis - jumble - existed). `pile.stacks`
+ * is a small metadata map keyed by `stackId` - `{ [stackId]: { style } }`
+ * - and `style` here is only the PILE'S DEFAULT, used by any stack that
+ * never chose one.
  *
- * Metadata, deliberately, and nothing else: it carries direction, not
+ * Metadata, deliberately, and nothing else: it carries style, not
  * membership and not order. Membership stays each pileable's own
  * `stackId` and order stays `pile.cards`, so there is no state in
  * which the two can disagree about what is IN a stack. That was the
@@ -170,12 +188,12 @@ export class Stack {
  * card has moved away is simply unused; it never conjures a phantom
  * empty stack into the layout, because the stacks come from the cards.
  *
- * A pile-wide direction could not express one pile holding a vertical
+ * A pile-wide style could not express one pile holding a vertical
  * column beside a horizontal run - which is exactly what a battlefield
  * is - so it was the last thing forcing a second layout mechanism to
  * exist alongside this one.
  */
-export function stacksOf({ cards = [], stacks = {}, direction = VERTICAL, spread = 0 } = {}) {
+export function stacksOf({ cards = [], stacks = {}, style = VERTICAL, spread = 0 } = {}) {
   const groups = new Map();
   for (const record of cards) {
     const key = record?.stackId;
@@ -188,7 +206,7 @@ export function stacksOf({ cards = [], stacks = {}, direction = VERTICAL, spread
       return new Stack({
         id,
         pileables,
-        direction: meta?.direction ?? direction,
+        style: meta?.style ?? style,
         // Stack -> pile -> kind default, so a pile nobody has adjusted
         // looks exactly as it always did.
         spread: meta?.spread ?? spread,

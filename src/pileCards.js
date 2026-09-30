@@ -12,7 +12,7 @@ import { MAX_SPREAD, MIN_SPREAD } from './piles/Pile.js';
 import { PILE_TYPES, pileInstanceFor } from './piles/pileTypes.js';
 import { beginCardTargetPick, clearPileTargets, wireCardDrag, wireCardLiftCue } from './dragDrop.js';
 import { pileableFor } from './pileables/pileableTypes.js';
-import { VERTICAL, HORIZONTAL, FAN } from './pileables/Stackable.js';
+import { VERTICAL, HORIZONTAL, FAN, JUMBLE } from './pileables/Stackable.js';
 
 /**
  * The card SHELL, shared by every card face (D76). The `<button>`, its
@@ -149,10 +149,10 @@ function stackGearFor(stack, pileView, options) {
     // and bounds - the per-stack sibling of the pile-level menu's own
     // `rangeOptions.spread` (see the `<pile-panel>` call site).
     const rangeOptions = { spreadStack: { value: stack.spread, min: MIN_SPREAD, max: maxSpread } };
-    // US-145/D167: Flip's 3 choices + the stack's own current direction -
+    // US-145/D167: Flip's choices + the stack's own current style -
     // same "static spec, per-instance value at the call site" split
     // `changePileType`'s `enumOptions` already uses (`PileElement.js`).
-    const enumOptions = { flipStack: { value: stack.direction, choices: FLIP_DIRECTION_CHOICES } };
+    const enumOptions = { flipStack: { value: stack.style, choices: FLIP_STYLE_CHOICES } };
     openStackActionMenu(at.left, at.bottom, ids, disabled, pileView.id, stackKeyFor(stack.id), rangeOptions, enumOptions, options);
   });
   return gear;
@@ -160,30 +160,33 @@ function stackGearFor(stack, pileView, options) {
 
 /**
  * US-145/D167: a small literal illustration of 2-3 overlapping card
- * shapes, arranged the way `direction` would actually lay a stack out -
- * not a generic arrow glyph, per the user's own design answer. Pure DOM
+ * shapes, arranged the way `style` would actually lay a stack out - not
+ * a generic arrow glyph, per the user's own design answer. Pure DOM
  * construction (no measurement, no card content) - CSS does the actual
- * positioning per direction (`.stack-direction-preview-<direction>`,
- * `style.css`), the same "JS builds the box, CSS positions it" split
- * `Stackable.offsetIn`'s own stride-multiplier design already uses for
- * the real stack layout.
+ * positioning per style (`.stack-style-preview-<style>`, `style.css`),
+ * the same "JS builds the box, CSS positions it" split `Stackable.
+ * offsetIn`'s own stride-multiplier design already uses for the real
+ * stack layout. `jumble` (US-147) gets no dedicated per-card rule -
+ * `nth-child` positions are scattered/rotated generically, matching the
+ * "no axis" shape of the real layout (`Stackable.jumbleHash`).
  */
-function buildDirectionPreview(direction) {
+function buildStylePreview(style) {
   const preview = document.createElement('span');
-  preview.className = `stack-direction-preview stack-direction-preview-${direction}`;
+  preview.className = `stack-style-preview stack-style-preview-${style}`;
   preview.setAttribute('aria-hidden', 'true'); // decoration only - the choice's own label carries the meaning (Smith Gate 1)
   for (let index = 0; index < 3; index += 1) {
     const card = document.createElement('span');
-    card.className = 'stack-direction-preview-card';
+    card.className = 'stack-style-preview-card';
     preview.append(card);
   }
   return preview;
 }
 
-const FLIP_DIRECTION_CHOICES = [
-  { value: VERTICAL, label: 'Column', preview: () => buildDirectionPreview(VERTICAL) },
-  { value: HORIZONTAL, label: 'Row', preview: () => buildDirectionPreview(HORIZONTAL) },
-  { value: FAN, label: 'Fan', preview: () => buildDirectionPreview(FAN) },
+const FLIP_STYLE_CHOICES = [
+  { value: VERTICAL, label: 'Column', preview: () => buildStylePreview(VERTICAL) },
+  { value: HORIZONTAL, label: 'Row', preview: () => buildStylePreview(HORIZONTAL) },
+  { value: FAN, label: 'Fan', preview: () => buildStylePreview(FAN) },
+  { value: JUMBLE, label: 'Jumble', preview: () => buildStylePreview(JUMBLE) },
 ];
 
 /** The box one `Stack` lays itself out inside (D129): its own
@@ -248,15 +251,15 @@ export function renderPileCards(container, pileView, allPiles, options = {}) {
   // offset by this count, so depth 2 lands exactly one more step below
   // depth 1, same step size, chained by arithmetic instead of by flow.
   // D129: ONE layout for every pile. A pile is a row of `Stack`s, each
-  // running in its OWN direction (`pile.stacks[stackId].direction`,
-  // falling back to the kind's default), and every pileable is
-  // positioned from its own index within its stack. This replaced four
-  // hand-written CSS overlap formulas plus a `--column-depth` counter
-  // that existed only because cross-axis flex margins do not chain.
+  // running in its OWN style (`pile.stacks[stackId].style`, falling
+  // back to the kind's default), and every pileable is positioned from
+  // its own index within its stack. This replaced four hand-written CSS
+  // overlap formulas plus a `--column-depth` counter that existed only
+  // because cross-axis flex margins do not chain.
   const stacks = stacksOf({
     cards: pileView.cards,
     stacks: pileView.stacks,
-    direction: PILE_TYPES[pileView.kind]?.stackDirection,
+    style: PILE_TYPES[pileView.kind]?.stackStyle,
     spread: effectiveSpread(pileView),
   });
   const renderedStacks = [];

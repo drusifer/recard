@@ -137,10 +137,14 @@ test('every chip supply stacks via its own kind\'s defaultSpread, never a per-pr
 
 // REVERSED by direct user correction, follow-up *nit ("instead of a
 // stack it can be just a pile"): a token supply is an ordinary `Pile`
-// now, not `GroupedPile` - no stacking spread, no per-preset override
-// needed either way.
-test('a token supply is a plain pile - no stacking spread of its own', () => {
-  assert.equal(TokenPile.defaultSpread, 0);
+// now, not `GroupedPile` - no per-preset spread override needed either
+// way. US-147 (direct user request, "a new stack style called jumble...
+// make that the default for tokens") gave it its OWN non-zero default
+// spread rather than inheriting `Pile`'s 0 - at 0 a jumble looks like a
+// single token with the rest perfectly hidden underneath, the opposite
+// of "a disordered pile" as an out-of-the-box look (found live).
+test('a token supply is a plain pile, jumbled by its own default - no per-preset spread override needed', () => {
+  assert.equal(TokenPile.defaultSpread, 0.6);
   for (const preset of PRESETS) {
     const supplies = preset.piles?.filter((pile) => pile.kind === 'token') ?? [];
     for (const pile of supplies) {

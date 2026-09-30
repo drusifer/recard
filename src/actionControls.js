@@ -122,6 +122,20 @@ function buildEnumActionMenu(id, spec, { value, choices }, options) {
 
   const menu = document.createElement('div');
   menu.className = 'pile-action-menu';
+  // US-147 (found live, wiring Flip's 4th choice): the dropdown is
+  // `position: absolute` under the summary, so opening it never changes
+  // the ENCLOSING `<action-menu>` popup's own layout box - clamping that
+  // outer popup at open time (`ActionMenuElement`) cannot see this
+  // dropdown grow, because as far as layout is concerned it never does.
+  // Standard fix: flip the dropdown to open UPWARD when there is no room
+  // below, checked against the dropdown's own real rect once native
+  // `<details>` toggling has actually applied - the same "flip near an
+  // edge" pattern a native `<select>` already gives for free.
+  details.addEventListener('toggle', () => {
+    if (!details.open) { menu.classList.remove('pile-action-menu-flip-up'); return; }
+    const rect = menu.getBoundingClientRect();
+    if (rect.bottom > globalThis.innerHeight) menu.classList.add('pile-action-menu-flip-up');
+  });
   for (const choice of choices) {
     const item = document.createElement('button');
     item.type = 'button';

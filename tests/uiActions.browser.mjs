@@ -819,20 +819,20 @@ test('a stack gear opens that stack\'s own actions, and choosing Column/Row turn
   }, undefined, { timeout: 5000 });
 });
 
-test('Flip\'s three choices each show a preview alongside their label, never instead of it', async () => {
+test('Flip\'s choices each show a preview alongside their label, never instead of it', async () => {
   const page = fixture.page;
   const stack = page.locator('[data-kind="hand"] .card-stack').first();
   await stack.locator('.stack-gear').click();
   const menu = page.locator('.stack-action-menu');
   await menu.locator('.pile-action-enum-btn').click();
   const rows = menu.locator('.pile-action-menu-item');
-  assert.equal(await rows.count(), 3, 'Column, Row, Fan - all three, always');
-  for (const label of ['Column', 'Row', 'Fan']) {
+  assert.equal(await rows.count(), 4, 'Column, Row, Fan, Jumble - all four, always (US-147)');
+  for (const label of ['Column', 'Row', 'Fan', 'Jumble']) {
     const row = rows.filter({ hasText: label });
     assert.equal(await row.count(), 1, `${label} choice is present`);
     // Smith Gate 1 condition (WCAG 1.4.1): the preview is decoration
     // ALONGSIDE the text, never a replacement for it.
-    assert.equal(await row.locator('.stack-direction-preview').count(), 1, `${label} has a preview icon`);
+    assert.equal(await row.locator('.stack-style-preview').count(), 1, `${label} has a preview icon`);
     assert.ok((await row.textContent()).includes(label), `${label}'s own text label is still there, not just the icon`);
     // Found live (not anticipated): the outer action-menu popup reuses
     // `.pile-action-menu`'s own classname for ITS shell, whose

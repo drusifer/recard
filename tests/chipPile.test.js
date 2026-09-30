@@ -433,7 +433,7 @@ test('a preset-built chip tray produces one stack per denomination, with real of
   const stacks = stacksOf({
     cards: built.cards,
     stacks: built.stacks,
-    direction: PILE_TYPES.chip.stackDirection,
+    style: PILE_TYPES.chip.stackStyle,
     spread: PILE_TYPES.chip.defaultSpread,
   });
   assert.ok(stacks.length > 1, 'a mixed tray is more than one stack');

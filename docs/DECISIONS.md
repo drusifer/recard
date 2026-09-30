@@ -70,6 +70,70 @@ D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rul
 
 ---
 
+### D169. Stack "direction" renamed "style"; a new Jumble style, real bugs found generalizing it
+
+US-147: direct user request. Renaming `direction` to `style` throughout
+(`Stackable.offsetIn`, `Stack`, `stacksOf`, `Pile.stackStyle`,
+`SET_STACK_STYLE`, the Flip menu's internals, the CSS preview classes) -
+no back-compat, every reference and every test rewritten, with care not
+to touch the WORD "direction" where it names something else entirely in
+the same files (card-flip direction, rank-adjacent either-direction, tap
+orientation - all left alone).
+
+**Jumble** (`Stackable.JUMBLE`): no axis - every thing sits at the
+stack's own origin with a small, deterministic per-index scatter/tilt
+(a seed-only sine hash, `jumbleHash`, not `Math.random()` - a re-render
+must not reshuffle a pile that hasn't changed). `TokenPile.stackStyle =
+JUMBLE`, replacing `Pile`'s inherited horizontal-row default.
+
+**Three real structural bugs found live, generalizing this - not one-off
+patches, each fixed at the root:**
+
+1. **Jumble's offset was SIGNED (`-1..1`) at first** - a thing could land
+   BEHIND the stack's own origin, outside the box the pile reserves for
+   it, overlapping whatever renders above/before the pile (found live:
+   RtG's token supply overlapped its own title bar). Fixed by making
+   position jitter UNSIGNED (`jumbleHash`, `[0, 1)`) - every style now
+   only ever extends FORWARD from the origin, which is what let a pile
+   size itself from its own layout in the first place. Rotation stays
+   signed (no layout consequence, free to tilt either way).
+2. **`Stack.extent()` took the LAST thing's offset** as "how far this
+   stack reaches" - true by construction for the three styles that lay
+   things out along one monotonically-increasing axis, but jumble's
+   per-index scatter is NOT monotonic. Fixed to take the MAX across
+   every thing on each axis independently - correct for every style, not
+   a jumble-specific branch bolted on beside the existing behaviour.
+3. **`--raise-base` was only ever CONSUMED (as a real `transform`) by
+   `.fan-row .middle-card`** - setting the custom property alone paints
+   nothing outside a fan. The token pile had ALREADY hit this exact gap
+   once before (a small `nth-child`-cycled ad-hoc decoration existed
+   specifically to patch it for tokens) - deleting that ad-hoc rule
+   without noticing what it was actually doing left jumble's own
+   rotation computing correctly but never painting, the identical
+   failure mode recurring. Fixed at the root this time: `transform: var
+   (--raise-base, none)` moved onto the UNIVERSAL `.card-stack >
+   .middle-card` rule, so any style that reports a rotation paints one,
+   not just fan's - `.fan-row`'s own rule now only overrides
+   `transform-origin` (bottom-center pivot), nothing else.
+
+A fourth issue, found the same way (running it, not reading it): a test
+helper (`moveTo`, `rtgPlaythrough.browser.mjs`) clicked a pile title's
+whole bounding-box CENTER to trigger "move here" - fragile whenever a
+busy header (title + rename + the Tighten/Loosen slider every pile with
+2+ items now offers) has another interactive element sitting within
+that same box. Jumble's real 2D scatter shifted enough page layout
+elsewhere to newly expose it. Fixed by clicking the title's own stable
+`.zone-name-text` label instead of the whole header's box - general
+robustness, not jumble-specific.
+
+**Rejected:** leaving the old ad-hoc token-jumble CSS decoration in
+place alongside the new real style - exactly the render-mechanics
+special case this project's own standing principle (model the domain,
+not the pixels) argues against, and it would have doubly-applied once
+the real mechanism worked.
+
+---
+
 ### D168. Remote cursor broadcasts a `pileId`, not raw coordinates; a harness test player drives it
 
 US-146: D13's live cursor never got the fix D68 later gave the card-drag

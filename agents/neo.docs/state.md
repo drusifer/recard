@@ -57,12 +57,46 @@ branch inline - that missed call is WHY enum never worked as a stack action befo
 
 check clean, test-ui 21/21 (3x stress-clean), rtg/headeractions/zonepanel green throughout.
 
+## Current Task (2026-09-30, later) - US-147/D169 SHIPPED: stack direction -> style + Jumble
+
+`/bloop rename stack_direction to stack_style... add jumble... default for tokens`. Renamed the
+whole "direction" concept to "style" throughout (Stackable/Stack/Pile/state.js/pileCards.js/CSS
+class names), no back-compat - careful not to touch UNRELATED "direction" words in the same
+files (card-flip, rank-adjacent, tap orientation). Added JUMBLE (Stackable.js): deterministic
+per-index scatter+tilt via a seed-only sine hash, not Math.random. TokenPile.stackStyle = JUMBLE
++ its own defaultSpread=0.6 (Pile's own 0 would collapse a jumble to looking like one token).
+
+**3 real structural bugs found live generalizing this, not patched around:**
+1. Jumble's offset was signed - could land BEHIND the stack's own origin, overlapping content
+   ABOVE the pile (found live: RtG's token supply overlapped its own title bar). Fixed: unsigned
+   position jitter (rotation stays signed - no layout consequence).
+2. Stack.extent() took the LAST item's offset - correct by construction for monotonic styles,
+   wrong for jumble's non-monotonic scatter. Fixed: MAX across every item, each axis, for all
+   styles (not a jumble-only branch).
+3. `--raise-base` was only ever CONSUMED (as a real `transform`) by `.fan-row` - the token pile
+   had ALREADY hit this exact gap once before (an old ad-hoc nth-child CSS patch existed just for
+   it). Deleting that patch without replacing the underlying gap left jumble's rotation computing
+   correctly but never painting - same failure, recurring. Fixed at the root: moved `transform:
+   var(--raise-base, none)` onto the UNIVERSAL `.card-stack > .middle-card` rule.
+
+Also found+fixed: a test helper (`moveTo`, rtgPlaythrough.browser.mjs) clicked a pile title's
+whole bounding-box center - fragile whenever a busy header (title+rename+Tighten/Loosen slider)
+has another control in that same box. Jumble's real 2D scatter shifted page layout just enough to
+expose it. Fixed: click the title's own stable `.zone-name-text` label instead.
+
+Verification style worth remembering: git-stashed the WHOLE diff against clean dev and re-ran
+each failing test against the untouched baseline before trusting any "this is caused by my
+change" theory - caught that the .pile-title/slider overlap was pre-existing (a red herring) and
+that the REAL regressions were exactly the 3 bugs above, nothing else.
+
+check clean, full unit suite (1195) + every browser suite (rtg 3x stress, ui, multiplayer,
+reconnect, hostsetup, headeractions, zonepanel, actionmenu, pileelement, spectator, remotecursor)
+all green. Visually confirmed (screenshot) both the token-jumble look and Flip's new 4th choice.
+
 ## Next Steps
-Nothing assigned. Not committed yet - see agents/cypher.docs/state.md (2 sprints uncommitted:
-US-144/D166 host-setup split + US-145/D167 Flip redesign). Otherwise await the user's next
-direction, or pick up docs/BACKLOG.md's Technical/testing section (multi-player harness
-follow-ups, Gin bot tuning, read()/patch() consolidation candidate) or the queued nit (stack
-gear icon to upper-left corner).
+Nothing assigned. Not committed yet. Otherwise await the user's next direction, or pick up
+docs/BACKLOG.md's Technical/testing section (multi-player harness follow-ups, Gin bot tuning,
+read()/patch() consolidation candidate) or the still-open card-drag motion sync gap.
 
 ## Previous - (2026-09-25) - US-130: impl + 2 real bugs found by the browser test going intermittently red
 

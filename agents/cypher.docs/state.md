@@ -86,9 +86,19 @@ No back-compat (user's own mid-sprint reminder - confirmed clean, no leftover x/
 via screenshot. Smith's own retro line worth remembering: "a blocked backlog item may need a
 better question, not a decision."
 
+## Current Task (2026-09-30, later still) - US-147/D169 SHIPPED (stack direction -> style + Jumble)
+
+`/bloop`: renamed the "direction" concept to "style" throughout the Stack/Stackable/Pile system
+(no back-compat), added a real JUMBLE stack style, made it the token supply's default (with its
+own non-zero defaultSpread so it actually LOOKS jumbled, not just after a manual spread bump).
+3 real structural bugs found and fixed while generalizing it (see agents/neo.docs/state.md for
+full detail) - none patched around, all fixed at the root and verified via git-stash-vs-baseline
+comparison before trusting any "caused by my change" theory. Full Neo->Trin->Morpheus->Smith
+Bloop chain in CHAT.md; Smith's UX gate confirmed the live look matches the user's literal ask.
+
 ## Next Steps
-1. User's standing instruction: commit + push all (dev + main). Covers US-146/D168 - the only
-   thing still uncommitted (US-144/D166, US-145/D167, and the gear nit are already pushed).
+1. User's standing instruction: commit + push all (dev + main). Covers US-147/D169 - the only
+   thing still uncommitted (everything before it this session is already pushed).
 2. **Waiting on the user** (docs/BACKLOG.md, been open since the US-130 era): RtG's 5s quit grace vs
    its safe points; a bot that ignores SIGTERM (~11s worst-case shutdown).
 3. Cold start: read this file, then docs/BACKLOG.md top, then task.md tail, then ask what's next.

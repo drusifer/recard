@@ -4730,3 +4730,44 @@ actually lands ON) - pickable later if a real need shows up. Pinch/touch
 motion - desktop-only per standing convention. The card-drag ghost
 (`updateDragGhost`) is a separate, already-correct mechanism (D68's own
 fix) and is untouched.
+
+### US-147: stack "direction" is renamed "style", and a new Jumble style exists
+**As** someone extending the stack layout system, **I want** the concept
+`direction` renamed to `style` (since a style with no axis at all -
+jumble - was never a direction), and a new Jumble style that scatters a
+pile's things into a disordered heap, **so that** the vocabulary
+actually fits what it names, and a token supply reads as a loose pile
+someone reaches into rather than a neat row.
+
+**AC:**
+1. Every identifier for this concept is renamed, no back-compat: the
+   `Stackable.offsetIn` param, `Stack`'s own field, `stacksOf`'s param,
+   `Pile.stackDirection` -> `stackStyle`, the `SET_STACK_DIRECTION`
+   reducer action -> `SET_STACK_STYLE`, `pile.stacks[key].direction` ->
+   `.style`, the Flip menu's internals (`FLIP_DIRECTION_CHOICES` ->
+   `FLIP_STYLE_CHOICES`, `buildDirectionPreview` -> `buildStylePreview`),
+   and the CSS preview classes (`.stack-direction-preview-*` ->
+   `.stack-style-preview-*`). Prose describing an UNRELATED "direction"
+   (card-flip direction, rank-adjacent either-direction, tap orientation)
+   is left alone - only the stack-layout concept is renamed.
+2. `JUMBLE` is a fourth real style (`Stackable.js`): every thing in the
+   stack sits at the stack's own origin with a small, DETERMINISTIC
+   per-index scatter and tilt (not `Math.random()` - a re-render must
+   not reshuffle a pile that hasn't changed). `spread` scales the
+   scatter (0 collapses to the origin, 1 is the fullest jumble), so
+   Tighten/Loosen means something here too.
+3. `TokenPile.stackStyle = JUMBLE` - a token supply defaults to a
+   disordered pile, not `Pile`'s base horizontal row. `TokenPile` also
+   gets its own non-zero `defaultSpread` (not `Pile`'s 0) so a fresh
+   supply actually LOOKS jumbled out of the box, not just after a host
+   manually raises the spread slider.
+4. Flip's gear-menu choice list offers Jumble as a fourth option
+   (Column/Row/Fan/Jumble), with the same preview-alongside-label
+   treatment (US-145/D167) as the other three.
+5. `bobp make check` + the full browser suite stay green; every test
+   asserting the old vocabulary is rewritten against the new one, not
+   kept alongside it.
+
+**Out of scope:** zones getting their own jumble-like style (not asked);
+per-preset spread overrides for jumble (US-147's own default is enough,
+no preset needs one).

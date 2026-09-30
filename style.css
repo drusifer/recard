@@ -549,33 +549,16 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   border-color: rgba(180, 240, 200, 0.4);
 }
 
-/* *nit (direct user request, "jumble them up in a pile"): a scattered
-   handful of beads, not a neat aligned row - each position gets a
-   small fixed rotate+drift via `--raise-base` (the SAME composable
-   base transform `.fan-row`'s per-card rotation already uses, so
-   hover-raise still adds cleanly on top instead of replacing this).
-   `nth-child` cycling rather than a real per-card random value: fully
-   deterministic (same look every render, no test flakiness / no
-   layout jitter on re-render) while still reading as scattered rather
-   than mechanically repeating - 7 steps so a run of same-colour beads
-   never lands on the exact same offset twice in a row. */
-/* `--raise-base` is only CONSUMED by `.fan-row .middle-card` at rest
-   (below) - setting the custom property alone (the nth-child rules
-   under this one) does nothing outside a fan, since a plain `.card-row`
-   never reads it. Same pattern, scoped to a token pile specifically -
-   found live: the jumble offsets were computing correctly (confirmed
-   via `getComputedStyle`) but never painting, because nothing told a
-   plain row to apply them. */
-.pile-section[data-kind="token"] .middle-card {
-  transform: var(--raise-base, none);
-}
-.pile-section[data-kind="token"] .middle-card:nth-child(7n+1) { --raise-base: rotate(-9deg) translate(-2px, 1px); }
-.pile-section[data-kind="token"] .middle-card:nth-child(7n+2) { --raise-base: rotate(6deg) translate(2px, -2px); }
-.pile-section[data-kind="token"] .middle-card:nth-child(7n+3) { --raise-base: rotate(-4deg) translate(1px, 2px); }
-.pile-section[data-kind="token"] .middle-card:nth-child(7n+4) { --raise-base: rotate(11deg) translate(-1px, -1px); }
-.pile-section[data-kind="token"] .middle-card:nth-child(7n+5) { --raise-base: rotate(-13deg) translate(2px, 1px); }
-.pile-section[data-kind="token"] .middle-card:nth-child(7n+6) { --raise-base: rotate(3deg) translate(-2px, -1px); }
-.pile-section[data-kind="token"] .middle-card:nth-child(7n+7) { --raise-base: rotate(-6deg) translate(1px, 2px); }
+/* US-147: the ad-hoc "jumble them up in a pile" decoration that used to
+   live here - a small FIXED `nth-child`-cycled rotate+drift, composed
+   on top of whatever the pile's real position already was - is deleted
+   outright, no back-compat. It was exactly the render-mechanics special
+   case this project's own standing principle argues against (model the
+   domain, not the pixels): a real `JUMBLE` stack style now exists
+   (`Stackable.js`, `TokenPile.stackStyle`) that positions AND rotates
+   each token FOR REAL, per its own deterministic per-index hash, the
+   same way every other style already does - nothing token-specific
+   left to compose here at all. */
 
 /* A chip tray (direct user correction: "stacked chips should be in
    separate piles by denomination. currently you are drawing them in an
@@ -636,15 +619,23 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   margin: 0;
   left: calc(var(--stack-x, 0) * (var(--card-w) + var(--card-gap)));
   top: calc(var(--stack-y, 0) * (var(--card-h) + var(--card-gap)));
-  /* A fan's lean comes from the layout, through the SAME `--raise-base`
-     seam the hover-raise already composes on top of - so a raised card
-     in a hand keeps its angle instead of snapping upright. Not a
-     fan-specific rule, because a fan is a stack layout like any other
-     now; `--stack-rotate` is simply absent (and the default applies)
-     for the two layouts that do not rotate. The token pile's own
-     scatter still overrides this with a more specific selector, as it
-     always did. */
+  /* A fan's lean (and a jumble's tilt, US-147) comes from the layout,
+     through the SAME `--raise-base` seam the hover-raise already
+     composes on top of - so a raised card in a hand keeps its angle
+     instead of snapping upright. Not a fan-specific rule, because a fan
+     is a stack layout like any other now; `--stack-rotate` is simply
+     absent (and the default applies) for the two layouts that do not
+     rotate. */
   --raise-base: rotate(var(--stack-rotate, 0deg));
+  /* US-147, found live (twice - once for the token pile's own earlier
+     ad-hoc fix, now generalized): setting the custom property alone
+     does nothing - only `.fan-row .middle-card` (below) ever actually
+     APPLIED it as a real `transform`, so jumble's rotation computed
+     correctly but never painted for a plain (non-fan) row, the exact
+     same gap the deleted token-specific rule used to patch one kind at
+     a time. Applying it HERE, universally, is the actual fix - any
+     style that reports a rotation now paints one, not just fan's. */
+  transform: var(--raise-base, none);
 }
 
 /* Which END a stack grows from. Everything grows down/right, except a
@@ -882,16 +873,12 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    on top of that. */
 .fan-row .middle-card {
   /* Fan pivot (US-30): rotates from the bottom, like cards actually held
-     in a hand, not around the wrapper's own center. */
+     in a hand, not around the wrapper's own center - every OTHER style
+     (including jumble, US-147) keeps the default origin (dead center),
+     which is the only thing fan-specific left here now that `transform:
+     var(--raise-base, none)` itself is the universal `.card-stack >
+     .middle-card` rule's own job, not restated per style. */
   transform-origin: bottom center;
-  /* D51 follow-up: the fan spread (per-card rotate/translateY, set as
-     the `--raise-base` custom property in `renderZoneCards`'s `opts.fan`
-     branch) applies through this plain class rule rather than an inline
-     `transform`, so the shared `.pile-hover-host:hover` rule (also
-     class-based) can compose its own raise on top instead of losing to
-     an inline style regardless of specificity - same pattern `.seat-zone`
-     uses. */
-  transform: var(--raise-base, none);
 }
 
 /* D129: the generic row overlap rule that used to live here is GONE.
@@ -2771,6 +2758,20 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
   overflow: hidden;
 }
+/* US-147: found live wiring Flip's 4th choice - opening the dropdown
+   never changes its OWN parent's layout box (it's `position: absolute`),
+   so the enclosing popup's one-time open-time clamp can't see it grow
+   and a 4-item menu near the bottom of the screen ran off past the
+   viewport. `buildEnumActionMenu` adds this class once the dropdown's
+   own real rect (checked on the native `toggle` event, once it's
+   actually open) would extend past the viewport bottom - the same
+   "flip near an edge" a native `<select>` gives for free. */
+.pile-action-menu-flip-up {
+  top: auto;
+  bottom: 100%;
+  margin-top: 0;
+  margin-bottom: 0.2rem;
+}
 .pile-action-menu-item {
   min-height: 44px;
   padding: 0 0.75rem;
@@ -2801,21 +2802,22 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   content: ' ✓';
 }
 
-/* US-145/D167: Flip's 3 choices (`buildEnumActionMenu`'s optional
-   `choice.preview`) get a small literal illustration of the resulting
-   arrangement beside their label - never instead of it (Smith Gate 1,
-   WCAG 1.4.1: the word is the real signal, the picture is decoration,
-   `aria-hidden` on the preview itself says so structurally too). A
-   fixed box just large enough for 3 tiny "cards"; CSS positions them
-   per direction, the same "JS builds, CSS positions" split the real
-   stack layout math (`Stackable.offsetIn`) already uses. */
-.stack-direction-preview {
+/* US-145/D167 (renamed direction -> style, US-147): Flip's choices
+   (`buildEnumActionMenu`'s optional `choice.preview`) get a small
+   literal illustration of the resulting arrangement beside their label
+   - never instead of it (Smith Gate 1, WCAG 1.4.1: the word is the real
+   signal, the picture is decoration, `aria-hidden` on the preview
+   itself says so structurally too). A fixed box just large enough for
+   3 tiny "cards"; CSS positions them per style, the same "JS builds,
+   CSS positions" split the real stack layout math (`Stackable.
+   offsetIn`) already uses. */
+.stack-style-preview {
   position: relative;
   flex: none;
   width: 1.5rem;
   height: 1.3rem;
 }
-.stack-direction-preview-card {
+.stack-style-preview-card {
   position: absolute;
   width: 0.6rem;
   height: 0.85rem;
@@ -2823,17 +2825,25 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   border-radius: 1px;
   opacity: 0.85;
 }
-.stack-direction-preview-vertical .stack-direction-preview-card:nth-child(1) { top: 0; left: 0.45rem; }
-.stack-direction-preview-vertical .stack-direction-preview-card:nth-child(2) { top: 0.225rem; left: 0.45rem; }
-.stack-direction-preview-vertical .stack-direction-preview-card:nth-child(3) { top: 0.45rem; left: 0.45rem; }
+.stack-style-preview-vertical .stack-style-preview-card:nth-child(1) { top: 0; left: 0.45rem; }
+.stack-style-preview-vertical .stack-style-preview-card:nth-child(2) { top: 0.225rem; left: 0.45rem; }
+.stack-style-preview-vertical .stack-style-preview-card:nth-child(3) { top: 0.45rem; left: 0.45rem; }
 
-.stack-direction-preview-horizontal .stack-direction-preview-card:nth-child(1) { top: 0.225rem; left: 0; }
-.stack-direction-preview-horizontal .stack-direction-preview-card:nth-child(2) { top: 0.225rem; left: 0.45rem; }
-.stack-direction-preview-horizontal .stack-direction-preview-card:nth-child(3) { top: 0.225rem; left: 0.9rem; }
+.stack-style-preview-horizontal .stack-style-preview-card:nth-child(1) { top: 0.225rem; left: 0; }
+.stack-style-preview-horizontal .stack-style-preview-card:nth-child(2) { top: 0.225rem; left: 0.45rem; }
+.stack-style-preview-horizontal .stack-style-preview-card:nth-child(3) { top: 0.225rem; left: 0.9rem; }
 
-.stack-direction-preview-fan .stack-direction-preview-card:nth-child(1) { top: 0.4rem; left: 0.1rem; transform: rotate(-18deg); }
-.stack-direction-preview-fan .stack-direction-preview-card:nth-child(2) { top: 0.25rem; left: 0.45rem; }
-.stack-direction-preview-fan .stack-direction-preview-card:nth-child(3) { top: 0.4rem; left: 0.8rem; transform: rotate(18deg); }
+.stack-style-preview-fan .stack-style-preview-card:nth-child(1) { top: 0.4rem; left: 0.1rem; transform: rotate(-18deg); }
+.stack-style-preview-fan .stack-style-preview-card:nth-child(2) { top: 0.25rem; left: 0.45rem; }
+.stack-style-preview-fan .stack-style-preview-card:nth-child(3) { top: 0.4rem; left: 0.8rem; transform: rotate(18deg); }
+
+/* US-147: Jumble's preview scatters its 3 "cards" off-centre and tilts
+   them, echoing the real layout's own "no axis, small deterministic
+   scatter" shape (`Stackable.jumbleHash`) - a fixed illustration here,
+   not computed, since a preview icon has no `index` to hash. */
+.stack-style-preview-jumble .stack-style-preview-card:nth-child(1) { top: 0.1rem; left: 0.2rem; transform: rotate(-12deg); }
+.stack-style-preview-jumble .stack-style-preview-card:nth-child(2) { top: 0.35rem; left: 0.55rem; transform: rotate(15deg); }
+.stack-style-preview-jumble .stack-style-preview-card:nth-child(3) { top: 0.15rem; left: 0.75rem; transform: rotate(-6deg); }
 
 /* US-100/D101: the card right-click menu (`ui.js`'s `openCardContextMenu`)
    reuses `.pile-action-menu`/`.pile-action-menu-item` above verbatim for

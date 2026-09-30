@@ -40,8 +40,10 @@
  */
 import { Pileable } from './Pileable.js';
 
-/** The two directions a stack can run. A cascade is vertical, a run is
- * horizontal; there is no third, and nothing accepts a free string. */
+/** The two straight-line styles a stack can run. A cascade is vertical,
+ * a run is horizontal. (Renamed from "direction" - US-147: once a
+ * style with no axis at all exists, calling the field that picks
+ * between them a "direction" stopped fitting even the two that have one.) */
 export const VERTICAL = 'vertical';
 export const HORIZONTAL = 'horizontal';
 
@@ -57,6 +59,45 @@ export const HORIZONTAL = 'horizontal';
  * from another - the last place two layout mechanisms coexisted.
  */
 export const FAN = 'fan';
+
+/**
+ * A jumble: no axis at all - every thing sits at the stack's own
+ * origin with a small, DETERMINISTIC per-index scatter and tilt, so it
+ * reads as a disordered heap rather than a line or an arc (US-147,
+ * direct user request: "a new stack style called jumble that keeps the
+ * stackables in a disordered pile"). Deterministic on `index` alone
+ * (`jumbleHash`, below) rather than `Math.random()` - a re-render must
+ * not reshuffle a pile that hasn't actually changed, the same
+ * first-appearance stability `stacksOf` already gives stack membership.
+ * `spread` still scales the scatter (0 collapses everything onto the
+ * origin; 1 is the fullest jumble), so Tighten/Loosen keeps meaning
+ * something here too, not just for the three axis-based styles.
+ */
+export const JUMBLE = 'jumble';
+
+/** How far a jumbled thing may land from the stack's own origin, along
+ * each axis, as a fraction of one stride, at full spread. */
+const JUMBLE_MAX_OFFSET = 0.6;
+
+/**
+How far a jumbled thing may tilt, in degrees, at full spread.
+*/
+const JUMBLE_MAX_ROTATE_DEG = 20;
+
+/**
+ * A cheap, seed-only pseudo-random generator (the classic GLSL sine
+ * hash) - deterministic in `seed` alone, no state, no dependency. Three
+ * calls per index (`salt` 1/2/3) give x/y/rotate values that don't
+ * correlate with each other the way three calls to the SAME seed would.
+ */
+function jumbleHash(seed) {
+  const value = Math.sin(seed * 12.9898) * 43_758.5453;
+  return value - Math.floor(value); // fractional part only, in [0, 1)
+}
+
+/** `jumbleHash` mapped from [0, 1) to [-1, 1] - for ROTATION only,
+ * which can tilt either way with no layout consequence. */
+const jumbleSigned = (seed) => jumbleHash(seed) * 2 - 1;
 
 /**
  * Degrees of lean per card away from the centre of a fan.
@@ -119,13 +160,15 @@ export class Stackable extends Pileable {
    * Where this thing sits in its stack, relative to the stack's own
    * origin, as UNITLESS STRIDE MULTIPLIERS on each axis.
    *
-   * ONE formula, both directions: a thing sits `index` VISIBLE STRIDES
-   * along the stack's direction, where a visible stride is how much of
-   * one thing stays uncovered beside the next - a full stride at spread
-   * 0, nothing at spread 1, linear between, so equal Tighten steps
-   * uncover equal amounts at every spread. Which axis the multiplier
-   * lands on is the only thing direction decides; the multiplier itself
-   * is the same number either way.
+   * ONE formula for the two straight-line styles: a thing sits `index`
+   * VISIBLE STRIDES along the stack's own style, where a visible stride
+   * is how much of one thing stays uncovered beside the next - a full
+   * stride at spread 0, nothing at spread 1, linear between, so equal
+   * Tighten steps uncover equal amounts at every spread. Which axis the
+   * multiplier lands on is the only thing `style` decides between those
+   * two; the multiplier itself is the same number either way. `fan`
+   * adds an arc on top of the horizontal case; `jumble` (US-147) has no
+   * axis at all and uses a different formula entirely, below.
    *
    * Offsets are absolute from the stack origin rather than relative to
    * the previous thing, so depth chains by arithmetic and cannot
@@ -150,18 +193,41 @@ export class Stackable extends Pileable {
    * wrong four times) is here, in JS, unit-tested; CSS is left with a
    * multiply it cannot get subtly wrong.
    */
-  offsetIn({ index, count = 0, spread, direction }) {
-    if (direction !== VERTICAL && direction !== HORIZONTAL && direction !== FAN) {
+  offsetIn({ index, count = 0, spread, style }) {
+    if (style !== VERTICAL && style !== HORIZONTAL && style !== FAN && style !== JUMBLE) {
       throw new TypeError(
-        `Stackable.offsetIn: direction must be ${VERTICAL}, ${HORIZONTAL} or ${FAN}, got ${direction}`,
+        `Stackable.offsetIn: style must be ${VERTICAL}, ${HORIZONTAL}, ${FAN} or ${JUMBLE}, got ${style}`,
       );
+    }
+    if (style === JUMBLE) {
+      // No axis, no stride - every thing sits at the stack's own
+      // origin with a small, per-index scatter/tilt instead of lining
+      // up. `spread` scales the scatter rather than being ignored, so
+      // Tighten/Loosen still does something meaningful here.
+      //
+      // x/y are UNSIGNED (`jumbleHash`, [0, 1) - never `jumbleSigned`):
+      // every other style only ever extends FORWARD from the stack's
+      // own origin (down, across, or both) - never behind it - which is
+      // exactly what lets a pile size its own box from the layout at
+      // all. A signed jitter here would occasionally land a thing
+      // BEHIND the origin, outside the box the pile reserves for it,
+      // overlapping whatever renders above/before the pile instead
+      // (found live: RtG's token supply overlapped its own title bar).
+      // Rotation stays signed - it has no layout consequence, so
+      // tilting either way is free.
+      const scatter = clampSpread(spread) * JUMBLE_MAX_OFFSET;
+      return {
+        x: jumbleHash(index * 3 + 1) * scatter,
+        y: jumbleHash(index * 3 + 2) * scatter,
+        rotate: (jumbleSigned(index * 3 + 3) * clampSpread(spread) * JUMBLE_MAX_ROTATE_DEG) || 0,
+      };
     }
     const step = index * (1 - clampSpread(spread));
     // Only a fan rotates, so only a fan reports a rotation - the other
     // two keep the plain `{x, y}` contract and CSS defaults the angle
     // (`var(--stack-rotate, 0deg)`).
-    if (direction === VERTICAL) return { x: 0, y: step };
-    if (direction === HORIZONTAL) return { x: step, y: 0 };
+    if (style === VERTICAL) return { x: 0, y: step };
+    if (style === HORIZONTAL) return { x: step, y: 0 };
 
     // A fan overlaps along x exactly as a horizontal stack does - the
     // arc is added TO that, so Tighten/Loosen keeps working on a hand

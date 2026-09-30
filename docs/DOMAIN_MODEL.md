@@ -40,9 +40,12 @@ behavior so future, genuinely free-form (non-stacked) pileables have
 room to exist without inheriting stacking concerns they don't need.
 
 `Stackable extends Pileable` (`src/pileables/Stackable.js`) is where
-overlap/stacking behavior actually lives — `VERTICAL`/`HORIZONTAL`
-direction, `offsetIn()` (a unitless stride-multiplier along whichever
-axis the direction picks; the caller's CSS converts to pixels). `Card`/
+overlap/stacking behavior actually lives — `VERTICAL`/`HORIZONTAL`/
+`FAN`/`JUMBLE` stack STYLE (renamed from "direction", US-147, once a
+style with no axis - jumble - existed), `offsetIn()` (a unitless
+stride-multiplier along whichever axis the style picks - or, for
+jumble, a small deterministic per-index scatter with no axis at all;
+the caller's CSS converts to pixels). `Card`/
 `Chip`/`Token` (`CardPileable`/`ChipPileable`/`TokenPileable`) all
 extend `Stackable`, not `Pileable` directly — a sibling `Stackable` was
 rejected because a card would then need multiple inheritance (both a
@@ -64,30 +67,33 @@ extends — `DeckPile`, `HandPile` (→ `PlayerHandPile`/`OpponentHandPile`),
 `ChipPile`, `LandsPile`), `TokenPile`, `StackPile`. A subclass overrides
 only what differs — visibility, which actions it offers
 (`pileActions`), whether it accepts a given drop (`canAccept`), its
-default spread/stack direction, its rendering component. Nothing else
+default spread/stack style, its rendering component. Nothing else
 branches on kind; `pileForKind(kind)` is the one place a kind string
-resolves to a real class.
+resolves to a real class. `TokenPile` does NOT extend `GroupedPile`
+(grouping-by-colour was tried and reverted, US-112) - it declares its
+own `stackStyle` (`jumble`, US-147) directly on plain `Pile`.
 
 `Stack` (`src/piles/Stack.js`) is a real domain object for "some of this
-pile's cards, overlapping along one shared direction" — introduced
-(D129) to replace four independently-hand-written overlap formulas
-(chip-tray columns, battlefield depth, the hand's fan curve, a same-
-session pure-math module written and immediately deleted for "routing
-around the missing domain object"). A pile can hold more than one Stack
-at once (e.g. `LandsPile` groups by mana colour into side-by-side
-columns) — `stacksOf(pile)` groups a pile's flat card list by each
-card's own `stackId` (a foreign key on the Pileable, not a nested list —
-one source of truth, no state where a card is in `cards` but missing
-from a `stacks` list). Direction and spread live on the STACK, in
+pile's cards, overlapping in one shared style" — introduced (D129) to
+replace four independently-hand-written overlap formulas (chip-tray
+columns, battlefield depth, the hand's fan curve, a same-session pure-
+math module written and immediately deleted for "routing around the
+missing domain object"). A pile can hold more than one Stack at once
+(e.g. `LandsPile` groups by mana colour into side-by-side columns) —
+`stacksOf(pile)` groups a pile's flat card list by each card's own
+`stackId` (a foreign key on the Pileable, not a nested list — one
+source of truth, no state where a card is in `cards` but missing from a
+`stacks` list). Style and spread live on the STACK, in
 `pile.stacks[stackId]` metadata — never in the pile-wide fields older
 code used to read.
 
 Key `Pile` statics a subclass may override: `visibility` (mixed/hidden/
 in-hand), `component` (which Web Component renders it — see
-`docs/UI_ARCHITECTURE.md`), `stackDirection` (horizontal/vertical
-default), `maxSpread`/`defaultSpread` (how tightly its stacks overlap by
-default and at most), `reparentable` (can it move between zones),
-`keepWhenEmptied`, `supportsStackTap`. Key methods: `pileActions(ctx)`
+`docs/UI_ARCHITECTURE.md`), `stackStyle` (renamed from `stackDirection`,
+US-147 - vertical/horizontal/fan/jumble default), `maxSpread`/
+`defaultSpread` (how tightly its stacks overlap by default and at
+most), `reparentable` (can it move between zones), `keepWhenEmptied`,
+`supportsStackTap`. Key methods: `pileActions(ctx)`
 (which pile-level actions this kind offers), `disabledActions(count)`,
 `canAccept(pile, card)` (drop eligibility), `redactCard`/`cardActions`
 (per-card visibility and offered actions for a given viewer — though as

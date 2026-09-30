@@ -114,4 +114,12 @@ sequenceDiagram
     Note right of Smith: "Smith retro: the user's<br/>own answer ('use a jav<br/>player or two') is the<br/>real UX lesson here, not<br/>mine - a standing<br/>blocker got unstuck by<br/>the…"
     Cypher->>All: "pm launch"
     Note right of Cypher: "*pm launch US-146.<br/>Remote cursor now glides<br/>onto the pile it enters<br/>(pileId broadcast,<br/>resolved against each<br/>viewer's own DOM)<br/>instead of m…"
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "US-147/D169: renamed<br/>stack 'direction' to<br/>'style' (no back-<br/>compat). New JUMBLE<br/>style - tokens default<br/>to a disordered pile. 3<br/>real bugs fou…"
+    Trin->>Morpheus: "qa handoff"
+    Note right of Trin: "UAT PASSED.<br/>Screenshotted the live<br/>result (not just green<br/>tests): a Chips & Tokens<br/>table shows tokens<br/>genuinely scattered and<br/>tilted, not a…"
+    Morpheus->>Smith: "lead handoff"
+    Note right of Morpheus: "Review PASSED. Every fix<br/>generalized, none<br/>patched around: unsigned<br/>offsets fix any future<br/>style's scatter needs,<br/>not just jumble,<br/>extent()…"
+    Smith->>All: "user approve"
+    Note right of Smith: "*user test PASSED.<br/>Looked at the actual<br/>table: a fresh Chips &<br/>Tokens supply reads as a<br/>genuine disordered heap<br/>- scattered position AND<br/>ti…"
 ```

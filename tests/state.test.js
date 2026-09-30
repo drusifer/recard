@@ -1548,13 +1548,13 @@ function threeCardsOnTable(rng = () => 0.5) {
 
 const tableCards = (state) => pilesOf(state).find((z) => z.id === 'table').cards;
 const tableIds = (state) => tableCards(state).map((c) => c.id);
-// D129: the per-card `layout` field is gone. What a drop's direction
-// hint produces now is stack MEMBERSHIP plus that stack's direction,
-// so these read the stack a card is in rather than a relationship to
-// whoever happens to precede it.
+// D129: the per-card `layout` field is gone. What a drop's layout
+// hint produces now is stack MEMBERSHIP plus that stack's style
+// (renamed from "direction", US-147), so these read the stack a card
+// is in rather than a relationship to whoever happens to precede it.
 const stackOf = (state, pileableId) => tableCards(state).find((c) => c.id === pileableId)?.stackId;
 const stacksMetaOf = (state) => pilesOf(state).find((p) => p.id === 'table')?.stacks ?? {};
-const directionOf = (state, pileableId) => stacksMetaOf(state)[stackOf(state, pileableId)]?.direction;
+const styleOf = (state, pileableId) => stacksMetaOf(state)[stackOf(state, pileableId)]?.style;
 
 test('PLAY/MOVE with no target still appends, carrying no placement data at all', () => {
   const { state, ids } = threeCardsOnTable();
@@ -1574,7 +1574,7 @@ test('MOVE side:after inserts directly after the target and stacks the DROPPED c
   assert.deepEqual(tableIds(next), [a, c, b], 'C is reinserted immediately after A');
   assert.equal(stackOf(next, c), stackOf(next, a), 'the dropped card joins the target\'s stack');
   assert.ok(stackOf(next, c) !== undefined, 'and that stack is real, not the pile default');
-  assert.equal(directionOf(next, c), HORIZONTAL, 'a stack/overlap drop is the horizontal intent');
+  assert.equal(styleOf(next, c), HORIZONTAL, 'a stack/overlap drop is the horizontal intent');
   assert.equal(stackOf(next, b), undefined, 'the untouched card stays in the pile default stack');
 });
 
@@ -1593,7 +1593,7 @@ test('MOVE side:before joins the target\'s stack too - no side-dependent placeme
   // does not depend on which side of its target it landed - only where
   // in the order it sits does - so both sides read the same now.
   assert.equal(stackOf(next, c), stackOf(next, b), 'both ends of the newly adjacent pair are one stack');
-  assert.equal(directionOf(next, c), HORIZONTAL);
+  assert.equal(styleOf(next, c), HORIZONTAL);
 });
 
 test('MOVE: a same-zone move actually reorders (D21 removes the old no-op)', () => {
@@ -1631,7 +1631,7 @@ test('PLAY straight from hand can stack onto a card already on the table', () =>
   });
   assert.deepEqual(tableIds(state), [first, second]);
   assert.equal(stackOf(state, second), stackOf(state, first), 'the played card joins the table card\'s stack');
-  assert.equal(directionOf(state, second), HORIZONTAL);
+  assert.equal(styleOf(state, second), HORIZONTAL);
 });
 
 test('PICKUP strips layout, so a stacked card does not carry it back into a hand', () => {
@@ -3628,44 +3628,53 @@ test('D129: a plain move to another pile clears membership - a stackId is PILE-s
 });
 
 // US-145/D167: `FLIP_STACK` (an implicit toggle via `Stack.flippedDirection()`)
-// is replaced outright by `SET_STACK_DIRECTION` - the gear menu's Flip
-// entry became a 3-way choice (Column/Row/Fan), so the reducer needs an
-// EXPLICIT target direction, the same "delta action -> absolute-value
-// action" shape change `ADJUST_PILE_SPREAD` -> `SET_STACK_SPREAD` already
-// went through for the spread slider. No back-compat - `flippedDirection`
-// itself is deleted (see stack.test.js), so there is nothing left to keep
-// a toggle-shaped test around for.
-test('SET_STACK_DIRECTION: sets a hand stack directly to any of the three directions', () => {
+// is replaced outright by `SET_STACK_STYLE` (renamed from
+// `SET_STACK_DIRECTION`, US-147, once a style with no axis - jumble -
+// existed) - the gear menu's Flip entry became a multi-way choice
+// (Column/Row/Fan/Jumble), so the reducer needs an EXPLICIT target
+// style, the same "delta action -> absolute-value action" shape change
+// `ADJUST_PILE_SPREAD` -> `SET_STACK_SPREAD` already went through for
+// the spread slider. No back-compat - `flippedDirection` itself is
+// deleted (see stack.test.js), so there is nothing left to keep a
+// toggle-shaped test around for.
+test('SET_STACK_STYLE: sets a hand stack directly to any of the four styles', () => {
   let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
   state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
   const handPileId = state.piles.find((p) => p.kind === 'hand' && p.ownerId === 'p1').id;
 
-  state = reduce(state, { type: 'SET_STACK_DIRECTION', pileId: handPileId, stackKey: DEFAULT_STACK_KEY, direction: 'vertical' });
-  assert.equal(state.piles.find((p) => p.id === handPileId).stacks[DEFAULT_STACK_KEY].direction, 'vertical');
+  state = reduce(state, { type: 'SET_STACK_STYLE', pileId: handPileId, stackKey: DEFAULT_STACK_KEY, style: 'vertical' });
+  assert.equal(state.piles.find((p) => p.id === handPileId).stacks[DEFAULT_STACK_KEY].style, 'vertical');
 
   // Going straight from vertical back to fan in ONE call - the whole
   // point of an explicit target over a toggle (US-145's user answer:
-  // all 3 directions offered directly, not reached by repeated clicks).
-  state = reduce(state, { type: 'SET_STACK_DIRECTION', pileId: handPileId, stackKey: DEFAULT_STACK_KEY, direction: 'fan' });
-  assert.equal(state.piles.find((p) => p.id === handPileId).stacks[DEFAULT_STACK_KEY].direction, 'fan');
+  // every style offered directly, not reached by repeated clicks).
+  state = reduce(state, { type: 'SET_STACK_STYLE', pileId: handPileId, stackKey: DEFAULT_STACK_KEY, style: 'fan' });
+  assert.equal(state.piles.find((p) => p.id === handPileId).stacks[DEFAULT_STACK_KEY].style, 'fan');
 
-  state = reduce(state, { type: 'SET_STACK_DIRECTION', pileId: handPileId, stackKey: DEFAULT_STACK_KEY, direction: 'horizontal' });
-  assert.equal(state.piles.find((p) => p.id === handPileId).stacks[DEFAULT_STACK_KEY].direction, 'horizontal');
+  state = reduce(state, { type: 'SET_STACK_STYLE', pileId: handPileId, stackKey: DEFAULT_STACK_KEY, style: 'horizontal' });
+  assert.equal(state.piles.find((p) => p.id === handPileId).stacks[DEFAULT_STACK_KEY].style, 'horizontal');
+
+  state = reduce(state, { type: 'SET_STACK_STYLE', pileId: handPileId, stackKey: DEFAULT_STACK_KEY, style: 'jumble' });
+  assert.equal(state.piles.find((p) => p.id === handPileId).stacks[DEFAULT_STACK_KEY].style, 'jumble');
 });
 
-test('SET_STACK_DIRECTION: rejects a direction that is not vertical/horizontal/fan', () => {
+test('SET_STACK_STYLE: rejects a style that is not vertical/horizontal/fan/jumble', () => {
   let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
   state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
   const handPileId = state.piles.find((p) => p.kind === 'hand' && p.ownerId === 'p1').id;
-  assert.throws(() => reduce(state, { type: 'SET_STACK_DIRECTION', pileId: handPileId, stackKey: DEFAULT_STACK_KEY, direction: 'diagonal' }));
+  assert.throws(() => reduce(state, { type: 'SET_STACK_STYLE', pileId: handPileId, stackKey: DEFAULT_STACK_KEY, style: 'diagonal' }));
 });
 
-test('SET_STACK_DIRECTION: throws on an unknown pile or stack, same as SET_STACK_SPREAD', () => {
+test('SET_STACK_STYLE: throws on an unknown pile or stack, same as SET_STACK_SPREAD', () => {
   let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
-  assert.throws(() => reduce(state, { type: 'SET_STACK_DIRECTION', pileId: 'nope', stackKey: DEFAULT_STACK_KEY, direction: 'vertical' }));
+  assert.throws(() => reduce(state, { type: 'SET_STACK_STYLE', pileId: 'nope', stackKey: DEFAULT_STACK_KEY, style: 'vertical' }));
   state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
   const handPileId = state.piles.find((p) => p.kind === 'hand' && p.ownerId === 'p1').id;
-  assert.throws(() => reduce(state, { type: 'SET_STACK_DIRECTION', pileId: handPileId, stackKey: 'nope', direction: 'vertical' }));
+  assert.throws(() => reduce(state, { type: 'SET_STACK_STYLE', pileId: handPileId, stackKey: 'nope', style: 'vertical' }));
+});
+
+test('PILE_TYPES.token: US-147 gives tokens a jumble default, not Pile\'s base horizontal row', () => {
+  assert.equal(PILE_TYPES.token.stackStyle, 'jumble');
 });
 
 // ---- US-124 / D141 / D145: spectators are a role on the one roster ----

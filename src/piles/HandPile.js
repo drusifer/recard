@@ -38,7 +38,7 @@ export class HandPile extends Pile {
    * here beside the component that renders it, so "a hand fans" is one
    * fact in one place rather than a `component` string and a separate
    * `fan: true` render flag that had to agree. */
-  static stackDirection = FAN;
+  static stackStyle = FAN;
   // A hand IS tableSide (D51: it renders at its owner's seat through
   // the same generic <zone-panel> machinery every other table-side pile
   // uses, and must appear in pilesOf()/view.piles for that). It is

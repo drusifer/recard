@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Stackable, VERTICAL, HORIZONTAL, FAN } from '../src/pileables/Stackable.js';
+import { Stackable, VERTICAL, HORIZONTAL, FAN, JUMBLE } from '../src/pileables/Stackable.js';
 import { Pileable } from '../src/pileables/Pileable.js';
 import { CardPileable } from '../src/pileables/CardPileable.js';
 import { ChipPileable } from '../src/pileables/ChipPileable.js';
@@ -10,10 +10,10 @@ import { pileableFor } from '../src/pileables/pileableTypes.js';
 // Offsets are UNITLESS STRIDE MULTIPLIERS, not px (Morpheus review
 // Condition 2): card metrics are rem-based and rewritten per preset at
 // runtime, so px would either need a computed-style read per card or go
-// stale. `1` here means "one full stride along the stack's direction",
-// and CSS multiplies it by `--card-h + --card-gap` (or `--card-w`).
-const at = (index, spread, direction) =>
-  new Stackable({ id: `s${index}` }).offsetIn({ index, spread, direction });
+// stale. `1` here means "one full stride along the stack's style", and
+// CSS multiplies it by `--card-h + --card-gap` (or `--card-w`).
+const at = (index, spread, style) =>
+  new Stackable({ id: `s${index}` }).offsetIn({ index, spread, style });
 
 // ---------------------------------------------------------------------
 // The hierarchy (D129). Stackable sits BETWEEN Pileable and the
@@ -65,9 +65,11 @@ test('stackId survives a JSON round trip - records stay plain at rest', () => {
 });
 
 // ---------------------------------------------------------------------
-// The offset. ONE formula: a thing sits `index` visible strides along
-// the stack's direction. No axis special cases, no depth multiplier, no
-// sign flip - those were artifacts of computing this as flex margins.
+// The offset. ONE formula for the two straight-line styles: a thing
+// sits `index` visible strides along the stack's own style. No axis
+// special cases, no depth multiplier, no sign flip - those were
+// artifacts of computing this as flex margins. Jumble (US-147) has no
+// axis and its own tests, below.
 // ---------------------------------------------------------------------
 
 test('the first thing in a stack sits at the origin', () => {
@@ -85,16 +87,16 @@ test('horizontal stacks step ACROSS by a full stride at spread 0', () => {
   assert.deepEqual(at(2, 0, HORIZONTAL), { x: 2, y: 0 });
 });
 
-test('direction picks the AXIS only - the multiplier is the same number', () => {
+test('style picks the AXIS only - the multiplier is the same number', () => {
   // Which stride it multiplies (card height vs width) is CSS's job, so
-  // there is no per-direction arithmetic left here to get wrong.
+  // there is no per-style arithmetic left here to get wrong.
   assert.equal(at(3, 0.4, VERTICAL).y, at(3, 0.4, HORIZONTAL).x);
 });
 
 test('spread 1 collapses a stack to a single position', () => {
-  for (const direction of [VERTICAL, HORIZONTAL]) {
+  for (const style of [VERTICAL, HORIZONTAL]) {
     for (const index of [1, 2, 5]) {
-      assert.deepEqual(at(index, 1, direction), { x: 0, y: 0 }, `${direction} #${index}`);
+      assert.deepEqual(at(index, 1, style), { x: 0, y: 0 }, `${style} #${index}`);
     }
   }
 });
@@ -135,8 +137,8 @@ test('spread is clamped - a thing never inverts past its predecessor', () => {
   assert.deepEqual(at(1, -0.5, VERTICAL), { x: 0, y: 1 });
 });
 
-test('direction is required to be one of the two real ones', () => {
-  assert.throws(() => at(1, 0.5, 'diagonal'), /direction/i);
+test('style is required to be one of the real ones', () => {
+  assert.throws(() => at(1, 0.5, 'diagonal'), /style/i);
 });
 
 // ---------------------------------------------------------------------
@@ -150,11 +152,11 @@ test('direction is required to be one of the two real ones', () => {
 // ---------------------------------------------------------------------
 
 const fanned = (index, count, spread = 0.7) =>
-  new Stackable({ id: `f${index}` }).offsetIn({ index, count, spread, direction: FAN });
+  new Stackable({ id: `f${index}` }).offsetIn({ index, count, spread, style: FAN });
 
-test('FAN is a real direction, accepted like the other two', () => {
+test('FAN is a real style, accepted like the others', () => {
   assert.doesNotThrow(() => fanned(0, 3));
-  assert.throws(() => new Stackable().offsetIn({ index: 0, count: 3, spread: 0, direction: 'arc' }), /direction/i);
+  assert.throws(() => new Stackable().offsetIn({ index: 0, count: 3, spread: 0, style: 'arc' }), /style/i);
 });
 
 test('a fan still overlaps along x exactly like a horizontal stack', () => {
@@ -218,7 +220,64 @@ test('the droop scales with the cards, because it is in stride units', () => {
   assert.ok(fanned(0, 9).y < 1, 'a droop is a fraction of a stride, not a whole card');
 });
 
-test('the other two directions carry no rotation at all', () => {
+test('the other two straight-line styles carry no rotation at all', () => {
   assert.equal(at(2, 0.5, HORIZONTAL).rotate ?? 0, 0);
   assert.equal(at(2, 0.5, VERTICAL).rotate ?? 0, 0);
+});
+
+// ---------------------------------------------------------------------
+// JUMBLE (US-147, direct user request: "a new stack style called
+// jumble that keeps the stackables in a disordered pile") - no axis at
+// all. Deterministic on index alone (`jumbleHash`), so a re-render
+// never reshuffles a pile that has not actually changed; spread still
+// scales the scatter, so Tighten/Loosen means something here too.
+// ---------------------------------------------------------------------
+
+test('JUMBLE is a real style, accepted like the others', () => {
+  assert.doesNotThrow(() => at(0, 0.5, JUMBLE));
+});
+
+test('jumble at spread 0 collapses every thing onto the stack origin', () => {
+  for (const index of [0, 1, 2, 5]) {
+    assert.deepEqual(at(index, 0, JUMBLE), { x: 0, y: 0, rotate: 0 }, `index ${index}`);
+  }
+});
+
+test('jumble scatters away from the origin as spread rises', () => {
+  const magnitude = (index, spread) => {
+    const { x, y } = at(index, spread, JUMBLE);
+    return Math.hypot(x, y);
+  };
+  // At least one of several indices must actually move as spread rises
+  // - a hash that happened to land near zero for one index must not
+  // read as "jumble does nothing".
+  const isMovedAtFullSpread = [1, 2, 3, 4, 5].some((index) => magnitude(index, 1) > 0.05);
+  assert.ok(isMovedAtFullSpread, 'jumble must visibly scatter at full spread');
+});
+
+test('jumble is DETERMINISTIC on index alone - same index, same offset, every call', () => {
+  const first = at(3, 0.8, JUMBLE);
+  const second = at(3, 0.8, JUMBLE);
+  assert.deepEqual(first, second, 're-asking for the same index must not reshuffle it');
+});
+
+test('jumble gives different indices different offsets - a real scatter, not one point repeated', () => {
+  const offsets = [0, 1, 2, 3, 4].map((index) => at(index, 1, JUMBLE));
+  const unique = new Set(offsets.map((o) => `${o.x.toFixed(4)},${o.y.toFixed(4)}`));
+  assert.ok(unique.size > 1, 'at least two indices must land at different points');
+});
+
+test('jumble never scatters past its declared maximum offset, at any spread', () => {
+  for (const index of [0, 1, 2, 3, 10, 50]) {
+    for (const spread of [0, 0.3, 0.7, 1]) {
+      const { x, y } = at(index, spread, JUMBLE);
+      assert.ok(Math.abs(x) <= 0.6 + 1e-9, `x ${x} exceeded the declared max at index ${index}, spread ${spread}`);
+      assert.ok(Math.abs(y) <= 0.6 + 1e-9, `y ${y} exceeded the declared max at index ${index}, spread ${spread}`);
+    }
+  }
+});
+
+test('jumble does report a rotation, unlike the two straight-line styles', () => {
+  const isRotated = [0, 1, 2, 3, 4].some((index) => at(index, 1, JUMBLE).rotate !== 0);
+  assert.ok(isRotated, 'at least one index must tilt at full spread');
 });

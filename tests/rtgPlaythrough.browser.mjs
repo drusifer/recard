@@ -73,7 +73,15 @@ async function openMenu(page, locator) {
 async function moveTo(page, cardLocator, destination) {
   await openMenu(page, cardLocator);
   await page.locator('.card-context-menu [data-action="move"]').click();
-  await page.locator(`.pile-section.pile-target${destination} .pile-title`).click();
+  // `.zone-name-text` (the title's own label span), not `.pile-title`'s
+  // whole bounding box - found live: a busy header (title + rename +
+  // action controls, e.g. the Tighten/Loosen slider every pile with 2+
+  // items now offers) can have OTHER interactive elements sitting within
+  // that same box, so clicking its reported CENTER is not reliably the
+  // title itself. The label is always present (`HeaderActions.js`
+  // renders it unconditionally) and never overlapped by a sibling
+  // control, which the whole header's own box is not guaranteed to be.
+  await page.locator(`.pile-section.pile-target${destination} .zone-name-text`).click();
 }
 
 async function rotate(page, cardLocator) {
@@ -502,15 +510,27 @@ test('tokens are round glass beads, jumbled (not perfectly aligned), and only 2 
   // asserted via the real computed transform on the WRAPPER (`.middle-
   // card`, where `--raise-base` is actually consumed - `.card-token`
   // itself never has a transform of its own), not just that a CSS rule
-  // exists (a rule that never actually applies would still pass a
-  // weaker check). `.fan-row`'s own resting-state consumption of
-  // `--raise-base` doesn't reach a plain `.card-row` by default - this
-  // pile needed its own copy of that rule, found live when the first
-  // draft set the custom property correctly but nothing painted it.
+  // exists. US-147: this used to be a small FIXED `nth-child`-cycled
+  // decoration, deleted outright once a real `JUMBLE` stack style
+  // existed (`Stackable.js`, `TokenPile.stackStyle`) - `--stack-rotate`
+  // now carries each token's own deterministic-per-index tilt through
+  // the SAME generic `--raise-base` seam every other stack style
+  // already uses (`.card-stack > .middle-card`, style.css), no
+  // token-specific CSS rule needed at all any more.
   const wrappers = page.locator('[data-pile-id="rtg-tokens"] .middle-card');
   const transforms = await wrappers.evaluateAll((elements) => elements.map((element) => getComputedStyle(element).transform));
   assert.ok(new Set(transforms).size > 1, `expected varied per-bead transforms, got all identical: ${transforms[0]}`);
   assert.ok(transforms.every((t) => t !== 'none'), 'every bead should have SOME jumble transform, not the identity');
+
+  // The REAL jumble also scatters POSITION, not just rotation (US-147) -
+  // unlike the old decoration, which only ever nudged a few px on top of
+  // an otherwise-ordinary row. Assert the actual on-screen positions
+  // differ too, which is the part that makes it read as a genuine heap.
+  const boxes = await wrappers.evaluateAll((elements) => elements.map((element) => {
+    const { left, top } = element.getBoundingClientRect();
+    return `${Math.round(left)},${Math.round(top)}`;
+  }));
+  assert.ok(new Set(boxes).size > 1, `expected varied per-bead positions, got all identical: ${boxes[0]}`);
 });
 
 test('game 1: a token from the shared supply can mark a permanent and be returned', async () => {

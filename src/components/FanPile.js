@@ -21,7 +21,7 @@ import { renderPileCards } from '../pileCards.js';
  *
  * D129: this component supplies NOTHING layout-related any more. A fan
  * is a stack layout (`Stackable`'s `FAN`, declared by
- * `HandPile.stackDirection`), so the arc comes out of the same
+ * `HandPile.stackStyle`), so the arc comes out of the same
  * `renderPileCards` call every other pile makes. The `opts.fan` flag
  * and `applyFanOffset` that used to live behind it are deleted - a
  * hand's position and its arc came from two different mechanisms, and

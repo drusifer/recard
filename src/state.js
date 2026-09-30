@@ -1,6 +1,6 @@
 import { buildDeck, shuffle, RANKS, SUITS } from './deck.js';
 import { stacksOf, stackKeyFor, DEFAULT_STACK_KEY } from './piles/Stack.js';
-import { VERTICAL, HORIZONTAL, FAN } from './pileables/Stackable.js';
+import { VERTICAL, HORIZONTAL, FAN, JUMBLE } from './pileables/Stackable.js';
 import { PILE_TYPES, revivePile, pileInstanceFor } from './piles/pileTypes.js';
 import { MIN_SPREAD, MAX_SPREAD } from './piles/Pile.js';
 import { survivorsOfReset } from './pileables/pileableTypes.js';
@@ -1474,12 +1474,13 @@ const ACTIONS = {
   },
 
   /**
-   * D129/US-145/D167: set one stack's own layout direction directly -
-   * Column (vertical), Row (horizontal) or Fan. The capability per-stack
-   * direction unlocked, and the reason the gear emblem is worth its
-   * pixels. Replaces `FLIP_STACK` (an implicit toggle via
+   * D129/US-145/D167 (renamed direction -> style, US-147): set one
+   * stack's own layout style directly - Column (vertical), Row
+   * (horizontal), Fan, or Jumble. The capability per-stack style
+   * unlocked, and the reason the gear emblem is worth its pixels.
+   * Replaces `FLIP_STACK` (an implicit toggle via
    * `Stack.flippedDirection()`, now deleted) outright - the gear menu's
-   * Flip entry is a 3-way choice now, not a single button, so the
+   * Flip entry is a multi-way choice now, not a single button, so the
    * reducer needs an explicit target rather than "the other one." Same
    * "delta action -> absolute-value action" shape change
    * `ADJUST_PILE_SPREAD` -> `SET_STACK_SPREAD` already went through.
@@ -1488,9 +1489,9 @@ const ACTIONS = {
    * `SET_STACK_SPREAD`): everyone at the table is looking at the same
    * cards, so they must see the same arrangement.
    */
-  SET_STACK_DIRECTION(state, action) {
-    if (![VERTICAL, HORIZONTAL, FAN].includes(action.direction)) {
-      throw new Error(`SET_STACK_DIRECTION: direction must be ${VERTICAL}, ${HORIZONTAL} or ${FAN}, got ${action.direction}`);
+  SET_STACK_STYLE(state, action) {
+    if (![VERTICAL, HORIZONTAL, FAN, JUMBLE].includes(action.style)) {
+      throw new Error(`SET_STACK_STYLE: style must be ${VERTICAL}, ${HORIZONTAL}, ${FAN} or ${JUMBLE}, got ${action.style}`);
     }
     const pile = state.piles.find((p) => p.id === action.pileId);
     if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
@@ -1498,13 +1499,13 @@ const ACTIONS = {
     const stack = stacksOf({
       cards: pile.cards,
       stacks: pile.stacks,
-      direction: kind?.stackDirection,
+      style: kind?.stackStyle,
       spread: pile.spread ?? kind?.defaultSpread ?? MIN_SPREAD,
     }).find((candidate) => stackKeyFor(candidate.id) === action.stackKey);
     if (!stack) throw new Error(`Stack ${action.stackKey} is not in pile ${action.pileId}`);
 
     const key = action.stackKey;
-    const stacks = { ...pile.stacks, [key]: { ...pile.stacks?.[key], direction: action.direction } };
+    const stacks = { ...pile.stacks, [key]: { ...pile.stacks?.[key], style: action.style } };
     return { ...state, piles: state.piles.map((p) => (p.id === action.pileId ? { ...p, stacks } : p)) };
   },
 

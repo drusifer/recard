@@ -104,13 +104,13 @@ export const SPREAD_STEP = 0.1;
  * stack, which is what keeps an ordinary row free of any placement
  * data whatsoever.
  */
-const DIRECTION_FOR_LAYOUT = new Map([['column', VERTICAL], ['stack', HORIZONTAL], ['overlap', HORIZONTAL]]);
+const STYLE_FOR_LAYOUT = new Map([['column', VERTICAL], ['stack', HORIZONTAL], ['overlap', HORIZONTAL]]);
 
-/** The direction a drop's layout hint asks for, or `undefined` for a
+/** The stack style a drop's layout hint asks for, or `undefined` for a
  * drop that asks for nothing (which lands in the pile's default
  * stack). A Map rather than an object literal so an unrecognised hint
  * can never collide with something inherited from Object.prototype. */
-const directionForLayout = (layout) => DIRECTION_FOR_LAYOUT.get(layout);
+const styleForLayout = (layout) => STYLE_FOR_LAYOUT.get(layout);
 
 /** A stack id for a newly-formed stack, derived from the card the drop
  * landed ON - stable, readable in a state dump, and unique because a
@@ -119,8 +119,8 @@ const stackIdFor = (targetCardId) => `stack-${targetCardId}`;
 
 /**
  * Place `card` into the same stack as `targetCardId`, creating that
- * stack if the target was not in one yet, and recording the direction
- * the drop asked for.
+ * stack if the target was not in one yet, and recording the style the
+ * drop asked for.
  *
  * Returns the new `cards` and `stacks` together because they change
  * together: joining a stack that does not exist yet has to stamp the
@@ -128,12 +128,12 @@ const stackIdFor = (targetCardId) => `stack-${targetCardId}`;
  * appear to be overlapping nothing.
  */
 function joinedStack(cards, card, targetCardId, layout) {
-  const direction = directionForLayout(layout);
+  const style = styleForLayout(layout);
   const target = cards.find((c) => c.id === targetCardId);
   const stackId = target?.stackId ?? stackIdFor(targetCardId);
   return {
     stackId,
-    direction,
+    style,
     // Stamping the target is idempotent: a third card dropped onto the
     // second finds the stack already there and extends it rather than
     // starting a second one beside it.
@@ -293,19 +293,26 @@ export class Pile {
    * runs vertically, a run horizontally.
    *
    * HORIZONTAL is the base default because an ordinary card pile is
-   * one overlapping row. `GroupedPile` overrides it once for every
-   * tray kind (chips, tokens, lands - columns of stacked pieces), and
-   * nothing else needs to name it: the point of putting this on the
-   * class is that it is INHERITED, not restated per kind. A per-kind
-   * table of directions is exactly the shape that drifts out of step
-   * with the classes, which is how the four competing overlap formulas
-   * this replaces got out of step in the first place.
+   * one overlapping row. `GroupedPile` overrides it once for the
+   * grouped tray kinds that extend it (chips, lands - columns of
+   * stacked pieces); `TokenPile` overrides it directly (a jumble,
+   * US-147 - it does NOT extend `GroupedPile`, see that class's own
+   * comment for why grouping-by-colour was tried and reverted). Nothing
+   * else needs to name it: the point of putting this on the class is
+   * that it is INHERITED, not restated per kind. A per-kind table of
+   * styles is exactly the shape that drifts out of step with the
+   * classes, which is how the four competing overlap formulas this
+   * replaces got out of step in the first place.
    *
    * Read by the renderer to build `Stack`s; never branched on - a
-   * caller passes it through to `stacksOf`/`Stack` and the direction
-   * decides only which axis the offset multiplier lands on.
+   * caller passes it through to `stacksOf`/`Stack` and the style
+   * decides only which axis the offset multiplier lands on (or, for
+   * `jumble`, that there is no axis at all).
+   *
+   * (Renamed from `stackDirection`, US-147: once a style with no axis
+   * existed, "direction" stopped fitting even the two that have one.)
    */
-  static stackDirection = HORIZONTAL;
+  static stackStyle = HORIZONTAL;
 
   /** D55/US-63: eligible for `MOVE_PILE` (reparenting into a different
    * Zone). True by default (this base class and `DiscardPile`);
@@ -335,14 +342,15 @@ export class Pile {
     // card moves in or out of the pile.
     this.spread = spread;
     /**
-     * D129: per-stack metadata, `{ [stackId]: { direction } }`.
+     * D129: per-stack metadata, `{ [stackId]: { style } }` (renamed
+     * from `direction`, US-147).
      *
-     * Direction only - never membership and never order. Membership is
+     * Style only - never membership and never order. Membership is
      * each pileable's own `stackId` and order is `cards`, so this map
      * cannot desynchronise from the cards: it does not describe them.
      * An entry whose stack has emptied is simply unused, because
      * `stacksOf` builds stacks FROM the cards and only consults this
-     * for the direction of one it already found.
+     * for the style of one it already found.
      *
      * Carried here AND in `toJSON` for the reason `spread`'s comment
      * above gives - `insertPileable`/`removePileable` rebuild a pile
@@ -391,7 +399,7 @@ export class Pile {
       // and is how this was actually found.
       spread: this.spread,
       // D129: and `stacks` for the same reason, found the same way -
-      // the reducer wrote per-stack directions correctly, every model
+      // the reducer wrote per-stack styles correctly, every model
       // test passed, and a battlefield column still rendered flat
       // because the renderer never received them. Anything the LAYOUT
       // depends on has to be named here.
@@ -640,10 +648,10 @@ export class Pile {
   insertPileable(card, placement = {}) {
     const { targetCardId, side = 'after', layout } = placement;
     const base = this.toJSON();
-    // No target, or no direction asked for: the card joins the pile's
+    // No target, or no style asked for: the card joins the pile's
     // one default stack and carries no placement data at all.
-    const direction = directionForLayout(layout);
-    if (!targetCardId || !direction) {
+    const style = styleForLayout(layout);
+    if (!targetCardId || !style) {
       const plain = { ...card };
       delete plain.stackId;
       if (!targetCardId) return { ...base, cards: [...this.cards, plain] };
@@ -658,7 +666,7 @@ export class Pile {
       throw new Error(`Target card ${targetCardId} is not in the destination zone`);
     }
 
-    // D129: the drop's direction hint becomes the stack's direction.
+    // D129: the drop's layout hint becomes the stack's style.
     // Both the dropped card and its target end up in that stack -
     // dropping BEFORE the target does not change which stack either is
     // in, only where in the order the card sits, so the old
@@ -669,7 +677,7 @@ export class Pile {
     return {
       ...base,
       cards: [...joined.cards.slice(0, offset), joined.card, ...joined.cards.slice(offset)],
-      stacks: { ...base.stacks, [joined.stackId]: { direction: joined.direction } },
+      stacks: { ...base.stacks, [joined.stackId]: { style: joined.style } },
     };
   }
 
@@ -702,11 +710,12 @@ export class Pile {
     }
     this.registerStackActions({
       spreadStack: (pile, stackKey, value) => ({ action: { type: 'SET_STACK_SPREAD', pileId: pile.id, value, stackKey }, guard: 'silent' }),
-      // US-145/D167: `value` is the chosen direction (Column/Row/Fan),
-      // same second-parameter shape `spreadStack` above already uses -
+      // US-145/D167 (renamed direction -> style, US-147): `value` is
+      // the chosen style (Column/Row/Fan/Jumble), same second-parameter
+      // shape `spreadStack` above already uses -
       // `performStackAction(stackKey, actionId, value)` already threads
       // it through, no new plumbing needed for the enum choice to reach here.
-      flipStack: (pile, stackKey, value) => ({ action: { type: 'SET_STACK_DIRECTION', pileId: pile.id, stackKey, direction: value }, guard: 'silent' }),
+      flipStack: (pile, stackKey, value) => ({ action: { type: 'SET_STACK_STYLE', pileId: pile.id, stackKey, style: value }, guard: 'silent' }),
       tapStack: (pile, stackKey) => ({ action: { type: 'SET_STACK_ORIENTATION', pileId: pile.id, stackKey, orientation: 'landscape' }, guard: 'silent' }),
       untapStack: (pile, stackKey) => ({ action: { type: 'SET_STACK_ORIENTATION', pileId: pile.id, stackKey, orientation: 'portrait' }, guard: 'silent' }),
     });
