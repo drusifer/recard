@@ -91,7 +91,12 @@ export function buildSpecialActionControl(id, spec, options) {
  *
  * @param {string} id the action id (e.g. `'changePileType'`)
  * @param {{label: string, icon: string}} spec
- * @param {{value: string, choices: {value: string, label: string}[]}} enumInfo
+ * @param {{value: string, choices: {value: string, label: string,
+ *   preview?: () => HTMLElement}[]}} enumInfo `choice.preview` (US-145/
+ *   D167) is optional and generic - not Flip-specific - a factory
+ *   called fresh per menu open, rendered ALONGSIDE `choice.label` inside
+ *   the same button, never replacing it (Smith's Gate 1 condition,
+ *   WCAG 1.4.1 - a picture is decoration, the word is the real signal).
  * @param {{onAction: (id: string, value: string) => void}} options
  */
 function buildEnumActionMenu(id, spec, { value, choices }, options) {
@@ -104,6 +109,15 @@ function buildEnumActionMenu(id, spec, { value, choices }, options) {
   summary.textContent = `${spec.icon} ${current?.label ?? value}`;
   summary.title = spec.label;
   summary.setAttribute('aria-label', `${spec.label}: ${current?.label ?? value}`);
+  // US-145/D167: found live wiring this into a stack's own gear menu -
+  // `<action-menu>` (`ActionMenuElement`) closes itself on ANY document
+  // click that isn't one of its own rows' explicit `stopPropagation()`
+  // (`#rowFor`, `ActionMenu.js`). The native `<summary>` toggle has no
+  // such call, so opening the disclosure inside that popup closed the
+  // WHOLE popup on the very click meant to open it. `<header-actions>`
+  // never hit this because it renders the enum control inline, outside
+  // any such popup - this is specific to reusing it inside one.
+  summary.addEventListener('click', (event) => event.stopPropagation());
   details.append(summary);
 
   const menu = document.createElement('div');
@@ -113,7 +127,8 @@ function buildEnumActionMenu(id, spec, { value, choices }, options) {
     item.type = 'button';
     const isCurrent = choice.value === value;
     item.className = 'pile-action-menu-item' + (isCurrent ? ' pile-action-menu-item-current' : '');
-    item.textContent = choice.label;
+    if (choice.preview) item.append(choice.preview());
+    item.append(document.createTextNode(choice.label));
     if (isCurrent) item.setAttribute('aria-current', 'true');
     item.addEventListener('click', (event) => {
       event.stopPropagation();

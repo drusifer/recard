@@ -703,17 +703,23 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    reintroduced BY it, which is what both earlier placements did. */
 .stack-gear {
   position: absolute;
-  /* *fix (queued 2026-09-10, direct user request: "move the gear to
+  /* *fix (queued 2026-09-10, direct user report: "move the gear to
      the top right of the stack"): was `top: calc(100% + 0.15rem)`
-     (below the stack) - moved to hang off the top-right corner instead,
+     (below the stack) - moved to hang off the top corner instead,
      mirroring `.chip-stack-badge`'s own proven "pin outside the card,
      never on top of it" pattern (top: -0.6rem) rather than inventing a
      new one. Still never overlaps the card face itself (the whole
      reason the first two placements - ON the card, then on the pile
      HEADER - were rejected), so hover-raise/click-through concerns
-     from those two do not apply here. */
+     from those two do not apply here.
+     *nit (queued 2026-09-29, direct user request: "move stack gear icon
+     to upper left corner of stack"): top-right -> top-left, `right`
+     swapped for `left`. Still the same top-edge hang-off, so the
+     battlefield row's own top-padding reservation (`[data-kind=
+     'battlefield'] .card-row`, below) needs no change - it accounts for
+     the gear's footprint above the row, not which side it hangs from. */
   top: -0.6rem;
-  right: -0.3rem;
+  left: -0.3rem;
   z-index: 4;
   display: flex;
   align-items: center;
@@ -2766,6 +2772,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   display: flex;
   align-items: center;
   justify-content: flex-start;
+  gap: 0.5rem;
   text-align: left;
   font-size: 0.8rem;
   background: transparent;
@@ -2789,6 +2796,40 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   content: ' ✓';
 }
 
+/* US-145/D167: Flip's 3 choices (`buildEnumActionMenu`'s optional
+   `choice.preview`) get a small literal illustration of the resulting
+   arrangement beside their label - never instead of it (Smith Gate 1,
+   WCAG 1.4.1: the word is the real signal, the picture is decoration,
+   `aria-hidden` on the preview itself says so structurally too). A
+   fixed box just large enough for 3 tiny "cards"; CSS positions them
+   per direction, the same "JS builds, CSS positions" split the real
+   stack layout math (`Stackable.offsetIn`) already uses. */
+.stack-direction-preview {
+  position: relative;
+  flex: none;
+  width: 1.5rem;
+  height: 1.3rem;
+}
+.stack-direction-preview-card {
+  position: absolute;
+  width: 0.6rem;
+  height: 0.85rem;
+  background: var(--text);
+  border-radius: 1px;
+  opacity: 0.85;
+}
+.stack-direction-preview-vertical .stack-direction-preview-card:nth-child(1) { top: 0; left: 0.45rem; }
+.stack-direction-preview-vertical .stack-direction-preview-card:nth-child(2) { top: 0.225rem; left: 0.45rem; }
+.stack-direction-preview-vertical .stack-direction-preview-card:nth-child(3) { top: 0.45rem; left: 0.45rem; }
+
+.stack-direction-preview-horizontal .stack-direction-preview-card:nth-child(1) { top: 0.225rem; left: 0; }
+.stack-direction-preview-horizontal .stack-direction-preview-card:nth-child(2) { top: 0.225rem; left: 0.45rem; }
+.stack-direction-preview-horizontal .stack-direction-preview-card:nth-child(3) { top: 0.225rem; left: 0.9rem; }
+
+.stack-direction-preview-fan .stack-direction-preview-card:nth-child(1) { top: 0.4rem; left: 0.1rem; transform: rotate(-18deg); }
+.stack-direction-preview-fan .stack-direction-preview-card:nth-child(2) { top: 0.25rem; left: 0.45rem; }
+.stack-direction-preview-fan .stack-direction-preview-card:nth-child(3) { top: 0.4rem; left: 0.8rem; transform: rotate(18deg); }
+
 /* US-100/D101: the card right-click menu (`ui.js`'s `openCardContextMenu`)
    reuses `.pile-action-menu`/`.pile-action-menu-item` above verbatim for
    its look - this class only overrides the ANCHORING, from "absolute
@@ -2801,6 +2842,26 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   left: 0;
   z-index: 20;
   margin-top: 0;
+}
+
+/* US-145/D167: found live wiring Flip into the stack gear menu - the
+   outer `<action-menu>` popup reuses `.pile-action-menu`'s own
+   classname for ITS shell (`ActionMenuElement.open()`), including that
+   class's `overflow: hidden` (meant to clip a plain row's rounded
+   corners). An EnumAction item (`buildEnumActionMenu`) nests its OWN
+   `.pile-action-menu` dropdown that must render BELOW the toggle,
+   outside the outer shell's box - `overflow: hidden` silently clipped
+   it to nothing, invisible but still fully present in the DOM (every
+   existing test kept passing regardless - Playwright's own click/
+   visibility checks don't account for an ANCESTOR's overflow clip,
+   only the element's own display/visibility/opacity - see
+   `tests/uiActions.browser.mjs`'s `elementFromPoint` check, added
+   specifically because this class of bug is otherwise invisible to
+   automated tests). Scoped to `.stack-action-menu` only (this feature's
+   own popup) so the plain card-context-menu keeps its tight-clipped
+   corners. */
+.stack-action-menu {
+  overflow: visible;
 }
 
 /* *nit (2026-08-26), direct user request ("cards are Movable not
@@ -3242,8 +3303,9 @@ body.panel-resize-active {
   overflow-y: auto;
   align-content: flex-start;
   /* *fix (queued 2026-09-10, "No Gears on RTG stacks?" then "move the
-     gear to the top right of the stack"): `.stack-gear` sits OUTSIDE
-     its own stack's box (originally below, now above-right), which is
+     gear to the top right of the stack"; nitted again 2026-09-29 to
+     top-left): `.stack-gear` sits OUTSIDE its own stack's box (below,
+     originally; the top edge, either corner, since), which is
      never part of this row's own auto-sized flow-content height - an
      auto-height `overflow:auto` box only ever sizes to its IN-FLOW
      children, so anything positioned outside a row-edge stack's own

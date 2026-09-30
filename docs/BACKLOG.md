@@ -91,12 +91,17 @@ or a live-verification session) versus being pickable directly.
   groom's own sprint added `tests/resume.browser.mjs`. Left in place
   rather than deleted, since the original D6 v1 limitation it describes
   really was true once.
+- ~~**Move the stack gear icon to the upper-left corner of the stack**~~
+  DONE (nit, 2026-09-30, direct user request): `.stack-gear`'s `right:
+  -0.3rem` -> `left: -0.3rem`, top edge unchanged. Verified geometrically
+  (gear's left edge flush with the stack's own left edge) and via
+  test-ui/test-rtg green (neither asserts a side, only top-edge
+  clipping, so both stayed valid unchanged).
 - **Builder screen** — standing idea, not yet scoped into stories.
-- **Flip as a radio box with preview icons** (Neo, queued) — replace
-  the single Flip action with a radio control listing orientations
-  directly, each with a small icon/image showing the resulting
-  arrangement. Needs the user's own visual-design input (icon
-  rendering, layout) before implementation - not a fix-loop's to guess.
+- ~~**Flip as a radio box with preview icons**~~ SHIPPED (US-145/D167,
+  2026-09-29): the gear menu's Flip entry is now a 3-way Column/Row/Fan
+  choice (`changePileType`'s own disclosure control, reused unchanged),
+  each with a mini card-stack preview alongside its label.
 - **Zone-level privacy** (Neo, queued) — a pile inside a player's own
   PlayerZone defaulting to hidden-from-everyone-but-owner, like a hand
   card. **Not blocked** (corrected 2026-09-17, direct user

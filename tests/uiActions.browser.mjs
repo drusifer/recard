@@ -759,7 +759,19 @@ test('deck and chip stacks climb at the same slight angle, lower-left to upper-r
 // D129 (direct user request): every stack carries a gear emblem that
 // opens its OWN actions, and pile-level Tighten/Loosen became "All",
 // routing to each stack rather than writing one pile-wide number.
-test('a stack gear opens that stack\'s own actions, and flipping it turns the run', async () => {
+//
+// US-145/D167: Flip is now a 3-way choice (Column/Row/Fan), the same
+// disclosure-menu control `changePileType` already uses, not a single
+// toggle button - `flipStack`'s `[data-action]` plain button is gone,
+// replaced by `.pile-action-enum`'s `<summary>` + labelled choice rows.
+async function chooseFlipDirection(page, gear, label) {
+  await gear.click();
+  const menu = page.locator('.stack-action-menu');
+  await menu.locator('.pile-action-enum-btn').click(); // open the disclosure
+  await menu.locator('.pile-action-menu-item', { hasText: label }).click();
+}
+
+test('a stack gear opens that stack\'s own actions, and choosing Column/Row turns the run', async () => {
   const page = fixture.page;
   // The HAND, not a chip tray: it always holds the five dealt cards in
   // one stack, whereas the trays are redistributed (and eventually
@@ -776,10 +788,7 @@ test('a stack gear opens that stack\'s own actions, and flipping it turns the ru
   });
   assert.equal(await runsVertically(), false, 'a hand fans sideways to begin with');
 
-  await gear.click();
-  const menu = page.locator('.stack-action-menu');
-  assert.equal(await menu.count(), 1, 'the gear opens a stack action menu');
-  await menu.locator('[data-action="flipStack"]').click();
+  await chooseFlipDirection(page, gear, 'Column');
   await page.waitForFunction(() => {
     const cards = document.querySelectorAll('[data-kind="hand"] .card-stack > .middle-card');
     if (cards.length < 2) return false;
@@ -787,17 +796,64 @@ test('a stack gear opens that stack\'s own actions, and flipping it turns the ru
     return Math.abs(b.y - a.y) > Math.abs(b.x - a.x);
   }, undefined, { timeout: 5000 });
 
-  // Flip it BACK. This suite shares one browser and one dealt table
-  // (see the file header), so "each test independent within it" means
-  // a test that changes replicated state has to put it back.
+  // AC1: the current choice is marked - re-open and check BEFORE
+  // putting it back, so this assertion exercises the real live state,
+  // not an assumption about what the previous click did.
   await gear.click();
-  await page.locator('.stack-action-menu [data-action="flipStack"]').click();
+  await page.locator('.stack-action-menu .pile-action-enum-btn').click();
+  const current = page.locator('.stack-action-menu .pile-action-menu-item-current');
+  assert.equal(await current.count(), 1);
+  assert.match(await current.textContent(), /Column/);
+  await page.keyboard.press('Escape');
+
+  // Fan it BACK. This suite shares one browser and one dealt table
+  // (see the file header), so "each test independent within it" means
+  // a test that changes replicated state has to put it back - and a
+  // hand's own default is Fan, not Row, so restoring means Fan here.
+  await chooseFlipDirection(page, gear, 'Fan');
   await page.waitForFunction(() => {
     const cards = document.querySelectorAll('[data-kind="hand"] .card-stack > .middle-card');
     if (cards.length < 2) return false;
     const [a, b] = [...cards].map((card) => card.getBoundingClientRect());
     return Math.abs(b.x - a.x) > Math.abs(b.y - a.y);
   }, undefined, { timeout: 5000 });
+});
+
+test('Flip\'s three choices each show a preview alongside their label, never instead of it', async () => {
+  const page = fixture.page;
+  const stack = page.locator('[data-kind="hand"] .card-stack').first();
+  await stack.locator('.stack-gear').click();
+  const menu = page.locator('.stack-action-menu');
+  await menu.locator('.pile-action-enum-btn').click();
+  const rows = menu.locator('.pile-action-menu-item');
+  assert.equal(await rows.count(), 3, 'Column, Row, Fan - all three, always');
+  for (const label of ['Column', 'Row', 'Fan']) {
+    const row = rows.filter({ hasText: label });
+    assert.equal(await row.count(), 1, `${label} choice is present`);
+    // Smith Gate 1 condition (WCAG 1.4.1): the preview is decoration
+    // ALONGSIDE the text, never a replacement for it.
+    assert.equal(await row.locator('.stack-direction-preview').count(), 1, `${label} has a preview icon`);
+    assert.ok((await row.textContent()).includes(label), `${label}'s own text label is still there, not just the icon`);
+    // Found live (not anticipated): the outer action-menu popup reuses
+    // `.pile-action-menu`'s own classname for ITS shell, whose
+    // `overflow: hidden` silently clipped this nested dropdown to
+    // nothing - present in the DOM, fully textContent()-able, entirely
+    // invisible. `count()`/`textContent()` above would pass either way;
+    // Playwright's own visibility/click actionability checks don't look
+    // at an ANCESTOR's overflow clip either (only the element's own
+    // display/visibility/opacity), so nothing above this line would
+    // have caught it - only actually looking (a screenshot) did. A real
+    // `elementFromPoint` hit-test at the row's own center is the one
+    // check that reproduces what clipping actually breaks: a click
+    // there in a real browser hits whatever IS painted, not this row.
+    const isActuallyPainted = await row.evaluate((element) => {
+      const { x, y, width, height } = element.getBoundingClientRect();
+      const hit = document.elementFromPoint(x + width / 2, y + height / 2);
+      return element === hit || element.contains(hit);
+    });
+    assert.ok(isActuallyPainted, `${label}'s row must be the thing actually painted at its own position, not clipped away by an ancestor`);
+  }
+  await page.keyboard.press('Escape');
 });
 
 test('a stack of one offers no gear - three controls that would visibly do nothing', async () => {

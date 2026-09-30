@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Stack, stacksOf } from '../src/piles/Stack.js';
-import { VERTICAL, HORIZONTAL, FAN } from '../src/pileables/Stackable.js';
+import { VERTICAL, HORIZONTAL } from '../src/pileables/Stackable.js';
 
 const card = (id, stackId) => ({ id, pileableType: 'card', ...(stackId !== undefined && { stackId }) });
 
@@ -249,40 +249,11 @@ test('a stack of ONE offers no overlap actions - there is nothing to overlap', (
   assert.deepEqual(stack.stackActions({ maxSpread: 0.85 }).ids, []);
 });
 
-test('flipping a direction is its own inverse', () => {
-  const [vertical] = stacksOf({ cards: [card('a'), card('b')], direction: VERTICAL });
-  const [horizontal] = stacksOf({ cards: [card('a'), card('b')], direction: HORIZONTAL });
-  assert.equal(vertical.flippedDirection(), HORIZONTAL);
-  assert.equal(horizontal.flippedDirection(), VERTICAL);
-});
-
-test('flipping a FAN gives vertical, not a plain horizontal stack (the arc would silently vanish)', () => {
-  const [fan] = stacksOf({ cards: [card('a'), card('b')], direction: FAN });
-  assert.equal(fan.flippedDirection(FAN), VERTICAL);
-});
-
-// *fix (queued 2026-09-10, direct user report: "cant re-fan my hand
-// stack after flip"): the OLD `flippedDirection()` only ever toggled
-// VERTICAL<->HORIZONTAL - once a FAN-default stack (a hand) flipped
-// away to VERTICAL, flipping again pushed it on to HORIZONTAL, and FAN
-// was gone for good. Passing the pile's own default direction lets it
-// tell "away from the pile's natural rest state" (go there) apart from
-// "already away from it" (go BACK), so FAN is always one flip back.
-test('flipping a FAN-default stack twice returns to FAN, not on to horizontal', () => {
-  const [fan] = stacksOf({ cards: [card('a'), card('b')], direction: FAN });
-  const flippedOnce = fan.flippedDirection(FAN);
-  assert.equal(flippedOnce, VERTICAL);
-
-  const [vertical] = stacksOf({ cards: [card('a'), card('b')], direction: flippedOnce });
-  assert.equal(vertical.flippedDirection(FAN), FAN, 'the second flip must restore the fan, not advance to horizontal');
-});
-
-test('a non-FAN-default pile (Battlefield, Lands) still just toggles vertical<->horizontal, unaffected', () => {
-  const [vertical] = stacksOf({ cards: [card('a'), card('b')], direction: VERTICAL });
-  const [horizontal] = stacksOf({ cards: [card('a'), card('b')], direction: HORIZONTAL });
-  assert.equal(vertical.flippedDirection(VERTICAL), HORIZONTAL);
-  assert.equal(horizontal.flippedDirection(VERTICAL), VERTICAL);
-});
+// US-145/D167: `Stack.flippedDirection()` (and its tests, formerly here)
+// is deleted along with the `FLIP_STACK` toggle action it existed for -
+// the gear menu's Flip entry now sets a stack's direction directly to
+// one of Column/Row/Fan (`SET_STACK_DIRECTION`, see state.test.js), so
+// nothing computes "the other" direction from the current one any more.
 
 // ---------------------------------------------------------------------
 // Stack-scoped tap/untap (direct user request: "add stackaction for

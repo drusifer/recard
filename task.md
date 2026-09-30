@@ -2405,3 +2405,43 @@ Phase 3: startGame/auto-start/New Game flow
       tests/docs added elsewhere)
 
 **US-144/D166 COMPLETE** - all 3 phases shipped, D161's original pause-list fully closed.
+
+# Flip control redesign (US-145, D167) — 2026-09-29
+
+Phase 1: reducer + registry shape change
+- [x] state.js: SET_STACK_DIRECTION(pileId, stackKey, direction) replaces FLIP_STACK; validates
+      direction against Stackable.js's VERTICAL/HORIZONTAL/FAN
+- [x] Stack.flippedDirection() deleted (no caller left once the reducer takes direction directly)
+- [x] Pile.js: flipStack stack-action registry entry -> (pile, stackKey, value) => SET_STACK_DIRECTION
+- [x] pileActions.js: flipStack spec gains enum: true
+- [x] tests/stack.test.js's flippedDirection tests (4) and tests/state.test.js's FLIP_STACK test
+      rewritten -> 3 SET_STACK_DIRECTION tests (set-directly, invalid-direction, unknown pile/stack)
+- [x] gate: bobp make check (315 unit tests). NOTE: test-ui's existing flipStack click test is
+      expected red until Phase 2 wires the enum UI - reducer now requires an explicit direction
+      the plain-button path can't supply yet. Not a regression to fix in Phase 1.
+
+Phase 2: UI wiring - the enum control + preview icons
+- [x] actionControls.js: buildEnumActionMenu gains optional choice.preview (a () => HTMLElement
+      factory), rendered alongside the label, never replacing it (Smith's WCAG condition)
+- [x] pileCards.js: openStackActionMenu switched to call the shared buildSpecialActionControl
+      (was duplicating its range-only branch inline - real pre-existing gap, D167) + builds
+      enumOptions.flipStack {value: stack.direction, choices: Column/Row/Fan}
+- [x] pileCards.js: buildDirectionPreview() mini card-stack illustration, CSS-positioned per
+      direction (style.css .stack-direction-preview-*); pure DOM construction
+- [x] REAL BUG #1 found+fixed live: `<action-menu>`'s document-click close listener caught the
+      enum's native <summary> toggle click (no stopPropagation), so opening Flip's disclosure
+      inside a stack's gear menu closed the whole popup instantly. Fixed in buildEnumActionMenu;
+      mutation-proved (revert -> both new Flip tests fail with the exact same symptom)
+- [x] REAL BUG #2 found by actually LOOKING (Smith's own standing principle - a screenshot,
+      not a test report): the outer <action-menu> popup reuses .pile-action-menu's own
+      classname for its shell, whose overflow:hidden silently clipped the enum's nested
+      dropdown to nothing - present in the DOM, fully textContent()-able, INVISIBLE. All 21
+      test-ui tests kept passing throughout, including the brand-new Flip tests - Playwright's
+      own click/visibility checks don't account for an ancestor's overflow clip. Fixed with a
+      scoped .stack-action-menu{overflow:visible} override; added a real elementFromPoint
+      hit-test to the test itself (the one check that reproduces what clipping actually
+      breaks), mutation-proved against BOTH the CSS fix and the new check independently
+- [x] tests/uiActions.browser.mjs's flipStack test rewritten for the enum control + a new test
+      for the preview-alongside-label requirement (AC2/Smith's condition)
+- [x] gate: bobp make check; test-ui 21/21 (3x stress-clean), test-rtg 16/16, headeractions 9/9,
+      zonepanel 6/6 all green

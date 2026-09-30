@@ -70,6 +70,74 @@ D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rul
 
 ---
 
+### D167. Flip becomes `SET_STACK_DIRECTION`, an EnumAction reusing `changePileType`'s own control
+
+US-145: the user's own design answers (all 3 directions everywhere, mini
+illustration previews, same gear-menu slot) map directly onto machinery
+this codebase already has, rather than needing anything new:
+
+1. **`FLIP_STACK` (implicit toggle via `Stack.flippedDirection()`) is
+   replaced outright by `SET_STACK_DIRECTION(pileId, stackKey, direction)`**
+   - the same "delta action -> absolute-value action" shape change
+   `ADJUST_PILE_SPREAD` -> `SET_STACK_SPREAD` already went through when
+   a slider needed an explicit target instead of a toggle. `direction`
+   is validated against `Stackable.js`'s own `VERTICAL`/`HORIZONTAL`/
+   `FAN` exports. `Stack.flippedDirection()` is deleted - once every
+   caller passes an explicit direction, nothing calls it. No back-compat
+   shim; `flippedDirection`'s own tests (`tests/stack.test.js`) and
+   `FLIP_STACK`'s reducer tests (`tests/state.test.js`) are rewritten
+   against the new action, not kept alongside it.
+2. **`flipStack` becomes `enum: true`** (`src/pileActions.js`), the same
+   flag `changePileType` already uses. `Pile.js`'s stack-action registry
+   entry needs no new plumbing - `performStackAction(stackKey, actionId,
+   value)` already threads a `value` through (`spreadStack` proves it):
+   `flipStack: (pile, stackKey, value) => ({ action: { type:
+   'SET_STACK_DIRECTION', pileId: pile.id, stackKey, direction: value },
+   guard: 'silent' })`.
+3. **The choice control is `buildEnumActionMenu` (`actionControls.js`),
+   unchanged in shape** - the same disclosure list `changePileType`
+   already renders, marking the current choice via `aria-current` and
+   no-op'ing a click on it. Three choices, `{value, label}` pairs:
+   Column/`VERTICAL`, Row/`HORIZONTAL`, Fan/`FAN`.
+4. **New, genuinely reusable: an optional `choice.preview` factory**
+   (`() => HTMLElement`, called fresh per menu open) rendered alongside
+   the text label inside `buildEnumActionMenu`'s existing choice button -
+   generic, not Flip-specific, so a future EnumAction can carry its own
+   previews the same way. Satisfies Smith's Gate 1 condition (preview
+   ALONGSIDE the label, never replacing it - text stays the real signal,
+   same WCAG 1.4.1 rule the deck-choice colour dots already follow).
+   `pileActions.js` gains the actual mini-illustration builder (three
+   small stacked/offset/fanned rectangles, CSS-positioned per direction) -
+   pure DOM construction, covered by the existing UI browser suite per
+   this project's "pure logic unit-tested, DOM-building browser-tested"
+   split, not a new unit-test file.
+5. **Real pre-existing gap found and fixed along the way, not new scope
+   creep**: `pileCards.js`'s `openStackActionMenu` never called the
+   shared `buildSpecialActionControl` (`actionControls.js`) at all - it
+   duplicated that helper's range-only branch inline, so an `enum`
+   action rendered as a stack menu item would have silently fallen
+   through to a plain button. Switched to call `buildSpecialActionControl`
+   directly (passing both `rangeOptions` and the new `enumOptions`),
+   removing the duplicated branch - this is what makes `flipStack`
+   possible as a stack action at all, and closes the gap for any future
+   enum stack action too.
+
+Gating (`Stack.stackActions()`'s `pileables.length >= 2` check for
+`flipStack`) is untouched - presentation-only change, same invariant as
+before.
+
+**Rejected:** a new bespoke radio-group component - `changePileType`'s
+disclosure control already does everything this needs (current-choice
+indicator, click-to-select, keyboard/click-outside-to-close for free from
+`<details>`); building a second control for the same interaction shape
+would duplicate proven UI for no reason. Also rejected: keeping `direction`
+selectable only from each pile kind's own 2-option subset - the user's
+explicit answer was all 3 everywhere, and gating by kind would need a new
+per-kind "allowed directions" declaration nothing else in the domain model
+calls for yet.
+
+---
+
 ### D166. Host-setup/new-game cluster: D161's explicit-param pattern, not a new domain object
 
 The last cluster on D161's original pause list (US-144) - deck/preset

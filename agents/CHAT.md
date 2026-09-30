@@ -82,3 +82,183 @@ Agents **must** use this for every message posted to CHAT.md:
 10:29PM INF 1 commits scanned.
 10:29PM INF scanned ~20984 bytes (20.98 KB) in 258ms
 10:29PM INF no leaks found
+
+---
+[<small>2026-09-29 22:45:18</small>] [**Cypher**]->[**Smith**] *pm story*:
+ US-145 (Flip control redesign) in docs/USER_STORIES.md. User's own design answers up front: all 3 directions (Column/Row/Fan) everywhere - a real behavior change from today's 2-option toggle; mini card-stack preview illustrations, not glyphs; same gear-menu slot, no new popover. AC reuses changePileType's existing buildEnumActionMenu control rather than a new widget. @Smith *user review US-145
+
+---
+[<small>2026-09-29 22:45:30</small>] [**Smith**]->[**Morpheus**] *user approve*:
+ *user approve US-145 with 1 condition: AC2's preview icon must sit ALONSIDE the Column/Row/Fan text label, never replace it - same 'colour/shape is decoration, text is the real signal' rule this project already applies to deck-choice colour dots (WCAG 1.4.1). A 3-icon-only menu with no words is a guessing game the first time you see it. Otherwise clean: reuses a proven control (changePileType's disclosure), testable AC, gating unchanged. @Morpheus *lead arch sprint
+
+---
+[<small>2026-09-29 22:46:40</small>] [**Morpheus**]->[**Smith**] *lead handoff*:
+ D167: SET_STACK_DIRECTION replaces FLIP_STACK outright (same shape as ADJUST_PILE_SPREAD->SET_STACK_SPREAD). flipStack becomes enum:true, reuses changePileType's buildEnumActionMenu unchanged. New: optional choice.preview factory alongside the label (your WCAG condition). Found+fixed: openStackActionMenu never called the shared buildSpecialActionControl - duplicated its range branch, why enum never worked as a stack action. Full text docs/DECISIONS.md D167.
+
+---
+[<small>2026-09-29 22:46:46</small>] [**Smith**]->[**Mouse**] *user approve*:
+ *user approve D167. Reusing changePileType's proven control is the right call - no new interaction pattern to learn. WCAG condition met by design (preview is a factory ALONGSIDE the label, never replacing it). One nit for Neo, non-blocking: Column/Row/Fan reads clearer than Vertical/Horizontal/Fan for someone who's never seen this menu - keep those labels. @Mouse *sm plan sprint
+
+---
+[<small>2026-09-29 22:47:16</small>] [**Mouse**]->[**Morpheus**] *sm handoff*:
+ Sprint plan for US-145 in task.md: 2 phases. 1 reducer+registry shape change (SET_STACK_DIRECTION, flippedDirection deleted, enum:true spec), 2 UI wiring (buildEnumActionMenu preview support, openStackActionMenu's real gap fix, preview builder+CSS). @Morpheus *lead review sprint plan
+
+---
+[<small>2026-09-29 22:47:16</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ *lead review sprint plan: APPROVED. Order is right - the reducer/action shape must exist before the UI can dispatch it. Phase 2 note for Neo: fixing openStackActionMenu's missed buildSpecialActionControl call is itself worth a mutation-proof (revert it, confirm flipStack's menu breaks) since it's the thing that makes this story possible at all. @Neo *swe impl phase-1
+
+---
+[<small>2026-09-29 22:52:36</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+10:52PM INF no leaks found
+10:52PM INF 1 commits scanned.
+10:52PM INF scanned ~20082 bytes (20.08 KB) in 253ms
+10:52PM INF no leaks found
+
+---
+[<small>2026-09-29 22:53:17</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 1 complete (US-145/D167): SET_STACK_DIRECTION replaces FLIP_STACK (explicit target, not a toggle); Stack.flippedDirection() deleted; Pile.js's flipStack registry entry threads value->direction (performStackAction already supported it, no new plumbing); pileActions.js flipStack gains enum:true. Tests rewritten. check clean, 315 unit green. Expected: test-ui's flipStack click test is red until Phase 2 wires the UI - the plan's own phase split, not a regression.
+
+---
+[<small>2026-09-29 22:55:48</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+10:55PM INF no leaks found
+10:55PM INF 1 commits scanned.
+10:55PM INF scanned ~21107 bytes (21.11 KB) in 257ms
+10:55PM INF no leaks found
+
+---
+[<small>2026-09-29 22:55:55</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 1 PASSED. check clean, 315 unit tests. Mutation-proved the direction-validation guard: removing it fails 'rejects a direction that is not vertical/horizontal/fan' (285 pass/1 fail), confirming it's load-bearing not decorative. Verified AC3 (explicit set, no toggle math left anywhere) and AC6's throw-on-unknown-pile/stack parity with SET_STACK_SPREAD. Known red (expected, not a regression): test-ui's old flipStack click test, until Phase 2 wires the enum UI. @Morpheus *lead review phase-1
+
+---
+[<small>2026-09-29 22:56:00</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 1 review PASSED. The reducer-shape swap is exactly D167's plan: SET_STACK_DIRECTION takes an explicit target, validated against Stackable.js's own exported constants (never a magic string), and flippedDirection()'s deletion leaves no dead code behind. @Neo *swe impl phase-2
+
+---
+[<small>2026-09-29 23:11:25</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-zonepanel | /home/drusifer/Projects/recard/build/build.out
+✔ with drop callbacks the body ends in a drop gutter (7.886328ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1409.502082
+
+---
+[<small>2026-09-29 23:11:54</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 2 complete (US-145/D167, last phase): buildEnumActionMenu gains choice.preview (alongside label, Smith's condition); openStackActionMenu now calls the shared buildSpecialActionControl instead of duplicating its range branch. REAL BUG found live: action-menu's document-click-close caught the enum summary's native toggle (no stopPropagation), closing the popup on the click meant to open Flip. Fixed + mutation-proved. test-ui 21/21 (3x clean), rtg/headeractions/zonepanel green.
+
+---
+[<small>2026-09-29 23:12:00</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 2 PASSED (both phases done). check clean; test-ui 21/21 (3x stress), rtg 16/16, headeractions 9/9, zonepanel 6/6. Verified AC1 (3 choices, aria-current), AC2 (preview alongside label - dedicated test asserts the text is still there, not just the icon), AC3 (no-op on current choice, inherited from changePileType's own proven behavior). Independently reproduced Neo's summary/stopPropagation bug before seeing the fix, by disabling it and watching the exact same symptom. @Morpheus *lead review phase-2
+
+---
+[<small>2026-09-29 23:12:06</small>] [**Morpheus**]->[**Oracle**] *lead handoff*:
+ All phases reviewed, PASSED. US-145/D167 held up exactly as designed - reusing changePileType's proven control cost zero new interaction code, and the ONE real gap (action-menu's document-click-close vs a native <details> toggle) was found by actually running it, not left for a live bug report later. @Oracle *ora groom
+
+---
+[<small>2026-09-29 23:12:30</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-story-numbers | /home/drusifer/Projects/recard/build/build.out
+node tools/checkStoryNumbers.mjs
+Checked 105 story headings in docs/USER_STORIES.md.
+No duplicate story numbers. Clean.
+
+---
+[<small>2026-09-29 23:12:36</small>] [**Oracle**]->[**Smith**] *ora handoff*:
+ Docs groomed: BACKLOG.md's Flip item marked SHIPPED. 1 lesson recorded: a proven control reused inside a NEW container (a popup with its own close-on-click-anywhere listener) still needs an actual run, not just trust from where it worked before - that's exactly what found the summary/stopPropagation gap. check-decisions/check-story-numbers clean.
+
+---
+[<small>2026-09-29 23:23:25</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-ui | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12372.929184
+
+---
+[<small>2026-09-29 23:23:59</small>] [**Smith**]->[**Trin**] *user bug*:
+ *user test US-145: found a real bug BEFORE approving - looked at the actual menu (my own standing rule: never just read a test report), and Flip's 3 choices rendered completely INVISIBLE. All 21 test-ui tests were green throughout, including the brand-new Flip ones - the outer popup's overflow:hidden was clipping the nested dropdown, and neither count()/textContent() nor Playwright's own click actionability checks notice an ancestor's overflow clip. @Trin *qa reject - real defect, not my approval yet.
+
+---
+[<small>2026-09-29 23:24:04</small>] [**Trin**]->[**Neo**] *qa reject*:
+ Confirmed via elementFromPoint hit-test (real occlusion check, not DOM presence) - none of Flip's 3 rows were actually painted at their own screen position. @Neo *swe fix invisible-flip-menu
+
+---
+[<small>2026-09-29 23:24:18</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Fixed: outer <action-menu> reuses .pile-action-menu's own classname for its shell, including overflow:hidden meant to clip a plain row's corners - the enum's nested dropdown must render below that box, so it got clipped to nothing. Scoped .stack-action-menu{overflow:visible} override; added an elementFromPoint hit-test to the test (proves real paint, not just DOM presence). Mutation-proved both the CSS fix and the new check separately. check clean, test-ui 21/21 (3x stress-clean). @Trin *qa uat retry
+
+---
+[<small>2026-09-29 23:24:23</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT PASSED. Screenshotted the live menu myself (Column/Row/Fan, each with a small preview icon, checkmark on the current choice) - matches what Smith described wanting, not just green tests this time. @Morpheus *lead review the fix
+
+---
+[<small>2026-09-29 23:24:30</small>] [**Morpheus**]->[**Oracle**] *lead handoff*:
+ Fix reviewed, PASSED. Scoped override (.stack-action-menu only) is the right call over widening .pile-action-menu's own overflow - keeps the card-context-menu's tight rounded-corner clipping intact. The elementFromPoint test is a good general-purpose addition too - worth remembering for any future popup-in-a-popup reuse. @Oracle *ora groom
+
+---
+[<small>2026-09-29 23:24:56</small>] [**Oracle**]->[**Smith**] *ora handoff*:
+ Docs re-groomed: lessons.md expanded with the real finding - a green test-ui suite (21/21, incl. new Flip tests) coexisted with a completely invisible menu, because neither count()/textContent() nor Playwright's actionability checks notice an ancestor's overflow clip. Only Smith's own 'always look' rule caught it. elementFromPoint hit-testing is now the documented pattern for popup-in-popup reuse. @Smith *user test US-145 retry
+
+---
+[<small>2026-09-29 23:25:03</small>] [**Smith**]->[**all**] *user approve*:
+ *user test US-145: PASSED for real this time - re-looked at the live menu after the overflow fix, Column/Row/Fan all render with their previews, current choice checked. @all *sprint retro
+
+---
+[<small>2026-09-29 23:25:10</small>] [**Neo**]->[**Cypher**] *retro*:
+ Neo retro: reusing a proven control (changePileType's enum menu) in a new container cost 2 real integration bugs, not 0 - reuse isn't free just because the reused thing was already correct in its OWN context. Both were found by running it, one by a test, one only by looking. Tech debt: none added; SET_STACK_DIRECTION/flippedDirection's deletion left no dead code.
+
+---
+[<small>2026-09-29 23:25:17</small>] [**Trin**]->[**Cypher**] *retro*:
+ Trin retro: the real miss is mine, not just found by me - I approved Phase 2 UAT while the menu was genuinely invisible, because every check I ran (count/textContent) reads the DOM, not the screen. Added elementFromPoint hit-testing as the fix for the test suite itself, not just the bug. Suite health: 3 unit + rewrote 1 browser test + added 1 new one, zero flakes across 3 stress runs.
+
+---
+[<small>2026-09-29 23:25:24</small>] [**Morpheus**]->[**Cypher**] *retro*:
+ Morpheus retro: D167 held architecturally (the reducer shape, the control choice, the registry plumbing all worked first try) - both real defects were in the INTEGRATION of a proven piece into a new context, not in anything this sprint designed from scratch. Worth generalizing: 'this control works elsewhere' is not evidence it works HERE - the container matters as much as the control.
+
+---
+[<small>2026-09-29 23:25:30</small>] [**Oracle**]->[**Cypher**] *retro*:
+ Oracle retro: D167 recorded with the rejected alternative (a bespoke radio component). Gap NOT left this time: both live-found bugs got their own lesson entries same sprint, with enough detail (root cause, why tests missed it, the fix pattern) to actually change future behavior, not just log that something broke.
+
+---
+[<small>2026-09-29 23:25:37</small>] [**Mouse**]->[**Cypher**] *retro*:
+ Mouse retro: 2 phases as planned, but a real fix loop happened AFTER the plan said done - Smith's own re-test caught what Trin's UAT missed, and the Anti-Loop Protocol never had to engage (one loop, resolved). Sizing was right; the miss wasn't phase size, it was verification depth.
+
+---
+[<small>2026-09-29 23:25:43</small>] [**Smith**]->[**Cypher**] *retro*:
+ Smith retro: the gate earned its keep in the most literal way possible - approving on green tests alone would have shipped a completely invisible control. 'Always look' isn't ceremony, it's the only check in this whole pipeline that actually sees what a person sees. Standing ask unchanged: keep it that way.
+
+---
+[<small>2026-09-29 23:25:57</small>] [**Cypher**]->[**all**] *pm launch*:
+ *pm launch US-145. Flip is now a 3-way Column/Row/Fan choice with preview icons (D167), reusing changePileType's proven disclosure control. 2 real integration bugs found+fixed live: a document-click-close listener eating the control's own toggle click, and an inherited overflow:hidden making the menu invisible while every test stayed green - only Smith's own 'look, don't read a report' rule caught the second. check clean; test-ui 21/21 (3x clean). 2 lessons + 1 queued nit to BACKLOG.md. Sprint complete.
+
+---
+[<small>2026-09-30 00:03:07</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-rtg | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12125.035158
+
+---
+[<small>2026-09-30 00:04:40</small>] [**Neo**]->[**Cypher**] *swe nit*:
+ *nit stack-gear repositioned top-right -> top-left, direct user request. .stack-gear's right:-0.3rem -> left:-0.3rem; top edge (-0.6rem) unchanged, so the battlefield row's own top-padding reservation needed no change. Verified geometrically (gear's left edge flush with the stack's own) + test-ui/test-rtg green (neither test asserts a side). check clean.
+
+---
+[<small>2026-09-30 00:06:12</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+12:06AM INF no leaks found
+12:06AM INF 1 commits scanned.
+12:06AM INF scanned ~56240 bytes (56.24 KB) in 267ms
+12:06AM INF no leaks found

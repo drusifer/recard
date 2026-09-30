@@ -704,9 +704,34 @@ where the bug would get introduced if built naively.
   reach outside the component's own DOM.
 
 ## Next Steps
-@Smith *user feedback arch (Gate 2) - then @Mouse *sm plan sprint. This
-is small enough to likely be ONE phase like the check-story-numbers
-sprint, but Mouse should confirm sizing since it touches state.js
-(new reducer action), a new tools-adjacent Web Component file, AND
-ui.js wiring across two menu call sites - slightly more surface than a
-single pure-function tool.
+Superseded - this sprint (SpreadSlider) shipped and closed. This file
+went stale through the whole D160-166 main.js/ui.js split arc (5+
+sprints tracked only in CHAT.md/docs/DECISIONS.md, never mirrored
+here) - a real state-hygiene miss, noted rather than backfilled in
+full; docs/DECISIONS.md D161-166 and docs/ARCHITECTURE.md are the
+accurate record for that arc.
+
+## Current Task (2026-09-29) - US-144/D166 reviewed, sprint closed
+
+Reviewed and approved all 3 phases of the host-setup/new-game cluster's
+move to src/hostSetup.js (D166). main.js: 2174 -> 1412; the whole
+D160/161 arc (main.js + ui.js combined, 2947+2946 -> 268+1412) is now
+closed. Full architectural assessment (given directly, not just
+recorded) posted to the user 2026-09-29 - see that conversation for
+the honest read: the reassess-per-cluster discipline (D161 explicit-
+param / D162-163 private objects / D165 registry / D166 back to
+explicit-param, each CHECKED not assumed) is the real win; the
+`read()`/`patch()` pattern is now duplicated twice (layoutSave.js,
+hostSetup.js) and is a genuine watch-item if a third cluster ever
+needs it (docs/BACKLOG.md has this); hostSetup.js itself (834 lines)
+is the single largest post-split file and covers four sub-concerns
+(deck preview, host session, resume, new-game) - not yet worth
+splitting further (no repeated pain point), but the next thing to
+watch if it keeps growing.
+
+## Next Steps
+Nothing assigned. Watch items only (docs/BACKLOG.md): read()/patch()
+consolidation if a 3rd cluster needs it; hostSetup.js's own size if it
+grows again; the "untested-for-years critical path" pattern (Resume
+just proved it - worth asking whether anything else is in that state,
+next time there's room).

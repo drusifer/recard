@@ -723,6 +723,39 @@ This file contains critical lessons and rules derived from past errors, technica
   READ them. Privatizing would have relocated a shared dependency, not
   encapsulated one. Grep every reference, not just the writes, before
   choosing "private state" over "crosses the boundary."
+- **A shared popup's "click anywhere closes it" listener can eat a
+  native control's OWN click before that control gets to react.**
+  US-145/D167: `<action-menu>` closes on any document click that isn't
+  explicitly `stopPropagation()`'d (every plain row button does this).
+  Reusing `changePileType`'s enum control (a native `<details>`/
+  `<summary>`) INSIDE that popup for the first time exposed a gap the
+  control never had before: the `<summary>`'s native toggle click has
+  no such guard, so the whole popup closed on the very click meant to
+  open the disclosure - working fine everywhere it had been used
+  (inline in `<header-actions>`, no enclosing popup) and breaking only
+  in the new context. Reusing a proven control in a NEW container is
+  still worth actually running, not just trusting because it worked
+  elsewhere.
+- **A second, more serious version of the same story, same sprint: a
+  green test suite does not mean a human can see the thing.** The fix
+  above still left Flip's 3 choices completely invisible - the outer
+  `<action-menu>` popup reuses `.pile-action-menu`'s own classname for
+  its shell, and that class's `overflow: hidden` (there to clip a plain
+  row's rounded corners) silently clipped the enum's nested dropdown to
+  nothing. All 21 `test-ui` tests stayed green through this, including
+  the brand-new Flip tests, because `count()`/`textContent()` read the
+  DOM regardless of paint, and Playwright's own click/visibility
+  actionability checks do NOT consider an ANCESTOR's `overflow: hidden`
+  clip - only the element's own display/visibility/opacity. The bug was
+  found only because Smith's standing rule ("a UX gate should always
+  LOOK, never read a test report" - see this file's earlier US-121
+  entry) was actually followed: a screenshot, not a green checkmark.
+  Fixed with a scoped `.stack-action-menu { overflow: visible; }`
+  override, and closed the TEST gap too - an `elementFromPoint` hit-test
+  at a row's own center (`tests/uiActions.browser.mjs`) is the one check
+  that reproduces what clipping actually breaks, and is now the pattern
+  to reach for whenever a popup nests another popup/disclosure inside
+  it, not `count()`/`isVisible()` alone.
 - **A real browser's `confirm()`/`alert()` blocks until a test answers
   it - Playwright auto-DISMISSES by default, so an unhandled `confirm()`
   silently returns `false`.** Writing `tests/resume.browser.mjs` hit

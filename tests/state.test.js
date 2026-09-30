@@ -3627,26 +3627,45 @@ test('D129: a plain move to another pile clears membership - a stackId is PILE-s
   assert.equal(moved.stackId, undefined, 'the old pile\'s stack does not follow it');
 });
 
-// *fix (queued 2026-09-10, direct user report: "cant re-fan my hand
-// stack after flip") - `FLIP_STACK` only ever toggled a stack's stored
-// direction between VERTICAL and HORIZONTAL, so a hand (whose Pile-kind
-// default is FAN) that got flipped once could never flip its way back
-// to FAN - it dead-ended at HORIZONTAL on the second flip instead.
-// Fixed by having `Stack.flippedDirection` accept the owning pile
-// kind's own default direction, so FAN-default piles get a genuine
-// 2-state FAN<->VERTICAL toggle (see stack.test.js for the pure-Stack
-// coverage) - this is the reducer-level wiring proof that FLIP_STACK
-// actually passes that default through.
-test('FLIP_STACK: a hand (FAN-default) flips to vertical then back to fan - not on to horizontal', () => {
+// US-145/D167: `FLIP_STACK` (an implicit toggle via `Stack.flippedDirection()`)
+// is replaced outright by `SET_STACK_DIRECTION` - the gear menu's Flip
+// entry became a 3-way choice (Column/Row/Fan), so the reducer needs an
+// EXPLICIT target direction, the same "delta action -> absolute-value
+// action" shape change `ADJUST_PILE_SPREAD` -> `SET_STACK_SPREAD` already
+// went through for the spread slider. No back-compat - `flippedDirection`
+// itself is deleted (see stack.test.js), so there is nothing left to keep
+// a toggle-shaped test around for.
+test('SET_STACK_DIRECTION: sets a hand stack directly to any of the three directions', () => {
   let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
   state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
   const handPileId = state.piles.find((p) => p.kind === 'hand' && p.ownerId === 'p1').id;
 
-  state = reduce(state, { type: 'FLIP_STACK', pileId: handPileId, stackKey: DEFAULT_STACK_KEY });
+  state = reduce(state, { type: 'SET_STACK_DIRECTION', pileId: handPileId, stackKey: DEFAULT_STACK_KEY, direction: 'vertical' });
   assert.equal(state.piles.find((p) => p.id === handPileId).stacks[DEFAULT_STACK_KEY].direction, 'vertical');
 
-  state = reduce(state, { type: 'FLIP_STACK', pileId: handPileId, stackKey: DEFAULT_STACK_KEY });
-  assert.equal(state.piles.find((p) => p.id === handPileId).stacks[DEFAULT_STACK_KEY].direction, 'fan', 'a second flip must restore the fan, not advance to horizontal');
+  // Going straight from vertical back to fan in ONE call - the whole
+  // point of an explicit target over a toggle (US-145's user answer:
+  // all 3 directions offered directly, not reached by repeated clicks).
+  state = reduce(state, { type: 'SET_STACK_DIRECTION', pileId: handPileId, stackKey: DEFAULT_STACK_KEY, direction: 'fan' });
+  assert.equal(state.piles.find((p) => p.id === handPileId).stacks[DEFAULT_STACK_KEY].direction, 'fan');
+
+  state = reduce(state, { type: 'SET_STACK_DIRECTION', pileId: handPileId, stackKey: DEFAULT_STACK_KEY, direction: 'horizontal' });
+  assert.equal(state.piles.find((p) => p.id === handPileId).stacks[DEFAULT_STACK_KEY].direction, 'horizontal');
+});
+
+test('SET_STACK_DIRECTION: rejects a direction that is not vertical/horizontal/fan', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
+  const handPileId = state.piles.find((p) => p.kind === 'hand' && p.ownerId === 'p1').id;
+  assert.throws(() => reduce(state, { type: 'SET_STACK_DIRECTION', pileId: handPileId, stackKey: DEFAULT_STACK_KEY, direction: 'diagonal' }));
+});
+
+test('SET_STACK_DIRECTION: throws on an unknown pile or stack, same as SET_STACK_SPREAD', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1']);
+  assert.throws(() => reduce(state, { type: 'SET_STACK_DIRECTION', pileId: 'nope', stackKey: DEFAULT_STACK_KEY, direction: 'vertical' }));
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
+  const handPileId = state.piles.find((p) => p.kind === 'hand' && p.ownerId === 'p1').id;
+  assert.throws(() => reduce(state, { type: 'SET_STACK_DIRECTION', pileId: handPileId, stackKey: 'nope', direction: 'vertical' }));
 });
 
 // ---- US-124 / D141 / D145: spectators are a role on the one roster ----

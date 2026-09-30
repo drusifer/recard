@@ -54,8 +54,27 @@ docs/ARCHITECTURE.md/BACKLOG.md/DECISIONS.md/USER_STORIES.md, task.md, agents/CH
 archive files). Ask the user before committing - this project's own pattern is mixed (some
 sprints auto-commit+push, some wait).
 
+## Current Task (2026-09-29, later still) - US-145/D167 SHIPPED (Flip control redesign)
+
+`/sprint flip control redesign`. Backlog item (Flip as radio + previews) needed the user's own
+visual-design input first - asked via AskUserQuestion before writing the story: all 3 directions
+everywhere (real behavior change), mini card-stack illustration previews, same gear-menu slot.
+Full cycle: Cypher story -> Smith gate 1 -> Morpheus arch (D167: reuse changePileType's own
+buildEnumActionMenu control, SET_STACK_DIRECTION replaces FLIP_STACK) -> Smith gate 2 -> Mouse
+2-phase plan -> Neo/Trin/Morpheus Bloop -> Oracle groom -> **Smith's user-test caught a REAL bug
+Trin's UAT had missed** (Flip's menu was completely invisible - an inherited overflow:hidden -
+while all 21 test-ui tests stayed green) -> fix loop (Neo fix + new elementFromPoint test, Trin
+re-verify, Morpheus re-review) -> Oracle re-groom -> Smith re-test PASSED -> retro -> launch.
+
+Worth remembering: this is the sprint protocol's fix-loop working exactly as designed - Smith's
+own "always look, never read a test report" standing rule is what caught it, not a script.
+
+Plus a same-day nit (2026-09-30): stack gear icon moved top-right -> top-left, direct user
+request. .stack-gear right->left, verified geometrically + test-ui/test-rtg green.
+
 ## Next Steps
-1. Ask the user: commit + push (dev, likely also merge to main per this project's usual pattern)?
+1. User asked to commit + push all (dev + main) once done - covers US-144/D166, US-145/D167,
+   and the gear-reposition nit, all in one working tree.
 2. **Waiting on the user** (docs/BACKLOG.md, been open since the US-130 era): RtG's 5s quit grace vs
    its safe points; a bot that ignores SIGTERM (~11s worst-case shutdown).
 3. Cold start: read this file, then docs/BACKLOG.md top, then task.md tail, then ask what's next.

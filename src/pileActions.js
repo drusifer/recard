@@ -180,7 +180,13 @@ export const ACTION_SPECS = {
   // site" split (`rangeOptions`, `ui.js`, mirroring `enumOptions`).
   spread: { label: 'Spread', destructive: false, hint: 'Adjust how much every stack in this pile overlaps.', icon: '↔', range: true },
   spreadStack: { label: 'Spread', destructive: false, hint: 'Adjust how much this stack\'s cards overlap.', icon: '↔', range: true },
-  flipStack: { label: 'Flip', destructive: false, hint: 'Run this stack the other way - a row becomes a column.', icon: '↕' },
+  // US-145/D167 (direct user request: "listing orientations directly"
+  // with previews, not a single toggle button): an EnumAction, same
+  // flag `changePileType` uses - `enumOptions.flipStack` (the current
+  // direction + the 3 Column/Row/Fan choices, each with a preview) is
+  // supplied per-render (`pileCards.js`), same "static spec, per-
+  // instance value at the call site" split as every other EnumAction.
+  flipStack: { label: 'Flip', destructive: false, hint: 'Set how this stack is arranged.', icon: '↕', enum: true },
   // D129 (direct user request: "add stackaction for tap/untap, keep
   // pile level for all stacks") - `untapAll` above stays pile-wide and
   // untouched; these act on one stack only. Not destructive, same

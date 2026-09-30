@@ -33,10 +33,36 @@ sprints) archived to agents/chat_archive/CHAT_MAINJS_AND_JEV_SPLIT.md in the sam
 **NOT committed** - see agents/cypher.docs/state.md for the working-tree file list; ask the user
 before committing/pushing.
 
+## Current Task (2026-09-29, later still) - US-145/D167 SHIPPED: Flip control redesign
+
+Gear menu's Flip is now enum:true, reusing changePileType's own buildEnumActionMenu disclosure
+(no new widget). SET_STACK_DIRECTION(pileId, stackKey, direction) replaces FLIP_STACK outright;
+Stack.flippedDirection() deleted. buildEnumActionMenu gained an optional choice.preview factory
+(generic, not Flip-specific) rendered alongside the label. pileCards.js's openStackActionMenu
+switched to call the shared buildSpecialActionControl instead of duplicating its range-only
+branch inline - that missed call is WHY enum never worked as a stack action before this.
+
+**2 real bugs found live, both worth remembering:**
+1. `<action-menu>`'s document-click-close listener caught the enum's native `<summary>` toggle
+   click (no stopPropagation) - opening Flip's disclosure closed the whole popup instantly.
+   Fixed with `summary.addEventListener('click', e => e.stopPropagation())`.
+2. Bigger one: the outer `<action-menu>` popup reuses `.pile-action-menu`'s own classname for
+   its shell, including that class's `overflow: hidden` - clipped the enum's nested dropdown to
+   NOTHING, invisible but fully present in the DOM. All 21 test-ui tests (incl. the new Flip
+   ones) stayed GREEN throughout - count()/textContent() don't check paint, and Playwright's own
+   click/visibility actionability doesn't check an ancestor's overflow clip either. Found only by
+   Smith actually looking at a screenshot. Fixed with scoped `.stack-action-menu{overflow:visible}`;
+   added a real `elementFromPoint` hit-test to the test itself as the general pattern for any
+   future popup-in-popup reuse.
+
+check clean, test-ui 21/21 (3x stress-clean), rtg/headeractions/zonepanel green throughout.
+
 ## Next Steps
-Nothing assigned. D160/161's whole main.js/ui.js split arc is done - await the user's next
+Nothing assigned. Not committed yet - see agents/cypher.docs/state.md (2 sprints uncommitted:
+US-144/D166 host-setup split + US-145/D167 Flip redesign). Otherwise await the user's next
 direction, or pick up docs/BACKLOG.md's Technical/testing section (multi-player harness
-follow-ups, Gin bot tuning, read()/patch() consolidation candidate from this sprint's own retro).
+follow-ups, Gin bot tuning, read()/patch() consolidation candidate) or the queued nit (stack
+gear icon to upper-left corner).
 
 ## Previous - (2026-09-25) - US-130: impl + 2 real bugs found by the browser test going intermittently red
 

@@ -6,12 +6,13 @@
 // module: `PileElement`'s subclasses call `renderPileCards` for their row, and
 // it touches `document` only when called.
 import { ACTION_SPECS, pileableMenuItems, actionsForPileable } from './pileActions.js';
-import { buildRangeAction } from './actionControls.js';
+import { buildSpecialActionControl } from './actionControls.js';
 import { stacksOf, stackKeyFor } from './piles/Stack.js';
 import { MAX_SPREAD, MIN_SPREAD } from './piles/Pile.js';
 import { PILE_TYPES, pileInstanceFor } from './piles/pileTypes.js';
 import { beginCardTargetPick, clearPileTargets, wireCardDrag, wireCardLiftCue } from './dragDrop.js';
 import { pileableFor } from './pileables/pileableTypes.js';
+import { VERTICAL, HORIZONTAL, FAN } from './pileables/Stackable.js';
 
 /**
  * The card SHELL, shared by every card face (D76). The `<button>`, its
@@ -148,10 +149,42 @@ function stackGearFor(stack, pileView, options) {
     // and bounds - the per-stack sibling of the pile-level menu's own
     // `rangeOptions.spread` (see the `<pile-panel>` call site).
     const rangeOptions = { spreadStack: { value: stack.spread, min: MIN_SPREAD, max: maxSpread } };
-    openStackActionMenu(at.left, at.bottom, ids, disabled, pileView.id, stackKeyFor(stack.id), rangeOptions, options);
+    // US-145/D167: Flip's 3 choices + the stack's own current direction -
+    // same "static spec, per-instance value at the call site" split
+    // `changePileType`'s `enumOptions` already uses (`PileElement.js`).
+    const enumOptions = { flipStack: { value: stack.direction, choices: FLIP_DIRECTION_CHOICES } };
+    openStackActionMenu(at.left, at.bottom, ids, disabled, pileView.id, stackKeyFor(stack.id), rangeOptions, enumOptions, options);
   });
   return gear;
 }
+
+/**
+ * US-145/D167: a small literal illustration of 2-3 overlapping card
+ * shapes, arranged the way `direction` would actually lay a stack out -
+ * not a generic arrow glyph, per the user's own design answer. Pure DOM
+ * construction (no measurement, no card content) - CSS does the actual
+ * positioning per direction (`.stack-direction-preview-<direction>`,
+ * `style.css`), the same "JS builds the box, CSS positions it" split
+ * `Stackable.offsetIn`'s own stride-multiplier design already uses for
+ * the real stack layout.
+ */
+function buildDirectionPreview(direction) {
+  const preview = document.createElement('span');
+  preview.className = `stack-direction-preview stack-direction-preview-${direction}`;
+  preview.setAttribute('aria-hidden', 'true'); // decoration only - the choice's own label carries the meaning (Smith Gate 1)
+  for (let index = 0; index < 3; index += 1) {
+    const card = document.createElement('span');
+    card.className = 'stack-direction-preview-card';
+    preview.append(card);
+  }
+  return preview;
+}
+
+const FLIP_DIRECTION_CHOICES = [
+  { value: VERTICAL, label: 'Column', preview: () => buildDirectionPreview(VERTICAL) },
+  { value: HORIZONTAL, label: 'Row', preview: () => buildDirectionPreview(HORIZONTAL) },
+  { value: FAN, label: 'Fan', preview: () => buildDirectionPreview(FAN) },
+];
 
 /** The box one `Stack` lays itself out inside (D129): its own
  * positioning origin, sized from the stack's real extent so it
@@ -411,22 +444,23 @@ function attachCardContextMenu(wrapper, card, pileableActions, piles, fromPileId
  * differs from the card menu is only WHAT it acts on: a stack, addressed
  * by its key, rather than a card.
  */
-function openStackActionMenu(clientX, clientY, actionIds, disabled, pileId, stackKey, rangeOptions, options) {
+function openStackActionMenu(clientX, clientY, actionIds, disabled, pileId, stackKey, rangeOptions, enumOptions, options) {
   const items = actionIds.map((id) => {
     const spec = ACTION_SPECS[id];
-    // Tighten/Loosen slider (2026-09-13): `spreadStack` (`spec.range`)
-    // renders as a `<spread-slider>`, same as the pile-level menu's own
-    // `spread` action (`buildRangeAction`) - it does NOT close the menu
-    // on interaction the way a plain button does, since a slider is
-    // meant to be dragged repeatedly, not clicked once and dismissed.
-    const rangeInfo = spec.range ? rangeOptions?.[id] : undefined;
-    if (rangeInfo) {
-      return {
-        node: buildRangeAction(id, spec, rangeInfo, {
-          onAction: (actionId, value) => options.onStackAction?.(pileId, stackKey, actionId, value),
-        }),
-      };
-    }
+    // US-145/D167: this used to duplicate `buildSpecialActionControl`'s
+    // own range-only branch inline instead of calling it - which is
+    // exactly why an `enum` action (Flip) could never have rendered as
+    // a stack menu item before. `spreadStack` (`spec.range`) renders as
+    // a `<spread-slider>`; it does NOT close the menu on interaction
+    // the way a plain button does, since a slider is meant to be
+    // dragged repeatedly, not clicked once and dismissed - same for the
+    // enum's own `<details>` disclosure.
+    const control = buildSpecialActionControl(id, spec, {
+      rangeOptions,
+      enumOptions,
+      onAction: (actionId, value) => options.onStackAction?.(pileId, stackKey, actionId, value),
+    });
+    if (control) return { node: control };
     return { id, text: `${spec.icon} ${spec.label}`, title: spec.hint, label: spec.label, disabled: disabled.includes(id) };
   });
   document.createElement('action-menu').open({

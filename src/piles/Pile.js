@@ -702,7 +702,11 @@ export class Pile {
     }
     this.registerStackActions({
       spreadStack: (pile, stackKey, value) => ({ action: { type: 'SET_STACK_SPREAD', pileId: pile.id, value, stackKey }, guard: 'silent' }),
-      flipStack: (pile, stackKey) => ({ action: { type: 'FLIP_STACK', pileId: pile.id, stackKey }, guard: 'silent' }),
+      // US-145/D167: `value` is the chosen direction (Column/Row/Fan),
+      // same second-parameter shape `spreadStack` above already uses -
+      // `performStackAction(stackKey, actionId, value)` already threads
+      // it through, no new plumbing needed for the enum choice to reach here.
+      flipStack: (pile, stackKey, value) => ({ action: { type: 'SET_STACK_DIRECTION', pileId: pile.id, stackKey, direction: value }, guard: 'silent' }),
       tapStack: (pile, stackKey) => ({ action: { type: 'SET_STACK_ORIENTATION', pileId: pile.id, stackKey, orientation: 'landscape' }, guard: 'silent' }),
       untapStack: (pile, stackKey) => ({ action: { type: 'SET_STACK_ORIENTATION', pileId: pile.id, stackKey, orientation: 'portrait' }, guard: 'silent' }),
     });

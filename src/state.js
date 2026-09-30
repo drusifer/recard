@@ -1,5 +1,6 @@
 import { buildDeck, shuffle, RANKS, SUITS } from './deck.js';
 import { stacksOf, stackKeyFor, DEFAULT_STACK_KEY } from './piles/Stack.js';
+import { VERTICAL, HORIZONTAL, FAN } from './pileables/Stackable.js';
 import { PILE_TYPES, revivePile, pileInstanceFor } from './piles/pileTypes.js';
 import { MIN_SPREAD, MAX_SPREAD } from './piles/Pile.js';
 import { survivorsOfReset } from './pileables/pileableTypes.js';
@@ -1473,16 +1474,24 @@ const ACTIONS = {
   },
 
   /**
-   * D129 (direct user request): turn one stack's run the other way -
-   * a horizontal run becomes a vertical cascade and back. The
-   * capability per-stack direction unlocked, and the reason the gear
-   * emblem is worth its pixels.
+   * D129/US-145/D167: set one stack's own layout direction directly -
+   * Column (vertical), Row (horizontal) or Fan. The capability per-stack
+   * direction unlocked, and the reason the gear emblem is worth its
+   * pixels. Replaces `FLIP_STACK` (an implicit toggle via
+   * `Stack.flippedDirection()`, now deleted) outright - the gear menu's
+   * Flip entry is a 3-way choice now, not a single button, so the
+   * reducer needs an explicit target rather than "the other one." Same
+   * "delta action -> absolute-value action" shape change
+   * `ADJUST_PILE_SPREAD` -> `SET_STACK_SPREAD` already went through.
    *
    * Replicated like every other presentation change (see
    * `SET_STACK_SPREAD`): everyone at the table is looking at the same
    * cards, so they must see the same arrangement.
    */
-  FLIP_STACK(state, action) {
+  SET_STACK_DIRECTION(state, action) {
+    if (![VERTICAL, HORIZONTAL, FAN].includes(action.direction)) {
+      throw new Error(`SET_STACK_DIRECTION: direction must be ${VERTICAL}, ${HORIZONTAL} or ${FAN}, got ${action.direction}`);
+    }
     const pile = state.piles.find((p) => p.id === action.pileId);
     if (!pile) throw new Error(`Pile ${action.pileId} does not exist`);
     const kind = PILE_TYPES[pile.kind];
@@ -1495,7 +1504,7 @@ const ACTIONS = {
     if (!stack) throw new Error(`Stack ${action.stackKey} is not in pile ${action.pileId}`);
 
     const key = action.stackKey;
-    const stacks = { ...pile.stacks, [key]: { ...pile.stacks?.[key], direction: stack.flippedDirection(kind?.stackDirection) } };
+    const stacks = { ...pile.stacks, [key]: { ...pile.stacks?.[key], direction: action.direction } };
     return { ...state, piles: state.piles.map((p) => (p.id === action.pileId ? { ...p, stacks } : p)) };
   },
 

@@ -4641,3 +4641,47 @@ already were, with no behavior change.
 **Out of scope:** any behavior change to host setup, resume, or new-game
 (this is D161's pause-list cleanup, not a feature); the create-table/
 new-game DOM wiring for screens other than `#screen-host`/`#screen-game`.
+
+### US-145: Flip becomes a 3-way orientation choice with preview icons
+**As** someone arranging a stack, **I want** the stack gear menu's Flip
+entry to show all three possible orientations (Column/Row/Fan) with a
+small preview of what each looks like, **so that** I can pick the
+arrangement I want directly instead of guessing what one Flip click will
+toggle to and clicking again if it's wrong.
+
+User's own design answers (asked before this story was finalized, not
+guessed): (1) offer all 3 directions on every stack, a real behavior
+change from today's 2-option-per-kind toggle; (2) each choice shows a
+small literal mini card-stack illustration of the resulting arrangement,
+not just a directional glyph; (3) lives in the same stack-gear-menu slot
+Flip occupies today, as an inline choice list - no new popover/dialog.
+
+**AC:**
+1. The gear menu's Flip entry becomes an `enum`-shaped action (reusing
+   `changePileType`'s existing disclosure-menu control, `buildEnumActionMenu`
+   in `src/actionControls.js` - not a new bespoke widget), offering exactly
+   three choices: Column (vertical), Row (horizontal), Fan. The current
+   direction is marked (`aria-current`), same as `changePileType` marks
+   the pile's current kind.
+2. Each choice renders a small preview - a literal mini illustration of
+   2-3 overlapping card shapes arranged the way that choice would lay the
+   stack out (vertical/horizontal/fan), not a generic arrow icon. The
+   preview mechanism is a generic addition to `buildEnumActionMenu`
+   (an optional `choice.preview`), not hardcoded to Flip only, so a future
+   EnumAction can reuse it.
+3. Selecting a choice sets the stack directly to that direction - clicking
+   the already-current choice is a no-op (same "isCurrent -> no dispatch"
+   rule `buildEnumActionMenu` already enforces for `changePileType`).
+4. Gating unchanged: the Flip entry is still absent on a stack of one
+   (`Stack.stackActions()`'s existing `pileables.length >= 2` check) -
+   no false affordance on a stack too small for any arrangement to matter.
+5. No card-count/data change - this is presentation only (D129's stack
+   metadata, `direction`), same invariant the old toggle already held.
+6. `bobp make check` + the existing UI/RtG/stack-action browser suites
+   stay green; stale `flippedDirection`/`FLIP_STACK`-specific tests are
+   rewritten against the new shape, not left asserting dead behavior.
+
+**Out of scope:** direction becoming selectable per-kind-restricted
+(e.g. refusing Fan on a Battlefield) - the user's answer was every
+direction, everywhere; a Battlefield fanned out is unusual but not
+prevented. Touch/mobile - desktop-only per standing UI-pass convention.
