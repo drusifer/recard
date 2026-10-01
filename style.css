@@ -703,14 +703,16 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
      reason the first two placements - ON the card, then on the pile
      HEADER - were rejected), so hover-raise/click-through concerns
      from those two do not apply here.
-     *nit (queued 2026-09-29, direct user request: "move stack gear icon
-     to upper left corner of stack"): top-right -> top-left, `right`
-     swapped for `left`. Still the same top-edge hang-off, so the
-     battlefield row's own top-padding reservation (`[data-kind=
-     'battlefield'] .card-row`, below) needs no change - it accounts for
-     the gear's footprint above the row, not which side it hangs from. */
+     *nit (2026-09-29, direct user request: "move stack gear icon to
+     upper left corner of stack"): top-right -> top-left.
+     *nit (2026-09-30, direct user request: "move stack gear back to
+     upper right corner of the stack"): reverted, left -> right. Still
+     the same top-edge hang-off, so the battlefield row's own
+     top-padding reservation ([data-kind='battlefield'] .card-row,
+     below) needs no change - it accounts for the gear's footprint
+     above the row, not which side it hangs from. */
   top: -0.6rem;
-  left: -0.3rem;
+  right: -0.3rem;
   z-index: 4;
   display: flex;
   align-items: center;

@@ -94,12 +94,11 @@ or a live-verification session) versus being pickable directly.
   groom's own sprint added `tests/resume.browser.mjs`. Left in place
   rather than deleted, since the original D6 v1 limitation it describes
   really was true once.
-- ~~**Move the stack gear icon to the upper-left corner of the stack**~~
-  DONE (nit, 2026-09-30, direct user request): `.stack-gear`'s `right:
-  -0.3rem` -> `left: -0.3rem`, top edge unchanged. Verified geometrically
-  (gear's left edge flush with the stack's own left edge) and via
-  test-ui/test-rtg green (neither asserts a side, only top-edge
-  clipping, so both stayed valid unchanged).
+- ~~**Move the stack gear icon**~~ upper-left (nit, 2026-09-30), then
+  REVERTED back to upper-right (nit, same day, direct user request):
+  `.stack-gear`'s `left: -0.3rem` -> `right: -0.3rem`, top edge
+  unchanged throughout. test-ui/test-rtg stay valid either way (neither
+  asserts a side, only top-edge clipping).
 - ~~**Builder screen**~~ SHIPPED (US-149/D171, 2026-09-30): direct user
   description - "we are actually quite close to a game builder
   already... just need an add menu to add new zones and piles" - and
