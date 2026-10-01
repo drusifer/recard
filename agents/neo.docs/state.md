@@ -151,12 +151,67 @@ a real `player_act` `CREATE_ZONE(discard)` dispatch, screenshot of the resulting
 `bobp make check` clean (lint/decks/secrets) at every gate, zero fix loops, 6 new tests total.
 **NOT committed** - awaiting the user (standing session pattern).
 
+## Current Task (2026-09-30, later still) - Pile action buttons -> corner gear menu (bloop)
+
+Direct user request: "move pile action buttons to a corner gear icon menu like the slack
+settings (including the slider)". `HeaderActions.js`'s per-action button row -> one `.pile-gear`
+emblem that opens the SAME `<action-menu>` popup the stack's own gear menu already uses
+(`buildHeaderGear`, reuses `buildSpecialActionControl` for the enum/range rows). Deleted
+`applyIconButton` outright (zero remaining callers once the button row was gone).
+
+**Real bug found and fixed, not just a refactor**: focus-zoom's own click-outside/pointerup-
+anywhere/pointerleave dismissal logic (`TableView.js`) checked `overlay.contains(event.target)`
+to decide "is this still part of the focused pile" - broke the moment a pile's own actions
+moved into a popup deliberately appended to `document.body` (same reason every such popup is
+appended there - to escape a clipping ancestor). New `isPartOfFocusedPile(target, overlay)`
+helper treats an open `<action-menu>` as part of the pile everywhere this check happens (3
+call sites). A SECOND, subtler bug inside that same fix: a native `<input type=range>` (the
+Tighten/Loosen slider) implicitly captures the pointer while dragged, so `event.target` at
+release is ALWAYS the slider regardless of where it's actually released on screen -
+`document.elementFromPoint(clientX, clientY)` (immune to capture) replaces target-based
+checks specifically in `onPointerUpAnywhere`. A THIRD bug: my own first draft of the helper had
+`target.closest?.(...)` (only guards the CALL) instead of `target?.closest?.(...)` (guards
+`target` itself) - `elementFromPoint` legitimately returns `null` for a point outside the
+viewport, which threw silently and prevented the shrink entirely until fixed.
+
+Swept every affected browser test file (6): `headerActions.browser.mjs` (rewritten for the new
+shape), `zonePanel.browser.mjs`, `focusZoom.browser.mjs`, `tableZoom.browser.mjs`,
+`rtgPlaythrough.browser.mjs`, `uiActions.browser.mjs`. Two of those also had a PRE-EXISTING
+break unrelated to this bloop (War's default preset dealing a 'deck' not '[data-kind="hand"]',
+from the earlier same-session fix) - fixed by switching their shared fixtures to explicitly
+select Gin Rummy, since none of them were ever actually about War.
+
+One more real, War-adjacent regression found while fixing `rtgPlaythrough.browser.mjs`: a
+fixed `bfBox.x+50` drop-point offset USED to land on empty battlefield space, but shorter pile
+headers shifted the battlefield panel's own position just enough that it now lands on an
+existing card's stack-gear, merging two tests' cards into one stack. Fixed by computing a
+drop point that clears every existing card by a real margin (+300, empirically the smallest
+round number that worked - the battlefield's own stack-assignment reads proximity, not literal
+overlap, so a mere card-width margin still merged).
+
+Also, per the user's explicit mid-session correction: stopped using multi-second `waitForFunction`/
+`waitForSelector` timeout CEILINGS and wall-clock `waitForTimeout` sleeps sized for real network
+latency in tests that are 100% localhost (no real network exists to pad for) - tightened every
+touched file's timeouts to ~1-2s ceilings and ~50ms settle waits. Also added `check-fast` to
+the Makefile (unit + static lint only, no browser launch) per direct user request ("we need a
+fast gate - not every test needs to run every time") - `check` itself launches real Chromium
+for lint:design's full per-preset sweep + two full-history gitleaks scans, far too slow to
+re-run after every small edit.
+
+Verified (targeted, not a blind full `make check` re-run): each of the 6 touched browser files
+green standalone (headerActions 10/10, zonePanel 13/13, focusZoom 11/11, tableZoom 13/13,
+rtgPlaythrough 16/16, uiActions 21/21), full unit suite 1200/1200, `lint:design` clean,
+`lint:js`/`lint:style` clean, `secrets` clean. Full chain: Neo fix -> Trin independent re-run
+-> Morpheus review, all PASSED, posted to CHAT.md.
+
+**NOT committed yet** - ready to commit.
+
 ## Next Steps
-Nothing assigned. Not committed yet (this US-148/149 work, plus everything already queued from
-earlier this session - see agents/cypher.docs/state.md for the full uncommitted-file picture).
-Otherwise await the user's next direction, or pick up docs/BACKLOG.md's Technical/testing
-section (multi-player harness follow-ups, Gin bot tuning, read()/patch() consolidation
-candidate) or the still-open card-drag motion sync gap.
+Commit this gear-menu work (plus everything else already queued uncommitted this session - see
+agents/cypher.docs/state.md for the full picture) once the user confirms. Otherwise await the
+user's next direction, or pick up docs/BACKLOG.md's Technical/testing section (multi-player
+harness follow-ups, Gin bot tuning, read()/patch() consolidation candidate) or the still-open
+card-drag motion sync gap.
 
 ## Previous - (2026-09-25) - US-130: impl + 2 real bugs found by the browser test going intermittently red
 

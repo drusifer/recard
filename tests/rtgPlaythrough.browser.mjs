@@ -89,8 +89,12 @@ async function rotate(page, cardLocator) {
   await page.locator('.card-context-menu [data-action="rotate"]').click();
 }
 
-function pileAction(page, pileId, label) {
-  return page.locator(`.pile-section[data-pile-id="${pileId}"] button[aria-label="${label}"]`);
+// US-150: one gear per pile header opens a menu now, instead of one
+// always-visible button per action - open it first, then return the
+// matching row (same `aria-label` text the old per-action button had).
+async function pileAction(page, pileId, label) {
+  await page.locator(`.pile-section[data-pile-id="${pileId}"] .pile-gear`).click({ timeout: 1000 });
+  return page.locator(`action-menu .pile-action-menu-item[aria-label="${label}"]`);
 }
 
 /**
@@ -170,25 +174,24 @@ test('the Decks zone fits every deck panel with no overflow and no overlap with 
 // icons + the changePileType control) - `.pile-title`'s old
 // `width: max-content` with no cap meant it always forced the WHOLE
 // panel open to fit that unwrapped row, rather than ever wrapping.
-test('a Deck panel\'s header wraps its many actions instead of forcing the whole panel wide', async () => {
+//
+// US-150 ("move pile action buttons to a corner gear icon menu"): the
+// original fix was capping `.pile-title`'s width so a long action row
+// WRAPPED instead of forcing the panel wide - that row doesn't exist
+// any more (one gear, always), so the wrap-onto-2-rows half of this
+// test is gone; the narrow-panel assertion stays, since it's still a
+// real width guarantee (and trivially true now, not coincidentally).
+test('a Deck panel\'s header stays narrow, not forced wide by its actions', async () => {
   const page = fixture.page;
   const width = await page.locator(`.pile-section[data-pile-id="${DECK_ID}"]`).evaluate((element) => element.getBoundingClientRect().width);
-  // Was 210px before this fix (one unbroken action row); the fixed
-  // 11rem (176px) cap on `.pile-title` brings it back near the panel's
-  // own 11rem `min-width` floor instead of being dictated by the
-  // button row.
-  assert.ok(width <= 200, `Deck panel should be narrow now that its actions wrap (was 210px unwrapped), got ${width}px`);
-
-  const buttonRows = await page.locator(`.pile-section[data-pile-id="${DECK_ID}"] .pile-title .pile-action-btn, .pile-section[data-pile-id="${DECK_ID}"] .pile-title .pile-action-enum`)
-    .evaluateAll((elements) => new Set(elements.map((element) => Math.round(element.getBoundingClientRect().top))).size);
-  assert.ok(buttonRows >= 2, 'Deck\'s 7 header controls must wrap onto at least 2 rows, not force one unbroken row');
+  assert.ok(width <= 200, `Deck panel should be narrow (was 210px with every action inline, pre-gear-menu), got ${width}px`);
 });
 
 test('game 1: draw an opening hand from a real deck pile', async () => {
   const page = fixture.page;
   const before = await deckCount(page, DECK_ID);
   const hand = page.locator('[data-kind="hand"] .middle-card');
-  for (let index = 0; index < 3; index++) await pileAction(page, DECK_ID, 'Draw').click();
+  for (let index = 0; index < 3; index++) await (await pileAction(page, DECK_ID, 'Draw')).click({ timeout: 1000 });
   await page.waitForFunction(() => document.querySelectorAll('[data-kind="hand"] .middle-card').length === 3, undefined, { timeout: 10_000 });
   assert.equal(await hand.count(), 3, 'drew 3 real cards into hand');
   assert.equal(await deckCount(page, DECK_ID), before - 3, 'the deck badge reflects exactly 3 fewer cards');
@@ -203,9 +206,12 @@ test('game 1: draw an opening hand from a real deck pile', async () => {
 // last doesn't cover.
 test('the hand offers RtG-specific sort actions, and cost sits at the card\'s left edge (visible in a fan)', async () => {
   const page = fixture.page;
-  const sortButtons = await page.locator('[data-kind="hand"] header-actions button').evaluateAll(
+  // US-150: one gear now, open it to see what it offers.
+  await page.locator('[data-kind="hand"] .pile-gear').click({ timeout: 1000 });
+  const sortButtons = await page.locator('action-menu .pile-action-menu-item').evaluateAll(
     (buttons) => buttons.map((b) => b.getAttribute('aria-label')).filter(Boolean),
   );
+  await page.keyboard.press('Escape');
   assert.ok(sortButtons.includes('Sort by color'), `expected a color sort button, got ${sortButtons}`);
   assert.ok(sortButtons.includes('Sort by type'), `expected a type sort button, got ${sortButtons}`);
   assert.ok(sortButtons.every((label) => !/rank|suit/i.test(label)), 'rank/suit sort makes no sense for RtG cards');
@@ -246,6 +252,17 @@ test('game 1: cast a creature to the battlefield and tap it', async () => {
   await page.waitForFunction(
     (id) => document.querySelector(`[data-kind="battlefield"] .middle-card[data-pileable-id="${CSS.escape(id)}"]`)?.dataset.orientation === 'landscape',
     cardId, { timeout: 5000 },
+  );
+  // US-150 (found live): the card's `data-orientation` attribute and its
+  // `.card-stack` wrapper (the gear-bearing one later tests query by)
+  // settle in two separate render passes - a real, pre-existing race
+  // this file's own tests never happened to hit until a layout change
+  // (shorter pile headers) shifted render timing. Wait for the wrapper
+  // too, not just the attribute, so every later test that assumes this
+  // card already has its own stack starts from a genuinely settled DOM.
+  await page.waitForFunction(
+    (id) => document.querySelector(`[data-kind="battlefield"] .middle-card[data-pileable-id="${CSS.escape(id)}"]`)?.closest('.card-stack') !== null,
+    cardId, { timeout: 2000 },
   );
 });
 
@@ -323,7 +340,7 @@ test('game 1: a column of 3+ cards offsets each one further down, not on top of 
   }
 
   const handCountBefore = await page.locator('[data-kind="hand"] .middle-card').count();
-  for (let index = 0; index < 3; index++) await pileAction(page, DECK_ID, 'Draw').click();
+  for (let index = 0; index < 3; index++) await (await pileAction(page, DECK_ID, 'Draw')).click({ timeout: 1000 });
   await page.waitForFunction(
     (n) => document.querySelectorAll('[data-kind="hand"] .middle-card').length >= n,
     handCountBefore + 3, { timeout: 10_000 },
@@ -333,7 +350,24 @@ test('game 1: a column of 3+ cards offsets each one further down, not on top of 
   );
 
   const bfBox = await page.locator('[data-kind="battlefield"]').boundingBox();
-  await dropAt(idA, bfBox.x + 50, bfBox.y + 50);
+  // US-150 (found live): a fixed `bfBox.x+50` offset USED to be empty
+  // space - shorter pile headers (one gear instead of a button row)
+  // shifted the battlefield's own box just enough that this exact point
+  // now lands on the earlier "cast a creature and tap it" test's own
+  // singleton stack-gear, merging this NEW card into THAT stack instead
+  // of starting a fresh one (found via a real cursor-position dump, not
+  // guessed). A mere card-width clearance (+50) still merged - the
+  // battlefield's own stack-assignment reads PROXIMITY, not literal
+  // overlap, so +300 (empirically the smallest round number that
+  // reliably produced a genuinely separate stack, not guessed either)
+  // is what actually clears it.
+  const existingCardBoxes = await page.locator('[data-kind="battlefield"] .middle-card').evaluateAll(
+    (cards) => cards.map((card) => card.getBoundingClientRect().toJSON()),
+  );
+  const clearX = existingCardBoxes.length === 0
+    ? bfBox.x + 50
+    : Math.max(...existingCardBoxes.map((b) => b.x + b.width)) + 300;
+  await dropAt(idA, clearX, bfBox.y + 50);
   await page.waitForTimeout(150);
 
   async function boxOf(id) {
@@ -564,7 +598,7 @@ test('game 1: a token from the shared supply can mark a permanent and be returne
 
 test('game 1: exile, discard, the shared stack, and life total all work', async () => {
   const page = fixture.page;
-  for (let index = 0; index < 3; index++) await pileAction(page, DECK_ID, 'Draw').click();
+  for (let index = 0; index < 3; index++) await (await pileAction(page, DECK_ID, 'Draw')).click({ timeout: 1000 });
   await page.waitForFunction(() => document.querySelectorAll('[data-kind="hand"] .middle-card').length >= 3, undefined, { timeout: 10_000 });
 
   // `.last()`, not `.first()`: same reasoning as `uiActions.browser.mjs`'s
@@ -605,7 +639,7 @@ test('game 1: Reshuffle & deal on one deck recalls only ITS OWN cards, wherever 
   const deckBefore = await deckCount(page, DECK_ID);
 
   page.once('dialog', (dialog) => dialog.accept());
-  await pileAction(page, DECK_ID, 'Reshuffle & deal').click();
+  await (await pileAction(page, DECK_ID, 'Reshuffle & deal')).click({ timeout: 1000 });
   await page.waitForTimeout(500);
 
   // D114's own design (the user's exact words, prior sprint): reshuffle
@@ -624,7 +658,7 @@ test('game 2: Restart game rebuilds every deck, not just the canonical one', asy
   const deckCountBeforeRestart = await deckCount(page, DECK_ID);
 
   page.once('dialog', (dialog) => dialog.accept());
-  await pileAction(page, DECK_ID, 'Restart game').click();
+  await (await pileAction(page, DECK_ID, 'Restart game')).click({ timeout: 1000 });
   await page.waitForTimeout(500);
 
   const deckCountAfterRestart = await deckCount(page, DECK_ID);
@@ -635,7 +669,7 @@ test('game 2: Restart game rebuilds every deck, not just the canonical one', asy
   assert.equal(await page.locator('[data-kind="battlefield"] .middle-card').count(), 0, 'RESET is a real restart - the battlefield is cleared too');
 
   // A second game is actually playable: draw again.
-  await pileAction(page, DECK_ID, 'Draw').click();
+  await (await pileAction(page, DECK_ID, 'Draw')).click({ timeout: 1000 });
   await page.waitForFunction(() => document.querySelectorAll('[data-kind="hand"] .middle-card').length === 1, undefined, { timeout: 10_000 });
   assert.equal(await page.locator('[data-kind="hand"] .middle-card').count(), 1, 'game 2 is genuinely playable - drawing works after a restart');
 });
@@ -662,7 +696,7 @@ test('game 1: a lands column cascades downward with an even, overlapping step', 
   // hides at. Nine from a two-colour guild deck leaves no such out.
   const DRAWS = 9;
   const handCountBefore = await page.locator('[data-kind="hand"] .middle-card').count();
-  for (let index = 0; index < DRAWS; index++) await pileAction(page, DECK_ID, 'Draw').click();
+  for (let index = 0; index < DRAWS; index++) await (await pileAction(page, DECK_ID, 'Draw')).click({ timeout: 1000 });
   await page.waitForFunction(
     (n) => document.querySelectorAll('[data-kind="hand"] .middle-card').length >= n,
     handCountBefore + DRAWS, { timeout: 10_000 },

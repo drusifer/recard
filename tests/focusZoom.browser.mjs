@@ -28,13 +28,18 @@ async function freshLiveTable(context) {
   await page.goto(BASE);
   await page.click('#show-host');
   await page.fill('#host-name', 'Alice');
+  // US-150: the host form's own default (War, PRESETS[0]) now deals a
+  // face-down DECK pile, not `[data-kind="hand"]` - this file's own
+  // mechanics (hover/drag/zoom a fanned hand) need a real hand-kind
+  // pile, which was never specifically about War. Gin Rummy instead.
+  await page.selectOption('#host-preset', { label: 'Gin Rummy' });
   await page.click('#create-table');
-  await page.waitForSelector('#host-share:not([hidden])', { timeout: 20_000 });
+  await page.waitForSelector('#host-share:not([hidden])', { timeout: 2000 });
   await page.fill('#cards-per-player', '5');
   await page.click('#deal-btn');
   await page.waitForFunction(
     () => document.querySelector('[data-kind="hand"]')?.querySelectorAll('.card').length === 5,
-    undefined, { timeout: 15_000 },
+    undefined, { timeout: 2000 },
   );
   return page;
 }
@@ -155,10 +160,12 @@ test('acting on the focused pile itself (causing a re-render) does not lose the 
     await page.waitForSelector('body > .focus-zoomed[data-pile-id="deck"]', { timeout: 2000 });
 
     // A click INSIDE the now-grown (reparented to <body>) deck pile -
-    // its own "Draw" action button - dispatches DRAW and forces a full
-    // renderGameFromView -> renderZones. The pile's OWN DOM node from
-    // before this click is now stale/destroyed by that render.
-    await page.locator('body > .focus-zoomed[data-pile-id="deck"] .pile-action-btn[title="Draw"]').click();
+    // its own gear menu's "Draw" row (US-150: one gear, not a button per
+    // action) - dispatches DRAW and forces a full renderGameFromView ->
+    // renderZones. The pile's OWN DOM node from before this click is now
+    // stale/destroyed by that render.
+    await page.locator('body > .focus-zoomed[data-pile-id="deck"] .pile-gear').click({ timeout: 1000 });
+    await page.locator('action-menu .pile-action-menu-item[data-action="draw"]').click({ timeout: 1000 });
 
     // Still focus-zoomed afterward - `reapplyFocusZoom` re-grew a
     // FRESH element for the same pile id, not left the old one to rot.
@@ -313,25 +320,34 @@ test('dragging the pile\'s own spread slider outside its bounds does not shrink 
     // the button goes down, and the press lands on the pile instead of
     // the slider - which is what made this test flaky.
     await overlay.evaluate((element) => Promise.all(element.getAnimations().map((animation) => animation.finished)));
-    const slider = overlay.locator('.spread-slider-input');
+    // US-150: the slider lives inside the gear's own popup now (appended
+    // to `document.body`, same as every such menu - never nested under
+    // `overlay`), not inline in the header any more.
+    await overlay.locator('.pile-gear').click({ timeout: 1000 });
+    const slider = page.locator('action-menu .spread-slider-input');
     const box = await slider.boundingBox();
     const press = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
     assert.ok(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.matches('.spread-slider-input'), press),
       'the press point must actually be ON the slider');
-    // The release point must be OUTSIDE the grown pile but INSIDE the
-    // viewport. The old fixed `box.y - 400` landed above the window
-    // whenever the overlay sat high - and a button released outside the
-    // window delivers `pointerup` to the element that was pressed (the
-    // slider, inside the pile), so the shrink never fired: an
-    // intermittent failure that tracked the overlay's clamped size.
+    // The release point must be OUTSIDE both the grown pile AND its own
+    // open gear menu (US-150: the slider lives in that menu now, which
+    // `isPartOfFocusedPile` also treats as "part of the pile" - same
+    // reasoning as the pile itself) but INSIDE the viewport. The old
+    // fixed `box.y - 400` landed above the window whenever the overlay
+    // sat high - and a button released outside the window delivers
+    // `pointerup` to the element that was pressed (the slider, inside
+    // the pile), so the shrink never fired: an intermittent failure that
+    // tracked the overlay's clamped size.
     const grown = await overlay.boundingBox();
+    const menuBox = await page.locator('action-menu').boundingBox();
+    const isClearOfMenu = (x, y) => !(x >= menuBox.x && x <= menuBox.x + menuBox.width && y >= menuBox.y && y <= menuBox.y + menuBox.height);
     const viewport = page.viewportSize();
     const outside = [
       { x: grown.x + grown.width / 2, y: grown.y - 20 },
       { x: grown.x + grown.width / 2, y: grown.y + grown.height + 20 },
       { x: grown.x - 20, y: grown.y + grown.height / 2 },
       { x: grown.x + grown.width + 20, y: grown.y + grown.height / 2 },
-    ].find(({ x, y }) => x >= 0 && y >= 0 && x < viewport.width && y < viewport.height);
+    ].find(({ x, y }) => x >= 0 && y >= 0 && x < viewport.width && y < viewport.height && isClearOfMenu(x, y));
     assert.ok(outside, 'need an on-screen point outside the grown pile to release at');
 
     await page.mouse.move(press.x, press.y);

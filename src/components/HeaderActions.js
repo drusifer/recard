@@ -1,6 +1,6 @@
 import { ACTION_SPECS } from '../pileActions.js';
 import { pileDragToken } from '../dragDrop.js';
-import { applyIconButton, buildSpecialActionControl } from '../actionControls.js';
+import { buildSpecialActionControl } from '../actionControls.js';
 
 /**
  * US-133/D160, cluster 4a: `<header-actions>` IS the actionable title bar.
@@ -87,50 +87,64 @@ export class HeaderActionsElement extends HTMLElement {
       });
     }
 
-    for (const id of actionIds) {
-      if (options.disabled?.includes(id)) continue;
-      const spec = ACTION_SPECS[id];
-      const specialControl = buildSpecialActionControl(id, spec, options);
-      if (specialControl) {
-        this.append(specialControl);
-        continue;
-      }
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'pile-action-btn' + (spec.destructive ? ' btn-danger' : '');
-      applyIconButton(button, spec, options.labels?.[id]);
-      button.addEventListener('click', (event) => {
-        event.stopPropagation();
-        // US-61 (Sprint 23), Smith's ruling (Phase 70): each spec's own
-        // `hint` already states its real consequence (reshuffleDeal's own
-        // hint says it deals a fresh hand to each player; take's says it
-        // takes every card) - a second, hardcoded "every player's hand
-        // will be cleared" sentence bolted on here was WRONG for every
-        // destructive action except reshuffleDeal, silently inherited by
-        // `take` the moment it became destructive (Phase 68). One prompt,
-        // built from the actual action's own hint, for all of them.
-        // `options.noConfirm` (a 1-card `take`, Smith's ruling) skips the
-        // dialog entirely - identical in effect to that card's own
-        // un-confirmed single-card `pickup`.
-        if (spec.destructive && !options.noConfirm?.includes(id) &&
-          !globalThis.confirm(`${spec.hint}\n\nContinue?`)) return;
-        options.onAction(id);
-      });
-      // D67: the `spec.target`-driven action-token drag protocol (D34/
-      // D35, fixed D65) is retired - direct user correction: "drop isn't
-      // triggering an action it's moving cards around." An action that
-      // always resolved to the SAME fixed destination (Draw -> your own
-      // hand) regardless of where you actually released the drag was
-      // never real drop semantics, just a click wearing a drag costume.
-      // Draw stays available as a plain click (`onAction` above); the
-      // deck's own real drag-to-anywhere entry point is now
-      // `renderDeckStack`'s single card visual, using the exact same
-      // generic card-move mechanism (`onDropCard`) every other pile's
-      // cards already use - see its own comment for why a synthetic
-      // token stands in for a real card id there.
-      this.append(button);
-    }
+    const visibleIds = actionIds.filter((id) => !options.disabled?.includes(id));
+    if (visibleIds.length > 0) this.append(buildHeaderGear(visibleIds, options));
   }
+}
+
+/**
+ * UX follow-up (direct user request: "move pile action buttons to a
+ * corner gear icon menu like the slack settings"): a header used to be
+ * its own row of buttons (plus any enum/range control inline) - now it's
+ * one gear emblem, same idea as the stack's own `stackGearFor`/
+ * `openStackActionMenu` (`pileCards.js`, D129) one level up. Reuses that
+ * exact popup (`<action-menu>`, D101/D133) rather than inventing a
+ * second one - a special control (the spread slider, change-pile-type's
+ * enum disclosure) renders as a real `node` row, same as the stack menu
+ * already does for `spreadStack`/`flipStack`; a plain action becomes a
+ * row whose own `destructive`/`confirm` fields reuse `<action-menu>`'s
+ * built-in confirm gate (`#rowFor`) instead of the inline
+ * `globalThis.confirm` this file used to call directly - D67's own
+ * "destructive gets ONE prompt, from the spec's own hint" rule is
+ * unchanged, just moved into data instead of a click handler.
+ */
+function buildHeaderGear(actionIds, options) {
+  const gear = document.createElement('button');
+  gear.type = 'button';
+  gear.className = 'pile-action-btn pile-gear';
+  gear.textContent = '⚙';
+  gear.title = 'Actions';
+  gear.setAttribute('aria-label', 'Actions');
+  gear.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const items = actionIds.map((id) => {
+      const spec = ACTION_SPECS[id];
+      const control = buildSpecialActionControl(id, spec, options);
+      if (control) return { node: control };
+      const label = options.labels?.[id] ?? spec.label;
+      return {
+        id,
+        text: `${spec.icon} ${label}`,
+        title: spec.hint,
+        label,
+        // `options.noConfirm` (a 1-card `take`, Smith's ruling) skips the
+        // dialog entirely, same as before - folded into whether this row
+        // counts as "destructive" at all, since that's the one thing
+        // `<action-menu>`'s own confirm gate checks.
+        destructive: spec.destructive && !options.noConfirm?.includes(id),
+        confirm: spec.hint,
+      };
+    });
+    const at = gear.getBoundingClientRect();
+    document.createElement('action-menu').open({
+      x: at.left,
+      y: at.bottom,
+      items,
+      className: 'pile-header-menu',
+      onSelect: (id) => options.onAction(id),
+    });
+  });
+  return gear;
 }
 
 customElements.define('header-actions', HeaderActionsElement);

@@ -1,24 +1,16 @@
 // US-133/D160, cluster 4a: the controls an action header and a stack menu are
-// made of - an icon button, an enum dropdown, a range slider - moved out of
-// `ui.js` unchanged. One contract for "here is a control for this action id",
-// shared by `<header-actions>` and the stack's gear menu (`ui.js`). A plain
-// module: it touches `document` only when called.
-/**
- * UX follow-up (direct user request, 2026-08-24): "small square icons
- * ... with tool tip style hover text ... keep each button the same
- * size." The button's visible content is just `spec.icon` now - the
- * full name (an override from `labels`, or `spec.label`) moves to
- * `title` (a native tooltip) and `aria-label` (so the icon-only button
- * still has a real accessible name, not just a glyph). Shared by both
- * `<header-actions>` (piles/zones) and `attachActionRow` (cards) so
- * the icon-button contract can't drift between the two.
- */
-export function applyIconButton(button, spec, labelOverride) {
-  const label = labelOverride ?? spec.label;
-  button.textContent = spec.icon;
-  button.title = label;
-  button.setAttribute('aria-label', label);
-}
+// made of - an enum dropdown, a range slider - moved out of `ui.js`
+// unchanged. One contract for "here is a control for this action id",
+// shared by `<header-actions>`'s own gear menu and the stack's gear menu.
+// A plain module: it touches `document` only when called.
+//
+// UX follow-up (direct user request, "move pile action buttons to a
+// corner gear icon menu"): `applyIconButton` (one icon-only button per
+// action, in the header's own flow) is GONE - `<header-actions>` now
+// builds a single gear emblem and a popup instead (`buildHeaderGear`),
+// reusing `<action-menu>`'s own row look for plain actions. Deleted
+// outright, not kept for a hypothetical future caller - `attachActionRow`
+// (cards), its only other mentioned user, was already deleted earlier.
 
 /**
  * UX follow-up (direct user request, 2026-08-24): "the radials are not

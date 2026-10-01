@@ -6,6 +6,27 @@ import { clampOverlayPosition, clampFocusZoomScale, HOVER_INTENT_MS } from '../f
 import { pileElement } from '../dragDrop.js';
 
 /**
+ * US-150 (found live, fixing "move pile action buttons to a corner gear
+ * icon menu"): a pile's own action menu (`<action-menu>`, `HeaderActions
+ * .js`'s `buildHeaderGear`) is deliberately appended to `document.body`,
+ * same as every other such popup, NOT inside the pile's own DOM subtree
+ * - the whole reason being so an overflowing/clipping ancestor can never
+ * cut it off. That means a plain `overlay.contains(event.target)` check
+ * reads clicking a MENU ROW as "outside the focused pile" even though it
+ * is visually anchored to a control inside it, which a `pointerup` (does
+ * not stop propagating just because the row's own `click` handler called
+ * `stopPropagation` - a DIFFERENT event) then reads as "released outside
+ * the pile" and shrinks it mid-interaction, before the action it opened
+ * the menu FOR even finishes. `target.closest('action-menu')` folds an
+ * open popup into "still part of this pile" everywhere that containment
+ * check happens, the same way `overlay.contains` already does for the
+ * overlay itself.
+ */
+function isPartOfFocusedPile(target, overlay) {
+  return Boolean(overlay?.contains(target) || target?.closest?.('action-menu'));
+}
+
+/**
  * US-1xx: the table surface itself - `#zones`, the one element that is
  * BOTH the container every `<zone-panel>` renders into (`renderZones`,
  * unchanged, still just appends children) AND the table's own UX: the
@@ -209,13 +230,32 @@ export class TableViewElement extends HTMLElement {
     // outside" and shrinks then. `#clearFocusPointerWatchers` is how
     // EVERY shrink path - not just these two listeners - tears them
     // down; see `#shrinkFocusedPile`.
+    // US-150 (found live): the pointer leaving the overlay's own box with
+    // no button held used to mean "wandered away, shrink" unconditionally
+    // - but moving from the gear to ITS OWN popup menu (appended to
+    // `document.body`, outside the overlay's box by construction) is
+    // exactly that gesture with nothing actually held. `relatedTarget` is
+    // where the pointer is GOING; `isPartOfFocusedPile` already treats an
+    // open `<action-menu>` as part of this pile everywhere else.
     const onPileLeave = (event) => {
       if (event.buttons !== 0) return;
+      if (isPartOfFocusedPile(event.relatedTarget, this.#focusZoomOverlay(pileId))) return;
       this.#shrinkFocusedPile();
     };
+    // US-150 (found live): a native `<input type=range>` (the Tighten/
+    // Loosen slider) implicitly captures the pointer while dragged, so
+    // `event.target` here is ALWAYS the slider itself, no matter where
+    // on screen the button is actually released - `isPartOfFocusedPile`
+    // would then always say "yes, part of the pile" (true - the slider
+    // lives in the pile's own gear menu) and this listener could never
+    // detect "released far away," the one case it exists to catch.
+    // `elementFromPoint` reads the REAL element under the cursor, which
+    // capture does not affect - a true spatial check, same intent the
+    // original 2026-09-16 fix already had, now proof against capture.
     const onPointerUpAnywhere = (event) => {
       const overlay = this.#focusZoomOverlay(pileId);
-      if (overlay && !overlay.contains(event.target)) this.#shrinkFocusedPile();
+      const real = document.elementFromPoint(event.clientX, event.clientY);
+      if (overlay && !isPartOfFocusedPile(real, overlay)) this.#shrinkFocusedPile();
     };
     pileElementToGrow.addEventListener('pointerleave', onPileLeave);
     document.addEventListener('pointerup', onPointerUpAnywhere);
@@ -311,7 +351,7 @@ export class TableViewElement extends HTMLElement {
       // captured that exact node as the drag source. Only shrink an
       // UNRELATED already-focused pile.
       const overlay = this.#focusedPileId ? this.#focusZoomOverlay(this.#focusedPileId) : null;
-      if (!overlay?.contains(event.target)) this.#shrinkFocusedPile();
+      if (!isPartOfFocusedPile(event.target, overlay)) this.#shrinkFocusedPile();
     });
     document.addEventListener('dragend', () => {
       this.#isDragInProgress = false;
@@ -344,7 +384,7 @@ export class TableViewElement extends HTMLElement {
     document.addEventListener('click', (event) => {
       if (!this.#focusedPileId) return;
       const overlay = this.#focusZoomOverlay(this.#focusedPileId);
-      if (overlay && !overlay.contains(event.target)) this.#shrinkFocusedPile();
+      if (overlay && !isPartOfFocusedPile(event.target, overlay)) this.#shrinkFocusedPile();
     });
   }
 }

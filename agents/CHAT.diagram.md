@@ -173,4 +173,12 @@ sequenceDiagram
     Note right of User: "User: *nit War preset<br/>deals a fully-dealt deck<br/>onto one hand - 'chuck<br/>the whole preset and<br/>start over'.<br/>Investigating before<br/>rewriting (tab…"
     Neo->>Cypher: "swe fix"
     Note right of Neo: "*nit fixed: War preset<br/>rebuilt (user: chuck it,<br/>start over). Root cause:<br/>canvas height left only<br/>312 units below the<br/>bottom seat's anchor f…"
+    Neo->>Trin: "swe fix"
+    Note right of Neo: "*swe fix move pile<br/>action buttons into a<br/>corner gear-icon menu<br/>(slack-settings style),<br/>including the spread<br/>slider - reusing the<br/>stack's ow…"
+    Neo->>Trin: "swe fix"
+    Note right of Neo: "*swe fix done: pile/zone<br/>actions -> single corner<br/>gear menu, reusing the<br/>stack's own gear-menu<br/>machinery. Found+fixed a<br/>real bug along the…"
+    Trin->>Morpheus: "qa handoff"
+    Note right of Trin: "*qa test PASSED.<br/>Verified independently:<br/>7 affected browser<br/>suites all green<br/>standalone<br/>(headerActions 10/10,<br/>zonePanel 13/13,<br/>focusZoom 11…"
+    Morpheus->>Neo: "lead review"
+    Note right of Morpheus: "*lead review PASSED.<br/>Sound reuse: zero new<br/>popup/menu classes, the<br/>pile header's gear<br/>funnels through the<br/>exact same <action-menu><br/>the stac…"
 ```

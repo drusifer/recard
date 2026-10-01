@@ -67,19 +67,23 @@ test('renders the box: a zone with its id, a title bar and a body', async () => 
       groupId: zone.dataset.groupId,
       title: zone.querySelector('header-actions')?.textContent,
       body: Boolean(zone.querySelector(':scope > .zone-body')),
-      removable: zone.querySelectorAll('.pile-action-btn').length,
+      hasGear: zone.querySelectorAll('.pile-gear').length,
     };
   });
   assert.equal(shape.className, 'zone');
   assert.equal(shape.groupId, 'z1');
   assert.match(shape.title, /Discard/);
   assert.equal(shape.body, true);
-  assert.equal(shape.removable, 1, 'an empty zone can be removed');
+  assert.equal(shape.hasGear, 1, 'an empty zone has a gear menu');
+  // US-150: the gear is generic - open it to confirm "removable" means
+  // an actual "remove" row is offered, not just that SOME action exists.
+  await fixture.page.locator('#zone-fixture .pile-gear').click({ timeout: 1000 });
+  assert.equal(await fixture.page.locator('action-menu .pile-action-menu-item[data-action="remove"]').count(), 1, 'an empty zone can be removed');
 });
 
 test('the Table Zone is never removable', async () => {
   await renderZone({ id: 'table-zone', title: 'Table', withDrops: true });
-  assert.equal(await fixture.page.locator('#zone-fixture .pile-action-btn').count(), 0);
+  assert.equal(await fixture.page.locator('#zone-fixture .pile-gear').count(), 0, 'no actions at all means no gear');
 });
 
 test('a pile dropped on the zone is moved into it; a card dropped on it is dealt to it', async () => {

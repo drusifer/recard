@@ -1,8 +1,9 @@
 // US-136: `<header-actions>` - the actionable title bar every pile and zone
-// has: a title, an optional rename, an optional pile drag handle, and one
-// button per action. Tested as a component in a real browser with no table
-// behind it. NOT part of `npm test` - needs a browser.
-// `npm run test:headeractions`.
+// has: a title, an optional rename, an optional pile drag handle, and a
+// single gear that opens a menu of this pile/zone's own actions (US-150:
+// was one always-visible button per action). Tested as a component in a
+// real browser with no table behind it. NOT part of `npm test` - needs a
+// browser. `npm run test:headeractions`.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { launchChromium, startStaticServer } from './harness/multiplayer.mjs';
@@ -46,7 +47,14 @@ async function renderHeader({ title = 'Hand', actionIds = [], options = {} }) {
 }
 
 const calls = () => fixture.page.evaluate(() => JSON.parse(document.querySelector('#header-fixture').dataset.calls));
-const button = (label) => fixture.page.locator(`#header-fixture .pile-action-btn[aria-label="${label}"]`);
+
+// UX follow-up (direct user request, "move pile action buttons to a
+// corner gear icon menu"): one `.pile-gear` now opens an `<action-menu>`
+// popup instead of each action being its own always-visible button -
+// same shape as the stack's own gear menu. `openGear` + `menuItem`
+// replace the old direct `button(label)` lookup.
+const openGear = () => fixture.page.locator('#header-fixture .pile-gear').click({ timeout: 1000 });
+const menuItem = (id) => fixture.page.locator(`action-menu .pile-action-menu-item[data-action="${id}"]`);
 
 test('renders the title, the heading class and the id it was given', async () => {
   await renderHeader({ title: 'Discard', options: { headingClass: 'panel-title', headingId: 'h1' } });
@@ -61,34 +69,45 @@ test('renders the title, the heading class and the id it was given', async () =>
   assert.equal(shape.title, 'Discard');
 });
 
-test('an action becomes a button that reports its id when clicked', async () => {
+test('the gear opens a menu with one row per action; clicking a row reports its id', async () => {
   await renderHeader({ actionIds: ['sortRank', 'sortSuit'] });
-  assert.equal(await fixture.page.locator('#header-fixture .pile-action-btn').count(), 2);
-  await button('Sort by suit').click();
+  assert.equal(await fixture.page.locator('#header-fixture .pile-gear').count(), 1, 'one gear, not one button per action');
+  await openGear();
+  assert.equal(await fixture.page.locator('action-menu .pile-action-menu-item').count(), 2);
+  await menuItem('sortSuit').click({ timeout: 1000 });
   assert.deepEqual(await calls(), [['action', 'sortSuit']]);
 });
 
-test('a disabled action is not drawn at all', async () => {
+test('a disabled action is not offered in the menu at all', async () => {
   await renderHeader({ actionIds: ['sortRank', 'sortSuit'], options: { disabled: ['sortRank'] } });
-  assert.equal(await button('Sort by rank').count(), 0);
-  assert.equal(await button('Sort by suit').count(), 1);
+  await openGear();
+  assert.equal(await menuItem('sortRank').count(), 0);
+  assert.equal(await menuItem('sortSuit').count(), 1);
+});
+
+test('no actions at all means no gear is rendered', async () => {
+  await renderHeader({ actionIds: [] });
+  assert.equal(await fixture.page.locator('#header-fixture .pile-gear').count(), 0);
 });
 
 test('a destructive action asks first: cancel does nothing, confirm reports it', async () => {
   await renderHeader({ actionIds: ['remove'] });
+  await openGear();
   fixture.page.once('dialog', (dialog) => dialog.dismiss());
-  await button('Remove').click();
+  await menuItem('remove').click({ timeout: 1000 });
   assert.deepEqual(await calls(), []);
+  await openGear();
   fixture.page.once('dialog', (dialog) => dialog.accept());
-  await button('Remove').click();
+  await menuItem('remove').click({ timeout: 1000 });
   assert.deepEqual(await calls(), [['action', 'remove']]);
 });
 
 test('a destructive action listed in noConfirm goes straight through, with no dialog', async () => {
   await renderHeader({ actionIds: ['remove'], options: { noConfirm: ['remove'] } });
+  await openGear();
   let wasAsked = false;
   fixture.page.once('dialog', (dialog) => { wasAsked = true; return dialog.dismiss(); });
-  await button('Remove').click();
+  await menuItem('remove').click({ timeout: 1000 });
   assert.equal(wasAsked, false);
   assert.deepEqual(await calls(), [['action', 'remove']]);
 });

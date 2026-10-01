@@ -2912,6 +2912,16 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   overflow: visible;
 }
 
+/* UX follow-up (direct user request, "move pile action buttons to a
+   corner gear icon menu"): the pile header's own gear menu can ALSO
+   nest an EnumAction disclosure (changePileType) now - the exact same
+   popup-in-popup hazard `.stack-action-menu` above exists to fix, found
+   live there first. Applied here BEFORE shipping, not after a repeat
+   report - same root cause, same fix. */
+.pile-header-menu {
+  overflow: visible;
+}
+
 /* *nit (2026-08-26), direct user request ("cards are Movable not
    Actionable"): the card hover-popup (`.card-action-row`, `ui.js`'s
    `attachActionRow`) and its follow-mode label (`.radial-follow-ghost`,

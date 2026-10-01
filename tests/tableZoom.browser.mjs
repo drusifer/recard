@@ -40,13 +40,17 @@ async function freshLiveTable(context) {
   await page.goto(BASE);
   await page.click('#show-host');
   await page.fill('#host-name', 'Alice');
+  // US-150: the host form's own default (War, PRESETS[0]) now deals a
+  // face-down DECK pile, not `[data-kind="hand"]` - this file's zoom
+  // mechanics need a real hand-kind pile, never specifically War's own.
+  await page.selectOption('#host-preset', { label: 'Gin Rummy' });
   await page.click('#create-table');
-  await page.waitForSelector('#host-share:not([hidden])', { timeout: 20_000 });
+  await page.waitForSelector('#host-share:not([hidden])', { timeout: 2000 });
   await page.fill('#cards-per-player', '5');
   await page.click('#deal-btn');
   await page.waitForFunction(
     () => document.querySelector('[data-kind="hand"]')?.querySelectorAll('.card').length === 5,
-    undefined, { timeout: 15_000 },
+    undefined, { timeout: 2000 },
   );
   return page;
 }

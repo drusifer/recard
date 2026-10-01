@@ -552,3 +552,27 @@ design-lint: clean across 3 viewports (no forced scroll, no zone overlap, no und
 ✖ 6 problems (6 errors, 0 warnings)
 6 errors and 0 warnings potentially fixable with the `--fix` option.
 
+
+---
+[<small>2026-09-30 22:30:34</small>] [**Neo**]->[**Trin**] *swe fix*:
+ *swe fix move pile action buttons into a corner gear-icon menu (slack-settings style), including the spread slider - reusing the stack's own existing gear-menu pattern. Investigating HeaderActions.js + the stack gear implementation before changing anything.
+
+---
+[<small>2026-09-30 23:22:43</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make secrets | /home/drusifer/Projects/recard/build/build.out
+11:22PM INF no leaks found
+11:22PM INF 1 commits scanned.
+11:22PM INF scanned ~18635 bytes (18.64 KB) in 247ms
+11:22PM INF no leaks found
+
+---
+[<small>2026-09-30 23:22:58</small>] [**Neo**]->[**Trin**] *swe fix*:
+ *swe fix done: pile/zone actions -> single corner gear menu, reusing the stack's own gear-menu machinery. Found+fixed a real bug along the way: focus-zoom's dismiss logic didn't know menus live in document.body, shrinking mid-interaction. Swept 6 browser test files for the old per-button DOM shape. check-fast+lint-design+secrets clean.
+
+---
+[<small>2026-09-30 23:23:07</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa test PASSED. Verified independently: 7 affected browser suites all green standalone (headerActions 10/10, zonePanel 13/13, focusZoom 11/11, tableZoom 13/13, rtgPlaythrough 16/16, uiActions 21/21), unit 1200/1200, lint-design clean. The focus-zoom dismiss bug Neo found is real and well-reasoned (pointerup/pointerleave don't respect click's stopPropagation - separate events). @Morpheus *lead review gear-menu
+
+---
+[<small>2026-09-30 23:23:16</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ *lead review PASSED. Sound reuse: zero new popup/menu classes, the pile header's gear funnels through the exact same <action-menu> the stack gear already proved out (D101/D133). isPartOfFocusedPile is the right fix shape - one shared predicate, not three separate patches. Dead applyIconButton deleted outright, not left as an orphan export. Ready to commit.

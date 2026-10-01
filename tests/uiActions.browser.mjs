@@ -106,13 +106,17 @@ before(async () => {
   await fixture.page.goto(BASE);
   await fixture.page.click('#show-host');
   await fixture.page.fill('#host-name', 'Alice');
+  // US-150: the host form's own default (War, PRESETS[0]) now deals a
+  // face-down DECK pile, not `[data-kind="hand"]` - this fixture's own
+  // mechanics were never specifically about War. Gin Rummy instead.
+  await fixture.page.selectOption('#host-preset', { label: 'Gin Rummy' });
   await fixture.page.click('#create-table');
-  await fixture.page.waitForSelector('#host-share:not([hidden])', { timeout: 20_000 });
+  await fixture.page.waitForSelector('#host-share:not([hidden])', { timeout: 2000 });
   await fixture.page.fill('#cards-per-player', '5');
   await fixture.page.click('#deal-btn');
   await fixture.page.waitForFunction(
     () => document.querySelector('[data-kind="hand"]')?.querySelectorAll('.card').length === 5,
-    undefined, { timeout: 15_000 },
+    undefined, { timeout: 2000 },
   );
 });
 
@@ -268,7 +272,15 @@ const gapPx = async () => {
 // a HIGHER value means MORE overlap (tighter, smaller gap), a LOWER
 // value means LESS overlap (looser, bigger gap): `ChipPile`'s own
 // `defaultSpread >= 0.9` ("start nearly stacked") is the same direction.
-const handSlider = () => fixture.page.locator('[data-kind="hand"] .spread-slider-input');
+// US-150: the slider lives inside the hand's own gear menu now, not
+// inline in the header - open the gear once per test (idempotent: a
+// call after it's already open is a no-op, since re-clicking the gear
+// would close and rebuild the menu, losing whatever's mid-interaction).
+async function handSlider() {
+  const slider = fixture.page.locator('action-menu .spread-slider-input');
+  if (await slider.count() === 0) await fixture.page.locator('[data-kind="hand"] .pile-gear').click({ timeout: 1000 });
+  return slider;
+}
 
 // Interacting with the slider hovers the pointer over the hand pile,
 // which is also a focus-zoom trigger (US-117) - `HOVER_INTENT_MS`
@@ -280,7 +292,7 @@ const handSlider = () => fixture.page.locator('[data-kind="hand"] .spread-slider
 // itself uses.
 test('dragging the slider down really spreads the cards apart on screen, not just in state', async () => {
   const before = await gapPx();
-  await handSlider().fill('0');
+  await (await handSlider()).fill('0');
   await fixture.page.waitForFunction(
     (previous) => {
       const row = document.querySelector('[data-kind="hand"] .card-row');
@@ -296,7 +308,7 @@ test('dragging the slider down really spreads the cards apart on screen, not jus
 
 test('dragging the slider back up is the exact inverse - returns to where it started', async () => {
   const before = await gapPx();
-  await handSlider().fill('0.85');
+  await (await handSlider()).fill('0.85');
   await fixture.page.waitForFunction(
     (previous) => {
       const row = document.querySelector('[data-kind="hand"] .card-row');
@@ -305,7 +317,7 @@ test('dragging the slider back up is the exact inverse - returns to where it sta
     },
     before, { timeout: 5000 },
   );
-  await handSlider().fill('0');
+  await (await handSlider()).fill('0');
   await fixture.page.waitForTimeout(200);
   assert.ok(Math.abs(await gapPx() - before) < 0.5, 'back to the same overlap');
   await fixture.page.mouse.move(0, 0);
@@ -315,9 +327,9 @@ test('dragging the slider back up is the exact inverse - returns to where it sta
 // unlike the old button pair, there is no disabled-at-the-limit state
 // to check; the browser's own native range input enforces the range.
 test('the slider is bounded by the pile kind\'s own ceiling', async () => {
-  const max = await handSlider().getAttribute('max');
+  const max = await (await handSlider()).getAttribute('max');
   assert.equal(max, '0.85', 'a card pile\'s own MAX_SPREAD ceiling (Pile.js)');
-  await handSlider().fill('0');
+  await (await handSlider()).fill('0');
   assert.equal(await spreadOf(), '0', 'fully loosened means no overlap at all');
   await fixture.page.mouse.move(0, 0);
 });
@@ -389,10 +401,15 @@ test('the Chips & Tokens preset puts real chips and tokens on the table, rendere
     assert.ok(Math.abs(box.width - box.height) < 2, `a chip should be square-bounded (round), got ${box.width}x${box.height}`);
 
     // US-104 / Gate 1 condition B, where a player would actually see it.
+    // US-150: one gear opens a menu now - open it and read each row's own
+    // `aria-label` (the bare action name, same text the old per-button
+    // `title` carried - a menu row's OWN `title` is the longer hint now).
     const chipPile = page.locator('.pile-section').filter({ has: page.locator('.card-chip') }).first();
-    const actions = await chipPile.locator('.pile-action-btn, button').evaluateAll(
-      (buttons) => buttons.map((button) => button.title),
+    await chipPile.locator('.pile-gear').click({ timeout: 1000 });
+    const actions = await page.locator('action-menu .pile-action-menu-item').evaluateAll(
+      (buttons) => buttons.map((button) => button.getAttribute('aria-label')),
     );
+    await page.keyboard.press('Escape');
     // REVERSED by the chip-denomination *fix: chips carry a value now,
     // so a tray sorts by it. The original assertion ("no sort at all")
     // was a consequence of chips having nothing to order by, not an
@@ -475,9 +492,12 @@ test('a poker chip tray is stacked by denomination, highest first, with values s
     }
 
     // Make change: value conserved, count increased.
+    // US-150: behind the gear now - a menu row's own `title` is the
+    // longer hint, not the label, so match by `aria-label` instead.
     const tray = page.locator('.pile-section').filter({ has: page.locator('.card-chip') }).first();
     const before = values.reduce((sum, value) => sum + value, 0);
-    await tray.locator('button[title="Make change"]').click();
+    await tray.locator('.pile-gear').click({ timeout: 1000 });
+    await page.locator('action-menu .pile-action-menu-item[aria-label="Make change"]').click({ timeout: 1000 });
     await page.waitForFunction(
       (count) => document.querySelectorAll('.card-chip').length > count,
       values.length, { timeout: 5000 },
@@ -674,8 +694,11 @@ test('the deck visibly thins out as it empties, without its stack box resizing',
   const stackBefore = await layoutHeight();
 
   // Draw the deck down a long way and watch the stack lose depth.
+  // US-150: behind the gear now - open it fresh each time (one Draw per
+  // open/close cycle, same as every other gear-menu test in this file).
   for (let index = 0; index < 25; index++) {
-    await deck.locator('button[title="Draw"]').first().click();
+    await deck.locator('.pile-gear').click({ timeout: 1000 });
+    await fixture.page.locator('action-menu .pile-action-menu-item[aria-label="Draw"]').click({ timeout: 1000 });
   }
   // Release the focus-zoom so the pile is back in its own slot in the
   // table's flow before it is measured again.
