@@ -17,19 +17,22 @@ or a live-verification session) versus being pickable directly.
 
 ## Product
 
-- **RtG bots may not reach a safe point inside the 5s quit grace** (Smith,
+- ~~**RtG bots may not reach a safe point inside the 5s quit grace**~~
+  DECIDED (direct user call, 2026-09-30): accept the cut. (Smith,
   US-130 user test): on one Ctrl-C both RtG bots heard "asked to leave",
   one left cleanly and one, mid-decision, was cut off when the table
   closed at the grace limit (Gin bots leave in ~2s). It is D154's `safe`
-  tag working as designed, but the tradeoff is the user's: a longer
-  grace for RtG, more `safe` states in its turn file, or accept the cut.
+  tag working as designed; the user chose to keep the 5s grace as-is
+  over lengthening it or adding more `safe` states. No code change.
 - **`jev-table`'s "unknown player" error lists names but gives no
   did-you-mean** (Smith, US-130, non-blocking): the table-file errors do
   (D154's `unknown()`). Not done - unprompted.
 - **A bot that IGNORES SIGTERM makes shutdown ~11s** (US-130): 5s say
   cap, 5s grace, up to 5s after SIGTERM, 1s after SIGKILL. Only reached
-  by a bot that neither leaves nor dies on SIGTERM; the user's ask was
-  the 15s grace, now 5s. Cut the rest too if wanted.
+  by a bot that neither leaves nor dies on SIGTERM. **Decided (direct
+  user call, 2026-09-30): shorten further**, same way the original 15s
+  grace was cut to 5s - exact post-SIGTERM/SIGKILL windows not yet
+  picked, pickable directly by Neo.
 
 - **The RtG bot is unsure about starting its own turn** (Smith, US-127
   close): `untap_all` came back at 0.12 confidence on the first live
@@ -97,7 +100,12 @@ or a live-verification session) versus being pickable directly.
   (gear's left edge flush with the stack's own left edge) and via
   test-ui/test-rtg green (neither asserts a side, only top-edge
   clipping, so both stayed valid unchanged).
-- **Builder screen** — standing idea, not yet scoped into stories.
+- ~~**Builder screen**~~ SHIPPED (US-149/D171, 2026-09-30): direct user
+  description - "we are actually quite close to a game builder
+  already... just need an add menu to add new zones and piles" - and
+  it was truer than assumed: `CREATE_ZONE`/`CREATE_PILE` already
+  existed in the reducer, fully tested, with no UI entry point at all.
+  "Add Zone…"/"Add Pile…" in `#layout-controls` are that entry point.
 - ~~**Flip as a radio box with preview icons**~~ SHIPPED (US-145/D167,
   2026-09-29): the gear menu's Flip entry is now a 3-way Column/Row/Fan
   choice (`changePileType`'s own disclosure control, reused unchanged),
@@ -141,10 +149,10 @@ or a live-verification session) versus being pickable directly.
   stay zoomed (to adjust spacing/interact with cards) until they either
   zoom into another pile or click a top-right X, rather than losing
   focus involuntarily. Not yet triaged.
-- **SaveAs's `window.prompt()`** (Smith, non-blocking, flagged
-  2026-08-27) — a browser-native prompt for naming a saved layout;
-  works but is not a designed UI. Not re-confirmed as still relevant
-  since it was flagged - worth a quick re-check before picking up.
+- ~~**SaveAs's `window.prompt()`**~~ SHIPPED (US-148/D170, 2026-09-30):
+  replaced by the same inline-input idiom `<header-actions>`'s own
+  rename already uses - no native dialog left for naming a save.
+  (Smith, non-blocking, flagged 2026-08-27.)
 
 ## Technical / testing
 

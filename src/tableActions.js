@@ -207,6 +207,20 @@ export function createTableActions(io) {
     dispatch(zoneFor(zoneId).acceptDroppedCard(pileableId, zoneId, currentView()));
   }
 
+  // US-149/D171: the Builder menu's "Add Zone"/"Add Pile" - CREATE_ZONE/
+  // CREATE_PILE already exist as real, tested reducer actions (found
+  // live with no UI entry point anywhere). Plain `dispatchOrAlert`
+  // calls, not routed through a Pile/Zone instance's own
+  // `{action,guard}` descriptor (D165) - there is no existing instance
+  // to ask, same category as `adjustScore`/`setScore` in `main.js`.
+  function performCreateZone(kind) {
+    io.dispatchOrAlert({ type: 'CREATE_ZONE', kind });
+  }
+
+  function performCreatePile(kind, zoneId) {
+    io.dispatchOrAlert({ type: 'CREATE_PILE', kind, zoneId });
+  }
+
   /**
    * Opens (or, clicked again on the same pile, closes) the Split picker
    * for `pileId` - purely local, no dispatch. Switching to a DIFFERENT
@@ -232,6 +246,8 @@ export function createTableActions(io) {
     performMovePile,
     performMergePile,
     performCreatePileWithCard,
+    performCreateZone,
+    performCreatePile,
     toggleSplitPicker,
     /** The pile currently raised into its Split picker, or `null` -
      * read fresh by `buildZoneOptions` on every render. */

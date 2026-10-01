@@ -177,6 +177,11 @@
            button after it wrapped onto a third row of its own - 44px of
            chrome that pushed the game screen past the viewport. -->
       <button id="new-game-btn" type="button">New Game…</button>
+      <!-- US-149/D171: CREATE_ZONE/CREATE_PILE already existed in the
+           reducer with no UI entry point at all - these two buttons are
+           that missing entry point, nothing more. -->
+      <button id="add-zone-btn" type="button">Add Zone…</button>
+      <button id="add-pile-btn" type="button">Add Pile…</button>
       <p class="layout-controls-caption">
         Saves positions of built-in panels only — custom zones aren't included.
         Applies to new games with this preset, not this table.

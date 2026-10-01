@@ -31,6 +31,7 @@ import { recallHostSettings } from './hostSettings.js';
 import { loadPanelLayout, savePanelPosition, savePanelSize } from './panelLayout.js';
 import { overridesForPreset } from './layoutOverrides.js';
 import { wireLayoutControls } from './layoutSave.js';
+import { wireBuilderMenu } from './builderMenu.js';
 import {
   describeDeckConfig,
   describeConfiguredZones,
@@ -1174,6 +1175,10 @@ const tableActions = createTableActions({
   getLastDealCount: () => lastDealCount,
   rerender,
 });
+
+// US-149/D171: Builder menu - the missing UI entry point for the
+// already-existing CREATE_ZONE/CREATE_PILE reducer actions.
+wireBuilderMenu(() => ({ gameState }), tableActions);
 
 // --- New Game (US-116): host swaps to a different preset, same table ---
 

@@ -93,10 +93,70 @@ check clean, full unit suite (1195) + every browser suite (rtg 3x stress, ui, mu
 reconnect, hostsetup, headeractions, zonepanel, actionmenu, pileelement, spectator, remotecursor)
 all green. Visually confirmed (screenshot) both the token-jumble look and Flip's new 4th choice.
 
+## Current Task (2026-09-30, later still) - US-148/D170 + US-149/D171 SHIPPED
+
+**US-148**: `layoutSave.js` `performSaveLayoutAs` - swapped `globalThis.prompt()` for an inline
+`<input>` reveal, exact same idiom `<header-actions>`'s rename already uses (focus+select on
+open, Enter blurs to commit, Escape sets a settled flag and reverts, blur commits/reverts).
+Trigger is the BUTTON itself (there's no existing label to double-click here, Smith's own
+condition at the arch gate) - `button.replaceWith(input)` then back. `overwrite`/`save-success`
+`alert`/`confirm` left untouched (out of scope). New `.layout-save-as-edit` CSS, copying
+`.zone-name-edit`'s look. `tests/layoutSave.browser.mjs` (3 tests): type+Enter saves under the
+typed name (checked via the real `recard:layout-overrides:v1` localStorage key, object keyed by
+name - NOT an array, caught before shipping by reading `layoutOverrides.js`'s own doc comment);
+Escape and blank both revert with ZERO `dialog` events (asserted via `page.on('dialog')`).
+
+**US-149 - real finding, not just impl**: `state.js` already has `CREATE_ZONE(kind, name?)` and
+`CREATE_PILE(kind, zoneId, name?, pileableId?, fromPileId?)` - fully built, fully unit-tested
+(a dozen+ cases each in `tests/state.test.js`), replicated like any action, validated (rejects
+`kind: 'hand'` and non-`tableSide` kinds) - found by actually reading `state.js` before writing
+a single line, which caught that Morpheus's own arch draft (new `ADD_ZONE`/`ADD_PILE` actions)
+was unnecessary. `main.js` even has a standing comment disclosing the exact gap: "Reset/Reset
+Scores/Add Zone controls removed... CREATE_ZONE stay real, dispatchable, fully-tested... only
+their UI entry points are gone." Closed that gap outright:
+- `tableActions.js`: `performCreateZone(kind)`/`performCreatePile(kind, zoneId)` - plain
+  `io.dispatchOrAlert` calls, deliberately NOT routed through the Pile/Zone `{action,guard}`
+  descriptor registries (D165) - those are for an action an EXISTING instance decides the
+  meaning of; creating one has no instance to ask, same category as `main.js`'s own
+  `adjustScore`/`setScore`.
+- New `src/builderMenu.js` (~95 lines): `wireBuilderMenu(read, tableActions)` wires
+  `#add-zone-btn`/`#add-pile-btn`, each opening the SAME button-swap idiom US-148 just built -
+  a kind `<select>` (every `PILE_TYPES` key but `hand`) for Add Zone, plus a zone `<select>`
+  (`type: 'shared'` only - a per-player zone is another player's seat, not a builder target)
+  for Add Pile, with Create/Cancel buttons.
+- Two real lint catches, both fixed: `for...of` over a `.filter()` call built inline
+  (`unicorn/no-duplicate-loops` - filter to a named variable first); a single-line
+  `if (x) return; y; z;` arrow body (`sonarjs/no-unenclosed-multiline-block` - braces, matching
+  this file's own established multi-line `close()` style elsewhere).
+- Two real test bugs found and fixed before shipping: `getByText('Discard', {exact:true})`
+  doesn't match reliably against a real rendered heading - switched to
+  `.zone-name-text` with `hasText`; `page.keyboard.press('Escape')` only reaches a listener on
+  the actually-focused element - `openInlineForm` wasn't calling `.focus()` on its first field,
+  so Escape silently did nothing (caught by the test, not shipped broken) - fixed by focusing
+  `fields[0]` on open.
+- `tests/builderMenu.browser.mjs` (3 tests), mutation-proved: with `builderMenu.js` moved aside
+  and the other 4 files' diffs stashed, all 3 time out on a `#add-zone-btn` that doesn't exist -
+  the right symptom, not a false pass.
+
+**No new reducer test, no new replication test for either story's actions** - deliberate:
+`CREATE_ZONE`/`CREATE_PILE` and D13's generic replication are already proven; asserting them
+again per-caller would be padding, not safety (project standard, called out explicitly in
+Trin's UAT and the sprint retro).
+
+Smith's user-test used the live harness MCP for a real visual look (not just green tests):
+`game_start` (War, 1 player), screenshot of the full button row (no clipping at this viewport),
+a real `player_act` `CREATE_ZONE(discard)` dispatch, screenshot of the resulting Zone panel
+(clean placement, no overlap with Table Zone/hand/scores). `game_stop` after.
+
+`bobp make check` clean (lint/decks/secrets) at every gate, zero fix loops, 6 new tests total.
+**NOT committed** - awaiting the user (standing session pattern).
+
 ## Next Steps
-Nothing assigned. Not committed yet. Otherwise await the user's next direction, or pick up
-docs/BACKLOG.md's Technical/testing section (multi-player harness follow-ups, Gin bot tuning,
-read()/patch() consolidation candidate) or the still-open card-drag motion sync gap.
+Nothing assigned. Not committed yet (this US-148/149 work, plus everything already queued from
+earlier this session - see agents/cypher.docs/state.md for the full uncommitted-file picture).
+Otherwise await the user's next direction, or pick up docs/BACKLOG.md's Technical/testing
+section (multi-player harness follow-ups, Gin bot tuning, read()/patch() consolidation
+candidate) or the still-open card-drag motion sync gap.
 
 ## Previous - (2026-09-25) - US-130: impl + 2 real bugs found by the browser test going intermittently red
 

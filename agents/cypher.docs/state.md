@@ -96,9 +96,59 @@ full detail) - none patched around, all fixed at the root and verified via git-s
 comparison before trusting any "caused by my change" theory. Full Neo->Trin->Morpheus->Smith
 Bloop chain in CHAT.md; Smith's UX gate confirmed the live look matches the user's literal ask.
 
+## Current Task (2026-09-30, later) - Backlog Q&A: 4 standing judgment-calls answered
+
+User asked "what's in the backlog?" then "queue up the questions" - walked the 4
+"needs your judgment" items one at a time via AskUserQuestion:
+1. RtG 5s quit-grace cutoff -> **accept the cut**, no code change. BACKLOG.md updated (struck).
+2. Bot ignoring SIGTERM (~11s shutdown) -> **shorten further**, same way the 15s->5s grace
+   cut went; exact post-SIGTERM/SIGKILL windows NOT picked, pickable directly by Neo.
+3. SaveAs's `window.prompt()` -> still relevant, user said scope it -> **US-148** written.
+4. "Builder screen" -> user: "we are actually quite close to a game builder already...
+   just need an add menu to add new zones and piles" -> **US-149** written (Add Zone/Add
+   Pile menu actions on top of the existing GameConfig.zones/piles + D165 registries).
+All 4 decisions posted to CHAT.md (*pm decision*, 2026-09-30 20:19). docs/BACKLOG.md and
+docs/USER_STORIES.md both updated same turn.
+
+## Current Task (2026-09-30, later still) - US-148/D170 + US-149/D171 SHIPPED
+
+`/sprint the new stories` (Tier 2 fast-track, AGENTS.md rule 10.2): Cypher+Morpheus combined
+story+arch, Smith+Mouse combined review+plan, straight to Neo. 2 phases, no fix loops.
+
+**US-148 (SaveAs naming)**: `layoutSave.js`'s `globalThis.prompt()` - the one remaining native
+dialog in `src/` - replaced by the same inline-`<input>` idiom `<header-actions>`'s own rename
+already uses (Enter/Escape/blank-reverts). `tests/layoutSave.browser.mjs` (3 tests), mutation-
+proved (git-stash baseline, all 3 fail with the exact right symptom).
+
+**US-149 (Builder menu) - the sprint's real finding (D171, self-corrected same day)**: the
+architecture draft proposed new `ADD_ZONE`/`ADD_PILE` reducer actions. Checking `state.js`
+while implementing found `CREATE_ZONE`/`CREATE_PILE` ALREADY EXIST, fully unit-tested
+(`tests/state.test.js`, a dozen+ cases each), replicated like any action - with NO UI entry
+point anywhere (`main.js`'s own standing comment disclosed this gap explicitly). US-149 became
+pure UI: `src/builderMenu.js` (new, ~95 lines) wires "Add Zone…"/"Add Pile…" in
+`#layout-controls`, each revealing an inline kind-`<select>` (+zone-`<select>` for Add Pile,
+shared zones only) via the same button-swap idiom US-148 established one commit earlier. No new
+reducer test, no new replication test - would have duplicated already-proven coverage (prune,
+not pad). `tests/builderMenu.browser.mjs` (3 tests), mutation-proved (baseline has no
+`#add-zone-btn` at all).
+
+Smith's user-test used the live harness MCP (not just green tests): `game_start`, a real
+screenshot of the button row (no clipping), a real `player_act` CREATE_ZONE dispatch,
+screenshot of the result (clean render, no overlap). `game_stop` after.
+
+Full writeup: `docs/DECISIONS.md` D170/D171 (D171 includes the correction, in place, same
+D-number - Oracle's retro flagged this as the clean model to repeat). `docs/USER_STORIES.md`
+US-148/149 (AC5 of US-149 was narrowed mid-sprint to match the real scope). `docs/BACKLOG.md`
+both entries now SHIPPED. `docs/ARCHITECTURE.md` module map has the new `builderMenu.js` line.
+
+check clean throughout (lint/decks/secrets), 6 new tests total, zero flakes, zero fix loops.
+
+**NOT committed** - awaiting the user's go-ahead (same standing pattern as the rest of this
+session's work).
+
 ## Next Steps
-1. User's standing instruction: commit + push all (dev + main). Covers US-147/D169 - the only
-   thing still uncommitted (everything before it this session is already pushed).
-2. **Waiting on the user** (docs/BACKLOG.md, been open since the US-130 era): RtG's 5s quit grace vs
-   its safe points; a bot that ignores SIGTERM (~11s worst-case shutdown).
+1. User's standing instruction: commit + push all (dev + main). Covers US-147/D169 AND this
+   whole US-148/149 sprint - nothing committed yet this session.
+2. SIGTERM shortening (direct user decision earlier this session, see CHAT.md *pm decision*
+   2026-09-30 20:19): no story yet, small enough to go straight to Neo as a `*fix`, user's call.
 3. Cold start: read this file, then docs/BACKLOG.md top, then task.md tail, then ask what's next.

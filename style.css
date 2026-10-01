@@ -2441,6 +2441,37 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   color: var(--muted);
 }
 
+/* US-148/D170: the "Save Layout As" button's own replacement while
+   naming - same look-and-feel as `.zone-name-edit`'s inline rename,
+   sized for this button row rather than a zone title. */
+.layout-save-as-edit {
+  font: inherit;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 0.2rem 0.4rem;
+  min-width: 8rem;
+  max-width: 14rem;
+}
+
+/* US-149/D171: "Add Zone"/"Add Pile"'s own inline form, same
+   button-swap idiom as `.layout-save-as-edit` above. */
+.builder-inline-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.builder-kind-select,
+.builder-zone-select {
+  font: inherit;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 0.2rem 0.3rem;
+}
+
 .game-code-bar code {
   font-size: 1.05rem;
   font-weight: 700;

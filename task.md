@@ -2470,3 +2470,32 @@ Phase 2: harness test player + real cross-client proof
 - [x] Visually confirmed (screenshot, not just green tests): guest's screen shows the host's
       labeled cursor dot centered exactly on the guest's own Deck panel
 - [x] gate: bobp make check; test-remotecursor 2/2 (3x stress-clean), test-multiplayer 5/5 green
+
+# SaveAs naming UI + Builder menu (US-148/149, D170/D171) — 2026-09-30
+
+Phase 1: US-148 — SaveAs inline naming (replaces window.prompt)
+- [x] layoutSave.js performSaveLayoutAs: replace globalThis.prompt with an inline <input>
+      reveal (reuses header-actions's rename idiom: Enter commits, Escape cancels, blank/
+      unchanged reverts silently) - trigger point is the existing "Save Layout As" button,
+      not a double-click label (Smith's condition)
+- [x] overwrite-confirm (globalThis.confirm) and the save-success globalThis.alert stay
+      UNCHANGED - out of US-148's scope
+- [x] new tests/layoutSave.browser.mjs (3 tests): type a name, confirm; cancel via Escape;
+      blank reverts - mutation-proved (git-stash baseline)
+- [x] gate: bobp make check; test-layoutsave 3/3 green
+
+Phase 2: US-149 — Builder menu (found live, D171: CREATE_ZONE/CREATE_PILE already exist,
+fully tested, with NO ui entry point - this phase is UI-only, no reducer/replication work)
+- [x] tableActions.js: performCreateZone(kind)/performCreatePile(kind, zoneId) - plain
+      dispatchOrAlert calls (not routed through the Pile/Zone descriptor registries, D165 -
+      there is no existing instance to ask)
+- [x] index.html + new src/builderMenu.js: "Add Zone"/"Add Pile" buttons in #layout-controls,
+      each reveals an inline kind <select> (+ zone <select> for Add Pile, shared zones only)
+      and Create/Cancel, same button-swap idiom as US-148's Save As
+- [x] new tests/builderMenu.browser.mjs (3 tests): Add Zone creates a real zone panel; Add
+      Pile (kind + target zone) creates a real pile inside it; Cancel/Escape adds nothing -
+      mutation-proved (git-stash baseline, no #add-zone-btn exists at all)
+- [x] gate: bobp make check; test-buildermenu 3/3 green
+
+Sprint close: Oracle groom (docs/ARCHITECTURE.md module map +
+docs/BACKLOG.md both entries marked SHIPPED) - Smith user-test next.

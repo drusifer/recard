@@ -4771,3 +4771,65 @@ someone reaches into rather than a neat row.
 **Out of scope:** zones getting their own jumble-like style (not asked);
 per-preset spread overrides for jumble (US-147's own default is enough,
 no preset needs one).
+
+### US-148: SaveAs gets a real naming UI, not `window.prompt()`
+
+**As** a player naming a saved layout, **I want** a designed input
+instead of the browser's native `window.prompt()`, **so that** naming a
+save looks and behaves like the rest of the app, not like a page asking
+permission to pop up a dialog.
+
+**AC:**
+1. Whatever currently calls `window.prompt()` for a save name is
+   replaced with an in-app control (consistent with existing dialog/
+   menu patterns already in the codebase - e.g. `<action-menu>`'s own
+   popup styling, D101's "reuse the existing menu look" rule).
+2. Same inputs still work: a typed name, Enter to confirm, Escape/
+   cancel to back out without saving. No new validation rules invented
+   beyond whatever the current prompt-based flow already enforces.
+3. `bobp make check` + the relevant browser suite stay green; a new
+   live test exercises the real control (type a name, confirm, cancel),
+   not just that a save with a given name succeeds at the reducer level.
+
+**Out of scope:** renaming an already-saved layout (not asked); any
+change to what gets saved or how layouts are listed/loaded.
+
+**Flagged:** originally raised by Smith 2026-08-27, re-confirmed still
+relevant by the user 2026-09-30 before scoping.
+
+### US-149: Builder menu - add zones and piles to a live table
+
+**As** a host setting up or adjusting a table, **I want** a menu action
+to add a new Zone or a new Pile directly, **so that** building a custom
+table doesn't require picking a fixed preset first - the declarative
+`GameConfig.zones`/`GameConfig.piles` mechanism and the Pile/Zone class
+registries (D165) already do the hard part; what's missing is a UI path
+to reach them without editing a preset file.
+
+**AC:**
+1. A menu action ("Add Zone") creates a new Zone on the live table,
+   picking a kind (`PILE_TYPES`, any kind but `hand`) - dispatches the
+   EXISTING `CREATE_ZONE` reducer action (found live, D171: it already
+   exists, fully tested, with no UI entry point anywhere).
+2. A menu action ("Add Pile") creates a new Pile, letting the host pick
+   a pile kind the same way, and which shared Zone it belongs to -
+   dispatches the EXISTING `CREATE_PILE` reducer action (same D171
+   finding).
+3. Both actions replicate to every viewer the same way any other table
+   action already does (D13) - no new test of this needed; neither
+   action is special-cased relative to any other.
+4. Works from a from-scratch custom table, not only as an addition to
+   an existing preset - the host is not required to start from one of
+   `presets.js`'s fixed configs to reach this menu.
+5. `bobp make check` + a new live test (click Add Zone / Add Pile, the
+   new zone/pile actually appears; Escape/cancel adds nothing) stay
+   green.
+
+**Out of scope:** removing/reconfiguring an existing zone or pile
+(editing, not adding); a saved "custom preset" that can be reloaded
+later (SaveLayout already exists for the result, once built); deck/
+card-content authoring for a new pile beyond picking its kind.
+
+**Flagged:** backlog item "Builder screen" scoped 2026-09-30 per direct
+user description: "we are actually quite close to a game builder
+already... just need an add menu to add new zones and piles."

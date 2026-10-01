@@ -70,6 +70,84 @@ D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rul
 
 ---
 
+### D171. Builder menu — found live: `CREATE_ZONE`/`CREATE_PILE` already exist, unused by any UI
+
+US-149 ("Builder screen", direct user scoping: "we are actually quite
+close to a game builder already... just need an add menu to add new
+zones and piles"). **Correction to this decision's own first draft**
+(written before Neo started impl): it proposed new `ADD_ZONE`/`ADD_PILE`
+actions. Checking `state.js` while implementing found the user's framing
+was MORE literally true than assumed - `CREATE_ZONE(kind, name?)` and
+`CREATE_PILE(kind, zoneId, name?, pileableId?, fromPileId?)` are not just
+analogous, they are the EXACT reducer actions this story needs, already
+implemented, validated (rejects `kind: 'hand'` and any non-`tableSide`
+kind), unit-tested (`tests/state.test.js`, a dozen+ cases each), and
+replicated like every other action (D13) - with NO UI entry point at
+all. `main.js`'s own standing comment says so: "Reset/Reset
+Scores/Add Zone controls removed from the bottom of the screen...
+CREATE_ZONE stay real, dispatchable, fully-tested reducer actions...
+only their UI entry points are gone, disclosed to the user as a real
+functionality gap." US-149 closes exactly that disclosed gap.
+
+- **No new reducer action, no new test of the reducer or of
+  replication** - both are already proven and would be pure duplication
+  (project standard: prune, don't pad). The only new code is two menu
+  buttons and the small functions that call `dispatchOrAlert` with
+  these two existing action types.
+- **`performCreateZone(kind)`/`performCreatePile(kind, zoneId)`** added
+  to `tableActions.js` as plain `dispatchOrAlert` calls - NOT routed
+  through the Pile/Zone `{action,guard}` descriptor registries (D165):
+  those exist for actions a PILE OR ZONE INSTANCE decides the meaning
+  of; creating one is a table-level operation with no existing instance
+  to ask, the same category `adjustScore`/`setScore` already are.
+- **Pile target picker** (Add Pile's AC2) lists only `type: 'shared'`
+  zones - a per-player zone (another player's seat) is not a sane
+  builder target and D84 gives no reason to expose that distinction to
+  the host anyway.
+- **Rejected**: a separate "builder mode" / "custom preset" screen
+  distinct from a live table - unchanged from the first draft,
+  confirmed even more strongly now that both actions are proven to
+  behave exactly like `presets.js`'s own declarative shape.
+- **Menu surface**: two buttons in the existing host-only
+  `#layout-controls` row, each revealing an inline `<select>`+confirm/
+  cancel form on click (the same button-swaps-for-a-control idiom
+  D170/US-148 just established one row up, not `<action-menu>`'s
+  disclosure - that component is built around a `spec`/enum-choices
+  contract tied to an existing pile/zone instance, and bending it to fit
+  "no instance yet" would cost more than reusing the simpler idiom).
+
+**Out of scope (unchanged from US-149's own AC):** editing/removing an
+existing zone or pile from this menu; a reloadable "custom preset"
+artifact - SaveLayout (D61) already covers persisting the *result* once
+built.
+
+### D170. SaveAs naming reuses the existing inline-rename pattern, not a new dialog
+
+US-148 (direct user re-confirmation of a Smith flag from 2026-08-27).
+`layoutSave.js`'s `performSaveLayoutAs` currently calls
+`globalThis.prompt('Save layout as:', ...)` - a native browser dialog,
+the one remaining `prompt()` call in `src/`.
+
+**Decided:** replace it with the SAME inline-edit control
+`<header-actions>`'s zone/pile rename already uses (double-click-style
+reveal of a text `<input>`, Enter commits, Escape cancels, blur with an
+unchanged/blank value reverts silently - documented at
+`ScoreZone.js`'s own score-input comment as "same spirit as every other
+inline edit in this codebase"). No new component, no `<dialog>` element
+introduced - this is the third site following that exact pattern, which
+is what makes it a reuse rather than a one-off replacement.
+
+**Rejected:** a native `<dialog>`-element modal. Nothing else in `src/`
+uses one, and the inline-input pattern already handles the one thing a
+modal would add here (cancel without side effects) - introducing a
+second "ask the user for a short string" idiom for one call site isn't
+justified.
+
+`globalThis.alert`/`globalThis.confirm` in the same file (save
+confirmation, overwrite confirmation, reset confirmation) are
+UNCHANGED - US-148's AC scopes this to the naming prompt only, per the
+user's original flag.
+
 ### D169. Stack "direction" renamed "style"; a new Jumble style, real bugs found generalizing it
 
 US-147: direct user request. Renaming `direction` to `style` throughout

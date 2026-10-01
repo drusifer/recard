@@ -8,6 +8,8 @@
     "test:rtg": "node --test tests/rtgPlaythrough.browser.mjs",
     "test:hostsetup": "node --test tests/hostSetup.browser.mjs",
     "test:newgame": "node --test tests/newGame.browser.mjs",
+    "test:layoutsave": "node --test tests/layoutSave.browser.mjs",
+    "test:buildermenu": "node --test tests/builderMenu.browser.mjs",
     "test:resume": "node --test tests/resume.browser.mjs",
     "test:tablezoom": "node --test tests/tableZoom.browser.mjs",
     "test:focuszoom": "node --test tests/focusZoom.browser.mjs",

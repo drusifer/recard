@@ -408,3 +408,123 @@ gitleaks git --no-banner --redact --pre-commit .
 3:10PM INF 1 commits scanned.
 3:10PM INF scanned ~49870 bytes (49.87 KB) in 262ms
 3:10PM INF no leaks found
+
+---
+[<small>2026-09-30 20:06:44</small>] [**Cypher**]->[**User**] *pm handoff*:
+ Prep for /clear: tree clean, HEAD 4cd8326 on dev+main, no stray processes. This session shipped 4 sprints: US-144/D166 (host-setup split), US-145/D167 (Flip redesign), US-146/D168 (remote-cursor redesign), US-147/D169 (stack direction->style + Jumble). All committed+pushed. Full cold-start notes in agents/cypher.docs/state.md and agents/neo.docs/state.md.
+
+---
+[<small>2026-09-30 20:11:25</small>] [**Cypher**]->[**User**] *pm ask*:
+ *pm ask what's in the backlog? - summarized docs/BACKLOG.md Product + Technical/testing sections for the user; nothing started, no state change.
+
+---
+[<small>2026-09-30 20:19:26</small>] [**Cypher**]->[**all**] *pm decision*:
+ 4 backlog Qs answered by user: (1) RtG quit-grace cut-off -> accept, no change. (2) SIGTERM ~11s shutdown -> shorten further (Neo to pick numbers). (3) SaveAs window.prompt() -> scoped as US-148. (4) Builder screen -> scoped as US-149 (add-zone/add-pile menu). Full text: docs/BACKLOG.md, docs/USER_STORIES.md.
+
+---
+[<small>2026-09-30 20:20:18</small>] [**Cypher**]->[**Morpheus**] *pm plan sprint*:
+ *pm plan sprint: US-148 (SaveAs naming UI) + US-149 (Builder menu: add zone/pile). Both pickable directly, no open design question - Tier 2 fast-track (AGENTS.md rule 10): combining story+arch in one turn with Morpheus. @Morpheus *lead arch sprint
+
+---
+[<small>2026-09-30 20:21:36</small>] [**Morpheus**]->[**Smith**] *lead handoff*:
+ *lead arch sprint: D170 (US-148) SaveAs naming reuses header-actions's own inline-rename pattern (Enter/Escape/blur), not a new dialog. D171 (US-149) ADD_ZONE/ADD_PILE reuse ensureZoneRecord + the existing kind->class pile registry (D56) - no new builder-mode screen, replicated like any other action. Full text: docs/DECISIONS.md. @Smith *user feedback US-148/149 arch
+
+---
+[<small>2026-09-30 20:21:51</small>] [**Smith**]->[**Mouse**] *user approve*:
+ *user approve. D170/171 both sound: reuse over invention, no new idioms. One nuance for Neo: US-148's 'Save Layout As' is a BUTTON today, not an existing label - the inline-input reveal needs a sensible trigger point (e.g. input replaces/appears beside the button on click), not literally double-click like the zone/pile rename. @Mouse *sm plan sprint
+
+---
+[<small>2026-09-30 20:22:09</small>] [**Mouse**]->[**Neo**] *sm handoff*:
+ *sm plan sprint: 2 phases in task.md. Phase 1 US-148 (SaveAs inline naming, 1 task). Phase 2 US-149 (ADD_ZONE+ADD_PILE reducer actions + menu wiring + live test, 3 tasks). Tier 2 fast-track - handing straight to Neo per AGENTS.md rule 10.2. @Neo *swe impl phase-1
+
+---
+[<small>2026-09-30 20:28:43</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+8:28PM INF no leaks found
+8:28PM INF 1 commits scanned.
+8:28PM INF scanned ~18105 bytes (18.10 KB) in 257ms
+8:28PM INF no leaks found
+
+---
+[<small>2026-09-30 20:28:49</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 1 (US-148) impl complete. layoutSave.js performSaveLayoutAs: button swaps for an inline input (Enter/Escape/blank-reverts, D170's reuse of header-actions's rename idiom), no more globalThis.prompt(). New tests/layoutSave.browser.mjs (3 tests), mutation-proved (git-stash baseline fails all 3, exact symptom: input never appears). check clean. @Trin *qa uat phase-1
+
+---
+[<small>2026-09-30 20:29:05</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat phase-1 PASSED. AC1-3 covered: button->input swap (not double-click, matches Smith's condition), Enter commits+saves under typed name, Escape/blank revert with zero dialog reached (asserted via page.on('dialog') never firing). AC2 (alert/confirm unchanged) verified: save-success alert still fires on a real commit. check clean, mutation-proved by Neo (git-stash baseline, all 3 fail with exact symptom). @Morpheus *lead review phase-1
+
+---
+[<small>2026-09-30 20:29:10</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ *lead review phase-1 PASSED. Matches D170 exactly: button-as-trigger (not a fake double-click label), same commit/cancel idiom as header-actions, no new dialog component. Scope held - alert/confirm untouched. @Neo *swe impl phase-2
+
+---
+[<small>2026-09-30 20:33:09</small>] [**Neo**]->[**all**] *swe decision*:
+ Found live (D171 corrected): CREATE_ZONE/CREATE_PILE already exist in state.js, fully unit-tested, replicated like any action - ONLY their UI entry point was ever removed (main.js's own standing comment says so). US-149 is UI-only: no new reducer action, no new replication test (would duplicate existing coverage - prune not pad). docs/DECISIONS.md D171, USER_STORIES.md, task.md updated to match. Proceeding with Neo *swe impl phase-2 (UI-only now).
+
+---
+[<small>2026-09-30 20:40:45</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-buildermenu | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5720.29908
+
+---
+[<small>2026-09-30 20:40:51</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 2 (US-149) impl complete. UI-only, as D171's correction found: performCreateZone/performCreatePile (tableActions.js) are plain dispatchOrAlert calls onto the ALREADY-EXISTING CREATE_ZONE/CREATE_PILE. New src/builderMenu.js wires #add-zone-btn/#add-pile-btn (inline kind+zone <select> forms, same button-swap idiom as US-148). New tests/builderMenu.browser.mjs (3 tests), mutation-proved (baseline has no #add-zone-btn at all - exact symptom). check clean. @Trin *qa uat phase-2
+
+---
+[<small>2026-09-30 20:41:00</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat phase-2 PASSED. AC1/AC2 covered (kind picker for Add Zone; kind+zone picker for Add Pile, only shared zones offered). AC3 (replication) correctly NOT re-tested - CREATE_ZONE/CREATE_PILE are generic reducer actions, D13 replication is proven once for all actions, re-asserting per-action would be redundant. AC4 (works preset-agnostic) holds - neither action reads selectedPreset. check clean, mutation-proved by Neo. @Morpheus *lead review phase-2
+
+---
+[<small>2026-09-30 20:41:06</small>] [**Morpheus**]->[**Oracle**] *lead handoff*:
+ *lead review phase-2 PASSED. Clean minimal fix: reused CREATE_ZONE/CREATE_PILE outright instead of inventing ADD_ZONE/ADD_PILE once the live check found them already there - correctly not routed through the Pile/Zone descriptor registries (D165), since there's no instance yet to ask. All phases reviewed. @Oracle *ora groom
+
+---
+[<small>2026-09-30 20:42:01</small>] [**Oracle**]->[**Smith**] *ora handoff*:
+ *ora groom: docs/ARCHITECTURE.md module map +builderMenu.js entry; docs/BACKLOG.md both US-148/149 backlog entries marked SHIPPED (were SCOPED). No decision-log drift to backfill - D170/171 posted live as made. @Smith *user test US-148/149
+
+---
+[<small>2026-09-30 20:42:46</small>] [**Smith**]->[**all**] *user approve*:
+ *user test PASSED. Looked at the real table (screenshot, live harness, not just green tests): Add Zone…/Add Pile… sit cleanly in the layout-controls row at full width, no clipping. Dispatched a real CREATE_ZONE(discard) - new Zone panel renders correctly placed, no overlap with Table Zone/hand. Matches the user's literal ask - the add menu is just... there now. @all *sprint retro
+
+---
+[<small>2026-09-30 20:42:57</small>] [**Neo**]->[**Cypher**] *retro*:
+ Neo retro: finding CREATE_ZONE/CREATE_PILE already fully built (D171 correction) is the same lesson as 3 prior sprints now - check what exists before building. Saved an entire reducer+replication-test phase. Tech debt: none added.
+
+---
+[<small>2026-09-30 20:42:57</small>] [**Trin**]->[**Cypher**] *retro*:
+ Trin retro: both phases needed zero new reducer/replication tests, correctly - duplicating already-proven coverage would have been padding, not safety. Mutation-proved both UI changes instead (the actual new surface). Suite health: 6 new tests, zero flakes.
+
+---
+[<small>2026-09-30 20:42:58</small>] [**Morpheus**]->[**Cypher**] *retro*:
+ Morpheus retro: D171's self-correction mid-arch is the right failure mode to have - caught by Neo actually reading state.js before writing code, not by a review finding it later. Worth generalizing: 'check for an existing reducer action before designing a new one' alongside the standing 'check what UI already exists' habit.
+
+---
+[<small>2026-09-30 20:42:58</small>] [**Oracle**]->[**Cypher**] *retro*:
+ Oracle retro: D171 is now the project's clearest example of a decision correcting itself IN PLACE (same D-number, same day) rather than needing a superseding one - worth keeping as the model for 'found live, scope narrowed' writeups.
+
+---
+[<small>2026-09-30 20:42:58</small>] [**Mouse**]->[**Cypher**] *retro*:
+ Mouse retro: 2 phases, no re-planning, no fix loops, scope SHRANK mid-sprint instead of growing - rare and worth noting. Tier 2 fast-track held up fine for both stories.
+
+---
+[<small>2026-09-30 20:42:58</small>] [**Smith**]->[**Cypher**] *retro*:
+ Smith retro: a backlog item sitting since 2026-08-27 ('builder screen', vague) turned into exactly 2 small buttons once asked a concrete question. Worth remembering: a vague standing idea often just needs the queue-one-at-a-time treatment, not a design session.
+
+---
+[<small>2026-09-30 20:43:09</small>] [**Cypher**]->[**all**] *pm launch*:
+ *pm launch US-148/149. SaveAs naming (D170): window.prompt() -> inline-edit idiom. Builder menu (D171): Add Zone/Add Pile - found live CREATE_ZONE/CREATE_PILE already existed fully tested, no UI - closed a disclosed gap, not new mechanism. Verified via screenshot + real dispatch. check clean, 6 new tests. Sprint complete. Not committed - awaiting user go-ahead.
+
+---
+[<small>2026-09-30 21:19:25</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+9:19PM INF no leaks found
+9:19PM INF 1 commits scanned.
+9:19PM INF scanned ~39184 bytes (39.18 KB) in 256ms
+9:19PM INF no leaks found

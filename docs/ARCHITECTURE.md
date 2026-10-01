@@ -202,6 +202,8 @@ src/sessionLifecycle.js  a guest's connection to the host as a real machine (XSt
 src/tableActions.js      pile/zone/stack action dispatch - Pile/Zone own static action
                          registries, this is the ONLY interpreter of their descriptors (D165)
 src/layoutSave.js        Save/Save As/Reset Layout button wiring (D161's pilot cluster)
+src/builderMenu.js       Add Zone/Add Pile menu (US-149/D171) - UI entry point for the
+                         already-existing CREATE_ZONE/CREATE_PILE reducer actions
 src/staleTimers.js       shared Map+setTimeout tracker (moving/cursor/drag-ghost), clock-injected
 src/components/          registered Web Components - see docs/UI_ARCHITECTURE.md
 src/seating.js           pure per-viewer seat rotation + seat geometry

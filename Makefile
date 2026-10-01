@@ -7,7 +7,7 @@
 #
 # Adding a task: add the npm script first, then a one-line target here.
 
-.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-resume test-tablezoom test-focuszoom test-multiplayer test-remotecursor test-harness-mcp test-gin test-jev-runner test-jevtable test-actionmenu test-zonepanel test-headeractions test-pileelement test-reconnect jev-player jev-library jev-library-doc jev-readme jev-table secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers dead-code
+.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-layoutsave test-buildermenu test-resume test-tablezoom test-focuszoom test-multiplayer test-remotecursor test-harness-mcp test-gin test-jev-runner test-jevtable test-actionmenu test-zonepanel test-headeractions test-pileelement test-reconnect jev-player jev-library jev-library-doc jev-readme jev-table secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers dead-code
 
 help:
 	@echo "Recard targets (all front npm scripts):"
@@ -16,6 +16,8 @@ help:
 	@echo "  test-rtg      RtG playthrough (draw/cast/tap/tokens/exile/discard/stack/restart)"
 	@echo "  test-hostsetup  deck selection + sticky host settings on the start menu"
 	@echo "  test-newgame  New Game: host swaps preset mid-table, same code"
+	@echo "  test-layoutsave  Save Layout As inline-input naming (US-148)"
+	@echo "  test-buildermenu  Add Zone/Add Pile builder menu (US-149)"
 	@echo "  test-resume   Resume: a fresh page offers a saved host table back, hands intact (US-144)"
 	@echo "  test-tablezoom  Infinity Table: manual zoom dial + S/M/L/XL presets"
 	@echo "  test-focuszoom  Infinity Table: focus-zoom grow-pile-in-place mechanism"
@@ -68,6 +70,12 @@ test-hostsetup:
 
 test-newgame:
 	npm run test:newgame
+
+test-layoutsave:
+	npm run test:layoutsave
+
+test-buildermenu:
+	npm run test:buildermenu
 
 test-resume:
 	npm run test:resume
