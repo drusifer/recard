@@ -5,7 +5,7 @@ trace_annotate.py — Annotated tool-use extractor for Claude Code JSONL session
 Usage:
     python agents/tools/trace_annotate.py [--date YYYY-MM-DD] [--out FILE]
                                            [--format html|md] [--rules FILE]
-                                           [--no-via] [--project DIR]
+                                           [--no-via] [--no-jev] [--project DIR]
 
 Defaults:
     --date      yesterday
@@ -14,20 +14,36 @@ Defaults:
     --rules     agents/tools/trace_rules.json   (auto-loaded if present)
     --project   auto-detected from CWD
 
+Every rule below is JEV-JUDGED (direct user request): a cheap mechanical
+pass (regex, repeat-counting) only narrows down CANDIDATES; whether a
+candidate really IS the anti-pattern is a `judge.systemOne` call via
+`agents/tools/trace_judge.mjs`, the same call every Jev game player in
+this repo makes. No TYPESAFE_API_KEY (or `--no-jev`) falls back to
+flagging every mechanical candidate directly - the tool still runs with
+no key configured, just without the judgment layer.
+
 Anti-patterns detected:
-    AP-SKILL-RELOAD    Same Skill invoked more than once in a session
-    AP-MAKE-BYPASS     Bash runs pytest/ruff/python/.venv directly instead of make
-    AP-MAKE-PIPE       Bash pipes make output (violates make skill rule)
-    AP-VIA-GREP        Grep/Glob used for symbol/import/function lookups
-    AP-VIA-READ        Read used on source files never subsequently edited
-    AP-DUP-READ        Same file Read 3+ times in one session
-    AP-RAW-VENV        Bash calls .venv/bin/<tool> directly
+    AP-SKILL-RELOAD      Same Skill invoked more than once in a session
+    AP-MAKE-BYPASS       Bash runs pytest/ruff/python/.venv directly instead of make
+    AP-MAKE-PIPE         Bash pipes make output (violates make skill rule)
+    AP-VIA-GREP          Grep/Glob used for symbol/import/function lookups
+    AP-VIA-READ          Read used on source files never subsequently edited
+    AP-DUP-READ          Same file Read 3+ times in one session
+    AP-RAW-VENV          Bash calls .venv/bin/<tool> directly
+    AP-ONEOFF-SCRIPT     Manual probe used instead of a repeatable test: an inline
+                         `node -e`/`python -c` one-liner, OR a script Written
+                         outside tests/ (and outside agents/tools/, scratchpad,
+                         /tmp) that is then Bash-executed directly
+    AP-SLOW-TEST-REPEAT  A full/slow test-suite command repeated with no source
+                         edit since the last run of one, where a narrower or
+                         faster run would have confirmed the same thing
 """
 
 import argparse
 import html as html_lib
 import json
 import re
+import subprocess
 import sys
 from collections import Counter
 from datetime import date, timedelta
@@ -75,6 +91,24 @@ BUILTIN_RULES: dict[str, dict] = {
         'description': 'Same file Read 3+ times in one session without the file changing.',
         'fix': 'Read once, keep excerpt in context. Re-Read only to verify after an edit.',
         'color': '#eab308',
+    },
+    'AP-ONEOFF-SCRIPT': {
+        'description': 'Manual probe instead of a repeatable test: an inline `node -e`/`python -c` '
+                        'one-liner, or a script Written outside tests/ (and outside agents/tools/, '
+                        'scratchpad, /tmp) that is then run directly via Bash.',
+        'fix': 'Write the check into tests/ once, as a real test, instead of a throwaway eval or '
+               'script file. A scratchpad/tmp script used purely to investigate a LIVE bug while '
+               'debugging is fine (and not what this flags) - the violation is substituting a '
+               'probe for the regression test that should exist once the bug is understood.',
+        'color': '#d97706',
+    },
+    'AP-SLOW-TEST-REPEAT': {
+        'description': 'A full/slow test-suite command repeated with no source edit since the '
+                        'last run of one, where a narrower or faster run would do.',
+        'fix': 'Run a targeted subset (one file, one pattern, or the project\'s own quicker '
+               'validation gate) after a small change; save the full, slow run for an actual gate '
+               '(pre-handoff, pre-commit) - see AGENTS.md\'s own Bounded Testing rule.',
+        'color': '#0891b2',
     },
 }
 
@@ -144,20 +178,172 @@ VIA_SYMBOL_GREP_RE = re.compile(
     re.IGNORECASE
 )
 SOURCE_EXTENSIONS = {'.py', '.ts', '.tsx', '.js', '.jsx', '.go', '.rs', '.rb'}
+# An inline eval one-liner used to "prove it works" instead of writing a real
+# test - the cheapest-to-detect shape of AP-ONEOFF-SCRIPT, no Write needed.
+ONEOFF_EVAL_RE = re.compile(
+    r'(?:^|\s|;|&&|\|\|)(?:node|python3?)\s+(-e|-c)\b',
+    re.MULTILINE
+)
+# Extensions AP-ONEOFF-SCRIPT's Write-then-run half cares about: a throwaway
+# script, not a config/data file landing in the same non-test location.
+SCRIPT_EXTENSIONS = {'.py', '.mjs', '.js', '.ts', '.sh', '.rb'}
+# Paths excluded from the Write-then-run half: a test (the right place for a
+# repeatable check), a persistent project tool (agents/tools/, D154's own
+# games/<game> tool directories), or scratchpad/tmp (the harness's own
+# explicit sanctioned place for a throwaway file while live-debugging - see
+# this rule's own `fix` text for why that is NOT what it flags).
+ONEOFF_EXCLUDED_PREFIXES = ('tests/', 'agents/tools/')
+# AP-SLOW-TEST-REPEAT: a command that looks like a FULL, slow validation
+# run (the whole suite / whole gate), as opposed to one file, one pattern,
+# or a project's own quicker target (anything ending `-fast`/`-q`, or
+# naming a specific path/pattern, never matches this). Kept intentionally
+# generic - this file is copied verbatim between bob-protocol projects
+# (see the trin skill's own note on it), so it names shapes common across
+# ecosystems (make/npm/pytest/node --test) rather than one project's own
+# target names.
+FULL_SUITE_RE = re.compile(
+    r'(?:^|\s|;|&&|\|\|)(?:'
+    r'make\s+(?:test|check)\b(?!\S)'                 # make test | make check (not test-x/-fast)
+    r'|npm\s+(?:run\s+)?test\b(?!\S)'                # npm test | npm run test, no extra args
+    r'|pytest\b\s*$'                                 # bare pytest, no path/-k narrowing
+    r'|node\s+--test\s+(?:\S*\*\S*|tests/?\s*$)'     # node --test <glob> or the whole tests/ dir
+    r')',
+    re.MULTILINE
+)
+
+
+def is_oneoff_script_candidate(path: str) -> bool:
+    if not path or Path(path).suffix not in SCRIPT_EXTENSIONS:
+        return False
+    if path.startswith('/tmp/') or 'scratchpad' in path:
+        return False
+    return not any(path.startswith(p) for p in ONEOFF_EXCLUDED_PREFIXES)
 
 
 def classify_bash(cmd: str) -> list[str]:
+    """The MECHANICAL pre-filter: which rules this command is even a
+    CANDIDATE for. Candidates are judged by Jev (`judge_candidates`)
+    before becoming a real flag - this only decides what is worth asking
+    about at all (see the module's own `AP-ONEOFF-SCRIPT` fix text: a
+    fact-finding pass stays code; a judgment call goes to Jev)."""
     flags = []
     if MAKE_BYPASS_RE.search(cmd):
         flags.append('AP-MAKE-BYPASS')
     if VENV_RE.search(cmd):
         flags.append('AP-RAW-VENV')
+    if ONEOFF_EVAL_RE.search(cmd):
+        flags.append('AP-ONEOFF-SCRIPT')
     pipe_match = MAKE_PIPE_RE.search(cmd)
     if pipe_match and pipe_match.group('target') not in MKF_EXCLUDED_TARGETS:
         flags.append('AP-MAKE-PIPE')
     if VIA_SYMBOL_GREP_RE.search(cmd):
         flags.append('AP-VIA-GREP')
     return flags
+
+
+# ---------------------------------------------------------------------------
+# Jev judging — every rule's final yes/no (direct user request: "update the
+# tool to use jev for the rules"). `classify_bash` and the stateful trackers
+# in `annotate_events` below only narrow down CANDIDATES - a cheap, exact
+# fact ("this command matches AP-MAKE-BYPASS's shape", "this file was read
+# 3 times"). Whether a candidate is REALLY the anti-pattern, in spirit, is a
+# judgment call, so it goes to Jev (`agents/tools/trace_judge.mjs`, the same
+# `judge.systemOne` a Jev game player calls) exactly like every other fuzzy
+# call in this repo - never answered by more regex.
+# ---------------------------------------------------------------------------
+
+JUDGE_BRIDGE = Path(__file__).parent / 'trace_judge.mjs'
+
+RULE_QUESTIONS: dict[str, str] = {
+    'AP-MAKE-BYPASS': (
+        "A shell command appears to invoke a test runner or linter (pytest, ruff, pylint, mypy, "
+        "black, isort, coverage) directly rather than through the project's own `make <target>` "
+        "wrapper. Given the command, is this really bypassing project automation - not, say, a "
+        "harmless --help/--version check, or part of the Makefile's own internal definition?"
+    ),
+    'AP-RAW-VENV': (
+        "A shell command references a tool directly under .venv/bin instead of through "
+        "`make <target>`. Is this really bypassing project automation, rather than a legitimate "
+        "internal use (e.g. the Makefile's own invocation of it)?"
+    ),
+    'AP-MAKE-PIPE': (
+        "A shell command pipes `make <target>`'s own output into another command (tail, grep, "
+        "head, ...) instead of letting the Makefile capture it to build/build.out. Is this really "
+        "working around that capture, rather than a harmless exception such as `make help`?"
+    ),
+    'AP-VIA-GREP': (
+        "A grep/rg command's pattern looks like it is hunting for a code symbol's definition (a "
+        "function, class, import, or similar) rather than free-text content such as a string "
+        "literal, comment, or log line. Is this really symbol-hunting that should have used a "
+        "dedicated code-navigation tool instead of grep?"
+    ),
+    'AP-VIA-READ': (
+        "A source file was read in full, and was never edited later in this same session. Does "
+        "this really look like symbol/definition hunting that should have used a dedicated "
+        "code-navigation tool, rather than a deliberate read before editing elsewhere, or a "
+        "genuine review pass?"
+    ),
+    'AP-DUP-READ': (
+        "The exact same file (same offset/limit) was read multiple times in one session with no "
+        "edit to the file in between. Was this truly an avoidable re-read - the content could "
+        "have been kept in context from the first read - rather than a legitimate reason to look "
+        "again, such as confirming an external/background process changed the file?"
+    ),
+    'AP-SKILL-RELOAD': (
+        "The same reusable skill was invoked more than once in one session for what looks like "
+        "the same purpose. Was this really an avoidable reload - its sub-steps should have run "
+        "directly after the first load - rather than a legitimate second, distinct phase of work?"
+    ),
+    'AP-ONEOFF-SCRIPT': (
+        "A piece of throwaway code was run directly - either an inline one-liner, or a small "
+        "script written outside the project's real test suite - to manually check something. Was "
+        "this really substituting a one-off manual probe for a repeatable automated test that "
+        "should have been written instead, rather than a legitimate live-debugging aid used while "
+        "actively investigating a bug (not meant to persist or prove anything on its own)?"
+    ),
+    'AP-SLOW-TEST-REPEAT': (
+        "A slow, full test-suite (or equivalent full validation) command was run again with no "
+        "source file edits since the previous run of a similarly heavy command. Was this really a "
+        "wasteful repeat that a faster, narrower/targeted run (one file, one pattern, or the "
+        "project's own quicker validation gate) could have confirmed instead, rather than a "
+        "legitimate reason to re-run the full thing (e.g. confirming a flaky result, or this being "
+        "the only run so far)?"
+    ),
+}
+
+
+def judge_candidates(candidates: list[dict], use_jev: bool, cwd: Path) -> dict[int, str]:
+    """`candidates`: `[{id, rule, state}, ...]`. Returns `{id: 'yes'|'no'|'unsure'}`.
+    On any failure to reach Jev (disabled, no node, no TYPESAFE_API_KEY, bad
+    response), warns ONCE and falls back to 'yes' for every candidate - the
+    old, mechanical-only behavior - rather than silently dropping every flag
+    a session would otherwise have shown."""
+    if not candidates:
+        return {}
+    if not use_jev:
+        return {c['id']: 'yes' for c in candidates}
+
+    payload = [{'id': c['id'], 'instructions': RULE_QUESTIONS[c['rule']], 'state': c['state']} for c in candidates]
+    try:
+        result = subprocess.run(
+            ['node', str(JUDGE_BRIDGE)], input=json.dumps(payload), capture_output=True, text=True,
+            cwd=str(cwd), timeout=max(30, 10 * len(candidates)),
+        )
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or f'exit {result.returncode}')
+        verdicts = json.loads(result.stdout)
+    except Exception as error:  # noqa: BLE001 - any failure here is "fall back", not a crash
+        print(f'WARNING: trace_judge unavailable ({error}) - falling back to mechanical-only flags', file=sys.stderr)
+        return {c['id']: 'yes' for c in candidates}
+
+    by_id = {}
+    for v in verdicts:
+        if 'error' in v:
+            print(f"WARNING: trace_judge candidate {v['id']} errored ({v['error']}) - treating as not flagged", file=sys.stderr)
+            by_id[v['id']] = 'no'
+        else:
+            by_id[v['id']] = v['verdict']
+    return by_id
 
 
 # ---------------------------------------------------------------------------
@@ -233,8 +419,17 @@ def _paths_edited(events: list[dict]) -> set[str]:
     return edited
 
 
-def annotate_events(events: list[dict], rules: dict, no_via: bool) -> list[dict]:
-    """Return list of annotated event dicts for template rendering."""
+def annotate_events(events: list[dict], rules: dict, no_via: bool, use_jev: bool = True,
+                     repo_dir: Path | None = None) -> list[dict]:
+    """Return list of annotated event dicts for template rendering.
+
+    Two passes: this loop does the CHEAP, MECHANICAL part only - which
+    events are even candidates for which rule, a plain fact (a regex
+    match, a repeated read signature, a skill invoked twice). Nothing
+    here decides a real flag; every candidate is collected and handed to
+    `judge_candidates` (Jev) once the whole session is seen, then merged
+    into each event's `flags` in the second pass below.
+    """
     skill_seen: Counter = Counter()
     edited_paths = _paths_edited(events)
     # Per-path edit "generation" — bumped on every Edit/Write to that path, so a
@@ -242,39 +437,72 @@ def annotate_events(events: list[dict], rules: dict, no_via: bool) -> list[dict]
     # the same offset if no edit landed on the file in between.
     edit_generation: Counter = Counter()
     read_sig_seen: Counter = Counter()
+    read_sig_count: Counter = Counter()
     skill_reload_allowed = set(rules.get('AP-SKILL-RELOAD', {}).get('multi_call_allowed', []))
-    annotated = []
+    # AP-ONEOFF-SCRIPT's Write-then-run half: every non-test/tool/scratchpad
+    # script Written this session, by its basename (a Bash command rarely
+    # repeats a Write's exact - possibly absolute - path verbatim).
+    oneoff_candidates: dict[str, str] = {}
+    # AP-SLOW-TEST-REPEAT: the last full-suite command seen, and whether
+    # any Edit/Write has landed anywhere since (a repeat right after a
+    # real code change is not the anti-pattern this rule means).
+    last_full_suite_cmd: str | None = None
+    any_edit_since_last_full_suite = True
+
+    per_event_candidates: list[list[dict]] = [[] for _ in events]
+    all_candidates: list[dict] = []
+
+    def add_candidate(seq: int, rule: str, state: dict) -> None:
+        cid = len(all_candidates)
+        all_candidates.append({'id': cid, 'rule': rule, 'state': state})
+        per_event_candidates[seq - 1].append(all_candidates[-1])
 
     for seq, ev in enumerate(events, 1):
         name = ev['name']
         inp = ev['input']
-        flags: list[str] = []
 
         if name == 'Bash':
-            flags = classify_bash(inp.get('command', ''))
+            cmd = inp.get('command', '')
+            for rule in classify_bash(cmd):
+                add_candidate(seq, rule, {'command': cmd})
+            if any(base in cmd for base in oneoff_candidates):
+                add_candidate(seq, 'AP-ONEOFF-SCRIPT', {'command': cmd, 'written_path': next(
+                    path for base, path in oneoff_candidates.items() if base in cmd)})
+            if FULL_SUITE_RE.search(cmd):
+                if last_full_suite_cmd is not None and not any_edit_since_last_full_suite:
+                    add_candidate(seq, 'AP-SLOW-TEST-REPEAT', {'command': cmd, 'previous_command': last_full_suite_cmd})
+                last_full_suite_cmd = cmd
+                any_edit_since_last_full_suite = False
         elif name == 'Read':
             path = inp.get('file_path', '')
             sig = (path, inp.get('offset'), inp.get('limit'), edit_generation[path])
             read_sig_seen[sig] += 1
-            if (Path(path).suffix in SOURCE_EXTENSIONS
-                    and path not in edited_paths
-                    and not no_via):
-                flags.append('AP-VIA-READ')
+            read_sig_count[sig] += 1
+            if Path(path).suffix in SOURCE_EXTENSIONS and path not in edited_paths and not no_via:
+                add_candidate(seq, 'AP-VIA-READ', {'path': path})
             if read_sig_seen[sig] >= 3:
-                flags.append('AP-DUP-READ')
+                add_candidate(seq, 'AP-DUP-READ', {'path': path, 'times_read_so_far': read_sig_count[sig]})
         elif name in ('Edit', 'Write'):
             path = inp.get('file_path', '')
             if path:
                 edit_generation[path] += 1
+            any_edit_since_last_full_suite = True
+            if name == 'Write' and is_oneoff_script_candidate(path):
+                oneoff_candidates[Path(path).name] = path
         elif name == 'Skill':
             skill = inp.get('skill', '')
             skill_seen[skill] += 1
             if skill_seen[skill] > 1 and skill not in skill_reload_allowed:
-                flags.append('AP-SKILL-RELOAD')
+                add_candidate(seq, 'AP-SKILL-RELOAD', {'skill': skill, 'times_invoked_so_far': skill_seen[skill]})
 
+    verdicts = judge_candidates(all_candidates, use_jev, repo_dir or Path.cwd())
+
+    annotated = []
+    for seq, ev in enumerate(events, 1):
+        name, inp = ev['name'], ev['input']
+        flags = [c['rule'] for c in per_event_candidates[seq - 1] if verdicts.get(c['id']) == 'yes']
         if no_via:
             flags = [f for f in flags if 'VIA' not in f]
-
         annotated.append({
             'seq': seq,
             'name': name,
@@ -555,6 +783,10 @@ def main():
     parser.add_argument('--format', choices=['html', 'md'], default='html')
     parser.add_argument('--rules', default=str(DEFAULT_RULES_PATH))
     parser.add_argument('--no-via', action='store_true')
+    parser.add_argument('--no-jev', action='store_true',
+                         help='skip Jev judging; every mechanical candidate is flagged directly '
+                              '(the old, pre-Jev behavior) - also the automatic fallback if Jev '
+                              'is unreachable (no node, no TYPESAFE_API_KEY, network failure)')
     parser.add_argument('--project', default=None)
     args = parser.parse_args()
 
@@ -588,7 +820,7 @@ def main():
         events_raw = parse_session(path)
         if not events_raw:
             continue
-        annotated = annotate_events(events_raw, rules, args.no_via)
+        annotated = annotate_events(events_raw, rules, args.no_via, use_jev=not args.no_jev, repo_dir=cwd)
         all_flags = [f for ev in annotated for f in ev['flags']]
         ap_counts = Counter(all_flags)
         total_calls += len(annotated)

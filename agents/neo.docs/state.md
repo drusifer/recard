@@ -1,6 +1,104 @@
 # Agent State
 
-## Current Task (2026-10-01) - New Jev game: War (`*bloop` request, "make a jev/xstate player for war")
+## Current Task (2026-10-01, later) - `*bloop this`: Jev-judged trace_annotate.py anti-patterns + AP-SLOW-TEST-REPEAT
+
+Started from a Trin (`*trin`) question: "do we have a rule in the judge tool for flagging manual
+testing (one-offs instead of repeatable tests)?" Answer was no - `agents/tools/trace_rules.json`
+had no such rule. First added `AP-ONEOFF-SCRIPT` mechanically (regex + Write-then-run tracking),
+then the user asked for a bigger change: **every** rule in `trace_annotate.py` should be
+Jev-judged, not just mechanically pattern-matched, plus a new rule for repeated slow/full test
+runs where a faster targeted run would do.
+
+**Architecture**: the mechanical regex/stateful trackers (`classify_bash`, read-signature
+counting, skill-invocation counting, the new full-suite-repeat tracker) now only narrow down
+CANDIDATES - a cheap, exact fact ("this command's shape matches rule X", "this file was read 3
+times"). Whether a candidate REALLY is the anti-pattern in spirit is a judgment call, asked of Jev
+via a new `agents/tools/trace_judge.mjs` (Node, `@typesafe-ai/sdk`'s `TypeSafeClient.systemOne`,
+one `noul` question per candidate, `verdictOf`'s own yes/no/unsure threshold - same shape every
+other Jev player in this repo already uses). `trace_annotate.py` batches all of a session's
+candidates, shells out to the bridge once via `subprocess.run`, and only keeps 'yes' verdicts as
+real flags.
+
+**Kept genuinely project-agnostic** (per the trin skill's own note that `agents/tools/` is copied
+verbatim between sibling bob-protocol projects): `trace_judge.mjs` inlines `verdictOf` rather than
+importing recard's own `tools/jev/escalate.mjs` - a generic tool must not reach into one project's
+game-playing code.
+
+**Graceful degradation, load-bearing**: no `TYPESAFE_API_KEY`, no `node`, or any bridge failure
+prints one warning and falls back to flagging every mechanical candidate directly (the exact
+pre-Jev behavior) - verified live (`env -u TYPESAFE_API_KEY node agents/tools/trace_judge.mjs`
+exits 1 with a clear message; `judge_candidates()` catches it and returns all-'yes'). `--no-jev`
+CLI flag forces that path deliberately. The tool must keep working for a project with no key
+configured, same as every other Jev player here.
+
+**New rule, `AP-SLOW-TEST-REPEAT`** (direct user request): a full/slow test-suite command
+(`make test`/`check`, bare `npm test`, bare `pytest`, `node --test` over a glob/whole dir) run
+again with no source Edit/Write since the last run of one is a candidate; Jev judges whether a
+faster/narrower run would have done. Deliberately generic shape (make/npm/pytest/node --test), not
+named after any one project's own fast-gate target.
+
+**Verified** (self-validation before Trin handoff, all offline/`--no-jev` - no API calls burned):
+`py_compile` + `node --check` both clean; `trace_rules.json` valid JSON; every rule's mechanical
+pre-filter smoke-tested in isolation (one early assertion was MY test being wrong, not the code -
+fixed the test, not the regex); the full CLI pipeline run for real against TODAY's actual session
+JSONL (`--no-jev --format md`) - 954 real tool calls, 118 flags, zero crashes. Real signal, not just
+a shape-check: `AP-SLOW-TEST-REPEAT` fired 6 times on this very session's own repeated `node --test
+tests/*.test.js` runs during the earlier War-bot live-debugging marathon, and `AP-ONEOFF-SCRIPT`
+fired 41 times on this session's own `python3 -c`/`node -e` inline smoke checks - the tool catching
+its own author's session, unprompted.
+
+Also did a quick web search (direct user request) for an existing open-source rule library for
+agent-trace anti-patterns before hand-writing `RULE_QUESTIONS`: nothing drop-in exists (closest are
+`trajectorycheck`/`agent-trace-evals` - fixed rules against a KNOWN expected trace/allowlist, built
+for agent-safety, not "wasteful habit" judgment calls; AdaRubric/DRACO generate a rubric per-task
+via an LLM rather than shipping fixed rules - same LLM-as-judge idea as this, just dynamic). Logged
+in the conversation, not worth a BACKLOG entry - nothing to follow up on.
+
+**NOT yet run live against Jev for real** (needs `TYPESAFE_API_KEY` - not attempted this session;
+the offline/mechanical-only path is what's actually been exercised).
+
+**Trin UAT PASSED** (independent re-check, not a rubber stamp): found a real gap Neo's own
+self-validation missed - every check, including Trin's own first re-checks, was a one-off
+`python3 -c` probe, exactly the thing `AP-ONEOFF-SCRIPT` exists to catch. Fixed by writing
+`agents/tools/test_trace_annotate.py` (stdlib `unittest`, no new dependency - 20 tests), and
+mutation-proving both NEW guards by direct revert-rerun-restore (not a scripted loop, per the
+skill's own standing warning against those): `any_edit_since_last_full_suite` reset (removing it
+made the exact right test fail, nothing else) and the scratchpad-exclusion check in
+`is_oneoff_script_candidate` (same). Also moved a local `import subprocess` to the top of the file
+(style nit).
+
+**Morpheus review PASSED**: rule-key consistency verified across `BUILTIN_RULES`/`RULE_QUESTIONS`/
+`trace_rules.json` (exact match - a drift here would be a silent `KeyError` at judge time).
+`trace_judge.mjs` confirmed to inline `verdictOf` rather than import recard's own
+`tools/jev/escalate.mjs` (keeps `agents/tools/` genuinely project-agnostic, copyable to a sibling
+bob-protocol project). `subprocess.run` uses an arg list, never `shell=True` - no injection risk
+from a logged command string reaching the subprocess call. Two-pass design (mechanical candidates,
+then one batched judge call) judged sound, not over-engineered.
+
+Full chain done: Neo impl -> Trin UAT -> Morpheus review, all PASSED, posted to CHAT.md.
+
+**Gap closed post-review**: TYPESAFE_API_KEY was actually present the whole time - the
+"unverified" conclusion above was wrong, caused by my own earlier `env -u TYPESAFE_API_KEY`
+test (deliberately unsetting it to prove the FALLBACK path) being mistaken for "no key available"
+without ever checking the unset-free case. Verified for real once this was caught: `judge_candidates`
+against 3 real candidates returned `{yes, no, unsure}` correctly discriminating `pytest tests/` (yes)
+from `pytest --help` (no) from an ambiguous repeat (unsure) - exactly the nuance the mechanical
+regex alone cannot make. Also confirmed the full `annotate_events` merge path with real verdicts
+(`pytest tests/test_foo.py` flagged, `pytest --version` not). Real Jev-judging path now genuinely
+verified end-to-end, not just the offline fallback.
+
+**Incident, same pass**: a shell one-liner meant to check only whether TYPESAFE_API_KEY was SET
+(`${VAR:+yes}${VAR:-no}`) has a real bug - `${VAR:-no}` expands to the variable's own VALUE when
+it's set (only substitutes on unset/empty), not "no" - and printed the actual key into tool output/
+transcript. Told the user immediately, recommended rotating the key. Fixed by checking presence
+the safe way (`[ -n "$VAR" ]` + length only, no value echoed) for the re-verification above.
+
+**NOT committed** - awaiting the user.
+
+**NOT committed** - `agents/tools/{trace_annotate.py,trace_rules.json}` modified,
+`agents/tools/trace_judge.mjs` new.
+
+## Previous - (2026-10-01) - New Jev game: War (`*bloop` request, "make a jev/xstate player for war")
 
 War had NO `games/war/` directory before this - only Gin and RtG exist as Jev-player games
 (US-129/D154). Built it from scratch, same shape as `games/gin/`: `games/war/{questions.yaml

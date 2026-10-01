@@ -28,5 +28,13 @@
   "AP-DUP-READ": {
     "description": "Same file Read 3+ times in one session without the file changing between reads.",
     "fix": "Read a file once and keep the relevant excerpt in context. Use Edit/Write to change it; only re-Read if you need to verify the result of an edit."
+  },
+  "AP-ONEOFF-SCRIPT": {
+    "description": "Manual probe used instead of a repeatable test: an inline `node -e`/`python -c` one-liner, or a script Written outside tests/ (and outside agents/tools/, scratchpad, /tmp) that is then run directly via Bash.",
+    "fix": "Write the check into tests/ once, as a real test, instead of a throwaway eval or script file. A scratchpad/tmp script used purely to investigate a LIVE bug while debugging is fine (and not what this flags) - the violation is substituting a probe for the regression test that should exist once the bug is understood."
+  },
+  "AP-SLOW-TEST-REPEAT": {
+    "description": "A full/slow test-suite command repeated with no source edit since the last run of one, where a narrower or faster run would do.",
+    "fix": "Run a targeted subset (one file, one pattern, or the project's own quicker validation gate) after a small change; save the full, slow run for an actual gate (pre-handoff, pre-commit) - see AGENTS.md's own Bounded Testing rule."
   }
 }

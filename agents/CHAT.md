@@ -604,3 +604,23 @@ make: *** [Makefile:154: jev-table] Error 130
 ---
 [<small>2026-10-01 15:52:48</small>] [**Neo**]->[**User**] *swe blocked*:
  War bot: 2 real bugs found+fixed via live testing (premature 'done' before DEAL; missing waitForView confirm after act() - guest act() only confirms SEND, not landing). 3rd live stall (2 moves in, froze, unexplained) - stopping per anti-loop rule after 3 distinct live-env stalls this session (2 external join timeouts + this). Logic solid: 8/8 tests, lint clean, 1208 suite green. Recommend live test from a non-sandboxed machine.
+
+---
+[<small>2026-10-01 17:51:53</small>] [**Neo**]->[**Trin**] *swe impl*:
+ *swe impl: wiring Jev judgments into every trace_annotate.py anti-pattern rule (agents/tools/trace_judge.mjs bridge, noul verdicts) + new AP-SLOW-TEST-REPEAT rule. In progress.
+
+---
+[<small>2026-10-01 17:56:47</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ *swe impl done: every trace_annotate.py rule now Jev-judged (new trace_judge.mjs bridge, graceful no-key fallback) + new AP-SLOW-TEST-REPEAT rule. Self-validated offline (py_compile/node --check clean, real run vs today's session: 954 calls/118 flags/0 crashes). NOT yet run against real Jev (no API key exercised). Full detail: agents/neo.docs/state.md. @Trin *qa uat jev-judged trace rules
+
+---
+[<small>2026-10-01 17:59:05</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat PASSED. Independent re-check of Neo's claims (py_compile/node --check/json all clean). Real gap found+fixed: all prior verification (mine incl.) was one-off python3 -c probes - exactly AP-ONEOFF-SCRIPT's own target. Wrote agents/tools/test_trace_annotate.py, 20 tests, mutation-proven on both new guards (AP-SLOW-TEST-REPEAT's edit-reset, scratchpad exclusion). Jev-judging success path unverified (no TYPESAFE_API_KEY here) - disclosed, not hidden. @Morpheus *lead review jev-judged trace rules
+
+---
+[<small>2026-10-01 17:59:32</small>] [**Morpheus**]->[**User**] *lead review*:
+ *lead review PASSED. Rule-key consistency verified across BUILTIN_RULES/RULE_QUESTIONS/trace_rules.json (exact match, no KeyError risk). Clean separation held: trace_judge.mjs inlines verdictOf rather than importing recard's own tools/jev/escalate.mjs - agents/tools/ stays project-agnostic. subprocess.run uses arg list (no shell=True) - no injection risk. Two-pass mechanical-candidate+batch-judge design is sound, not over-engineered. Ready to commit pending user.
+
+---
+[<small>2026-10-01 18:04:32</small>] [**Neo**]->[**User**] *swe update*:
+ Gap closed: TYPESAFE_API_KEY was present all along (my earlier env -u test for the fallback path got mistaken for 'no key'). Real Jev judging verified: pytest tests/ ->yes, pytest --help->no, ambiguous repeat->unsure - correct nuance. Separately: my own key-presence check had a bug and printed the real key value into tool output - told user, recommended rotation.
