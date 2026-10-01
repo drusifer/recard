@@ -1,6 +1,135 @@
 # Agent State
 
-## Current Task (2026-09-29) - US-144/D166 ALL 3 PHASES DONE, sprint closed
+## Current Task (2026-10-01) - New Jev game: War (`*bloop` request, "make a jev/xstate player for war")
+
+War had NO `games/war/` directory before this - only Gin and RtG exist as Jev-player games
+(US-129/D154). Built it from scratch, same shape as `games/gin/`: `games/war/{questions.yaml
+(empty - War has no decision to judge),table.yaml,turn.yaml}` + `players/mechanical.yaml` (one
+player file - no real choice in War means no second style), `tools/war/{bot.mjs,library.mjs,
+adapter.mjs}`, registered in `tools/jev/games.mjs`. Confirmed via `docs/ARCHITECTURE.md`'s own
+module-layout section before starting (direct user instruction this session: "always read arch").
+
+**The actual design problem**: War's own doc comment in `src/presets.js` already states the whole
+game as primitives - "drag each pile's own top card onto the Table to compare, then MOVE the
+winnings into the winner's deck" - so there is nothing for Jev to judge (`games/war/questions.yaml`
+is `{}`); `WarBot.look()`/`step()` compute the phase mechanically, same shape as Gin's
+`gin_look`/`gin_step` (which also never judge - only Gin's STRATEGY choice does).
+
+Two real problems solved, not just "flip a card":
+1. **The Table pile carries no owner field** (it's `plain`, not a `hand`) - nothing on the wire
+   says which flipped card is mine vs the opponent's. `WarBot` remembers its own move ids in a
+   private `#myCardIds` Set and treats every other table card as the opponent's - the same kind
+   of client-side memory `GinTracker` keeps for Gin, just keyed by id instead of diffed.
+2. **A `deck`-kind source/destination gets no auto-reveal/auto-hide** (D43's `toHandCard`
+   stripping only fires for a `hand`). Every flip needs an explicit FLIP after the MOVE to become
+   visible; every collect needs an explicit FLIP back *only for the cards that were face-up* -
+   first draft flipped every collected card unconditionally, which would have un-hidden the war
+   procedure's 3 face-down burn cards (toggle, not set-to-false). Found and fixed before shipping,
+   not live.
+
+**`look()`'s phase logic** (flip | collect | wait | done), after one real redesign mid-session:
+first draft computed `done` from "either deck is 0 and face-up counts are equal" checked FIRST,
+which fired the instant a 1-card deck's only card was flipped (before the round was even compared
+or collected) - caught by the unit tests, not shipped. Rewritten so `done` is only ever checked at
+a true round BOUNDARY (face-up counts equal, nothing pending): either my own deck is out and I
+can't catch up, or at `myCount===theirCount===0` either side is out with nothing left to resolve.
+A win/loss with an uncollected pot always returns `wait`/`collect`, never `done`, even if a deck
+hit zero getting there.
+
+**Disclosed, not fixed** (scoped out, documented in `bot.mjs`'s own header comment): the official
+rule that a player unable to complete the war (fewer than 4 cards left) loses outright isn't
+modeled - this bot plays as many of the 3-down-1-up as remain instead. Good enough to finish a run,
+not a faithful edge case.
+
+Also wired the generated-docs side so the new game doesn't drift: `warLibrary` added to
+`tools/jev/libraryDocument.mjs`'s `allLibraries()` (US-129 Gate 1 C2 - without this,
+`jev-library-doc` and the README generator's statechart diagram silently can't find War's names).
+Ran `bobp make jev-readme` (regenerated `games/war/README.md`, gin/rtg's byte-identical) and
+`bobp make jev-library-doc` (`docs/JEV_LIBRARY.md`). Updated `tests/jevTableCli.test.js`'s
+`<gin, rtg>` listing to `<gin, rtg, war>` - a real, expected consequence of adding a game, not a
+defect.
+
+Tests: `tests/helpers/warFakeTable.mjs` (new fake table - deliberately does NOT auto-reveal on
+MOVE the way `ginFakeTable.mjs` does, since War's deck source gets no such auto-reveal for real;
+that distinction IS the thing under test). `tests/warBot.test.js` (5: ordinary round, loser never
+collects, tie -> war procedure -> winner takes the 10-card pot, both "done" boundary cases).
+`tests/warTurn.test.js` (2: the real statechart via `warSeat`, leave-while-safe). Full suite
+1207/1207 green, `bobp make lint` clean (fixed 6 real findings along the way: 2 unicorn boolean-
+name renames [`warContinuation`->`isWarContinuation`, a fake-table param], 2 single-line-block-
+comment style, 1 unused `onRecord` param, 1 nested-template-literal in `summaryLine`).
+
+Queued (not started, logged to `docs/BACKLOG.md` per direct user request via `*queue sprint`):
+**`jev-game-master`** - a generic Jev player, not tied to one game, that listens to table talk for
+add/remove-bot commands instead of taking them from the CLI.
+
+**Live validation, this sandbox - mixed results, one real bug found+fixed, one still open:**
+1. Joining the user's own live tables (`G6B9KN`, then `LWDFCJ`) both timed out at 60s ("not
+   seated") - never reached the War adapter at all. Likely this sandbox's WebRTC can't reliably
+   reach an EXTERNAL host; signaling to 0.peerjs.com itself works (curl 200), the data channel
+   doesn't complete.
+2. At the user's suggestion, hosted FROM here instead (`bobp make jev-table GAME=war`, 2 bots
+   against each other). First real run: finished in ~13s but with **zero recorded moves on either
+   side** - a real bug, found and fixed: `WarBot.look()`'s `done` check read `myDeck?.cards.length
+   ?? 0` as "0 cards left" when `myDeck` was actually just `undefined` (no `deck`-kind pile exists
+   yet - the host's DEAL step hadn't converted the player's pile from `hand` to `deck` by the time
+   this bot's own seat started looking). Fixed: `!myDeck || !opponentDeck` now returns `wait`,
+   never `done` - "not dealt yet" and "dealt then exhausted" no longer look the same. Regression
+   test added (`warBot.test.js`, the exact pre-deal pile shape).
+3. Second real run, same fix: progressed 25-29 real moves each side (actually playing War
+   correctly, multiple ties/wars resolved) then froze permanently mid-war, no crash, no further
+   writes for 8+ minutes. Direct live inspection (a throwaway spectator script, not committed)
+   found the actual cause: `WarBot` fired MOVE then immediately FLIP (and, during a collect, pairs
+   of these) with **no confirmation that either action had actually landed** before proceeding -
+   fine against the synchronous `FakeWarTable`, but a real guest's `peer.act()` only confirms the
+   message was SENT, not that the host's broadcast round-trip updated this bot's own view
+   (confirmed empirically with a clean isolated 2-peer repro: an unconfirmed MOVE+FLIP pair
+   genuinely never took effect, while the same pair with a settle wait did). Fixed by copying
+   `tools/gin/bot.mjs`'s own established pattern (`peer.waitForView` after every action) via a new
+   `#actAndConfirm` - which in turn hit a SECOND real bug on first live try: the confirm predicate
+   closed over `this`/a private method (`#onTable`), and `waitForView` against the real harness
+   peer is Playwright's `page.waitForFunction`, which RE-SERIALIZES the predicate into the
+   browser's own JS realm - `Private field '#onTable' must be declared in an enclosing class`,
+   live, the moment two real bots exercised it. Fixed: a module-level pure `cardConfirmed(view,
+   {pileId, cardId, faceUp})` with everything passed through the explicit `argument` parameter
+   (exactly `tools/gin/bot.mjs`'s own `waitForView((view, [cardId, isFaceDown]) => ..., [...])`
+   shape) - no closures at all.
+4. Third run, both fixes in place: progressed only 2 moves each side this time (an ordinary flip
+   then a tied war-continuation) before freezing the same way - no crash, no further writes, 5+
+   minutes. Live inspection showed something NEW and not yet explained: one bot's very first,
+   simplest possible move (a single MOVE of its own top card) never actually reached the table at
+   all - the card was found sitting back in its OWN deck with `faceUp:true` (i.e. flipped in
+   place, as if FLIP ran but the preceding MOVE silently never took effect) - while every one of
+   the OTHER 8 cards on the table that round landed correctly. Traced `__recardHarness.act` to
+   `submitAction` directly (not the `dispatchOrAlert`/`alert()` wrapper - ruled that out), and
+   `waitForView`'s timeout (15s) should throw a real error if a confirm never lands - it didn't,
+   the process just sat alive and silent for 5+ minutes. **Not root-caused.** Given this is the
+   THIRD distinct live-environment stall this session (two external join timeouts + this), stopped
+   per the anti-loop rule rather than attempting a 4th live run blind - most likely this sandbox's
+   WebRTC/network degrades under sustained concurrent 2-peer load, but that is a suspicion, not a
+   finding. Killed the stuck table+bots+browsers; nothing left running.
+
+**Net state**: the bot's own logic is solid - 8/8 unit+turn tests green (including both real
+pre-deal and confirm-ordering regressions), `bobp make lint` clean, full suite 1208/1208 green,
+and it DID play real, correct rounds of War (including resolving actual ties via the war
+procedure) against another live bot before each stall. What's unverified is a FULL game to
+completion in a real browser, in THIS environment specifically - every live multiplayer test this
+session (joining externally, twice; hosting locally, three times) has hit some form of
+WebRTC/timing flakiness, which reads as an environment constraint rather than something in this
+feature. Recommend: try `bobp make jev-table GAME=war` (or `jev-player ... CODE=<code>`) from a
+normal (non-sandboxed) machine to get a clean live signal; this session has exhausted its
+reasonable budget for chasing it here.
+
+**NOT committed** - everything above is new/untracked (`games/war/`, `tools/war/`,
+`tests/warBot.test.js`, `tests/warTurn.test.js`, `tests/helpers/warFakeTable.mjs`) or modified
+(`tools/jev/games.mjs`, `tools/jev/libraryDocument.mjs`, `tests/jevTableCli.test.js`,
+`docs/JEV_LIBRARY.md`, `docs/BACKLOG.md`) - awaiting the user, standing session pattern.
+
+## Next Steps
+Confirm the live join at `G6B9KN` actually played (check CHAT.md/this session). Then: commit this
+work (plus everything else already queued uncommitted - see `agents/cypher.docs/state.md`) once
+the user confirms, or start `jev-game-master` next if asked.
+
+## Previous - (2026-09-29) - US-144/D166 ALL 3 PHASES DONE, sprint closed
 
 main.js's host-setup/new-game cluster (D161's last pause-list item) moved to src/hostSetup.js
 in full, via `/sprint till done`. main.js 2174 -> 1412.

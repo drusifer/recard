@@ -8,6 +8,7 @@ import { fileURLToPath, URL } from 'node:url';
 export const GAMES = {
   gin: () => import('../gin/adapter.mjs'),
   rtg: () => import('../rtg/adapter.mjs'),
+  war: () => import('../war/adapter.mjs'),
 };
 
 /**

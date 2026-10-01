@@ -1,0 +1,9 @@
+# War, US-129/D154 shape: no questions. War has no decision to judge -
+# "drag each pile's own top card onto the Table to compare, then MOVE the
+# winnings into the winner's deck" (src/presets.js's own War comment) is
+# the whole game, so a Jev bot plays it mechanically (tools/war/bot.mjs),
+# the same way `games/gin/turn.yaml` computes whose move it is instead of
+# asking. Kept as an empty map, not a missing file, because
+# `tools/jev/gameFiles.mjs` reads every game's `questions.yaml` whether or
+# not the game has any.
+{}

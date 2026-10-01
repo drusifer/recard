@@ -67,3 +67,14 @@ the names in backticks in each line below are the ones it reads.
 
 - `gin_look` - Gin: read the table - whose move it is, and which hand
 - `gin_step` - Gin: one decision (draw or discard) by the seated strategy, acted and said
+
+## war
+
+### guards
+
+- `war_phase` - War: the table says it is phase `is` for me (flip | collect | wait | done)
+
+### actors
+
+- `war_look` - War: read the table - whose move it is, and whether the war procedure is owed
+- `war_step` - War: flip this round's card (with the war procedure on a tie) or collect a won pile, acted and said

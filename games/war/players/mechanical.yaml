@@ -1,0 +1,10 @@
+# War has no real choice to make (US-129/D154: see questions.yaml) - one
+# player file, not a strategy family. `floor`/`escalation` are never
+# read (nothing here ever calls Jev), left at their defaults rather than
+# omitted so this file reads the same shape as every other game's.
+
+description: "Mechanical: flips the top card every round, plays the war
+  procedure on a tie, and collects the pile when it wins. No real choices
+  to make, so nothing here is judged."
+floor: 0
+escalation: floor_fallback

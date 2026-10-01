@@ -1,0 +1,46 @@
+# War's turn, as a statechart (US-129/D154 shape, like games/gin/turn.yaml).
+# Run by tools/jev/machine.mjs; every name below is from the library
+# (`make jev-library`).
+#
+# There is no decision in War - "drag each pile's own top card onto the
+# Table to compare, then MOVE the winnings into the winner's deck"
+# (src/presets.js) is the whole game. war_look works out from the table
+# which of three things is true: I owe this round's card (possibly with
+# the war procedure's 3 face-down + 1 face-up, when the last comparison
+# tied), I just won and owe the collect, or it is not my move at all
+# (waiting on the opponent, or the run is over). war_step does whichever
+# one war_look found, in one shot - there is nothing to ask Jev either
+# way, so one actor covers both "move" states instead of Gin's separate
+# drawing/discarding (which differ in what each one legally ASKS, not in
+# mechanism - War has no such split).
+
+description: >-
+  A Jev bot plays War: it works out from the table whether it owes this round's flip (with the war procedure on a tie), owes the collect after winning, or has nothing to do yet, and repeats until one side's deck is empty.
+
+initial: waiting
+context: {}
+
+states:
+  waiting:
+    description: "Not my move yet; looks again when the table changes. Safe to leave."
+    tags: [safe]
+    on: { TABLE: looking }
+  looking:
+    description: "Reads the table (war_look) to find the phase: flip, collect, wait, or done."
+    invoke:
+      src: war_look
+      onDone:
+        - { target: acting, guard: { type: war_phase, params: { is: flip } } }
+        - { target: acting, guard: { type: war_phase, params: { is: collect } } }
+        - { target: finished, guard: { type: war_phase, params: { is: done } } }
+        - { target: waiting }
+  acting:
+    description: "My move: flip this round's card (plus the war procedure on a tie) or collect a won pile."
+    tags: [move]
+    on: { STEP: stepping }
+  stepping:
+    description: "Making that move at the table."
+    invoke: { src: war_step, onDone: waiting }
+  finished:
+    description: "One side's deck is empty; the run ends."
+    type: final

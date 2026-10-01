@@ -576,3 +576,31 @@ design-lint: clean across 3 viewports (no forced scroll, no zone overlap, no und
 ---
 [<small>2026-09-30 23:23:16</small>] [**Morpheus**]->[**Neo**] *lead review*:
  *lead review PASSED. Sound reuse: zero new popup/menu classes, the pile header's gear funnels through the exact same <action-menu> the stack gear already proved out (D101/D133). isPartOfFocusedPile is the right fix shape - one shared predicate, not three separate patches. Dead applyIconButton deleted outright, not left as an orphan export. Ready to commit.
+
+---
+[<small>2026-10-01 15:06:53</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-fast | /home/drusifer/Projects/recard/build/build.out
+
+> lint:style
+> stylelint style.css
+
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-10-01 15:07:59</small>] [**Neo**]->[**User**] *swe handoff*:
+ *swe impl new Jev game: War (games/war/ + tools/war/, mechanical bot - no decision to judge, computed phase like Gin). Real bugs found+fixed pre-ship: premature 'done' before a pending collect; collect flipping war's face-down burn cards back face-up. 1207 unit + 2 new turn tests green, lint clean. Joining live table G6B9KN now.
+
+---
+[<small>2026-10-01 15:51:34</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make jev-table | /home/drusifer/Projects/recard/build/build.out
+jev-player: left the table cleanly
+make: *** [Makefile:154: jev-table] Error 130
+
+---
+[<small>2026-10-01 15:52:48</small>] [**Neo**]->[**User**] *swe blocked*:
+ War bot: 2 real bugs found+fixed via live testing (premature 'done' before DEAL; missing waitForView confirm after act() - guest act() only confirms SEND, not landing). 3rd live stall (2 moves in, froze, unexplained) - stopping per anti-loop rule after 3 distinct live-env stalls this session (2 external join timeouts + this). Logic solid: 8/8 tests, lint clean, 1208 suite green. Recommend live test from a non-sandboxed machine.

@@ -1,0 +1,8 @@
+# How to stand up a table for War (D159): two Jev bots, the whole deck
+# split between them. `bobp make jev-table GAME=war` reads this.
+preset: War
+players: [mechanical, mechanical]
+# War's own preset deals the WHOLE deck between exactly two piles
+# (26+26=52, src/presets.js) - not a per-table choice, so this just
+# matches that fact rather than picking a number.
+deal: 26

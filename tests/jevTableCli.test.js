@@ -11,13 +11,13 @@ const run = (...cliArguments) => spawnSync(process.execPath, [CLI, ...cliArgumen
 test('jev-table: no game is refused, naming the ones there are', () => {
   const result = run();
   assert.equal(result.status, 2);
-  assert.match(result.stderr, /pass the game: GAME=<gin, rtg>/);
+  assert.match(result.stderr, /pass the game: GAME=<gin, rtg, war>/);
 });
 
 test('jev-table: an unknown game is refused, naming the real ones', () => {
   const result = run('--game', 'chess');
   assert.equal(result.status, 2);
-  assert.match(result.stderr, /unknown game "chess" - choose one of: gin, rtg/);
+  assert.match(result.stderr, /unknown game "chess" - choose one of: gin, rtg, war/);
 });
 
 test('jev-table: an unknown player is refused, naming that game\'s real ones', () => {

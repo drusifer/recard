@@ -330,3 +330,10 @@ superseded:
   A bot's own spells sit on the Stack forever from its perspective. A
   real feature (a `resolve` step, knowing when both sides have passed),
   not a one-line fix like D157 was - scoping it is its own task.
+- **`jev-game-master`** (queued, 2026-10-01, direct user request via
+  `*queue sprint`): a generic Jev player, not tied to any one `games/`
+  directory, that listens to table talk for add/remove-bot commands and
+  seats/dismisses Jev players in response - a table-talk front end over
+  what `tools/jev/runner.mjs`'s own add-bot/quit handling and
+  `tools/jevTable.mjs` already do from the CLI. Not started; queued
+  behind the War Jev player (this session).

@@ -181,4 +181,9 @@ sequenceDiagram
     Note right of Trin: "*qa test PASSED.<br/>Verified independently:<br/>7 affected browser<br/>suites all green<br/>standalone<br/>(headerActions 10/10,<br/>zonePanel 13/13,<br/>focusZoom 11…"
     Morpheus->>Neo: "lead review"
     Note right of Morpheus: "*lead review PASSED.<br/>Sound reuse: zero new<br/>popup/menu classes, the<br/>pile header's gear<br/>funnels through the<br/>exact same <action-menu><br/>the stac…"
+    Note over Cypher,User: 📅 2026-10-01
+    Neo->>User: "swe handoff"
+    Note right of Neo: "*swe impl new Jev game:<br/>War (games/war/ +<br/>tools/war/, mechanical<br/>bot - no decision to<br/>judge, computed phase<br/>like Gin). Real bugs<br/>found+fixe…"
+    Neo->>User: "swe blocked"
+    Note right of Neo: "War bot: 2 real bugs<br/>found+fixed via live<br/>testing (premature<br/>'done' before DEAL,<br/>missing waitForView<br/>confirm after act() -<br/>guest act() only…"
 ```

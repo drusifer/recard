@@ -4,6 +4,7 @@
 import { genericLibrary } from './library.mjs';
 import { ginLibrary } from '../gin/library.mjs';
 import { rtgLibrary } from '../rtg/library.mjs';
+import { warLibrary } from '../war/library.mjs';
 
 /**
  * Every library, built with no table behind it - only its names and docs
@@ -14,6 +15,7 @@ export function allLibraries() {
     { title: 'Generic', library: genericLibrary({}) },
     { title: 'rtg', library: rtgLibrary({ name: 'doc' }) },
     { title: 'gin', library: ginLibrary({}) },
+    { title: 'war', library: warLibrary({}) },
   ];
 }
 
