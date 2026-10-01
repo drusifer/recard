@@ -195,21 +195,38 @@ export const PRESETS = [
     jokers: 0,
     cardsPerPlayer: 26,
     tableZone: true,
-    // *fix (direct user request, 2026-09-18): a real outlier among the
-    // SIMPLE_LAYOUT presets - War deals HALF a deck to each player (26
-    // cards), measured at 393.4 local units tall vs Hearts' worst-case
-    // 240.6 at 13. Squeezing that into `SIMPLE_LAYOUT`'s shared 1050-
-    // tall canvas would have meant either a cramped shared row or
-    // widening the canvas for every OTHER preset that doesn't need it.
-    // Its own canvas (1280x1300) and a lower table-zone/score row
-    // (`y: 750`, clear of the top seat's ~705-unit-tall zone by ~45px
-    // and the bottom seat's own span - starting at 0.76*1300=988 - by
-    // ~48px) are calibrated for THIS preset's own real hand size.
-    tableCanvasSize: { width: 1280, height: 1300 },
-    layout: {
-      'table-zone': { x: 110, y: 750, w: 650, h: 190 },
-      score: { x: 780, y: 750, w: 180, h: 190 },
-    },
+    // War deals the WHOLE deck between exactly two piles (26+26=52) -
+    // the one preset where that's a rule, not a choice, so (direct user
+    // report, *nit 2026-09-30: "it has a fully dealt deck on one hand")
+    // a third player joining broke DEAL outright (`dealRoundRobin`
+    // throws when `cardsPerDestination * destinationCount` exceeds the
+    // deck). `playerLimit: 2`, same pattern as Gin Rummy above.
+    playerLimit: 2,
+    // *fix, rebuilt from scratch 2026-09-30 (direct user correction:
+    // "players have decks not hands" - look up `rulesReference.js`'s own
+    // War entry: "face-down, no one looks at their cards"). The ORIGINAL
+    // bug report ("fully dealt deck on one hand") was a symptom of the
+    // real problem: War was dealing into the generic `hand` pile kind
+    // (fanned, face-up to its own owner) like every other preset, which
+    // is simply the wrong primitive for a game where nobody - including
+    // the owner - ever looks at their own pile. `playerPileKind: 'deck'`
+    // (`applyPlayerPileKind`, state.js) converts each dealt pile to a
+    // real `deck`-kind pile right after dealing - hidden visibility,
+    // stack+count-badge rendering, no fan - using the SAME conversion
+    // `CHANGE_PILE_TYPE` already performs for any other kind (D87).
+    // Playing a round is already fully supported by existing primitives:
+    // drag each pile's own top card onto the Table to compare (D66/D67 -
+    // a deck's top card has always been a real draggable card), then
+    // MOVE the winnings into the winner's deck.
+    //
+    // This also RETIRES the earlier same-day canvas/layout rebuild
+    // (height 1700, table-zone y:870) - that calibration was solving for
+    // a 26-card FAN's real footprint, which no longer exists once the
+    // pile is a compact deck stack instead. Re-verified live: the shared
+    // `SIMPLE_LAYOUT`/default canvas (used by every other simple preset)
+    // fits a deck-kind pile with no special-casing needed at all.
+    playerPileKind: 'deck',
+    layout: SIMPLE_LAYOUT,
   },
   {
     name: 'Gin Rummy',

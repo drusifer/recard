@@ -258,6 +258,29 @@ function defaultKindName(kind) {
   return defaultNameWord(kind);
 }
 
+/**
+ * US-150 (direct user request, "players have decks not hands" - War's
+ * own rules, `rulesReference.js`: "face-down, no one looks at their
+ * cards"): a preset declares `gameConfig.playerPileKind` when a
+ * player's dealt pile should NOT be the generic 'hand' every other
+ * preset gets. `DEAL`/`RESHUFFLE_DEAL`'s own round-robin split is
+ * otherwise completely UNCHANGED - this runs once, after dealing, and
+ * reuses `CHANGE_PILE_TYPE`'s own kind/name-rewrite shape (D87: every
+ * registered kind is already a valid conversion target for every
+ * other) rather than threading a configurable kind through the dealing
+ * machinery itself. A preset that never sets this field (every one but
+ * War today) gets `piles` back byte-for-byte unchanged.
+ */
+function applyPlayerPileKind(piles, gameConfig) {
+  const kind = gameConfig?.playerPileKind;
+  if (!kind || kind === 'hand') return piles;
+  return piles.map((p) => {
+    if (p.kind !== 'hand' || !p.ownerId) return p;
+    const name = isDefaultPileName(p.name, p.kind) ? defaultKindName(kind) : p.name;
+    return { ...p, kind, name };
+  });
+}
+
 /** UX follow-up (direct user request - *nit "adjust the presets for
  * the new layout settings"): a configured (preset-declared) zone's id
  * is deterministic now - `kind` alone when there's only one (mirrors
@@ -480,6 +503,14 @@ export function createInitialState(deckConfig = {}, rng = Math.random, gameConfi
       // silently dropped by this exact explicit-field list not
       // knowing about it yet.
       tableCanvasSize: gameConfig.tableCanvasSize,
+      // US-150: a preset MAY declare what kind a player's dealt pile
+      // becomes (`applyPlayerPileKind`) when 'hand' is wrong for it -
+      // War's own rules say nobody looks at their own cards, so it
+      // declares 'deck'. Same "additive, explicit-list" shape as
+      // `tableCanvasSize` directly above - and the exact same mistake
+      // this field's own neighbor already warns about: found missing
+      // here FIRST (not assumed), the same way.
+      playerPileKind: gameConfig.playerPileKind,
     },
     zones: built.zones,
     piles: [
@@ -662,8 +693,18 @@ function seatedPlayers(state) {
   return state.players.filter((p) => p.role !== 'spectator');
 }
 
-function ensureHandPile(piles, playerId) {
-  if (piles.some((p) => p.kind === 'hand' && p.ownerId === playerId)) return piles;
+/**
+ * `alreadyKind` (US-150, `applyPlayerPileKind`): DEAL/RESHUFFLE_DEAL
+ * pass `gameConfig.playerPileKind` here so a RE-deal (same game, Deal
+ * clicked again) recognizes a player's pile that an EARLIER deal
+ * already converted away from 'hand' (War's own 'deck') as "already
+ * exists" - without this, the existence check below would miss it
+ * (wrong kind now) and mint a SECOND, duplicate pile at a random id.
+ * Every other call site (DRAW/PICKUP's lazy creation) passes nothing,
+ * so their behavior is exactly what it was before this field existed.
+ */
+function ensureHandPile(piles, playerId, alreadyKind) {
+  if (piles.some((p) => (p.kind === 'hand' || (alreadyKind && p.kind === alreadyKind)) && p.ownerId === playerId)) return piles;
   const canonicalId = handPileId(playerId);
   const id = piles.some((p) => p.id === canonicalId) ? randomPileId() : canonicalId;
   return [...piles, makePile('hand', { id, name: 'Hand', ownerId: playerId })];
@@ -988,8 +1029,10 @@ const ACTIONS = {
     const isFresh = action.type === 'DEAL';
     const players = seatedPlayers(state);
     const pile = state.piles.find((p) => p.id === action.pileId);
+    const playerPileKind = state.gameConfig?.playerPileKind;
+    const isPlayerPile = (p) => p.kind === 'hand' || (playerPileKind && p.kind === playerPileKind && p.ownerId);
     const reclaimed = isFresh
-      ? state.piles.filter((p) => p.kind === 'hand').flatMap((p) => p.cards.map((card) => toDeckCard(card)))
+      ? state.piles.filter((p) => isPlayerPile(p)).flatMap((p) => p.cards.map((card) => toDeckCard(card)))
       : [];
     const { remaining, dealt } = dealRoundRobin(
       [...(pile?.cards ?? []), ...reclaimed],
@@ -1000,10 +1043,10 @@ const ACTIONS = {
     );
 
     let piles = state.piles;
-    for (const player of players) piles = ensureHandPile(piles, player.id);
+    for (const player of players) piles = ensureHandPile(piles, player.id, playerPileKind);
     piles = piles.map((p) => {
       if (p.id === action.pileId) return withCards(p, remaining);
-      if (p.kind !== 'hand') return p;
+      if (!isPlayerPile(p)) return p;
       const index = players.findIndex((pl) => pl.id === p.ownerId);
       if (index === -1) return isFresh ? withCards(p, []) : p;
       const newCards = dealt[index].map((card) => toHandCard(card, p.ownerId));
@@ -1013,7 +1056,11 @@ const ACTIONS = {
     // - found by running it live (US-125): the harness stands a table up
     // that way, and treating it as started silently demoted the next
     // joiner to spectator, so a bot joining to play was never dealt in.
-    return { ...state, piles, dealtThisGame: state.dealtThisGame || action.cardsPerPlayer > 0 };
+    return {
+      ...state,
+      piles: applyPlayerPileKind(piles, state.gameConfig),
+      dealtThisGame: state.dealtThisGame || action.cardsPerPlayer > 0,
+    };
   },
 
   // D45: `action.kind` lets a host create any table-side pile TYPE, not
@@ -1570,17 +1617,18 @@ const ACTIONS = {
         `Cannot deal ${action.cardsPerPlayer} cards to ${players.length} players: only ${left} left`,
     );
 
+    const playerPileKind = state.gameConfig?.playerPileKind;
     let piles = gatheredPiles;
-    for (const player of players) piles = ensureHandPile(piles, player.id);
+    for (const player of players) piles = ensureHandPile(piles, player.id, playerPileKind);
     piles = piles.map((p) => {
       if (p.id === action.pileId) return withCards(p, remaining);
-      if (p.kind !== 'hand') return p;
+      if (p.kind !== 'hand' && !(playerPileKind && p.kind === playerPileKind && p.ownerId)) return p;
       const index = players.findIndex((pl) => pl.id === p.ownerId);
       if (index === -1) return p;
       const newCards = dealt[index].map((card) => toHandCard(card, p.ownerId));
       return withCards(p, [...p.cards, ...newCards]);
     });
-    return { ...state, piles };
+    return { ...state, piles: applyPlayerPileKind(piles, state.gameConfig) };
   },
 
   /**

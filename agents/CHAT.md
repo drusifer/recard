@@ -528,3 +528,27 @@ gitleaks git --no-banner --redact --pre-commit .
 9:19PM INF 1 commits scanned.
 9:19PM INF scanned ~39184 bytes (39.18 KB) in 256ms
 9:19PM INF no leaks found
+
+---
+[<small>2026-09-30 21:21:23</small>] [**User**]->[**all**] *request*:
+ User: *nit War preset deals a fully-dealt deck onto one hand - 'chuck the whole preset and start over'. Investigating before rewriting (tableCanvasSize/layout are calibrated, D132-era) - reproducing the actual bug first.
+
+---
+[<small>2026-09-30 21:41:39</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-design | /home/drusifer/Projects/recard/build/build.out
+> lint:design
+> node tests/designLint.check.mjs
+
+design-lint: clean across 3 viewports (no forced scroll, no zone overlap, no undersized touch targets)
+
+---
+[<small>2026-09-30 21:42:14</small>] [**Neo**]->[**Cypher**] *swe fix*:
+ *nit fixed: War preset rebuilt (user: chuck it, start over). Root cause: canvas height left only 312 units below the bottom seat's anchor for a 26-card hand needing 393.4 - arithmetic error, not FAN drift. Added playerLimit:2 (3rd player broke DEAL). New height bisected against lint-design's scroll gate. Verified live via screenshot+player_query. check+lint-design clean. Full writeup: src/presets.js comment.
+
+---
+[<small>2026-09-30 22:22:48</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make check | /home/drusifer/Projects/recard/build/build.out
+
+✖ 6 problems (6 errors, 0 warnings)
+6 errors and 0 warnings potentially fixable with the `--fix` option.
+

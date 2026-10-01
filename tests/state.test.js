@@ -61,13 +61,13 @@ test('createInitialState: gameConfig.allowsPlayerZones defaults true - matches e
   // `cardsPerPlayer` joined the shape when a restored table needed to
   // recover its own deal size; `undefined` when no preset set one.
   assert.deepEqual(state.gameConfig,
-    { allowsPlayerZones: true, tableZone: true, piles: [], zones: [], cardsPerPlayer: undefined, presetName: undefined, cardSize: undefined, tableCanvasSize: undefined, playerLimit: undefined });
+    { allowsPlayerZones: true, tableZone: true, piles: [], zones: [], cardsPerPlayer: undefined, presetName: undefined, cardSize: undefined, tableCanvasSize: undefined, playerLimit: undefined, playerPileKind: undefined });
 });
 
 test('createInitialState: allowsPlayerZones can be set false via the third param', () => {
   const state = createInitialState({}, () => 0.5, { allowsPlayerZones: false });
   assert.deepEqual(state.gameConfig,
-    { allowsPlayerZones: false, tableZone: true, piles: [], zones: [], cardsPerPlayer: undefined, presetName: undefined, cardSize: undefined, tableCanvasSize: undefined, playerLimit: undefined });
+    { allowsPlayerZones: false, tableZone: true, piles: [], zones: [], cardsPerPlayer: undefined, presetName: undefined, cardSize: undefined, tableCanvasSize: undefined, playerLimit: undefined, playerPileKind: undefined });
 });
 
 test('createInitialState: gameConfig.tableSpread sets the built-in Table pile\'s overlap; absent, the Table pile keeps its kind\'s default', () => {
@@ -1414,6 +1414,62 @@ test('DEAL after DEAL: cards cleared from hands are reclaimed into the deck, not
   // The 6 cards from the first deal (3+3) minus the 4 just redealt
   // (2+2) must be sitting back in the deck, not gone.
   assert.equal(deckOf(state).length, totalCards - 4);
+});
+
+// US-150 (direct user correction: "players have decks not hands" - War's
+// own rules, rulesReference.js: "face-down, no one looks at their cards").
+// A preset declares `gameConfig.playerPileKind` when 'hand' (fanned,
+// face-up to its own owner) is the wrong primitive for it.
+test('DEAL: a preset with playerPileKind converts each dealt pile to that kind', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5, { playerPileKind: 'deck' }), ['p1', 'p2']);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
+  const p1Pile = state.piles.find((p) => p.ownerId === 'p1');
+  const p2Pile = state.piles.find((p) => p.ownerId === 'p2');
+  assert.equal(p1Pile.kind, 'deck');
+  assert.equal(p1Pile.cards.length, 3);
+  assert.equal(p2Pile.kind, 'deck');
+  assert.equal(p2Pile.cards.length, 3);
+  // Not a 'hand' pile any more - handOf must NOT find it (it is a real
+  // kind change, not a cosmetic rename).
+  assert.deepEqual(handOf(state, 'p1'), []);
+});
+
+test('DEAL: a preset with NO playerPileKind is byte-for-byte unaffected (every other preset today)', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['p1', 'p2']);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
+  const p1Pile = state.piles.find((p) => p.ownerId === 'p1');
+  assert.equal(p1Pile.kind, 'hand');
+  assert.equal(handOf(state, 'p1').length, 3);
+});
+
+test('DEAL: a second DEAL with playerPileKind set does not mint a duplicate pile (the re-deal/kind-mismatch trap)', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5, { playerPileKind: 'deck' }), ['p1', 'p2']);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 2 });
+  const p1Piles = state.piles.filter((p) => p.ownerId === 'p1');
+  assert.equal(p1Piles.length, 1, 'exactly one pile for p1, not a stray second one at a random id');
+  assert.equal(p1Piles[0].kind, 'deck');
+  assert.equal(p1Piles[0].cards.length, 2, 'the second deal replaced the first, same as the hand-kind case');
+});
+
+test('DEAL_MORE: appends into the existing deck-kind pile when playerPileKind is set, not a new hand pile', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5, { playerPileKind: 'deck' }), ['p1', 'p2']);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
+  state = reduce(state, { type: 'DEAL_MORE', pileId: 'deck', cardsPerPlayer: 1 });
+  const p1Piles = state.piles.filter((p) => p.ownerId === 'p1');
+  assert.equal(p1Piles.length, 1);
+  assert.equal(p1Piles[0].kind, 'deck');
+  assert.equal(p1Piles[0].cards.length, 4);
+});
+
+test('RESHUFFLE_DEAL: also converts to playerPileKind and does not duplicate on repeat', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5, { playerPileKind: 'deck' }), ['p1', 'p2']);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 3 });
+  state = reduce(state, { type: 'RESHUFFLE_DEAL', pileId: 'deck', cardsPerPlayer: 3 });
+  const p1Piles = state.piles.filter((p) => p.ownerId === 'p1');
+  assert.equal(p1Piles.length, 1);
+  assert.equal(p1Piles[0].kind, 'deck');
+  assert.equal(p1Piles[0].cards.length, 3);
 });
 
 // D89: an orphaned (ownerless) hand-kind pile is no longer constructible

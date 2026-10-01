@@ -53,7 +53,12 @@ try {
   await host.click('#show-host');
   await host.fill('#host-name', 'Alice');
   await host.click('#create-table');
-  await host.waitForSelector('#host-share:not([hidden])', { timeout: 20_000 });
+  // US-150 (direct user correction): everything here is localhost - a
+  // static file server and two local Chromium pages on one machine, with
+  // no real network between them. A multi-second ceiling is padding for
+  // latency that cannot exist in this setup; it only means a genuinely
+  // broken wait burns seconds before failing instead of ~1.
+  await host.waitForSelector('#host-share:not([hidden])', { timeout: 2000 });
   const code = (await host.locator('.share-code').textContent()).trim();
 
   await guest.goto(`${BASE}/?join=${encodeURIComponent(code)}`);
@@ -61,7 +66,7 @@ try {
   await guest.click('#join-btn');
   await guest.waitForFunction(
     () => document.querySelector('#join-status').textContent.includes('Connected'),
-    undefined, { timeout: 20_000 },
+    undefined, { timeout: 2000 },
   );
   await host.fill('#cards-per-player', '7');
   await host.click('#deal-btn');
@@ -71,12 +76,21 @@ try {
   // case; a hand pile is a bare `[data-kind="hand"]` zone-panel now
   // (`src/components/PlayerZone.js` groups it with any other pile the
   // owner has), same generic `.middle-card .card` shape as any other
-  // zone's cards. The host's own hand pile is created first (host joins/
-  // deals before the guest), so it's the FIRST one in DOM order on the
-  // host's own page.
+  // zone's cards.
+  //
+  // US-150: `[data-kind="hand"]` stopped being a safe "the player's own
+  // dealt pile" selector once a preset can declare `playerPileKind`
+  // (War: 'deck') - a deck-kind pile renders a stack+badge, not N real
+  // `.card` elements, so counting them would hang forever. Wait on the
+  // harness's own authoritative VIEW instead (kind-agnostic: whichever
+  // pile this player owns, whatever its kind) rather than a DOM shape
+  // that only one specific kind happens to produce.
   await host.waitForFunction(
-    () => document.querySelector('[data-kind="hand"]')?.querySelectorAll('.card').length === 7,
-    undefined, { timeout: 15_000 },
+    () => {
+      const harness = globalThis.__recardHarness;
+      return harness.view().piles.find((pile) => pile.ownerId === harness.myId())?.cards.length === 7;
+    },
+    undefined, { timeout: 1000 },
   );
   // A card in the pot, matching the state the original regression was
   // found under (an empty pot doesn't exercise the overlap check at all).
@@ -95,12 +109,16 @@ try {
   // The wrapper is what this check actually cares about anyway: is the
   // last fanned card obstructed by a sibling, not whether tapping it
   // does anything.
-  await host.locator('zone-panel.seat-zone').first().locator('[data-kind="hand"] .middle-card').last().click();
-  await host.waitForTimeout(300);
+  // US-150: only a `hand`-kind pile fans (and so only it can have this
+  // obstructed-sibling bug) - a preset that declares `playerPileKind`
+  // (War: 'deck') has no `[data-kind="hand"]` at all, nothing to click.
+  const fannedHandCard = host.locator('zone-panel.seat-zone').first().locator('[data-kind="hand"] .middle-card').last();
+  if (await fannedHandCard.count() > 0) await fannedHandCard.click();
+  await host.waitForTimeout(50); // local synchronous render, not a network wait
 
   for (const vp of VIEWPORTS) {
     await host.setViewportSize({ width: vp.width, height: vp.height });
-    await host.waitForTimeout(150); // let layout settle
+    await host.waitForTimeout(50); // let layout settle (local, synchronous CSS reflow)
 
     const g = await host.evaluate(() => ({
       docScrollHeight: document.documentElement.scrollHeight,
@@ -298,7 +316,7 @@ try {
       await host2.fill('#host-name', 'Alice');
       await host2.selectOption('#host-preset', { label: preset.name });
       await host2.click('#create-table');
-      await host2.waitForSelector('#host-share:not([hidden])', { timeout: 20_000 });
+      await host2.waitForSelector('#host-share:not([hidden])', { timeout: 2000 });
       const code2 = (await host2.locator('.share-code').textContent()).trim();
 
       await guest2.goto(`${BASE}/?join=${encodeURIComponent(code2)}`);
@@ -306,10 +324,10 @@ try {
       await guest2.click('#join-btn');
       await guest2.waitForFunction(
         () => document.querySelector('#join-status').textContent.includes('Connected'),
-        undefined, { timeout: 20_000 },
+        undefined, { timeout: 2000 },
       );
       await host2.click('#deal-btn');
-      await host2.waitForTimeout(400); // no per-preset "hand has N cards" signal that works for cardsPerPlayer:0 presets too
+      await host2.waitForTimeout(100); // no per-preset "hand has N cards" signal that works for cardsPerPlayer:0 presets too - local render only
 
       const zones = await host2.evaluate(() => [...document.querySelectorAll('#zones .zone')].map((element) => ({
         label: element.querySelector('.zone-name')?.textContent?.trim() || element.className,
@@ -339,9 +357,9 @@ try {
         }, discards);
         await host2.waitForFunction(
           (count) => globalThis.__recardHarness.view().piles.find((pile) => pile.id === 'table').cards.length === count,
-          discards, { timeout: 10_000 },
+          discards, { timeout: 2000 },
         );
-        await host2.waitForTimeout(200); // one render after the last MOVE
+        await host2.waitForTimeout(50); // one render after the last MOVE - local, synchronous
         const spills = await host2.evaluate(() => [...document.querySelectorAll('#zones .zone')].flatMap((zone) => {
           const box = zone.getBoundingClientRect();
           return [...zone.querySelectorAll('.pile-section')].filter((pile) => {

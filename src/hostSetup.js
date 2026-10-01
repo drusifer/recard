@@ -188,6 +188,10 @@ export function configsForPreset(preset, deckIds, allowsPlayerZones) {
     tableCanvasSize: preset.tableCanvasSize,
     tableSpread: preset.tableSpread,
     playerLimit: preset.playerLimit,
+    // US-150: same "additive, explicit-list" field as the others above -
+    // found missing here too (the exact bug `tableCanvasSize`'s own
+    // state.js comment already warns about, at a SECOND layer this time).
+    playerPileKind: preset.playerPileKind,
   };
   return { deckConfig, gameConfig };
 }

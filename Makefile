@@ -7,7 +7,7 @@
 #
 # Adding a task: add the npm script first, then a one-line target here.
 
-.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-layoutsave test-buildermenu test-resume test-tablezoom test-focuszoom test-multiplayer test-remotecursor test-harness-mcp test-gin test-jev-runner test-jevtable test-actionmenu test-zonepanel test-headeractions test-pileelement test-reconnect jev-player jev-library jev-library-doc jev-readme jev-table secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers dead-code
+.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-layoutsave test-buildermenu test-resume check-fast test-tablezoom test-focuszoom test-multiplayer test-remotecursor test-harness-mcp test-gin test-jev-runner test-jevtable test-actionmenu test-zonepanel test-headeractions test-pileelement test-reconnect jev-player jev-library jev-library-doc jev-readme jev-table secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers dead-code
 
 help:
 	@echo "Recard targets (all front npm scripts):"
@@ -239,6 +239,18 @@ art:
 # must stay at exit 0 - an unbalanced deck is a real failure, not a
 # tolerated one.
 check: cards test lint lint-decks secrets
+
+# Direct user request (2026-09-30): "we need a fast gate - not every test
+# needs to run every time." `check` itself launches real Chromium for
+# `lint:design`'s full sweep (2-peer join, 3 viewports, AND a fresh
+# host+guest browser pair per preset - 15+ of them) plus two full-history
+# `gitleaks` scans - the right pre-commit/CI gate, but far too slow to
+# re-run after every small edit during iteration. `check-fast` is
+# everything in `check` EXCEPT `lint-design` and `secrets` - no browser
+# launch at all, just unit tests + the two static lint passes + the deck
+# balance check. Use this while iterating; run the real `check` once,
+# right before committing.
+check-fast: cards test lint-js lint-style lint-decks
 
 dev:
 	npm run dev

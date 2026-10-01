@@ -169,4 +169,8 @@ sequenceDiagram
     Note right of Smith: "Smith retro: a backlog<br/>item sitting since<br/>2026-08-27 ('builder<br/>screen', vague) turned<br/>into exactly 2 small<br/>buttons once asked a<br/>concrete qu…"
     Cypher->>All: "pm launch"
     Note right of Cypher: "*pm launch US-148/149.<br/>SaveAs naming (D170):<br/>window.prompt() -><br/>inline-edit idiom.<br/>Builder menu (D171): Add<br/>Zone/Add Pile - found<br/>live CREA…"
+    User->>All: "request"
+    Note right of User: "User: *nit War preset<br/>deals a fully-dealt deck<br/>onto one hand - 'chuck<br/>the whole preset and<br/>start over'.<br/>Investigating before<br/>rewriting (tab…"
+    Neo->>Cypher: "swe fix"
+    Note right of Neo: "*nit fixed: War preset<br/>rebuilt (user: chuck it,<br/>start over). Root cause:<br/>canvas height left only<br/>312 units below the<br/>bottom seat's anchor f…"
 ```
