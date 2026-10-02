@@ -1599,3 +1599,45 @@ syntax/unit verified here, not live. Flagging for Trin/a real machine.
 Hand off to Trin (`*qa uat`) - needs a real machine (or a sandbox with
 working loopback WebRTC) to actually exercise the live two-peer path
 this change is FOR, since this one couldn't. Nothing committed yet.
+
+## D173 — Blank preset (2026-10-02)
+
+Direct user request/observation: "we should be able to start with an
+empty table and add any zones and piles we want... no special zones,
+just different types and different names" - then correctly noted the
+existing "every game should ONLY be based on preset" decision (D82-ish,
+`index.html`'s own comment) predates D171's Add Zone/Add Pile.
+
+Confirmed D171 already made this true for a LIVE table (Add Zone/Add
+Pile dispatch the exact same CREATE_ZONE/CREATE_PILE a preset's own
+setup uses - no special-casing). What was missing: a way to START a
+table with nothing preset-declared. Added `Blank` to `presets.js` -
+name only, every other field at its default/unset (`tableZone` true,
+same baseline Deck+Table pile every preset already starts from;
+`piles`/`zones` unset; `cardsPerPlayer: 0` so nothing auto-deals). No
+new reducer path, no new pile/zone kind - deliberately the smallest
+possible preset, to prove the existing primitives need nothing added
+to start from nothing.
+
+**Real finding, fixed, not waived:** `lint:design`'s live preset sweep
+caught Blank's default Table Zone overlapping the host's own seat zone
+at 1280x800 - the same class of finding `SIMPLE_LAYOUT` already exists
+to fix for every other simple preset. Applied it rather than adding
+Blank to `KNOWN_EXCEPTIONS` (that set is for ALREADY-accepted
+limitations, not a new preset's own avoidable overlap).
+
+Verified: new `tests/presets.test.js` case (Blank declares nothing
+beyond a name/cardsPerPlayer), 1213/1213 unit, `lint:design` clean
+(same 2 pre-existing accepted exceptions only, zero new ones),
+`make check-fast` PASSED. Live-checked: a Blank table starts with
+exactly `deck` (full standard deck) + `table` (generic plain pile) -
+zero extra piles - and Add Zone's menu lists every registered pile kind
+generically (Plain, Deck, Battlefield, Chip, Token, ...), not a
+privileged subset. Did not re-test the create-flow mechanism itself -
+`builderMenu.browser.mjs` already covers that live, for any preset.
+
+## Next Steps
+Nothing pending - this and D172 are both ready to commit+push together
+with this state update. `RULES_REFERENCE['Blank']` added too (required
+by `presets.test.js`'s own "every preset has a matching rules-reference
+entry" guard).

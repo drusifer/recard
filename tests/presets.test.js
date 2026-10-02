@@ -84,6 +84,28 @@ test('Spit preset: 2 shared rank-adjacent piles + a cascade per player', () => {
   ]);
 });
 
+// --- D173 (direct user request): "start with an empty table and add
+// any zones and piles we want... no special zones, just different
+// types and different names." Already true for a LIVE table (D171's
+// Add Zone/Add Pile dispatch the same CREATE_ZONE/CREATE_PILE every
+// preset's own declarative setup uses) - what was missing was a way to
+// START one with nothing preset-declared at all. `tableZone`/`piles`/
+// `zones` all default or stay unset - the generic Table Zone plus one
+// Deck pile (D44's own always-true baseline, nothing new) and zero
+// cards dealt (`cardsPerPlayer: 0`), so the host builds the whole
+// layout themselves from there, through the one general mechanism.
+
+test('Blank preset: declares nothing beyond a name - no piles, no zones, no playerLimit/playerPileKind, nothing dealt', () => {
+  const preset = PRESETS.find((p) => p.name === 'Blank');
+  assert.ok(preset, 'the Blank preset must exist');
+  assert.equal(preset.cardsPerPlayer, 0, 'nothing auto-dealt - the host adds whatever they want, not a hand');
+  assert.equal(preset.tableZone, undefined, 'defaults true - the same baseline Deck+Table pile every preset starts from, not a special case');
+  assert.equal(preset.piles, undefined);
+  assert.equal(preset.zones, undefined);
+  assert.equal(preset.playerLimit, undefined, 'no seat cap - any number of players can join and build');
+  assert.equal(preset.playerPileKind, undefined);
+});
+
 test('every preset without a declared piles field is unaffected (undefined, not [])', () => {
   // US-83 joins Solitaire/Spit as a preset that declares a starting
   // table. The guard's point is that presets which DON'T declare piles

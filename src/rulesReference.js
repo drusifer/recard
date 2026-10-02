@@ -77,4 +77,11 @@ export const RULES_REFERENCE = {
     turns:
       'No turns - everyone plays at once. Play a card onto either center pile if it\'s one rank above or below (in either direction, wrapping King to Ace) the top card there.',
   },
+  Blank: {
+    goal: 'Whatever you make it - this is a table with nothing on it but a deck, not a game.',
+    setup:
+      'One standard deck in a Deck pile, nothing else. Use Add Zone / Add Pile (the gear menu) to build whatever layout your game needs, then draw or move cards from the deck into place by hand.',
+    turns:
+      'However you and the other players agree to run it - Recard tracks the table (zones, piles, whose turn the talk log says it is), not any one game\'s rules.',
+  },
 };

@@ -728,3 +728,26 @@ lint:decks — 15 deck(s) balanced
 ---
 [<small>2026-10-02 18:18:36</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
  *lead review D172 PASSED. Diff is small, well-scoped: test-file preset pins (zero src risk) correctly separated from the one real src fix (ICE config, zero STUN dependency). Each change carries a verified why, matches project conventions. Approved to commit+push. Separately flagging to Cypher/user: War-as-default-preset is a real pre-existing regression (any preset-less test breaks), worth its own ticket, not fixed here.
+
+---
+[<small>2026-10-02 18:40:14</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-fast | /home/drusifer/Projects/recard/build/build.out
+
+> lint:style
+> stylelint style.css
+
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-10-02 18:40:32</small>] [**Neo**]->[**User**] *swe done*:
+ *swe impl D173: Blank preset (direct user request) - name-only preset, zero new code paths, proves Add Zone/Add Pile (D171) need nothing special to start a table from nothing. Real finding fixed: default Table Zone overlapped seat zone at 1280x800, fixed w/ SIMPLE_LAYOUT not a waiver. 1213/1213 unit, lint:design clean, check-fast PASSED. Ready to commit+push with D172's UAT fixes.
+
+---
+[<small>2026-10-02 18:41:18</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
+No duplicate decision numbers, and the modern section is newest-first. Clean.

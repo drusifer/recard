@@ -37,7 +37,7 @@ is single-bucketed just to keep the list tidy.
 
 **Foundational stack** — static site, PeerJS/WebRTC, star topology,
 message classes, join flow, persistence, identity/reconnection
-D1: static site, no build step · D2: PeerJS + public broker · D3: star topology, host-authoritative · D4: two message classes · D5: join flow · D6: no persistence/reconnect (v1) · D13: live cursor / lift cue extends the motion channel · D26: host-only persistence snapshot · D27: `playerKey` is the identity · D30: `expectedPlayers` host-local trigger · D31: D26 reversed — hands ARE persisted · D32: reconnection is client retry · D33: wait list computed from snapshot · D100: returning identity trusted unconditionally
+D1: static site, no build step · D2: PeerJS + public broker · D3: star topology, host-authoritative · D4: two message classes · D5: join flow · D6: no persistence/reconnect (v1) · D13: live cursor / lift cue extends the motion channel · D26: host-only persistence snapshot · D27: `playerKey` is the identity · D30: `expectedPlayers` host-local trigger · D31: D26 reversed — hands ARE persisted · D32: reconnection is client retry · D33: wait list computed from snapshot · D100: returning identity trusted unconditionally · D172: local WebRTC signaling path, public broker still the jev-tool default
 
 **Privacy & visibility model** — redaction introduced, then
 progressively removed (a theme specifically because it reverses itself)
@@ -57,7 +57,7 @@ D14: hand order persists client-side only · D15: incremental dealing (`DEAL_MOR
 
 **Cards, chips, tokens & decks** — denominations/tray, deck visuals,
 reset/reshuffle, card ids, RtG content pipeline
-D9: score is a flat map · D10: presets/rules reference are static data · D11: solo play needs no architecture change · D22: deck operations reuse existing helpers · D40: `Card.orientation` field · D47: `DeckDefinition` registry · D48: `Card.orientation` ships, real `rotate` action · D49: preset schema extends to `DeckDefinition` (Pinochle) · D76: card faces are a registry · D77: card content is an offline pipeline · D78: deck balance is a lint check · D79: Battlefield/Exile/Stack real pile types, `UNTAP_ALL` · D80: `deckList` additive parameter · D81: a declared pile may be pre-stocked · D88: card conservation enforced invariant · D91: card-back rendering polymorphic · D105: cards get a visible border · D108: physical card id unique per BUILD · D109: chips have denominations, their own pile kind · D110: a chip tray is stacks, not a row · D111: reset redeals cards, does not confiscate chips · D113: the deck looks like a deck again · D114: Reshuffle & re-deal is its own action · D115: RESET rebuilds every declared deck · D117: New Game — host swaps preset, same table code · D125: `LandsPile` — colour columns · D126-D128: several small same-day nits
+D9: score is a flat map · D10: presets/rules reference are static data · D11: solo play needs no architecture change · D22: deck operations reuse existing helpers · D40: `Card.orientation` field · D47: `DeckDefinition` registry · D48: `Card.orientation` ships, real `rotate` action · D49: preset schema extends to `DeckDefinition` (Pinochle) · D76: card faces are a registry · D77: card content is an offline pipeline · D78: deck balance is a lint check · D79: Battlefield/Exile/Stack real pile types, `UNTAP_ALL` · D80: `deckList` additive parameter · D81: a declared pile may be pre-stocked · D88: card conservation enforced invariant · D91: card-back rendering polymorphic · D105: cards get a visible border · D108: physical card id unique per BUILD · D109: chips have denominations, their own pile kind · D110: a chip tray is stacks, not a row · D111: reset redeals cards, does not confiscate chips · D113: the deck looks like a deck again · D114: Reshuffle & re-deal is its own action · D115: RESET rebuilds every declared deck · D117: New Game — host swaps preset, same table code · D125: `LandsPile` — colour columns · D126-D128: several small same-day nits · D173: `Blank` preset — nothing beyond a name, same baseline every preset starts from
 
 **Camera / view** — Infinity Table: zoom, pan, focus-zoom
 D129: `Stack`/`Stackable` (also domain model — see above) · D130: camera is a pure CSS transform layer · D131: focus interaction — grow the Pile in place · D132: Infinity Table overview — manual dial + presets · D133: default zoom computed to fit a fixed canvas (D132 partially reversed) · D134: per-preset canvas size, lint:design preset sweep, transform-origin fix
@@ -69,6 +69,75 @@ D20: desktop table width, pure CSS breakpoints · D24: Zone room grows at deskto
 D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rules disabled post-autofix · D60: `tests/e2e.smoke.mjs` removed · D96: universal DnD guarantee, structural test (also drag-and-drop — see above) · D134: `lint:design` sweeps every preset, not just the default (also camera/view — see above) · D135: multi-player test harness — real peers driven over the real protocol, one `submitAction` funnel · D136: harness MCP server — agents drive a live table; read-only WebRTC traffic log · D137: Gin Rummy bots — typed rules in code, Jev opponent inference, one bot core behind runner + MCP · D138: table talk — host-ordered `talk` message, not game state · D139: lint:design fills Gin's Table pile with a hand's discards (also layout — see above) · D140: gitleaks — `make secrets` in `make check`, versioned pre-commit hook
 
 ---
+
+### D173. `Blank` preset — a table that starts with nothing beyond the baseline
+
+Direct user request, after a correct observation: "every game should
+ONLY be based on preset" (D82-era) predates D171's Add Zone/Add Pile,
+and the rationale that decision rested on (no live way to build a
+custom layout) no longer holds. "We should be able to start with an
+empty table and add any zones and piles we want... no special zones,
+just different types and different names."
+
+D171 already made that true for a LIVE table - Add Zone/Add Pile
+dispatch the exact same `CREATE_ZONE`/`CREATE_PILE` a preset's own
+declarative setup goes through, no special-casing. What was missing was
+a way to START one with nothing preset-declared. `Blank` declares
+nothing beyond a name - every other field stays at its default
+(`tableZone` true, the same baseline Deck+Table pile every preset
+already starts from; `piles`/`zones` unset; `cardsPerPlayer: 0` so
+nothing auto-deals). No new reducer path, no new pile/zone kind -
+deliberately the smallest possible preset, proving the existing
+primitives need nothing added to start from nothing.
+
+Real finding from `lint:design`'s live preset sweep, fixed rather than
+waived: the default Table Zone overlapped the host's own seat zone at
+1280x800 - the same class of finding `SIMPLE_LAYOUT` (D134) already
+exists to fix for every other simple preset. Applied it; `Blank` was
+not added to the sweep's `KNOWN_EXCEPTIONS` (that set is for already-
+accepted limitations, not a new preset's own avoidable overlap).
+
+### D172. Local WebRTC signaling path — real PeerJS, no public-broker dependency by default
+
+Direct user request: a local path for running tests and experiments
+without depending on the public PeerJS broker (reachability, latency,
+occasional flakiness). Test harness (`tests/harness/multiplayer.mjs`)
+signals over a local PeerServer by default for every `hostTable`/
+`joinTable`/`createTable` call; `realBroker: true` opts a specific call
+back out - kept on exactly one suite (`tests/realBroker.browser.mjs`)
+so a real break in the public broker still shows up. The jev tools
+(`jevTable.mjs`, `jev/runner.mjs`, `jevGameMaster.mjs`) keep the public
+broker as THEIR OWN default (direct user instruction - a jev player
+should default to the same path a person would use); `jevTable.mjs`
+gains `--local-peer`/`--peer-port` to opt a whole table (host + every
+spawned bot, same `baseUrl`) onto the local one.
+
+`tools/localPeerServer.mjs` spawns the `peer` npm package's own
+`peerjs` CLI as a child process rather than calling its `PeerServer()`
+API in-process - that API starts two `setInterval`s (expired-message
+sweep, broken-connection check) with no public stop, checked live to
+hang a `node --test` process (or `jev-table`) forever even after
+`http.Server.close()`. A child process + SIGTERM sidesteps the leak
+entirely. Binds/is addressed by literal `127.0.0.1`, not `localhost`,
+and `src/peerOptions.js`'s options carry `config: { iceServers: [] }` -
+PeerJS's own default ICE config bakes in a public Google STUN server
+regardless of the signaling host override (checked against its bundled
+source), and two peers on one machine have no NAT to traverse, so a
+"local" broker that still reached outside the machine for ICE was not
+actually local.
+
+Live-verifying this surfaced a real, separate, pre-existing bug: `War`
+(merged just before this work) deliberately deals into a
+`playerPileKind: 'deck'` pile (a War player never looks at their own
+pile) - fine on its own, but War is also the FIRST preset in
+`presets.js`, making it the silent default whenever a test doesn't name
+one, and a deck-kind pile never feeds `view.myHand`. Every preset-less
+`createTable()`/`dealTable()` call broke, independent of broker -
+confirmed via `git worktree` against the commit before this work that
+it predates it entirely. Fixed in the four affected test files only
+(an explicit hand-kind preset each) - `presets.js`/`state.js`
+untouched; which preset should default when none is named is a
+separate, still-open product question.
 
 ### D171. Builder menu — found live: `CREATE_ZONE`/`CREATE_PILE` already exist, unused by any UI
 

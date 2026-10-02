@@ -576,4 +576,27 @@ export const PRESETS = [
       'rtg-tokens': { x: 1460, y: 306, w: 250, h: 120 },
     },
   },
+  // D173 (direct user request): "start with an empty table and add any
+  // zones and piles we want... no special zones, just different types
+  // and different names." Declares nothing beyond a name - every other
+  // field stays at its default (`tableZone` true, so the same baseline
+  // Deck+Table pile every preset already starts from, not a NEW special
+  // case; `piles`/`zones` unset, so nothing is pre-built beyond that).
+  // `cardsPerPlayer: 0` so nothing auto-deals - the host builds the
+  // whole layout live, through Add Zone/Add Pile (D171), the exact same
+  // general mechanism every preset's own declarative setup already goes
+  // through. No new reducer path, no new pile/zone kind - this preset
+  // is a proof that the existing primitives need nothing special-cased
+  // to start from nothing.
+  {
+    name: 'Blank',
+    numDecks: 1,
+    jokers: 0,
+    cardsPerPlayer: 0,
+    // `lint:design`'s preset sweep, run live: the default Table Zone
+    // position overlaps the host's own seat zone at 1280x800 - the same
+    // finding SIMPLE_LAYOUT already exists to fix for every other simple
+    // preset (its own comment has the calibration history).
+    layout: SIMPLE_LAYOUT,
+  },
 ];

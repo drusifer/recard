@@ -226,4 +226,6 @@ sequenceDiagram
     Note right of Trin: "*qa uat D172 PASSED -<br/>live-verified (not just<br/>unit). Root-caused why<br/>Neo couldn't verify:<br/>unrelated pre-existing<br/>bug (War is now default<br/>pr…"
     Morpheus->>Neo: "lead handoff"
     Note right of Morpheus: "*lead review D172<br/>PASSED. Diff is small,<br/>well-scoped: test-file<br/>preset pins (zero src<br/>risk) correctly<br/>separated from the one<br/>real src fix (…"
+    Neo->>User: "swe done"
+    Note right of Neo: "*swe impl D173: Blank<br/>preset (direct user<br/>request) - name-only<br/>preset, zero new code<br/>paths, proves Add<br/>Zone/Add Pile (D171)<br/>need nothing sp…"
 ```
