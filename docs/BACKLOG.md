@@ -330,10 +330,36 @@ superseded:
   A bot's own spells sit on the Stack forever from its perspective. A
   real feature (a `resolve` step, knowing when both sides have passed),
   not a one-line fix like D157 was - scoping it is its own task.
-- **`jev-game-master`** (queued, 2026-10-01, direct user request via
-  `*queue sprint`): a generic Jev player, not tied to any one `games/`
-  directory, that listens to table talk for add/remove-bot commands and
-  seats/dismisses Jev players in response - a table-talk front end over
-  what `tools/jev/runner.mjs`'s own add-bot/quit handling and
-  `tools/jevTable.mjs` already do from the CLI. Not started; queued
-  behind the War Jev player (this session).
+- ~~**`jev-game-master`**~~ DONE 2026-10-02 (queued 2026-10-01 via `*queue
+  sprint`, built via direct user request "apply the backlogged
+  improvements"): `tools/jevGameMaster.mjs` - joins a table as a
+  SPECTATOR, reads `view.gameConfig.presetName` to detect which of the 3
+  supported games is on the table, loads that game's real player list,
+  and answers add-bot/quit requests for it via the EXISTING, already-
+  tested `serveSpawnRequests` (`tools/jev/runner.mjs`) standing alone -
+  no new spawn/quit logic, just a front end that doesn't require an
+  already-seated bot first. `tests/jevGameMaster.browser.mjs` (5 tests,
+  real CLI + real table): game-detect, real add-bot spawn (a genuine
+  second process joins and plays), refusal, quit, and an unsupported-
+  preset table (Hearts) refused up front via `UsageError` (exit 2, same
+  convention as `jevPlayer.mjs`'s own spectator-refusal). Found and fixed
+  live: killing a child via bare SIGTERM never ran its own `finally`
+  cleanup (no handler for it, same as `jevPlayer.mjs`), orphaning its
+  Playwright browser and hanging the whole test file's event loop - every
+  test now asks each bot it started to leave by name instead of relying
+  on a blunt kill. 4/5 stress runs fully clean, 1/5 hit this sandbox's
+  known intermittent WebRTC flakiness (a single `jev-ready` wait timing
+  out, not a repeat of the hang) - consistent with the already-disclosed
+  live-multiplayer constraint in this environment, not a new defect.
+- ~~**`AP-VIA-GREP`/`AP-VIA-READ` can't tell "ignored a real tool" from "no
+  tool existed to use"**~~ DONE 2026-10-02 (direct user request, "apply the
+  backlogged improvements"): confirmed the JSONL transcript has no
+  dedicated available-tools manifest event, but every real `tool_use` name
+  IS reliably recorded - `_via_mcp_used()` checks whether any event name
+  starts with `mcp__via__` anywhere in the session; `shutil.which('via')`
+  checks the CLI fallback. Both now ride along in these two rules'
+  candidate `state` (`via_mcp_used_elsewhere`, `via_cli_installed`),
+  `RULE_QUESTIONS` updated to tell Jev to answer `no` when both are false -
+  no real alternative existed, whatever a project's instructions ask for.
+  Verified with a real Jev call (not mocked): the exact same obvious
+  symbol-grep judged `yes` with both flags true, `no` with both false.

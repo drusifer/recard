@@ -7,7 +7,7 @@
 #
 # Adding a task: add the npm script first, then a one-line target here.
 
-.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-layoutsave test-buildermenu test-resume check-fast test-tablezoom test-focuszoom test-multiplayer test-remotecursor test-harness-mcp test-gin test-jev-runner test-jevtable test-actionmenu test-zonepanel test-headeractions test-pileelement test-reconnect jev-player jev-library jev-library-doc jev-readme jev-table secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers dead-code
+.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-layoutsave test-buildermenu test-resume check-fast test-tablezoom test-focuszoom test-multiplayer test-remotecursor test-harness-mcp test-gin test-jev-runner test-jev-game-master test-jevtable test-actionmenu test-zonepanel test-headeractions test-pileelement test-reconnect jev-player jev-game-master jev-library jev-library-doc jev-readme jev-table secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers dead-code
 
 help:
 	@echo "Recard targets (all front npm scripts):"
@@ -36,7 +36,9 @@ help:
 	@echo "  test-reconnect  guest reconnect, live: real host loss + real schedule, clock compressed (US-142)"
 	@echo "  test-jevtable  Ctrl-C at jev-table ends the table and leaves no bot running (D159)"
 	@echo "  test-jev-runner  the real jev-player CLI at a hosted table: moves, add-bot, quit (US-128)"
-	@echo "  jev-player    GAME=gin|rtg STRATEGY=<player file name> CODE=<table code> [FIRST=bot|opponent] [HANDS=1] [DECK=<pile id>] [STEPS=12]: a Jev player joins your table (US-120, US-128)"
+	@echo "  test-jev-game-master  the real jev-game-master CLI at a hosted table: game-detect, add-bot, refusal, quit, unsupported preset"
+	@echo "  jev-player    GAME=gin|rtg|war STRATEGY=<player file name> CODE=<table code> [FIRST=bot|opponent] [HANDS=1] [DECK=<pile id>] [STEPS=12]: a Jev player joins your table (US-120, US-128)"
+	@echo "  jev-game-master  CODE=<table code> [NAME=\"Game Master\"]: joins as a spectator and answers add-bot/quit requests for whichever game is on the table - no GAME/STRATEGY needed"
 	@echo "  secrets      gitleaks: every commit + uncommitted changes to tracked files"
 	@echo "  hooks        install the gitleaks pre-commit hook (.githooks/)"
 	@echo "  lint         style + design + js"
@@ -114,10 +116,22 @@ test-gin:
 test-jev-runner:
 	npm run test:jev-runner
 
+# jev-game-master: the real CLI at a real hosted table - detects the
+# game from the preset, add-bot, refusal, quit, unsupported preset (War
+# always; needs no TYPESAFE_API_KEY)
+test-jev-game-master:
+	npm run test:jev-game-master
+
 # US-120: a Jev player joins the table CODE you are hosting, playing GAME
 # (gin) with strategy STRATEGY. Jev strategies need TYPESAFE_API_KEY.
 jev-player:
 	npm run jev-player -- --game '$(GAME)' --strategy '$(STRATEGY)' --code '$(CODE)' --first '$(or $(FIRST),bot)' --hands '$(or $(HANDS),1)' $(if $(DECK),--deck '$(DECK)') $(if $(STEPS),--steps '$(STEPS)')
+
+# jev-game-master: joins the table CODE you are hosting as a spectator and
+# answers add-bot/quit requests for whichever game is on the table - no
+# GAME/STRATEGY needed up front.
+jev-game-master:
+	npm run jev-game-master -- --code '$(CODE)' --name '$(or $(NAME),Game Master)'
 
 # US-129 Gate 1 C2: every name a turn file may use, and what it means
 jev-library:

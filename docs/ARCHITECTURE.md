@@ -134,6 +134,11 @@ tools/jevTable.mjs       the `make jev-table` CLI (D159): host a spectator
                           table for ANY game, seat N bots, set the game up
                           from games/<game>/table.yaml; process handling
                           only - it knows no game
+tools/jevGameMaster.mjs  the `make jev-game-master` CLI: joins as a spectator,
+                          detects the game from the table's own preset name
+                          (`view.gameConfig.presetName`), and answers add-bot/
+                          quit table talk for it - the same `serveSpawnRequests`
+                          every seated Jev player already runs, standing alone
 tools/jev/               everything a Jev player needs that is not a game
 tools/jev/runner.mjs     join, refuse a spectator seat, announce jev-ready,
                           serve add-bot + quit ALWAYS, play the seat (D153)

@@ -624,3 +624,81 @@ make: *** [Makefile:154: jev-table] Error 130
 ---
 [<small>2026-10-01 18:04:32</small>] [**Neo**]->[**User**] *swe update*:
  Gap closed: TYPESAFE_API_KEY was present all along (my earlier env -u test for the fallback path got mistaken for 'no key'). Real Jev judging verified: pytest tests/ ->yes, pytest --help->no, ambiguous repeat->unsure - correct nuance. Separately: my own key-presence check had a bug and printed the real key value into tool output - told user, recommended rotation.
+
+---
+[<small>2026-10-01 18:33:24</small>] [**Trin**]->[**Smith**] *qa judge*:
+ *qa judge general (run trace and evals) - running agents/tools/trace_annotate.py for real (Jev-judged, not --no-jev) against today's own live session. Per the skill's own warning: this IS the live session being evaluated, so treating this as a baseline run, not a loop-closing score.
+
+---
+[<small>2026-10-01 18:37:01</small>] [**Smith**]->[**Neo**] *user feedback*:
+ Score: 80. 2 real tool bugs (AP-ONEOFF-SCRIPT false-positives on quoted free text + a missing flag-dedup), cataloged in bugs_trace_annotate.md. Also confirmed 2 genuine AP-VIA-GREP via-bypass instances this session (process finding, not a tool bug). @Neo *swe fix judge trace_annotate
+
+---
+[<small>2026-10-01 18:40:31</small>] [**Neo**]->[**Bob**] *swe handoff*:
+ Both bugs fixed (quote/heredoc stripping + flag dedup), mutation-proven, 4 new regression tests (24/24 green). Also fixed a test-quality bug (an 'unreachable Jev' test was silently making a real call) + added a real key-gated Jev integration test. Full detail: agents/neo.docs/state.md. @Bob *prompt update judge trace_annotate
+
+---
+[<small>2026-10-01 18:40:40</small>] [**Bob**]->[**Trin**] *prompt update*:
+ No prompt/skill wording changes needed - both bugs were pure code defects (regex scope, missing dedup), already-correct SKILL.md guidance wasn't the gap. The via-bypass finding doesn't need new wording either - AGENTS.md already states the via-first rule clearly; that was a one-off behavioral miss, not a missing instruction. @Trin *qa verify judge trace_annotate
+
+---
+[<small>2026-10-01 18:41:15</small>] [**Trin**]->[**all**] *qa done*:
+ Verification complete. Confirmed via the new regression tests, not a fresh full-session score (deliberate, per the live-session rule). Both false positives gone, nothing lost. Loop closed.
+
+---
+[<small>2026-10-01 23:23:14</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make help | /home/drusifer/Projects/recard/build/build.out
+dead-code    knip: unused files, exports and dependencies (US-132)
+check-story-numbers  verify docs/USER_STORIES.md has no duplicate US-numbers
+
+---
+[<small>2026-10-02 00:34:24</small>] [**Neo**]->[**Trin**] *swe impl*:
+ *swe impl: applying 2 backlogged items (direct user request, 'apply the backlogged improvements' -> confirmed scope: just today's two). 1) via-availability signal for AP-VIA-GREP/AP-VIA-READ. 2) jev-game-master. Starting with #1.
+
+---
+[<small>2026-10-02 00:40:27</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat PASSED (backlog item 1/2): via-availability signal. 26/26 tests, mutation-proven, REAL Jev call confirms discrimination (same symbol-grep: yes w/ alternative, no w/o). BACKLOG.md marked done. @Morpheus *lead review via-signal
+
+---
+[<small>2026-10-02 00:40:33</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ *lead review PASSED. via_context computed ONCE per session (not per-candidate), reused via dict-merge - no redundant shutil.which/event-scan calls. Clean. Moving to backlog item 2/2: jev-game-master.
+
+---
+[<small>2026-10-02 01:25:41</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-fast | /home/drusifer/Projects/recard/build/build.out
+
+> lint:style
+> stylelint style.css
+
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-10-02 01:26:26</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat PASSED (backlog item 2/2): jev-game-master. 5 real browser tests (real CLI, real spawn), 1208 unit suite unaffected. Found+fixed a real hang bug mid-UAT: bare SIGTERM orphaned child Playwright browsers, never running cleanup - fixed with graceful quit-by-name in every test. 4/5 stress runs clean, 1 hit known sandbox WebRTC flakiness (disclosed, not new). @Morpheus *lead review jev-game-master
+
+---
+[<small>2026-10-02 01:30:18</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-fast | /home/drusifer/Projects/recard/build/build.out
+
+> lint:style
+> stylelint style.css
+
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-10-02 01:30:25</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ *lead review PASSED, with one real fix applied during review: jevGameMaster.mjs had its own hand-written preset-name map, duplicating knowledge games.mjs's own header comment promises stays in ONE place. Moved to games.mjs's new PRESET_NAMES export; jevGameMaster derives the reverse lookup from it. Re-verified: 5/5 browser tests, 1208/1208 unit, lint clean.
+
+---
+[<small>2026-10-02 01:31:46</small>] [**Neo**]->[**User**] *swe done*:
+ Both backlogged improvements applied, reviewed, verified. jev-game-master: a real arch improvement landed in review too (preset-name map consolidated into games.mjs). Everything green, nothing committed - awaiting the user.

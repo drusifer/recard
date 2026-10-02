@@ -43,6 +43,7 @@ import argparse
 import html as html_lib
 import json
 import re
+import shutil
 import subprocess
 import sys
 from collections import Counter
@@ -220,23 +221,43 @@ def is_oneoff_script_candidate(path: str) -> bool:
     return not any(path.startswith(p) for p in ONEOFF_EXCLUDED_PREFIXES)
 
 
+# Real bug, found live (`*judge general`, 2026-10-01): "what program is this
+# command invoking" regexes (everything below except VIA_SYMBOL_GREP_RE,
+# which needs the QUOTED grep pattern itself) were matching inside quoted
+# free text too - a `git commit -m "$(cat <<'EOF' ...)"` heredoc whose
+# message happened to contain an earlier script's basename got flagged
+# AP-ONEOFF-SCRIPT, and a `bobp chat "...python3 -c..."` call got flagged
+# TWICE because its own prose literally discussed that phrase. Stripping
+# quoted-string spans and heredoc bodies before these regexes run removes
+# both false-positive shapes in one place, without hardcoding either
+# command - the general fix is "don't read inside a quoted message argument
+# as if it were the command being run."
+_HEREDOC_RE = re.compile(r"<<-?\s*'?(\w+)'?\n.*?^\1\s*$", re.DOTALL | re.MULTILINE)
+_QUOTED_RE = re.compile(r'"(?:[^"\\]|\\.)*"|\'[^\']*\'', re.DOTALL)
+
+
+def _without_quoted_text(cmd: str) -> str:
+    return _QUOTED_RE.sub(' ', _HEREDOC_RE.sub(' ', cmd))
+
+
 def classify_bash(cmd: str) -> list[str]:
     """The MECHANICAL pre-filter: which rules this command is even a
     CANDIDATE for. Candidates are judged by Jev (`judge_candidates`)
     before becoming a real flag - this only decides what is worth asking
     about at all (see the module's own `AP-ONEOFF-SCRIPT` fix text: a
     fact-finding pass stays code; a judgment call goes to Jev)."""
+    bare = _without_quoted_text(cmd)
     flags = []
-    if MAKE_BYPASS_RE.search(cmd):
+    if MAKE_BYPASS_RE.search(bare):
         flags.append('AP-MAKE-BYPASS')
-    if VENV_RE.search(cmd):
+    if VENV_RE.search(bare):
         flags.append('AP-RAW-VENV')
-    if ONEOFF_EVAL_RE.search(cmd):
+    if ONEOFF_EVAL_RE.search(bare):
         flags.append('AP-ONEOFF-SCRIPT')
-    pipe_match = MAKE_PIPE_RE.search(cmd)
+    pipe_match = MAKE_PIPE_RE.search(bare)
     if pipe_match and pipe_match.group('target') not in MKF_EXCLUDED_TARGETS:
         flags.append('AP-MAKE-PIPE')
-    if VIA_SYMBOL_GREP_RE.search(cmd):
+    if VIA_SYMBOL_GREP_RE.search(cmd):  # the grep PATTERN lives inside the quotes - keep them
         flags.append('AP-VIA-GREP')
     return flags
 
@@ -274,14 +295,21 @@ RULE_QUESTIONS: dict[str, str] = {
     'AP-VIA-GREP': (
         "A grep/rg command's pattern looks like it is hunting for a code symbol's definition (a "
         "function, class, import, or similar) rather than free-text content such as a string "
-        "literal, comment, or log line. Is this really symbol-hunting that should have used a "
-        "dedicated code-navigation tool instead of grep?"
+        "literal, comment, or log line. `via_mcp_used_elsewhere` says whether this session ever "
+        "actually called a dedicated code-navigation MCP tool anywhere else; `via_cli_installed` "
+        "says whether that tool's own command-line fallback exists on this machine at all. Only "
+        "count this as really bypassing that tool if at least one of those is true - if BOTH are "
+        "false, there was no real alternative to grep to bypass, whatever a project's own "
+        "instructions say should be used; answer no in that case, not yes."
     ),
     'AP-VIA-READ': (
-        "A source file was read in full, and was never edited later in this same session. Does "
-        "this really look like symbol/definition hunting that should have used a dedicated "
-        "code-navigation tool, rather than a deliberate read before editing elsewhere, or a "
-        "genuine review pass?"
+        "A source file was read in full, and was never edited later in this same session. "
+        "`via_mcp_used_elsewhere` says whether this session ever actually called a dedicated "
+        "code-navigation MCP tool anywhere else; `via_cli_installed` says whether that tool's own "
+        "command-line fallback exists on this machine at all. If both are false, there was no real "
+        "alternative available, so answer no regardless of how the read looks. Otherwise: does this "
+        "really look like symbol/definition hunting that should have used it, rather than a "
+        "deliberate read before editing elsewhere, or a genuine review pass?"
     ),
     'AP-DUP-READ': (
         "The exact same file (same offset/limit) was read multiple times in one session with no "
@@ -409,6 +437,20 @@ def summarize_input(name: str, inp: dict) -> str:
     return str(inp)[:140]
 
 
+def _via_mcp_used(events: list[dict]) -> bool:
+    """Whether a dedicated code-navigation MCP tool was ever actually
+    invoked ANYWHERE in this session - not a project-config claim, a real
+    tool-use event. Backlogged finding (2026-10-01, `*judge general`):
+    `AP-VIA-GREP`/`AP-VIA-READ` used to judge every grep/Read the same way
+    regardless of whether such a tool even existed to bypass. Checked (also
+    2026-10-01): the JSONL transcript has no dedicated "available tools"
+    manifest event to read instead - real `tool_use` names are the only
+    reliable signal this file can get at. `mcp__via__` is this ecosystem's
+    own convention (see `agents/skills/via/SKILL.md`), not recard-specific.
+    """
+    return any(ev['name'].startswith('mcp__via__') for ev in events)
+
+
 def _paths_edited(events: list[dict]) -> set[str]:
     edited = set()
     for ev in events:
@@ -432,6 +474,11 @@ def annotate_events(events: list[dict], rules: dict, no_via: bool, use_jev: bool
     """
     skill_seen: Counter = Counter()
     edited_paths = _paths_edited(events)
+    # AP-VIA-GREP/AP-VIA-READ context (see `_via_mcp_used`'s own doc): a
+    # real alternative has to have actually existed for either rule to be
+    # a fair flag at all, not just something a project's instructions ask
+    # for in the abstract.
+    via_context = {'via_mcp_used_elsewhere': _via_mcp_used(events), 'via_cli_installed': shutil.which('via') is not None}
     # Per-path edit "generation" — bumped on every Edit/Write to that path, so a
     # Read at a given offset only counts as a duplicate of an earlier Read at
     # the same offset if no edit landed on the file in between.
@@ -463,12 +510,20 @@ def annotate_events(events: list[dict], rules: dict, no_via: bool, use_jev: bool
 
         if name == 'Bash':
             cmd = inp.get('command', '')
+            bare = _without_quoted_text(cmd)
             for rule in classify_bash(cmd):
-                add_candidate(seq, rule, {'command': cmd})
-            if any(base in cmd for base in oneoff_candidates):
-                add_candidate(seq, 'AP-ONEOFF-SCRIPT', {'command': cmd, 'written_path': next(
-                    path for base, path in oneoff_candidates.items() if base in cmd)})
-            if FULL_SUITE_RE.search(cmd):
+                state = {'command': cmd, **via_context} if rule == 'AP-VIA-GREP' else {'command': cmd}
+                add_candidate(seq, rule, state)
+            # Word-boundary, not substring, and against `bare` (quoted text
+            # stripped) - same false-positive shape as `classify_bash`'s own
+            # fix above: a basename appearing inside an unrelated quoted
+            # message (a commit message, a chat line) is not this command
+            # running that script.
+            matched_base = next((base for base in oneoff_candidates
+                                  if re.search(rf'\b{re.escape(base)}\b', bare)), None)
+            if matched_base:
+                add_candidate(seq, 'AP-ONEOFF-SCRIPT', {'command': cmd, 'written_path': oneoff_candidates[matched_base]})
+            if FULL_SUITE_RE.search(bare):
                 if last_full_suite_cmd is not None and not any_edit_since_last_full_suite:
                     add_candidate(seq, 'AP-SLOW-TEST-REPEAT', {'command': cmd, 'previous_command': last_full_suite_cmd})
                 last_full_suite_cmd = cmd
@@ -479,7 +534,7 @@ def annotate_events(events: list[dict], rules: dict, no_via: bool, use_jev: bool
             read_sig_seen[sig] += 1
             read_sig_count[sig] += 1
             if Path(path).suffix in SOURCE_EXTENSIONS and path not in edited_paths and not no_via:
-                add_candidate(seq, 'AP-VIA-READ', {'path': path})
+                add_candidate(seq, 'AP-VIA-READ', {'path': path, **via_context})
             if read_sig_seen[sig] >= 3:
                 add_candidate(seq, 'AP-DUP-READ', {'path': path, 'times_read_so_far': read_sig_count[sig]})
         elif name in ('Edit', 'Write'):
@@ -500,7 +555,12 @@ def annotate_events(events: list[dict], rules: dict, no_via: bool, use_jev: bool
     annotated = []
     for seq, ev in enumerate(events, 1):
         name, inp = ev['name'], ev['input']
-        flags = [c['rule'] for c in per_event_candidates[seq - 1] if verdicts.get(c['id']) == 'yes']
+        # dict.fromkeys, not set(): the SAME rule can legitimately get two
+        # independent candidates on one event (e.g. AP-ONEOFF-SCRIPT via
+        # both the inline-eval regex and the write-then-run match) - found
+        # live (`*judge general`) showing the same rule twice in one row.
+        # Order-preserving dedup, not a set, so the legend stays readable.
+        flags = list(dict.fromkeys(c['rule'] for c in per_event_candidates[seq - 1] if verdicts.get(c['id']) == 'yes'))
         if no_via:
             flags = [f for f in flags if 'VIA' not in f]
         annotated.append({

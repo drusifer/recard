@@ -1,6 +1,94 @@
 # Agent State
 
-## Current Task (2026-10-01, later) - `*bloop this`: Jev-judged trace_annotate.py anti-patterns + AP-SLOW-TEST-REPEAT
+## Current Task (2026-10-02) - Applied both items logged during `*judge general` (direct user request, "apply the backlogged improvements")
+
+**1. via-availability signal for `AP-VIA-GREP`/`AP-VIA-READ`** (`agents/tools/trace_annotate.py`):
+confirmed the JSONL transcript has no dedicated available-tools manifest event, but every real
+`tool_use` name IS reliably recorded - `_via_mcp_used()` checks for any `mcp__via__*` name
+anywhere in the session; `shutil.which('via')` checks the CLI fallback. Both ride along in these
+two rules' candidate `state` now; `RULE_QUESTIONS` tells Jev to answer `no` when both are false -
+no real alternative existed, whatever a project's instructions ask for. Verified with a REAL Jev
+call (not mocked): the identical obvious symbol-grep judged `yes` with both flags true, `no` with
+both false. 2 new tests (26 total in `agents/tools/test_trace_annotate.py`), one guard mutation-
+proven.
+
+**2. `jev-game-master`** (`tools/jevGameMaster.mjs`, new): joins a table as a SPECTATOR, reads
+`view.gameConfig.presetName` to detect which of the 3 supported games is live, loads that game's
+real player list, and serves add-bot/quit table talk for it via the EXISTING, already-tested
+`serveSpawnRequests` (`tools/jev/runner.mjs`) - no new spawn/quit logic, just a front end that
+doesn't need an already-seated bot first.
+
+- Architecture fix made during Morpheus's own review, not left as a gap: `games.mjs`'s header
+  comment promises a new game is "one more entry here and nothing else" - my first draft's own
+  hand-written preset-name map in `jevGameMaster.mjs` broke that promise (two files to update for
+  a new game, not one). Moved to a new `PRESET_NAMES` export in `games.mjs` itself;
+  `jevGameMaster.mjs` derives its reverse lookup from that export instead of hand-duplicating it.
+- Real bug found and fixed DURING UAT, not before: killing a child process via bare SIGTERM (no
+  handler, same as `jevPlayer.mjs`) never ran its own `finally` cleanup, orphaning its Playwright
+  browser - kept the whole test file's event loop from ever going idle ("Promise resolution still
+  pending" from node:test, after all 5 individual tests had already genuinely passed). Fixed: every
+  test now asks each bot it started to leave BY NAME (the same quit mechanism under test) instead
+  of relying on `fixture.closers`' blunt kill.
+- `tests/jevGameMaster.browser.mjs` (5 real tests, real CLI + real hosted table): game-detect
+  without being told, a real second process spawned and joins for real, a refusal with a clear
+  reason, a graceful quit-and-exit, and an unsupported preset (Hearts - no Jev player exists for
+  it) refused up front via `UsageError` (exit 2, matching `jevPlayer.mjs`'s own spectator-refusal
+  convention - my first test draft wrongly expected exit 1, fixed the TEST not the code). 4/5
+  stress runs fully clean; 1/5 hit this sandbox's already-disclosed intermittent WebRTC flakiness
+  (one `jev-ready` wait timed out at 60s, not a repeat of the hang) - a known environment
+  constraint, not a new defect. `docs/ARCHITECTURE.md` module-layout updated; `Makefile`/
+  `package.json` got `jev-game-master`/`test-jev-game-master` targets (and a stale `GAME=gin|rtg`
+  help line - missing `war` - fixed in passing).
+
+Full loop both items: Neo impl -> Trin UAT -> Morpheus review (with a real fix applied in-review),
+all PASSED, posted to CHAT.md. `docs/BACKLOG.md` both marked done. Full unit suite still 1208/1208,
+lint clean throughout.
+
+**NOT committed** - awaiting the user.
+
+## Previous - (2026-10-01, later still) - `*judge general` - 2 real bugs found+fixed by dogfooding the Jev-rules feature
+
+Ran the just-shipped Jev-judged `trace_annotate.py` for real against today's actual 1005-call
+session (real TYPESAFE_API_KEY, not `--no-jev`). 118 mechanical candidates -> 8 real flags - strong
+discrimination. Manually reviewed every one of the 8 (Trin's own "manual review is still required"
+rule) and found 2 real false positives, both the SAME root cause: quoted free text (a `git commit
+-m "$(cat <<'EOF' ...)"` heredoc, a `bobp chat "...python3 -c..."` message) was being read as if it
+were the command actually running, because the invoke-shape regexes and the write-then-run
+basename check never excluded quoted/heredoc spans. One of the two also exposed a second, separate
+bug: the same rule could land on an event's flags list twice (two independent candidates, both
+confirmed 'yes'), with no dedup.
+
+**Fixed**: `_without_quoted_text()` strips quoted-string spans and heredoc bodies before every
+"what program is this" regex EXCEPT `AP-VIA-GREP` (which needs the quoted grep pattern itself -
+the one rule where quote content IS the signal). Write-then-run basename check: word-boundary
+regex against the stripped text, not a bare substring. Flags: `dict.fromkeys` dedup, order
+preserving. 4 new regression tests (24 total, all green), both new guards mutation-proven by
+direct revert/rerun/restore (not a scripted loop).
+
+**Bonus catch, same pass**: `JudgeCandidatesFallbackTests.test_unreachable_jev_falls_back_to_yes`
+was itself silently broken - it assumed "no TYPESAFE_API_KEY in this environment" (true when
+originally written) but once a real key turned out to be configured, it started making a REAL
+network call that happened to still pass (a bare `pytest` really is a `yes`) - a test proving
+nothing, passing for the wrong reason. Fixed with `mock.patch.dict(os.environ, {'TYPESAFE_API_KEY':
+''})` to force the condition deterministically. Added a genuine new test exercising the REAL Jev
+path (key-gated via `@unittest.skipUnless`, so it still skips cleanly with no key configured).
+
+**Process finding, not a tool bug**: 2 of the 8 real (true-positive) flags were `AP-VIA-GREP` -
+genuine instances of MY OWN session using grep for symbol-hunting (`grep -n "class HarnessPeer"
+...`) where this project's AGENTS.md names `via` as mandatory. Logged by Smith; Bob confirmed no
+skill-text change is warranted (the rule already says this clearly - a one-off behavioral miss,
+not a missing instruction).
+
+Full loop: Trin run -> Smith score (80, 2 bugs) -> Neo fix -> Bob (no prompt changes needed) ->
+Trin verify. Verification done by re-running the exact two real false-positive command strings
+against the fixed code (now zero flags, captured as the new regression tests) rather than paying
+for another full-session Jev pass - per the skill's own rule about not chasing a fresh score on an
+ever-growing live-session trace. Full writeup: `agents/smith.docs/{bugs_trace_annotate.md,
+trace_eval_general.md}`.
+
+**NOT committed** - awaiting the user.
+
+## Previous - (2026-10-01, later) - `*bloop this`: Jev-judged trace_annotate.py anti-patterns + AP-SLOW-TEST-REPEAT
 
 Started from a Trin (`*trin`) question: "do we have a rule in the judge tool for flagging manual
 testing (one-offs instead of repeatable tests)?" Answer was no - `agents/tools/trace_rules.json`

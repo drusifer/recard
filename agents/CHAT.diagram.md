@@ -15,7 +15,8 @@ sequenceDiagram
     participant Oracle
     participant All
     participant User
-    Note over Cypher,User: 📅 2026-09-29
+    participant Bob
+    Note over Cypher,Bob: 📅 2026-09-29
     Cypher->>Smith: "pm story"
     Note right of Cypher: "US-145 (Flip control<br/>redesign) in<br/>docs/USER_STORIES.md.<br/>User's own design<br/>answers up front: all 3<br/>directions<br/>(Column/Row/Fan)<br/>everywhere -…"
     Smith->>Morpheus: "user approve"
@@ -70,7 +71,7 @@ sequenceDiagram
     Note right of Smith: "Smith retro: the gate<br/>earned its keep in the<br/>most literal way<br/>possible - approving on<br/>green tests alone would<br/>have shipped a<br/>completely inv…"
     Cypher->>All: "pm launch"
     Note right of Cypher: "*pm launch US-145. Flip<br/>is now a 3-way<br/>Column/Row/Fan choice<br/>with preview icons<br/>(D167), reusing<br/>changePileType's proven<br/>disclosure control.…"
-    Note over Cypher,User: 📅 2026-09-30
+    Note over Cypher,Bob: 📅 2026-09-30
     Neo->>Cypher: "swe nit"
     Note right of Neo: "*nit stack-gear<br/>repositioned top-right<br/>-> top-left, direct user<br/>request. .stack-gear's<br/>right:-0.3rem -><br/>left:-0.3rem, top edge<br/>(-0.6rem) un…"
     Cypher->>Smith: "pm story"
@@ -181,7 +182,7 @@ sequenceDiagram
     Note right of Trin: "*qa test PASSED.<br/>Verified independently:<br/>7 affected browser<br/>suites all green<br/>standalone<br/>(headerActions 10/10,<br/>zonePanel 13/13,<br/>focusZoom 11…"
     Morpheus->>Neo: "lead review"
     Note right of Morpheus: "*lead review PASSED.<br/>Sound reuse: zero new<br/>popup/menu classes, the<br/>pile header's gear<br/>funnels through the<br/>exact same <action-menu><br/>the stac…"
-    Note over Cypher,User: 📅 2026-10-01
+    Note over Cypher,Bob: 📅 2026-10-01
     Neo->>User: "swe handoff"
     Note right of Neo: "*swe impl new Jev game:<br/>War (games/war/ +<br/>tools/war/, mechanical<br/>bot - no decision to<br/>judge, computed phase<br/>like Gin). Real bugs<br/>found+fixe…"
     Neo->>User: "swe blocked"
@@ -196,4 +197,27 @@ sequenceDiagram
     Note right of Morpheus: "*lead review PASSED.<br/>Rule-key consistency<br/>verified across BUILTIN_<br/>RULES/RULE_QUESTIONS/tra<br/>ce_rules.json (exact<br/>match, no KeyError<br/>risk). Cl…"
     Neo->>User: "swe update"
     Note right of Neo: "Gap closed:<br/>TYPESAFE_API_KEY was<br/>present all along (my<br/>earlier env -u test for<br/>the fallback path got<br/>mistaken for 'no key').<br/>Real Jev judgi…"
+    Trin->>Smith: "qa judge"
+    Note right of Trin: "*qa judge general (run<br/>trace and evals) -<br/>running agents/tools/tra<br/>ce_annotate.py for real<br/>(Jev-judged, not --no-<br/>jev) against today's own<br/>li…"
+    Smith->>Neo: "user feedback"
+    Note right of Smith: "Score: 80. 2 real tool<br/>bugs (AP-ONEOFF-SCRIPT<br/>false-positives on<br/>quoted free text + a<br/>missing flag-dedup),<br/>cataloged in<br/>bugs_trace_annotate…"
+    Neo->>Bob: "swe handoff"
+    Note right of Neo: "Both bugs fixed<br/>(quote/heredoc stripping<br/>+ flag dedup), mutation-<br/>proven, 4 new regression<br/>tests (24/24 green).<br/>Also fixed a test-<br/>quality bu…"
+    Bob->>Trin: "prompt update"
+    Note right of Bob: "No prompt/skill wording<br/>changes needed - both<br/>bugs were pure code<br/>defects (regex scope,<br/>missing dedup), already-<br/>correct SKILL.md<br/>guidance w…"
+    Trin->>All: "qa done"
+    Note right of Trin: "Verification complete.<br/>Confirmed via the new<br/>regression tests, not a<br/>fresh full-session score<br/>(deliberate, per the<br/>live-session rule).<br/>Both…"
+    Note over Cypher,Bob: 📅 2026-10-02
+    Neo->>Trin: "swe impl"
+    Note right of Neo: "*swe impl: applying 2<br/>backlogged items (direct<br/>user request, 'apply the<br/>backlogged improvements'<br/>-> confirmed scope: just<br/>today's two). 1)…"
+    Trin->>Morpheus: "qa handoff"
+    Note right of Trin: "*qa uat PASSED (backlog<br/>item 1/2): via-<br/>availability signal.<br/>26/26 tests, mutation-<br/>proven, REAL Jev call<br/>confirms discrimination<br/>(same symbo…"
+    Morpheus->>Neo: "lead review"
+    Note right of Morpheus: "*lead review PASSED.<br/>via_context computed<br/>ONCE per session (not<br/>per-candidate), reused<br/>via dict-merge - no<br/>redundant<br/>shutil.which/event-sca…"
+    Trin->>Morpheus: "qa handoff"
+    Note right of Trin: "*qa uat PASSED (backlog<br/>item 2/2): jev-game-<br/>master. 5 real browser<br/>tests (real CLI, real<br/>spawn), 1208 unit suite<br/>unaffected. Found+fixed<br/>a…"
+    Morpheus->>Neo: "lead review"
+    Note right of Morpheus: "*lead review PASSED,<br/>with one real fix<br/>applied during review:<br/>jevGameMaster.mjs had<br/>its own hand-written<br/>preset-name map,<br/>duplicating knowl…"
+    Neo->>User: "swe done"
+    Note right of Neo: "Both backlogged<br/>improvements applied,<br/>reviewed, verified. jev-<br/>game-master: a real arch<br/>improvement landed in<br/>review too (preset-name<br/>map co…"
 ```
