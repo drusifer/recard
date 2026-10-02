@@ -14,12 +14,52 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { URL, fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import { startLocalPeerServer } from '../../tools/localPeerServer.mjs';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webp': 'image/webp', '.svg': 'image/svg+xml' };
 const SYSTEM_CHROMIUM_PATHS = ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'];
 const JOIN_TIMEOUT_MS = 20_000;
 const VIEW_TIMEOUT_MS = 15_000;
+const LOCAL_PEER_PORT = 9000;
+
+// Real WebRTC, but signaled through a LOCAL broker by default (see
+// `tools/localPeerServer.mjs`) rather than the public one - every
+// browser test file that opens a table through this harness gets it for
+// free. One shared server per test-file process, started lazily on
+// first use; `realBroker: true` (on `hostTable`/`joinTable`/`createTable`)
+// opts a specific call back out, for the one suite that still has to
+// prove the real public broker isn't broken.
+const localPeer = { promise: undefined };
+function ensureLocalPeerServer() {
+  localPeer.promise ??= startLocalPeerServer(LOCAL_PEER_PORT);
+  return localPeer.promise;
+}
+
+/**
+ * The shared local signaling server's own `{ queryString, close() }`,
+ * starting it if this file's process hasn't yet. For a test that spawns
+ * a REAL CLI as a separate process (`jev-player`, `jev-game-master`) to
+ * join a table this process is hosting in-browser: that CLI defaults to
+ * the public broker (D172), so its own `--url` needs this query string
+ * appended too, or it will never find a host signaling locally.
+ */
+export function localPeerServer() {
+  return ensureLocalPeerServer();
+}
+
+/**
+ * Shuts down the shared local signaling server, if this file's process
+ * ever started one. Every test file's `after()` calls this once,
+ * alongside closing its own static server/browser - harmless, and
+ * necessary, even for a file whose tests never opened a table.
+ */
+export async function closeLocalPeerServer() {
+  if (!localPeer.promise) return;
+  const server = await localPeer.promise;
+  localPeer.promise = undefined;
+  await server.close();
+}
 
 /**
  * Serves the repo root statically on `port`; resolves `{ baseUrl, close() }`.
@@ -213,18 +253,19 @@ class HarnessPeer {
  * a geometry assertion measures where a card IS rather than racing its
  * travel. A test about the motion itself passes `motion: true`.
  */
-async function openPeer(browser, baseUrl) {
+async function openPeer(browser, baseUrl, { realBroker = false } = {}) {
   const context = await browser.newContext();
   const page = await context.newPage();
-  await page.goto(baseUrl);
+  const url = realBroker ? baseUrl : baseUrl + (await ensureLocalPeerServer()).queryString;
+  await page.goto(url);
   return { peer: new HarnessPeer(page), context };
 }
 
 /**
  * Hosts a new table (not dealt yet). Resolves `{ host, code, close() }`.
  */
-export async function hostTable({ browser, baseUrl, preset, spectate }) {
-  const { peer: host, context } = await openPeer(browser, baseUrl);
+export async function hostTable({ browser, baseUrl, preset, spectate, realBroker }) {
+  const { peer: host, context } = await openPeer(browser, baseUrl, { realBroker });
   await host.page.click('#show-host');
   if (preset) await host.page.selectOption('#host-preset', { label: preset });
   // US-124: host the table without taking a seat in the game.
@@ -241,8 +282,8 @@ export async function hostTable({ browser, baseUrl, preset, spectate }) {
  * table someone else is hosting). Resolves `{ peer, close() }` once the
  * join is sent; the host decides when it is seated.
  */
-export async function joinTable({ browser, baseUrl, code, name, role }) {
-  const { peer, context } = await openPeer(browser, baseUrl);
+export async function joinTable({ browser, baseUrl, code, name, role, realBroker }) {
+  const { peer, context } = await openPeer(browser, baseUrl, { realBroker });
   await peer.page.click('#show-join');
   await peer.page.fill('#join-name', name);
   await peer.page.fill('#join-code', code);
@@ -278,12 +319,12 @@ export async function dealTable(host, guests, { players, cardsPerPlayer }) {
  * joined by the real table code, then started with a real Deal of
  * `cardsPerPlayer`. Resolves `{ host, guests, close() }`.
  */
-export async function createTable({ browser, baseUrl, players, preset, cardsPerPlayer, spectate }) {
-  const hosted = await hostTable({ browser, baseUrl, preset, spectate });
+export async function createTable({ browser, baseUrl, players, preset, cardsPerPlayer, spectate, realBroker }) {
+  const hosted = await hostTable({ browser, baseUrl, preset, spectate, realBroker });
   const closers = [hosted.close];
   const guests = [];
   for (let index = 1; index < players; index++) {
-    const joined = await joinTable({ browser, baseUrl, code: hosted.code, name: `Guest ${index}` });
+    const joined = await joinTable({ browser, baseUrl, code: hosted.code, name: `Guest ${index}`, realBroker });
     closers.push(joined.close);
     guests.push(joined.peer);
   }

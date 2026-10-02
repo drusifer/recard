@@ -27,6 +27,7 @@ import { randomUUID } from 'node:crypto';
 import { fileURLToPath, URL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { launchChromium, startStaticServer, hostTable } from '../tests/harness/multiplayer.mjs';
+import { startLocalPeerServer } from './localPeerServer.mjs';
 import { GAMES, gameDirectory } from './jev/games.mjs';
 import { loadTable } from './jev/tableFile.mjs';
 import { setupSteps, botArguments } from './jev/tableSetup.mjs';
@@ -56,6 +57,8 @@ const { values: options } = parseArgs({
     score: { type: 'string' }, // starting score each seat is set to; defaults to the table file
     steps: { type: 'string' }, // decisions each bot's RUN may take; defaults to the table file
     port: { type: 'string', default: '8230' },
+    'local-peer': { type: 'boolean', default: false }, // signal over a local PeerServer instead of the public broker (D172)
+    'peer-port': { type: 'string', default: '9000' },
   },
 });
 
@@ -158,7 +161,7 @@ function signalAndWait(signal, pids, ms) {
  *  after the grace period - a bot that never answers, not the normal
  *  path. Every step is optional: shutdown runs from whatever point
  *  setup reached, including before a table or any bot exists. */
-async function shutdown({ host, closeTable, closeBrowser, closeServer, bots }) {
+async function shutdown({ host, closeTable, closeBrowser, closeServer, closePeerServer, bots }) {
   if (host) {
     try {
       await withTimeout(host.say('jev-table: closing the table - thanks for the game.', { kind: 'quit', requestId: randomUUID() }), 5000);
@@ -178,9 +181,10 @@ async function shutdown({ host, closeTable, closeBrowser, closeServer, bots }) {
   await closeTable?.();
   await closeBrowser?.();
   await closeServer?.();
+  await closePeerServer?.();
 }
 
-const resources = { host: null, closeTable: null, closeBrowser: null, closeServer: null, bots: [] };
+const resources = { host: null, closeTable: null, closeBrowser: null, closeServer: null, closePeerServer: null, bots: [] };
 // ONE shutdown, however it is reached: Ctrl-C and "every bot has left" both
 // land here, and two running side by side both closing the table, the
 // browser and the server was observed to hang the exit.
@@ -200,10 +204,24 @@ try {
   const browser = await launchChromium({ handleSIGINT: false });
   resources.closeBrowser = browser.close.bind(browser);
 
-  const hosted = await hostTable({ browser, baseUrl: server.baseUrl, preset: setup.preset, spectate: true });
+  // Public broker by default (unlike the test harness, which signals
+  // locally by default): `--local-peer` opts in, starting ONE local
+  // PeerServer here and folding its query string into the `baseUrl`
+  // passed to the table AND every spawned bot below (D172). `realBroker:
+  // true` always - the broker choice lives entirely in `baseUrl` itself,
+  // not in `hostTable`'s own default, since a spawned bot is a SEPARATE
+  // process that would otherwise start its own redundant local server.
+  let baseUrl = server.baseUrl;
+  if (options['local-peer']) {
+    const peerServer = await startLocalPeerServer(Number(options['peer-port']));
+    resources.closePeerServer = peerServer.close;
+    baseUrl += peerServer.queryString;
+    note(`signaling locally on port ${options['peer-port']} (--local-peer)`);
+  }
+  const hosted = await hostTable({ browser, baseUrl, preset: setup.preset, spectate: true, realBroker: true });
   resources.host = hosted.host;
   resources.closeTable = hosted.close;
-  note(`table ${hosted.code} at ${server.baseUrl} - join it in a real browser to watch, or ask the harness MCP tools to.`);
+  note(`table ${hosted.code} at ${baseUrl} - join it in a real browser to watch, or ask the harness MCP tools to.`);
 
   const view = await hosted.host.view();
   const deckId = options.deck ?? view.piles.find((pile) => pile.kind === 'deck')?.id;
@@ -211,7 +229,7 @@ try {
   // without running the try's cleanup - throw so the catch below does.
   if (!deckId) throw new Error('no deck pile found on this table - pass DECK=<pile id>');
 
-  resources.bots = players.map((strategy, seat) => spawnBot(strategy, seat, hosted.code, server.baseUrl, deckId));
+  resources.bots = players.map((strategy, seat) => spawnBot(strategy, seat, hosted.code, baseUrl, deckId));
   note(`seating ${players.join(', ')}...`);
 
   await hosted.host.waitForView((current, count) => current.players.filter((player) => player.role === 'player').length >= count,

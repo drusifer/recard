@@ -220,4 +220,6 @@ sequenceDiagram
     Note right of Morpheus: "*lead review PASSED,<br/>with one real fix<br/>applied during review:<br/>jevGameMaster.mjs had<br/>its own hand-written<br/>preset-name map,<br/>duplicating knowl…"
     Neo->>User: "swe done"
     Note right of Neo: "Both backlogged<br/>improvements applied,<br/>reviewed, verified. jev-<br/>game-master: a real arch<br/>improvement landed in<br/>review too (preset-name<br/>map co…"
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "*impl D172 (local WebRTC<br/>signaling) done, not<br/>committed: tests default<br/>local broker, jev tools<br/>stay public-default<br/>(--local-peer opt-in).<br/>R…"
 ```

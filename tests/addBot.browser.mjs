@@ -7,7 +7,7 @@
 // `npm run test:addbot` / `bobp make test-addbot`.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchChromium, startStaticServer, hostTable, joinTable } from './harness/multiplayer.mjs';
+import { launchChromium, startStaticServer, hostTable, joinTable, closeLocalPeerServer } from './harness/multiplayer.mjs';
 
 const PORT = 8221; // not 8211-8220 (every other browser test file)
 const STRATEGIES = [{ name: 'equilibrium', description: 'balanced' }, { name: 'defensive', description: 'blocks the opponent' }];
@@ -24,6 +24,7 @@ after(async () => {
   for (const close of fixture.closers.toReversed()) await close();
   await fixture.browser?.close();
   await fixture.server?.close();
+  await closeLocalPeerServer();
 });
 
 const controlHidden = () => fixture.hosted.host.page.$eval('add-bot', (element) => element.hidden);

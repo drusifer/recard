@@ -6,7 +6,7 @@
 // `npm run test:motion` / `bobp make test-motion`.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchChromium, startStaticServer, createTable } from './harness/multiplayer.mjs';
+import { launchChromium, startStaticServer, createTable, closeLocalPeerServer } from './harness/multiplayer.mjs';
 
 const PORT = 8224; // not 8211-8223 (every other browser test file)
 const CARDS = 5;
@@ -24,6 +24,7 @@ after(async () => {
   await fixture.table?.close();
   await fixture.browser?.close();
   await fixture.server?.close();
+  await closeLocalPeerServer();
 });
 
 const handOf = (view, ownerId) => view.piles.find((pile) => pile.kind === 'hand' && pile.ownerId === ownerId);

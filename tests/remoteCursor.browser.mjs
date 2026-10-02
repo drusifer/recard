@@ -12,7 +12,7 @@
 // `npm run test:remotecursor` / `bobp make test-remotecursor`.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchChromium, startStaticServer, createTable } from './harness/multiplayer.mjs';
+import { launchChromium, startStaticServer, createTable, closeLocalPeerServer } from './harness/multiplayer.mjs';
 
 const PORT = 8232; // not 8211-8231 (every other browser test file)
 const CARDS_PER_PLAYER = 5;
@@ -32,6 +32,7 @@ after(async () => {
   await fixture.table?.close();
   await fixture.browser?.close();
   await fixture.server?.close();
+  await closeLocalPeerServer();
 });
 
 async function remoteCursorBox(viewerPeer, ownerId) {

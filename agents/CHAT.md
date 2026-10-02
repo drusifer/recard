@@ -702,3 +702,21 @@ lint:decks — 15 deck(s) balanced
 ---
 [<small>2026-10-02 01:31:46</small>] [**Neo**]->[**User**] *swe done*:
  Both backlogged improvements applied, reviewed, verified. jev-game-master: a real arch improvement landed in review too (preset-name map consolidated into games.mjs). Everything green, nothing committed - awaiting the user.
+
+---
+[<small>2026-10-02 17:44:37</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-fast | /home/drusifer/Projects/recard/build/build.out
+
+> lint:style
+> stylelint style.css
+
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-10-02 17:45:12</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ *impl D172 (local WebRTC signaling) done, not committed: tests default local broker, jev tools stay public-default (--local-peer opt-in). Real finding: peer pkg leaks setIntervals, fixed via CLI-as-child-process. 1211/1211 unit, lint clean. Could NOT live-verify 2-peer connect in this sandbox (pre-existing, see state.md). @Trin *qa uat D172

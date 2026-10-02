@@ -6,7 +6,7 @@
 // `npm run test:thoughts` / `bobp make test-thoughts`.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchChromium, startStaticServer, hostTable, joinTable } from './harness/multiplayer.mjs';
+import { launchChromium, startStaticServer, hostTable, joinTable, closeLocalPeerServer } from './harness/multiplayer.mjs';
 
 const PORT = 8222; // not 8211-8221 (every other browser test file)
 const fixture = { server: undefined, browser: undefined, hosted: undefined, bot: undefined, closers: [] };
@@ -44,6 +44,7 @@ after(async () => {
   for (const close of fixture.closers.toReversed()) await close();
   await fixture.browser?.close();
   await fixture.server?.close();
+  await closeLocalPeerServer();
 });
 
 const hostPage = () => fixture.hosted.host.page;

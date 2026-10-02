@@ -6,7 +6,7 @@
 // `npm run test:multiplayer` / `bobp make test-multiplayer`.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchChromium, startStaticServer, createTable } from './harness/multiplayer.mjs';
+import { launchChromium, startStaticServer, createTable, closeLocalPeerServer } from './harness/multiplayer.mjs';
 
 const PORT = 8219; // not 8211-8218 (every other browser test file)
 const CARDS_PER_PLAYER = 5;
@@ -25,6 +25,7 @@ after(async () => {
   await fixture.table?.close();
   await fixture.browser?.close();
   await fixture.server?.close();
+  await closeLocalPeerServer();
 });
 
 function handPileOf(view, ownerId) {

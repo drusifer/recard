@@ -7,7 +7,7 @@
 // `npm run test:gin` / `bobp make test-gin`.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchChromium, startStaticServer, hostTable, joinTable, dealTable } from './harness/multiplayer.mjs';
+import { launchChromium, startStaticServer, hostTable, joinTable, dealTable, closeLocalPeerServer } from './harness/multiplayer.mjs';
 import { GinBot } from '../tools/gin/bot.mjs';
 import { knockEarly } from '../tools/gin/strategies.mjs';
 
@@ -27,6 +27,7 @@ after(async () => {
   await Promise.all(fixture.closers.map((close) => close()));
   await fixture.browser?.close();
   await fixture.server?.close();
+  await closeLocalPeerServer();
 });
 
 /**

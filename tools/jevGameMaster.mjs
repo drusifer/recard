@@ -52,7 +52,10 @@ async function run() {
   const browser = await launchChromium();
   try {
     note(`joining ${options.code} as "${options.name}" (spectator)`);
-    const { peer } = await joinTable({ browser, baseUrl, code: options.code, name: options.name, role: 'spectator' });
+    // realBroker: true - see jev/runner.mjs's own comment: a jev tool
+    // defaults to the public broker, and whichever broker is actually
+    // reachable lives entirely in `baseUrl` itself.
+    const { peer } = await joinTable({ browser, baseUrl, code: options.code, name: options.name, role: 'spectator', realBroker: true });
     try {
       await peer.waitForSeat({ timeout: SEAT_TIMEOUT_MS });
     } catch (error) {

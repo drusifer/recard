@@ -11,8 +11,13 @@
  */
 
 import { createTrafficLog } from './trafficLog.js';
+import { peerOptionsFromSearch } from './peerOptions.js';
 
 const PeerCtor = () => globalThis.Peer;
+// `undefined` (location unavailable, e.g. node:test) or no `peerHost`
+// param -> `undefined`, which PeerJS reads the same as "no options at
+// all" (its own public broker) - every existing caller is unchanged.
+const localPeerOptions = () => peerOptionsFromSearch(globalThis.location?.search);
 
 // Excludes visually-ambiguous characters (0/O, 1/I) since this is read
 // and typed by people, not just copy-pasted (Smith Gate-close finding:
@@ -73,7 +78,7 @@ export class Session {
     // rejoin with the code they already hold. The broker may refuse it
     // (still held, or since taken) - that rejects `ready()`, and the
     // caller falls back to a fresh code rather than failing outright.
-    const peer = new Peer(code || generateShortCode());
+    const peer = new Peer(code || generateShortCode(), localPeerOptions());
     session.peer = peer;
     session.selfId = null;
     session.selfName = name;
@@ -99,7 +104,7 @@ export class Session {
   static join(hostId, { name, playerKey, role }) {
     const session = new Session('join');
     const Peer = PeerCtor();
-    const peer = new Peer();
+    const peer = new Peer(localPeerOptions());
     session.peer = peer;
     session.selfName = name;
 

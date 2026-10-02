@@ -7,7 +7,7 @@
 #
 # Adding a task: add the npm script first, then a one-line target here.
 
-.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-layoutsave test-buildermenu test-resume check-fast test-tablezoom test-focuszoom test-multiplayer test-remotecursor test-harness-mcp test-gin test-jev-runner test-jev-game-master test-jevtable test-actionmenu test-zonepanel test-headeractions test-pileelement test-reconnect jev-player jev-game-master jev-library jev-library-doc jev-readme jev-table secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers dead-code
+.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-layoutsave test-buildermenu test-resume check-fast test-tablezoom test-focuszoom test-multiplayer test-realbroker test-remotecursor test-harness-mcp test-gin test-jev-runner test-jev-game-master test-jevtable test-actionmenu test-zonepanel test-headeractions test-pileelement test-reconnect jev-player jev-game-master jev-library jev-library-doc jev-readme jev-table secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers dead-code
 
 help:
 	@echo "Recard targets (all front npm scripts):"
@@ -22,6 +22,7 @@ help:
 	@echo "  test-tablezoom  Infinity Table: manual zoom dial + S/M/L/XL presets"
 	@echo "  test-focuszoom  Infinity Table: focus-zoom grow-pile-in-place mechanism"
 	@echo "  test-multiplayer  host + 2 guests driven over the real protocol (US-118 harness)"
+	@echo "  test-realbroker  the one suite that still runs over the real public PeerJS broker, not the local default (D172)"
 	@echo "  test-remotecursor  remote cursor glides onto the pile it enters, across two real peers (US-146)"
 	@echo "  test-harness-mcp  the harness MCP server over its real stdio transport (US-119)"
 	@echo "  test-gin      a Gin bot joins a hosted table, draws and knocks out loud (US-120)"
@@ -90,6 +91,9 @@ test-focuszoom:
 
 test-multiplayer:
 	npm run test:multiplayer
+
+test-realbroker:
+	npm run test:realbroker
 
 test-remotecursor:
 	npm run test:remotecursor

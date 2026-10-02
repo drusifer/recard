@@ -11,7 +11,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { fileURLToPath, URL } from 'node:url';
-import { launchChromium, startStaticServer, hostTable, dealTable } from './harness/multiplayer.mjs';
+import { launchChromium, startStaticServer, hostTable, dealTable, localPeerServer, closeLocalPeerServer } from './harness/multiplayer.mjs';
 import { GOODBYE } from '../tools/jev/runner.mjs';
 
 const PORT = 8223; // not 8211-8222 (other browser test files / the MCP server)
@@ -28,14 +28,19 @@ after(async () => {
   for (const close of fixture.closers.toReversed()) await close();
   await fixture.browser?.close();
   await fixture.server?.close();
+  await closeLocalPeerServer();
 });
 
 /**
  * Starts the real CLI against `code`. Resolves its exit once it ends;
  * `stderr` collects what it printed, for the failure message.
  */
-function startPlayer(code, ...cliArguments) {
-  const child = spawn(process.execPath, [CLI, '--code', code, '--url', fixture.server.baseUrl, ...cliArguments], {
+async function startPlayer(code, ...cliArguments) {
+  // The real CLI defaults to the public broker (D172) - this test's host
+  // is on the local one (this file's own default), so its `--url` needs
+  // that server's query string too, or the two would never find each other.
+  const peer = await localPeerServer();
+  const child = spawn(process.execPath, [CLI, '--code', code, '--url', fixture.server.baseUrl + peer.queryString, ...cliArguments], {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   const player = { child, stderr: '' };
@@ -69,7 +74,7 @@ const readyFrom = (game) => (entry) => entry.data?.kind === 'jev-ready' && entry
 
 test('Gin: a rule-list bot joins through the runner, offers both kinds of strategy, and plays real moves (C1)', async () => {
   const { host, code } = await hostFor('Gin Rummy');
-  const player = startPlayer(code, '--game', 'gin', '--strategy', 'knock-early');
+  const player = await startPlayer(code, '--game', 'gin', '--strategy', 'knock-early');
   const ready = await heard(host, readyFrom('gin'), 'the jev-ready announcement', player);
   const offered = ready.data.strategies.map((each) => each.name);
   assert.ok(offered.includes('knock-early') && offered.includes('jev-balanced'), `offers both kinds: ${offered}`);
@@ -86,7 +91,7 @@ test('Gin: a rule-list bot joins through the runner, offers both kinds of strate
 
 test('Gin: asked to leave before any deal, it says goodbye and exits cleanly (C4)', async () => {
   const { host, code } = await hostFor('Gin Rummy');
-  const player = startPlayer(code, '--game', 'gin', '--strategy', 'knock-early');
+  const player = await startPlayer(code, '--game', 'gin', '--strategy', 'knock-early');
   await heard(host, readyFrom('gin'), 'the jev-ready announcement', player);
   await host.say('knock-early, you can go', { kind: 'quit', requestId: 'q-1', target: 'knock-early' });
   const goodbye = await heard(host, (entry) => entry.data?.kind === 'quit-result', 'a goodbye', player);
@@ -99,7 +104,7 @@ test('RtG: now answers "add a bot" and "leave" like every game - the gap US-128 
   skip: !process.env.TYPESAFE_API_KEY && 'RtG judges every turn with Jev: set TYPESAFE_API_KEY',
 }, async () => {
   const { host, code } = await hostFor('Recard the Gathering');
-  const player = startPlayer(code, '--game', 'rtg', '--strategy', 'rules');
+  const player = await startPlayer(code, '--game', 'rtg', '--strategy', 'rules');
   const ready = await heard(host, readyFrom('rtg'), 'the jev-ready announcement', player);
   // US-129 AC7: every file in games/rtg/players/ is offered, with its description.
   assert.deepEqual(ready.data.strategies.map((each) => each.name), ['aggressive', 'rules']);

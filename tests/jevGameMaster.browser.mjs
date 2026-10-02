@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { fileURLToPath, URL } from 'node:url';
-import { launchChromium, startStaticServer, hostTable } from './harness/multiplayer.mjs';
+import { launchChromium, startStaticServer, hostTable, localPeerServer, closeLocalPeerServer } from './harness/multiplayer.mjs';
 
 const PORT = 8224; // not 8211-8223 (other browser test files / the MCP server / jevRunner's own)
 const CLI = fileURLToPath(new URL('../tools/jevGameMaster.mjs', import.meta.url));
@@ -27,10 +27,17 @@ after(async () => {
   for (const close of fixture.closers.toReversed()) await close();
   await fixture.browser?.close();
   await fixture.server?.close();
+  await closeLocalPeerServer();
 });
 
-function startMaster(code, ...cliArguments) {
-  const child = spawn(process.execPath, [CLI, '--code', code, '--url', fixture.server.baseUrl, ...cliArguments], {
+async function startMaster(code, ...cliArguments) {
+  // The real CLI defaults to the public broker (D172) - this test's host
+  // is on the local one (this file's own default), so its `--url` needs
+  // that server's query string too. Any bot IT spawns in turn (the
+  // grandchild-process test below) inherits the same `baseUrl` verbatim
+  // (`jev/runner.mjs`'s `spawnRunner`), so this one fix covers both.
+  const peer = await localPeerServer();
+  const child = spawn(process.execPath, [CLI, '--code', code, '--url', fixture.server.baseUrl + peer.queryString, ...cliArguments], {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   const proc = { child, stderr: '' };
@@ -77,7 +84,7 @@ async function quit(host, master, name) {
 
 test('joins as a spectator, detects War from the table, and announces mechanical without being told the game', async () => {
   const { host, code } = await hostFor('War');
-  const master = startMaster(code);
+  const master = await startMaster(code);
 
   const ready = await heard(host, (entry) => entry.data?.kind === 'jev-ready', 'jev-ready announcement', master);
   assert.deepEqual(ready.data.games, ['war']);
@@ -94,7 +101,7 @@ test('joins as a spectator, detects War from the table, and announces mechanical
 
 test('answers a real "add a bot" request by spawning the real jevPlayer CLI, which joins and plays', async () => {
   const { host, code } = await hostFor('War');
-  const master = startMaster(code);
+  const master = await startMaster(code);
   await heard(host, (entry) => entry.data?.kind === 'jev-ready', 'jev-ready announcement', master);
 
   const requestId = randomUUID();
@@ -120,7 +127,7 @@ test('answers a real "add a bot" request by spawning the real jevPlayer CLI, whi
 
 test('a refused request (unknown strategy) is answered with a clear reason, not silently dropped', async () => {
   const { host, code } = await hostFor('War');
-  const master = startMaster(code);
+  const master = await startMaster(code);
   await heard(host, (entry) => entry.data?.kind === 'jev-ready', 'jev-ready announcement', master);
 
   const requestId = randomUUID();
@@ -136,7 +143,7 @@ test('a refused request (unknown strategy) is answered with a clear reason, not 
 
 test('asked to leave by name, it answers and actually exits', async () => {
   const { host, code } = await hostFor('War');
-  const master = startMaster(code);
+  const master = await startMaster(code);
   await heard(host, (entry) => entry.data?.kind === 'jev-ready', 'jev-ready announcement', master);
 
   const requestId = randomUUID();
@@ -148,7 +155,7 @@ test('asked to leave by name, it answers and actually exits', async () => {
 
 test('a preset with no Jev player (Hearts) is refused up front, not a silent hang', async () => {
   const { code } = await hostFor('Hearts');
-  const master = startMaster(code);
+  const master = await startMaster(code);
   const status = await master.exited;
   // UsageError -> exit 2, same convention as jevPlayer.mjs's own "seated
   // as a spectator" refusal - this table can't do what the CLI came to

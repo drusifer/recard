@@ -7,7 +7,7 @@
 // `npm run test:spectator` / `bobp make test-spectator`.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchChromium, startStaticServer, hostTable, joinTable } from './harness/multiplayer.mjs';
+import { launchChromium, startStaticServer, hostTable, joinTable, closeLocalPeerServer } from './harness/multiplayer.mjs';
 
 const PORT = 8220; // not 8211-8219 (every other browser test file)
 const fixture = { server: undefined, browser: undefined, hosted: undefined, closers: [] };
@@ -23,6 +23,7 @@ after(async () => {
   for (const close of fixture.closers.toReversed()) await close();
   await fixture.browser?.close();
   await fixture.server?.close();
+  await closeLocalPeerServer();
 });
 
 const roleOf = (view, id) => view.players.find((p) => p.id === id)?.role;

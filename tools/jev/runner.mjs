@@ -160,7 +160,12 @@ export async function run(adapter, options) {
     const logFile = path.join(logDirectory, `${new Date().toISOString().replaceAll(':', '-')}-${strategy.name}.jsonl`);
     note(`joining ${options.code} as "${name}" (${strategy.description})`);
     note(`log ${logFile}`);
-    const { peer } = await joinTable({ browser, baseUrl, code: options.code, name });
+    // `realBroker: true`: a jev player defaults to the PUBLIC broker,
+    // unlike the test harness's own default - and whichever broker a
+    // table is actually reachable on lives entirely in `baseUrl` itself
+    // (plain, or carrying `--local-peer`'s query string from `jevTable.
+    // mjs`/a human's own local setup), never in this call's own default.
+    const { peer } = await joinTable({ browser, baseUrl, code: options.code, name, realBroker: true });
     try {
       await peer.waitForSeat({ timeout: SEAT_TIMEOUT_MS });
     } catch (error) {

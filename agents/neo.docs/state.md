@@ -1533,3 +1533,69 @@ layout, which is exactly the kind of change this project's own
 protocol wants a second set of eyes on before it lands. If Trin
 passes, this is still `*fix`-shaped (found live, root-caused, fixed,
 verified) - no Smith/retro/launch ceremony needed, just commit + push.
+
+## D172 — local WebRTC signaling path for tests/experiments (2026-10-02)
+
+**Status: implemented, unit-verified, NOT committed.** Direct user
+request via `*impl`: a local PeerJS signaling server so tests/jev-tools
+don't depend on the public broker.
+
+**Design (confirmed with the user before implementing):**
+- Test harness (`tests/harness/multiplayer.mjs`) defaults to a LOCAL
+  broker for every `hostTable`/`joinTable`/`createTable` call (a lazy
+  per-process singleton, `tools/localPeerServer.mjs`). `realBroker: true`
+  opts a call back out.
+- jev tools (`jevTable.mjs`, `jev/runner.mjs`, `jevGameMaster.mjs`)
+  default to the PUBLIC broker (unchanged) and always pass
+  `realBroker: true` - the broker choice lives entirely in `baseUrl`
+  itself, never in the shared helper's default (bots are SEPARATE
+  processes; a per-process default-local singleton would collide).
+  `jevTable.mjs` gained `--local-peer`/`--peer-port` to opt a whole
+  table (host + every spawned bot, same `baseUrl`) onto the local one.
+- `src/session.js` is the one touchpoint (per ARCHITECTURE.md): a new
+  pure `src/peerOptions.js` (`peerOptionsFromSearch`, unit-tested,
+  TDD'd first) reads `?peerHost=...` off the URL and feeds it to
+  `new Peer()`; absent, behavior is byte-for-byte unchanged (public
+  broker).
+- Kept exactly one suite on the real public broker:
+  `tests/realBroker.browser.mjs` / `make test-realbroker`.
+
+**Real finding mid-impl:** the `peer` npm package's `PeerServer()` API
+starts two `setInterval`s with no public stop - `http.Server.close()`
+was NOT enough to let the process exit (confirmed hanging
+indefinitely, checked live with `_getActiveHandles()`). Switched
+`tools/localPeerServer.mjs` to spawn the package's own `peerjs` CLI as
+a child process instead and control it by SIGTERM/SIGKILL - sidesteps
+the leak entirely, confirmed exits cleanly.
+
+**Also had to fix a real cross-process bug this design would otherwise
+have shipped with:** `tests/jevRunner.browser.mjs` and
+`tests/jevGameMaster.browser.mjs` spawn the REAL CLI as a child process
+to join a table this file hosts in-browser (default: local broker). The
+CLI itself now defaults to public broker - without passing it the
+shared local server's query string too, host and bot would never have
+found each other. Fixed both (`localPeerServer()` now exported from
+`multiplayer.mjs` for exactly this); the grandchild bot a game-master
+spawns inherits the same fixed `baseUrl` for free (existing
+`spawnRunner` plumbing).
+
+**Verified:** 1211/1211 unit (+ new `tests/peerOptions.test.js`),
+`lint:js` clean (3 real findings fixed: a useless `undefined` return, a
+missing `URL` import, and a top-level-reassignment-from-function the
+project's own eslint config deliberately does NOT blanket-exempt - used
+an object-property pattern instead), `make check-fast` PASSED.
+
+**NOT verified - disclosed, not hidden:** could not live-verify an
+actual two-peer WebRTC connection (local OR public broker) in this
+sandbox - `tests/multiplayer.browser.mjs` times out waiting for a
+connected guest on BOTH the unmodified `dev` branch (public broker,
+confirmed via `git stash`) and this change (local broker), same
+line/timeout both times. Pre-existing, already-disclosed sandbox
+WebRTC constraint (BACKLOG.md), not something this work introduced -
+but it does mean the actual signaling-and-connect path is only
+syntax/unit verified here, not live. Flagging for Trin/a real machine.
+
+## Next Steps
+Hand off to Trin (`*qa uat`) - needs a real machine (or a sandbox with
+working loopback WebRTC) to actually exercise the live two-peer path
+this change is FOR, since this one couldn't. Nothing committed yet.

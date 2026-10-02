@@ -11,7 +11,7 @@
 // NOT part of `npm test` - needs a browser. `npm run test:reconnect`.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchChromium, startStaticServer, hostTable, joinTable } from './harness/multiplayer.mjs';
+import { launchChromium, startStaticServer, hostTable, joinTable, closeLocalPeerServer } from './harness/multiplayer.mjs';
 
 const PORT = 8230; // not 8211-8229 (every other browser test file)
 const fixture = { server: undefined, browser: undefined };
@@ -24,6 +24,7 @@ before(async () => {
 after(async () => {
   await fixture.browser?.close();
   await fixture.server?.close();
+  await closeLocalPeerServer();
 });
 
 /**
