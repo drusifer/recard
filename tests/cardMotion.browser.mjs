@@ -17,7 +17,16 @@ before(async () => {
   // This suite is ABOUT the motion, so it keeps it (every other browser
   // suite runs with reduced motion forced on - see `launchChromium`).
   fixture.browser = await launchChromium({ motion: true });
-  fixture.table = await createTable({ browser: fixture.browser, baseUrl: fixture.server.baseUrl, players: 2, cardsPerPlayer: CARDS });
+  // D172 finding: an explicit preset, not the implicit default - `War`
+  // (added after this suite) deals into a `playerPileKind: 'deck'` pile
+  // BY DESIGN (its own comment: a War player never looks at their pile),
+  // which never feeds `view.myHand` - and became the default preset by
+  // being first in `presets.js`, silently breaking every preset-less
+  // `createTable()`/`dealTable()` call (confirmed: predates this
+  // suite's own changes, not introduced here). `createTable` always
+  // calls `dealTable`, which asserts on `myHand`, so a hand-kind preset
+  // is required - not a change to what this suite is actually testing.
+  fixture.table = await createTable({ browser: fixture.browser, baseUrl: fixture.server.baseUrl, preset: 'Gin Rummy', players: 2, cardsPerPlayer: CARDS });
 });
 
 after(async () => {

@@ -529,3 +529,64 @@ Restoring the fix passes clean. The fix is real, not incidental.
 
 ## Next Steps
 @Morpheus *lead review phase-114.
+
+## D172 UAT (2026-10-02): PASSED, with a real pre-existing bug found and root-caused
+
+Picked up Neo's handoff (local WebRTC signaling). Neo had disclosed
+"could not live-verify a 2-peer connection in this sandbox" - ran that
+down rather than accepting it.
+
+**Found: raw `RTCPeerConnection` data channels connect fine here** - the
+sandbox DOES support WebRTC. So the earlier "sandbox WebRTC flakiness"
+conclusion was wrong; something else was failing. Traced it with real
+diagnostics (page console/error listeners, DOM queries, polling view()
+over time) instead of guessing:
+
+1. Host+guest DO connect over both the local and public broker (`view.
+   players` shows both `connected`). `startGame()`'s `DEAL` dispatch DOES
+   run and DOES put cards in the hand pile. What never populates is
+   `view.myHand` - and every multiplayer test's `dealTable()` helper
+   waits on exactly that field.
+2. Root cause (confirmed on commit 4028a48, via `git worktree`, BEFORE
+   any of my/Neo's D172 work, with ZERO networking - solo host, no
+   guest at all): `pileInstanceFor` only feeds `myHand` for `kind ===
+   'hand'` piles. War's own preset deliberately sets `playerPileKind:
+   'deck'` (its own comment: a War player never looks at their pile -
+   not a bug). War is now the FIRST preset in `presets.js`, so it's the
+   silent default whenever a test doesn't pass one - breaking
+   EVERY preset-less `createTable()`/`dealTable()` call, independent of
+   broker, independent of D172. Pre-existing, not introduced by this
+   work - but it was the actual reason nothing could be verified live.
+3. Minimal, scoped fix (test files only, zero `src/` risk): pinned an
+   explicit hand-kind preset on the 4 affected suites (`multiplayer`,
+   `cardMotion`, `remoteCursor`, the new `realBroker`) - 'Gin Rummy' for
+   2-player ones, 'Hearts' for the 3-player one (Gin's own `playerLimit:
+   2` would've reproduced the identical symptom a second way).
+
+**Also found and fixed independent of the above:** PeerJS's own default
+ICE config bakes in a public Google STUN server regardless of signaling
+host - checked against its bundled source. A "local" broker was still
+reaching outside the machine for ICE. Fixed: `peerOptionsFromSearch`
+now also passes `config: { iceServers: [] }`, and `tools/
+localPeerServer.mjs` binds/is addressed by literal `127.0.0.1`, not
+`localhost`. Two peers on one machine need no STUN - no NAT between them.
+
+**Verified for real, live, after both fixes** (not just unit-level):
+- `test:multiplayer` 5/5, `test:realbroker` 1/1, `test:remotecursor`
+  2/2, `test:motion` 4/4, `test:spectator` 3/3, `test:addbot` 4/4,
+  `test:thoughts` 7/7, `test:gin` 1/1, `test:reconnect` 2/2,
+  `test:jev-runner` 3/3, `test:jev-game-master` 5/5, `test:jevtable`
+  1/1 - all real-browser, real-WebRTC, no mocks.
+- `tools/jevTable.mjs --local-peer --peer-port 9500` run by hand: real
+  table, 2 real bot processes, full hand played out, clean Ctrl-C
+  shutdown, confirmed no leftover `jevPlayer`/`peerjs` processes via `ps`.
+- 1212/1212 unit (3 new pure tests for the ICE-config change), `lint:js`
+  clean.
+
+## Next Steps
+@Morpheus *lead review D172 - architecture review passed inline (diff
+is small, test-file fixes correctly separated from the one real `src/`
+change, each change has a verified "why"). Recommend: commit+push, and
+separately flag the War-default-preset regression to the user/Cypher -
+it's real, pre-existing, and affects ANY future preset-less test, not
+just D172's.

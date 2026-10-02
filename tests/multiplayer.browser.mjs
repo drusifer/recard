@@ -16,8 +16,15 @@ const fixture = { server: undefined, browser: undefined, table: undefined };
 before(async () => {
   fixture.server = await startStaticServer(PORT);
   fixture.browser = await launchChromium();
+  // D172 finding: explicit preset, not the implicit (now War) default -
+  // see cardMotion.browser.mjs's own comment on this same fix. Hearts,
+  // not Gin Rummy, because this suite wants 3 players and Gin Rummy's
+  // own `playerLimit: 2` (US-124: "Gin is two-handed") would seat the
+  // third as a SPECTATOR, never dealt in - `dealTable`'s wait would
+  // hang on that guest's `myHand` forever, a second, different way to
+  // reach the exact same symptom.
   fixture.table = await createTable({
-    browser: fixture.browser, baseUrl: fixture.server.baseUrl, players: 3, cardsPerPlayer: CARDS_PER_PLAYER,
+    browser: fixture.browser, baseUrl: fixture.server.baseUrl, preset: 'Hearts', players: 3, cardsPerPlayer: CARDS_PER_PLAYER,
   });
 });
 

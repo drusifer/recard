@@ -23,6 +23,11 @@ import { URL, fileURLToPath } from 'node:url';
 const PEERJS_BIN = fileURLToPath(new URL('../node_modules/peer/dist/bin/peerjs.js', import.meta.url));
 const PATH = '/recard';
 const KEY = 'recard';
+// Literal loopback, not `localhost` - this is a LOCAL signaling server by
+// definition (the whole point is no public-broker dependency), so it
+// binds and is addressed by the one IP that can never resolve anywhere
+// else, rather than trusting DNS/hosts-file resolution of a name.
+const LOOPBACK = '127.0.0.1';
 const READY_TIMEOUT_MS = 10_000;
 const KILL_GRACE_MS = 3000;
 
@@ -32,7 +37,7 @@ const KILL_GRACE_MS = 3000;
  * already going to `page.goto()`.
  */
 export function localPeerQueryString(port) {
-  const parameters = new URLSearchParams({ peerHost: 'localhost', peerPort: String(port), peerPath: PATH, peerKey: KEY });
+  const parameters = new URLSearchParams({ peerHost: LOOPBACK, peerPort: String(port), peerPath: PATH, peerKey: KEY });
   return `?${parameters}`;
 }
 
@@ -67,7 +72,7 @@ function waitUntilListening(child) {
  * actually listening. Resolves `{ queryString, close() }`.
  */
 export async function startLocalPeerServer(port) {
-  const child = spawn(process.execPath, [PEERJS_BIN, '--port', String(port), '--path', PATH, '--key', KEY], { stdio: 'pipe' });
+  const child = spawn(process.execPath, [PEERJS_BIN, '--port', String(port), '--host', LOOPBACK, '--path', PATH, '--key', KEY], { stdio: 'pipe' });
   await waitUntilListening(child);
   return {
     queryString: localPeerQueryString(port),

@@ -23,8 +23,10 @@ const fixture = { server: undefined, browser: undefined, table: undefined };
 before(async () => {
   fixture.server = await startStaticServer(PORT);
   fixture.browser = await launchChromium();
+  // D172 finding: explicit preset, not the implicit (now War) default -
+  // see cardMotion.browser.mjs's own comment on this same fix.
   fixture.table = await createTable({
-    browser: fixture.browser, baseUrl: fixture.server.baseUrl, players: 2, cardsPerPlayer: CARDS_PER_PLAYER,
+    browser: fixture.browser, baseUrl: fixture.server.baseUrl, preset: 'Gin Rummy', players: 2, cardsPerPlayer: CARDS_PER_PLAYER,
   });
 });
 

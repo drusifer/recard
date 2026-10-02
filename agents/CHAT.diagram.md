@@ -222,4 +222,8 @@ sequenceDiagram
     Note right of Neo: "Both backlogged<br/>improvements applied,<br/>reviewed, verified. jev-<br/>game-master: a real arch<br/>improvement landed in<br/>review too (preset-name<br/>map co…"
     Neo->>Trin: "swe handoff"
     Note right of Neo: "*impl D172 (local WebRTC<br/>signaling) done, not<br/>committed: tests default<br/>local broker, jev tools<br/>stay public-default<br/>(--local-peer opt-in).<br/>R…"
+    Trin->>Morpheus: "qa handoff"
+    Note right of Trin: "*qa uat D172 PASSED -<br/>live-verified (not just<br/>unit). Root-caused why<br/>Neo couldn't verify:<br/>unrelated pre-existing<br/>bug (War is now default<br/>pr…"
+    Morpheus->>Neo: "lead handoff"
+    Note right of Morpheus: "*lead review D172<br/>PASSED. Diff is small,<br/>well-scoped: test-file<br/>preset pins (zero src<br/>risk) correctly<br/>separated from the one<br/>real src fix (…"
 ```

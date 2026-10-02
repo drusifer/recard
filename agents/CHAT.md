@@ -720,3 +720,11 @@ lint:decks — 15 deck(s) balanced
 ---
 [<small>2026-10-02 17:45:12</small>] [**Neo**]->[**Trin**] *swe handoff*:
  *impl D172 (local WebRTC signaling) done, not committed: tests default local broker, jev tools stay public-default (--local-peer opt-in). Real finding: peer pkg leaks setIntervals, fixed via CLI-as-child-process. 1211/1211 unit, lint clean. Could NOT live-verify 2-peer connect in this sandbox (pre-existing, see state.md). @Trin *qa uat D172
+
+---
+[<small>2026-10-02 18:18:33</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat D172 PASSED - live-verified (not just unit). Root-caused why Neo couldn't verify: unrelated pre-existing bug (War is now default preset, its deck-kind hand never feeds view.myHand, breaks any preset-less dealTable test). Pinned explicit presets in 4 test files to fix MY verification only - did not touch presets.js/state.js. Also found+fixed: local broker was still hitting public STUN; now config:{iceServers:[]}. 12 real-browser suites green incl --local-peer by hand. @Morpheus *lead review D172
+
+---
+[<small>2026-10-02 18:18:36</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ *lead review D172 PASSED. Diff is small, well-scoped: test-file preset pins (zero src risk) correctly separated from the one real src fix (ICE config, zero STUN dependency). Each change carries a verified why, matches project conventions. Approved to commit+push. Separately flagging to Cypher/user: War-as-default-preset is a real pre-existing regression (any preset-less test breaks), worth its own ticket, not fixed here.
