@@ -2278,9 +2278,22 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
    (`.seat-zone`'s own rule, below) and must not be widened/flex-grown
    the way a shared/deck panel is; `#zones > .zone` alone would win that
    fight by specificity (id+class beats a single class) regardless of
-   source order without this. */
+   source order without this.
+   *nit (direct user request): "default width of zones is too wide" -
+   `flex-grow: 1` (was `1 1 auto`) stretched a zone to fill whatever's
+   left of its row. Every BUILT-IN panel has an explicit preset/saved
+   width by now (the Infinity Table camera's absolute positioning,
+   D130+) and never reaches this rule at all - the only panel that
+   still does is a brand-new Add Zone/Add Pile result, which has no
+   stored size yet and was filling an entire empty row (confirmed live:
+   a single empty Pile inside a 700px-wide Zone). `0 1 auto` matches
+   the sibling rule this project already settled on for the same reason
+   (`.pile-section` below, "a Pile never stretches... only the ZONE
+   itself is Resizable") - fit content, don't grow to fill space no one
+   asked it to fill. Still `min-width: 11rem` below, still shrinkable,
+   still resizable by drag same as always. */
 #zones > .zone:not(.seat-zone) {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 11rem;
   margin-bottom: 0;
 }
