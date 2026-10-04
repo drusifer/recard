@@ -1,9 +1,20 @@
 # Gin Rummy's SCORING, as its own statechart - sibling to turn.yaml, not
 # folded into it (direct user request). A turn is about ONE seat's own
-# moves; scoring is about the WHOLE GAME's running total across however
-# many hands it takes to reach a target - a different lifecycle, a
-# different author, a different file, same discipline: states, events,
-# and names from a library, never code. Run by tools/gin/scoreMachine.mjs.
+# moves, judged by Jev; scoring is about the WHOLE GAME's running total,
+# and is PURE RULES - no Jev anywhere in this file. Run by
+# tools/gin/scoreMachine.mjs.
+#
+# Direct user request: "keep the find-meld algo in code... make scoring
+# just XState logic (no Jev)." The line is drawn at MELD-FINDING - which
+# cards form a set/run, and which of the opponent's cards lay off onto
+# the knocker's melds - that stays `cards.mjs`'s own search algorithm,
+# one small actor (`gin_measure`) below. Everything downstream of those
+# raw numbers - is this an undercut? is this gin, which forbids laying
+# off? who gets the bonus? - is a NAMED STATE here, not a branch buried
+# inside one JS function. The standard Gin rules read as this file's own
+# shape: measuring -> checking_gin (gin can never be undercut, checked
+# first) -> gin | checking_undercut -> undercut | knock (each its own
+# award) -> tallying (check the target) -> loop or end.
 #
 # A match driver (outside this file - it owns the real table/bots) sends
 # HAND_OVER with the two final hands and how it ended; this machine owns
@@ -11,30 +22,65 @@
 # game is over.
 
 description: >-
-  Gin Rummy's running score: each HAND_OVER is scored by standard rules
-  (knock/gin/undercut, computed from both final hands - `cards.mjs`'s own
-  meld math, nothing new), added to that winner's total, then checked
-  against the target. Below target, waits for the next hand; at or past
-  it, the game ends.
+  Gin Rummy's running score, as explicit rule states, not one scoring
+  function: a hand is measured (melds + lay-off, the one part that
+  stays code), classified (undercut, gin, or a clean knock - each its
+  own named state with its own award), tallied against the target, and
+  either waits for the next hand or ends the game.
 
 initial: waiting_for_hand
 context:
   target: 100 # TARGET=: first to this many points wins the game
+  undercutBonus: 25 # standard rules; a config value, not a magic number buried in code
+  ginBonus: 25
   totals: {} # { <playerId>: points }, built up as winners are seen
+  # Per-hand scratch, overwritten by each HAND_OVER - never read across hands.
+  knockerId: null
+  opponentId: null
+  outcome: null
+  knockerDeadwood: null
+  opponentDeadwoodAfterLayoff: null
 
 states:
   waiting_for_hand:
     description: "Between hands (or before the first one). Nothing to do until one ends."
-    on: { HAND_OVER: scoring }
+    on: { HAND_OVER: { target: measuring, actions: gin_remember_hand } }
 
-  scoring:
-    description: "Computes this hand's result from both final hands (gin_score)."
+  measuring:
+    description: "Melds both final hands and lays the opponent's deadwood off onto the knocker's melds (forbidden entirely on gin) - cards.mjs's own search, the one part staying code."
     invoke:
-      src: gin_score
-      onDone: { target: tallying, actions: gin_award }
+      src: gin_measure
+      onDone: { target: checking_gin, actions: gin_remember_measurement }
+
+  checking_gin:
+    description: "Standard rule: gin can NEVER be undercut (no lay-off was ever possible against it) - checked first, structurally, not left to coincide with the deadwood comparison below."
+    always:
+      - { target: gin, guard: gin_is_gin }
+      - { target: checking_undercut }
+
+  checking_undercut:
+    description: "A knock only: did the lay-off bring the opponent's deadwood to or below the knocker's?"
+    always:
+      - { target: undercut, guard: gin_is_undercut }
+      - { target: knock }
+
+  undercut:
+    description: "The OPPONENT'S deadwood (after lay-off) was <= the knocker's - they win instead: the difference, plus the undercut bonus."
+    entry: gin_award_undercut
+    always: tallying
+
+  gin:
+    description: "The knocker went gin (0 deadwood, no lay-off ever allowed against it) - the opponent's FULL deadwood, plus the gin bonus."
+    entry: gin_award_gin
+    always: tallying
+
+  knock:
+    description: "A clean knock - the deadwood difference, no bonus."
+    entry: gin_award_knock
+    always: tallying
 
   tallying:
-    description: "Points are added to the winner's running total; checks the target."
+    description: "Checks the just-awarded total against the target."
     always:
       - { target: finished, guard: gin_target_reached }
       - { target: waiting_for_hand }

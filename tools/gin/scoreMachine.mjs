@@ -67,6 +67,9 @@ export function parseScoring(text, { file, library }) {
     for (const [event, transition] of events) {
       const target = typeof transition === 'string' ? transition : transition.target;
       checkTarget(`${where}.on.${event}`, target);
+      if (typeof transition === 'object') {
+        for (const action of namesOf(transition.actions)) checkNamed(`${where}.on.${event}.actions`, 'actions', actions, action);
+      }
     }
   }
   function checkAlways(where, state) {
@@ -94,9 +97,9 @@ export function parseScoring(text, { file, library }) {
 
   // Every invoked actor gets `{ context, event }` as its input - the
   // same auto-wiring `tools/jev/machine.mjs`'s own compiler does (a
-  // turn file author never writes this either), so `gin_score` can read
-  // the triggering HAND_OVER event's payload without a scoring file
-  // ever having to say so itself.
+  // turn file author never writes this either), so `gin_measure` can
+  // read the triggering HAND_OVER event's payload without a scoring
+  // file ever having to say so itself.
   const compiledStates = Object.fromEntries(Object.entries(config.states).map(([name, state]) => [
     name,
     state.invoke ? { ...state, invoke: { ...state.invoke, input: ({ context, event }) => ({ context, event }) } } : state,
