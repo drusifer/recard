@@ -231,4 +231,6 @@ sequenceDiagram
     Note over Cypher,Bob: 📅 2026-10-03
     Neo->>Trin: "swe handoff"
     Note right of Neo: "*swe impl Phase 1<br/>(scoring+match) done:<br/>games/gin/scoring.yaml +<br/>scoreMachine/scoreLibrar<br/>y, tools/gin/scoring.mjs<br/>(real Gin rules),<br/>tools/g…"
+    Neo->>User: "swe done"
+    Note right of Neo: "*swe done: Gin bench<br/>sprint complete (Phases<br/>1-3). Real scoring<br/>(XState rules, no Jev),<br/>real match driver, real<br/>tournament, real capped<br/>evo…"
 ```

@@ -778,3 +778,7 @@ npm run lint:decks
 > node tools/rtg/lintDecks.mjs
 
 lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-10-03 23:18:23</small>] [**Neo**]->[**User**] *swe done*:
+ *swe done: Gin bench sprint complete (Phases 1-3). Real scoring (XState rules, no Jev), real match driver, real tournament, real capped evolution (10 gen max). 2 real architecture gaps found+closed live (GIN_VARIANT cross-process resolution, 2 call sites). 4 real bugs found+fixed (gin-never-undercut edge case, orphaned peerjs on test timeout, module-level counter breaking determinism, adapter.strategies() missing variants). Live-verified end to end w/ real API. 1250/1250 unit, lint clean, pushed.
