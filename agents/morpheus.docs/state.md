@@ -735,3 +735,70 @@ consolidation if a 3rd cluster needs it; hostSetup.js's own size if it
 grows again; the "untested-for-years critical path" pattern (Resume
 just proved it - worth asking whether anything else is in that state,
 next time there's room).
+
+## Arch: Gin bench/tournament/evolution (2026-10-03)
+
+Checked the real reusable surface before designing anything new
+(read code, not just Cypher's writeup): `tools/gin/bot.mjs`'s own
+header already says it works "through a peer (a harness peer in a real
+browser, or a fake table in tests)" - `tests/helpers/ginFakeTable.mjs`
+is real precedent for an in-memory, no-network table speaking the same
+`{view, act, myId, waitForView, say}` interface `GinBot` already uses.
+`askJev(judge, obs, facts)` takes any `{systemOne}` - also already
+precedented as fake-able (`fakeJudge`/`scriptedJudge` in existing
+tests). So `GinBot`/`decide()`/`askJev()` need ZERO changes - the bench
+is new ORCHESTRATION over fully proven, unchanged game logic.
+
+**One real gap**: `FakeTable` is single-sided (`myId()` hardcoded 'ME',
+opponent hand is static dressing, never actually acts) - built for
+testing one bot's decisions against a scripted scenario, not two
+autonomous bots actually playing each other. A genuine two-bot
+simulation needs a real two-sided table.
+
+**Decision: drive `state.js`'s REAL reducer directly**, not a second
+hand-rolled fake like `FakeTable`'s own light pile-shuffling. Two
+`GinBot`s, one seat each, both acting through the same `{view, act,
+myId, waitForView, say}` interface - implemented as a thin adapter over
+`createInitialState`/`reduce()` (both already seeded-rng-injectable,
+already unit-proven) instead of reimplementing card movement. More
+architecturally correct (one authoritative implementation of Gin's
+actual rules, not two), and reuses `state.js`'s own existing DEAL/DRAW/
+MOVE/FLIP action handling as-is.
+
+### Modules (`tools/gin/bench/`, new cluster - sibling to `tools/gin/`'s
+existing game logic, not inside it - this is tooling that DRIVES that
+logic, same relationship `tools/jevTable.mjs` has to `tools/jev/`)
+
+- `table.mjs` - the two-sided in-memory table (above), one per hand.
+- `fakeJudge.mjs` - a deterministic, seeded heuristic judge (`{systemOne}`)
+  for the free track: computes threat/helps from simple code heuristics
+  (same spirit as `strategies.mjs`'s own no-Jev fallback, `meldPaths/6`
+  for `helpsOf`) - NOT real Jev quality, which is exactly what's
+  deferred to the costed track. Every roster strategy (`usesJev` or
+  not) gets the SAME substitute judge in the free track, so none is
+  penalized for needing one.
+- `playHand.mjs` - one full hand, two named strategies, a seed in ->
+  `{winner, scores, deadwood, handLength}` out.
+- `tournament.mjs` - round robin over a roster, N hands/pairing (seeded,
+  reproducible) -> a leaderboard (win rate, avg margin, avg length).
+- `evolve.mjs` - the generation loop: mutate each survivor's own
+  factory-exposed numeric knobs by a small bounded step; recombine by
+  pairing one parent's rule list with another's thresholds; keep top K;
+  capped generation count; seeded end to end.
+- CLI entry `tools/ginBench.mjs`, matching `tools/jevPlayer.mjs`/
+  `tools/jevTable.mjs`'s own convention (`bobp make gin-bench` /
+  `gin-tournament` / `gin-evolve`).
+
+Determinism end to end (project standard, "repeatable tests only"): one
+seed in, same result out, every layer - `createInitialState`'s already-
+injectable `rng`, the fake judge, and the generation loop's own mutation
+RNG all thread the same seeded PRNG, never `Math.random()` directly.
+
+## Next Steps
+@Mouse *sm plan sprint - phase this as: (1) table.mjs + fakeJudge.mjs +
+playHand.mjs (the engine, hardest part, gates everything else),
+(2) tournament.mjs + leaderboard, (3) evolve.mjs + CLI + docs. Each
+phase's own Trin UAT must include a mutation check (same standard as
+every other load-bearing guard in this project) - e.g. neuter a
+strategy's knock rule and confirm the tournament's win-rate actually
+moves, not just that it runs without throwing.

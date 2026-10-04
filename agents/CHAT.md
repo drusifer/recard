@@ -748,6 +748,19 @@ lint:decks — 15 deck(s) balanced
  *swe impl D173: Blank preset (direct user request) - name-only preset, zero new code paths, proves Add Zone/Add Pile (D171) need nothing special to start a table from nothing. Real finding fixed: default Table Zone overlapped seat zone at 1280x800, fixed w/ SIMPLE_LAYOUT not a waiver. 1213/1213 unit, lint:design clean, check-fast PASSED. Ready to commit+push with D172's UAT fixes.
 
 ---
-[<small>2026-10-02 18:41:18</small>] [**make**]->[**all**] *build*:
- Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
-No duplicate decision numbers, and the modern section is newest-first. Clean.
+[<small>2026-10-03 22:23:49</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-fast | /home/drusifer/Projects/recard/build/build.out
+
+> lint:style
+> stylelint style.css
+
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-10-03 22:24:09</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ *swe impl Phase 1 (scoring+match) done: games/gin/scoring.yaml + scoreMachine/scoreLibrary, tools/gin/scoring.mjs (real Gin rules), tools/gin/match.mjs (real table/WebRTC/bots/Jev, redeals to target=100). Live-verified twice incl. real Jev API. 1222/1222 unit, lint clean, test:ginmatch 1/1. @Trin *qa uat gin-match-phase1

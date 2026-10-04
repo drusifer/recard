@@ -7,7 +7,7 @@
 #
 # Adding a task: add the npm script first, then a one-line target here.
 
-.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-layoutsave test-buildermenu test-resume check-fast test-tablezoom test-focuszoom test-multiplayer test-realbroker test-remotecursor test-harness-mcp test-gin test-jev-runner test-jev-game-master test-jevtable test-actionmenu test-zonepanel test-headeractions test-pileelement test-reconnect jev-player jev-game-master jev-library jev-library-doc jev-readme jev-table secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers dead-code
+.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-layoutsave test-buildermenu test-resume check-fast test-tablezoom test-focuszoom test-multiplayer test-realbroker test-remotecursor test-harness-mcp test-gin test-jev-runner test-jev-game-master test-jevtable test-actionmenu test-zonepanel test-headeractions test-pileelement test-reconnect test-ginmatch jev-player jev-game-master jev-library jev-library-doc jev-readme jev-table gin-match secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers dead-code
 
 help:
 	@echo "Recard targets (all front npm scripts):"
@@ -30,6 +30,7 @@ help:
 	@echo "  jev-library-doc  regenerate docs/JEV_LIBRARY.md from the library"
 	@echo "  jev-readme    regenerate games/<game>/README.md (description + statechart diagram) from each game's files (US-131)"
 	@echo "  jev-table     GAME=gin|rtg [PLAYERS=a,b] [DECK=<pile id>] [DEAL=n] [SCORE=n] [STEPS=n]: host a spectator table with N Jev bots dealt and ready, set up as games/<game>/table.yaml says - watch live or via the harness MCP tools"
+	@echo "  gin-match     A=<strategy> B=<strategy> [TARGET=100] [MAX_HANDS=40]: a full, real, scored Gin game between two strategies - real table/WebRTC/bots, real Jev where used, scored by games/gin/scoring.yaml"
 	@echo "  test-actionmenu  <action-menu> component in a real browser: position, dismissal, one at a time (US-133)"
 	@echo "  test-zonepanel  <zone-panel> component in a real browser: box, title bar, drop routing (US-135)"
 	@echo "  test-headeractions  <header-actions> component in a real browser: title, rename, actions, confirm (US-136)"
@@ -144,6 +145,9 @@ jev-library:
 test-jevtable:
 	npm run test:jevtable
 
+test-ginmatch:
+	npm run test:ginmatch
+
 test-actionmenu:
 	npm run test:actionmenu
 
@@ -170,6 +174,13 @@ jev-readme:
 # bot session otherwise needs by hand (US-129 live-session follow-up)
 jev-table:
 	node tools/jevTable.mjs --game '$(GAME)' $(if $(PLAYERS),--players '$(PLAYERS)') $(if $(DECK),--deck '$(DECK)') $(if $(DEAL),--deal '$(DEAL)') $(if $(SCORE),--score '$(SCORE)') $(if $(STEPS),--steps '$(STEPS)') --port '$(or $(PORT),8230)'
+
+# A full, real, scored Gin Rummy GAME (first to 100, standard) between
+# two named strategies - real table, real WebRTC, real bot processes,
+# real Jev where a strategy uses it. `games/gin/scoring.yaml` is the
+# scorer. `bobp make gin-match A=knock-early B=jev-balanced`.
+gin-match:
+	node tools/gin/match.mjs --strategy-a '$(A)' --strategy-b '$(B)' $(if $(TARGET),--target '$(TARGET)') $(if $(MAX_HANDS),--max-hands '$(MAX_HANDS)') --port '$(or $(PORT),8240)' --peer-port '$(or $(PEER_PORT),9001)'
 
 # Secret scan (direct user request, 2026-09-19 - the Jev players read
 # TYPESAFE_API_KEY from the environment, and it must never land in a

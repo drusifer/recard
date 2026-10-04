@@ -1,0 +1,45 @@
+# Gin Rummy's SCORING, as its own statechart - sibling to turn.yaml, not
+# folded into it (direct user request). A turn is about ONE seat's own
+# moves; scoring is about the WHOLE GAME's running total across however
+# many hands it takes to reach a target - a different lifecycle, a
+# different author, a different file, same discipline: states, events,
+# and names from a library, never code. Run by tools/gin/scoreMachine.mjs.
+#
+# A match driver (outside this file - it owns the real table/bots) sends
+# HAND_OVER with the two final hands and how it ended; this machine owns
+# nothing about HOW a hand played, only what it's WORTH and whether the
+# game is over.
+
+description: >-
+  Gin Rummy's running score: each HAND_OVER is scored by standard rules
+  (knock/gin/undercut, computed from both final hands - `cards.mjs`'s own
+  meld math, nothing new), added to that winner's total, then checked
+  against the target. Below target, waits for the next hand; at or past
+  it, the game ends.
+
+initial: waiting_for_hand
+context:
+  target: 100 # TARGET=: first to this many points wins the game
+  totals: {} # { <playerId>: points }, built up as winners are seen
+
+states:
+  waiting_for_hand:
+    description: "Between hands (or before the first one). Nothing to do until one ends."
+    on: { HAND_OVER: scoring }
+
+  scoring:
+    description: "Computes this hand's result from both final hands (gin_score)."
+    invoke:
+      src: gin_score
+      onDone: { target: tallying, actions: gin_award }
+
+  tallying:
+    description: "Points are added to the winner's running total; checks the target."
+    always:
+      - { target: finished, guard: gin_target_reached }
+      - { target: waiting_for_hand }
+
+  finished:
+    description: "A player's total reached the target - the game is over."
+    type: final
+    entry: note_game_over

@@ -1641,3 +1641,93 @@ Nothing pending - this and D172 are both ready to commit+push together
 with this state update. `RULES_REFERENCE['Blank']` added too (required
 by `presets.test.js`'s own "every preset has a matching rules-reference
 entry" guard).
+
+## Sprint: Gin bench/tournament/evolution, Phase 1a - scoring (2026-10-03)
+
+Direct user correction mid-sprint: use the REAL API + REAL harnesses
+(not a headless simulator with a fake judge, as originally planned) -
+"put two players in a game, have them play through, then score the
+game play when they are finished." Then: "see if we can make scoring
+logic out of our XState yaml logic orchestrations" + "add a new yaml
+for scoring".
+
+**Built, tested, mutation-checked:**
+- `tools/gin/scoring.mjs` - `scoreHand({knockerHand, opponentHand,
+  outcome})`: standard Gin scoring (knock/gin/undercut), built entirely
+  from `cards.mjs`'s existing `bestMelds`/`layoffs`/`cardValue` - no new
+  card logic. 4 tests, hand-verified arithmetic, 2 mutations confirmed
+  caught (undercut comparison, gin-forbids-layoff).
+- `games/gin/scoring.yaml` - the statechart: waiting_for_hand ->
+  (HAND_OVER) -> scoring (invokes gin_score) -> tallying (awards +
+  checks target) -> waiting_for_hand or finished.
+- `tools/gin/scoreMachine.mjs` - loads/checks/compiles it. NOT a reuse
+  of `tools/jev/machine.mjs`'s turn compiler: that one hard-requires a
+  reachable `safe`-tagged state (a bot's own leave-safety - meaningless
+  for a whole-game running total with no seated bot). Same "did you
+  mean" name-checking (`unknown()`, imported, not reimplemented), same
+  `createActor(machine, {input})` context-overlay convenience.
+- `tools/gin/scoreLibrary.mjs` - `gin_score` (actor), `gin_award`
+  (assign), `gin_target_reached` (guard), `note_game_over` (action).
+- `tests/ginScoreMachine.test.js` - loads the REAL scoring.yaml file (not
+  an inline fixture), runs it with `createActor`/`waitFor` same as
+  `jevMachine.test.js` does for turn files, asserts accumulation across
+  hands and game-over at target.
+
+Verified: 1222/1222 unit (9 new), `lint:js` clean.
+
+## Next Steps
+This is the SCORER only - not yet wired to a real table. Still needed:
+a match driver that hosts a real table (`jevTable.mjs`'s own
+`hostTable`/bot-spawn pattern, `--local-peer`), detects each hand's
+end (watches table talk for the knock/gin announcement `GinBot` already
+says), reads both final hands from the table's view at that moment,
+and sends HAND_OVER into this scoring machine - repeating hands until
+`finished`. That's Phase 1b. Tournament (round-robin over the roster)
+and evolution (mutate/recombine/select across generations of REAL
+games) are later phases, costed in real API calls + wall time per the
+user's own scoping - generation/game counts need an explicit cap,
+not yet decided.
+
+## Sprint: Gin bench/tournament/evolution, Phase 1b - the real match driver (2026-10-03)
+
+Built on Phase 1a's scoring engine. `tools/gin/match.mjs`: a full real
+Gin game between two named strategies, standard target 100 (confirmed
+w/ user), 10-generation cap noted for the LATER evolution phase (not
+yet built). Real table (`hostTable`), real local WebRTC (D172,
+`--local-peer` always on here - this tool has no reason to default
+public), real bot processes (`jevPlayer.mjs`, reused unchanged),
+redeals between hands (`RESHUFFLE_DEAL`, dispatched directly via
+`host.act()` same as a bot's own moves - no UI click needed), each
+hand's result read off the table once GinBot's own knock/gin talk
+announcement appears and fed into `games/gin/scoring.yaml`'s machine,
+stops at target, clean shutdown (same spawn/signal-escalation pattern
+as `jevTable.mjs`, not a reuse of it - its own table.yaml schema has no
+multi-hand-run concept to reuse).
+
+**Live-verified, twice, for real** (not just unit tests):
+1. knock-early vs knock-early (free, no Jev): table 8241/9510, target 25,
+   2 real hands, correct accumulation, correct game-over, clean process
+   teardown confirmed via `ps`.
+2. jev-balanced vs knock-early (REAL TypeSafe API, `"model":"jev"`
+   confirmed in the log): table 8242/9511, target 20, 2 hands, DIFFERENT
+   winner per hand, totals correctly kept separate per player id, game
+   ended at target, clean teardown.
+
+Added `tests/ginMatch.browser.mjs` (knock-early vs itself, free) as the
+permanent regression test - mirrors `jevTable.browser.mjs`'s own
+Ctrl-C/no-leftover-bots pattern, but for a full natural completion
+instead of an interrupt. `bobp make gin-match A=<x> B=<y> [TARGET=]
+[MAX_HANDS=]`.
+
+Verified: 1222/1222 unit (unchanged - this phase is browser/live-only,
+no new unit surface), `lint:js`/`lint:style` clean, `test:ginmatch`
+1/1 real pass, `make check-fast` PASSED.
+
+## Next Steps
+Phase 2: tournament (round-robin over the roster, calling `match.mjs`'s
+logic per pairing - probably factor its core into an importable
+function rather than only a CLI, so a tournament driver can call it
+in-process N times without N child-process CLI invocations). Phase 3:
+evolution (mutate/recombine/select, 10-generation cap per direct user
+confirmation, real games so costed - needs a real decision on hands/
+games per generation given cost). Not started.

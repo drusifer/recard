@@ -152,3 +152,70 @@ session's work).
 2. SIGTERM shortening (direct user decision earlier this session, see CHAT.md *pm decision*
    2026-09-30 20:19): no story yet, small enough to go straight to Neo as a `*fix`, user's call.
 3. Cold start: read this file, then docs/BACKLOG.md top, then task.md tail, then ask what's next.
+
+## Sprint: Gin strategy bench, tournament, and evolution (2026-10-03, direct user request)
+
+"Set up multiple jev gin strategies for Gin, have them compete, and
+evolve the best players." Directly addresses a standing backlog item
+("Tune the question files against played hands... needs a bench -
+bot vs bot over N hands, scored").
+
+**Scoped with the user up front** (two questions, before planning):
+rule-list bench/tournament/evolution is Phase 1-3, fully free and
+verified, BEFORE any costed Jev (question-file) track starts - the
+free track gates whether the costed one happens at all this sprint.
+Evolution mutates bounded numeric thresholds and recombines existing
+named strategies' rule lists/thresholds - no new rule-authoring
+mechanism, no wording/text mutation.
+
+**Real finding during scoping, corrected before writing stories:** 3 of
+the 4 rule-list strategies (`gin-hunter`/`equilibrium`/`defensive`) are
+`usesJev: true` and READ live Jev judgments (`context.jev.threat`/
+`.helps`) - not just enhanced by them. Checked `tools/gin/bot.mjs`:
+`askJev(judge, obs, facts)` takes any `{ systemOne: Function }` -
+"a TypeSafeClient, or a fake in tests" (its own doc comment) - already
+precedented (`tests/ginJudgments.test.js`'s `fakeJudge`,
+`tests/ginJevPlayer.test.js`'s `scriptedJudge`). So the free bench can
+exercise all 4 rule-list strategies fairly (same substitute judge for
+all), not just `knock-early` - just not with REAL Jev judgment
+quality, which is exactly what's deferred to the costed track.
+
+### Stories
+
+**US-1: Headless hand simulator.** Play a complete Gin hand (not one
+deal - draw/discard/knock/gin to a real conclusion) entirely in-process
+via the existing reducer + `tools/gin/strategies.mjs`, no browser, no
+WebRTC, no real Jev - a deterministic fake judge standing in wherever
+`usesJev` needs one. AC: given two strategy names + an RNG seed, plays
+one full hand, returns {winner, scores, deadwood, handLength}.
+Deterministic given the seed (repeatable, per project standard).
+
+**US-2: Round-robin tournament.** Every pair in the 4-strategy roster
+plays N hands (seeded, so reproducible); a leaderboard (win rate, avg
+score margin, avg hand length) per strategy, structured output (JSON),
+not just console prose.
+
+**US-3: Evolution loop.** Given a generation's leaderboard: mutate each
+survivor's own tunable numeric knobs (already exposed by its factory
+function - `ginHunter({chaseChance, draws, minThreat})`,
+`equilibrium({minThreat, weight, minGain})`, `knockEarly({minGain})`)
+by a small bounded random step; recombine by pairing one parent's rule
+list with another's thresholds. Keep the top K each generation, run a
+CAPPED number of generations (explicit flag, sane default). Seeded,
+reproducible. Final report names the winning generation's exact
+parameters, copy-pasteable into `strategies.mjs` as a new named
+strategy.
+
+**Out of scope, explicit:** the costed Jev question-file track
+(evolving `jev-balanced`/`jev-cagey`'s `floor`/wording with the REAL
+API) - gated on US-1 through US-3 proving the mechanism is correct and
+worth the cost, per the user's own framing. No UI/table visualization -
+a CLI tool, matching `jev-table`/`jev-player`'s own existing pattern.
+
+## Next Steps
+@Morpheus *lead arch sprint - the one real architecture question is
+where the simulator lives (`tools/gin/` alongside the strategies it
+drives, or a new `tools/gin/bench/` cluster) and what the fake-judge
+substitute actually computes (a cheap heuristic proxy for threat/helps,
+not random noise - needs to be GOOD ENOUGH that strategies are judged
+fairly on their own rule logic, not on judge noise).

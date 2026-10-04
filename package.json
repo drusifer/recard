@@ -22,6 +22,7 @@
     "test:pileelement": "node --test tests/pileElement.browser.mjs",
     "test:reconnect": "node --test tests/reconnect.browser.mjs",
     "test:jevtable": "node --test tests/jevTable.browser.mjs",
+    "test:ginmatch": "node --test tests/ginMatch.browser.mjs",
     "test:spectator": "node --test tests/spectator.browser.mjs",
     "test:addbot": "node --test tests/addBot.browser.mjs",
     "test:thoughts": "node --test tests/thoughtBubble.browser.mjs",

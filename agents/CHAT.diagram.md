@@ -228,4 +228,7 @@ sequenceDiagram
     Note right of Morpheus: "*lead review D172<br/>PASSED. Diff is small,<br/>well-scoped: test-file<br/>preset pins (zero src<br/>risk) correctly<br/>separated from the one<br/>real src fix (…"
     Neo->>User: "swe done"
     Note right of Neo: "*swe impl D173: Blank<br/>preset (direct user<br/>request) - name-only<br/>preset, zero new code<br/>paths, proves Add<br/>Zone/Add Pile (D171)<br/>need nothing sp…"
+    Note over Cypher,Bob: 📅 2026-10-03
+    Neo->>Trin: "swe handoff"
+    Note right of Neo: "*swe impl Phase 1<br/>(scoring+match) done:<br/>games/gin/scoring.yaml +<br/>scoreMachine/scoreLibrar<br/>y, tools/gin/scoring.mjs<br/>(real Gin rules),<br/>tools/g…"
 ```
