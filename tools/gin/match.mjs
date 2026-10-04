@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // A full, REAL Gin Rummy game between two named strategies, scored to a
 // target (standard: 100) - direct user request: "put two players in a
 // game, have them play through, and then score the game play when
@@ -8,13 +7,15 @@
 // uses them - the SAME path a person hosting a table gets, driven
 // unattended for as many hands as it takes to reach the target.
 //
-//   bobp make gin-match A=knock-early B=jev-balanced
-//   node tools/gin/match.mjs --strategy-a knock-early --strategy-b jev-balanced
+// Pure library (`playMatch`, like `tools/jev/runner.mjs` is to
+// `tools/jevPlayer.mjs`) - the CLI is `tools/ginMatch.mjs`;
+// `tools/gin/tournament.mjs`/`evolve.mjs` call this directly, one
+// match in-process at a time, rather than shelling out N times.
 //
-// Scoring itself is `games/gin/scoring.yaml` (D1??), run by
-// `scoreMachine.mjs`/`scoreLibrary.mjs` - this file is ORCHESTRATION
-// only: host a table, seat two real bots, redeal between hands, feed
-// each hand's result into the scoring machine, stop at the target.
+// Scoring itself is `games/gin/scoring.yaml`, run by `scoreMachine.mjs`/
+// `scoreLibrary.mjs` - this file is ORCHESTRATION only: host a table,
+// seat two real bots, redeal between hands, feed each hand's result
+// into the scoring machine, stop at the target.
 //
 // Deliberately NOT built on `jevTable.mjs`'s own table.yaml machinery
 // (`tools/jev/tableSetup.mjs`'s `botArguments`): that schema has no
@@ -25,7 +26,6 @@
 // (spawn/shutdown, same spirit as `jevTable.mjs`'s own).
 import { spawn } from 'node:child_process';
 import { fileURLToPath, URL } from 'node:url';
-import { parseArgs } from 'node:util';
 import { createActor, waitFor } from 'xstate';
 import { launchChromium, startStaticServer, hostTable } from '../../tests/harness/multiplayer.mjs';
 import { startLocalPeerServer } from '../localPeerServer.mjs';
@@ -42,26 +42,18 @@ const HAND_POLL_MS = 500;
 const HAND_TIMEOUT_MS = 180_000; // a single hand genuinely hanging (not just slow) is a real bug, not patience
 const QUIT_GRACE_MS = 5000;
 const KILL_GRACE_MS = 5000;
+export const DEFAULT_TARGET = 100; // standard Gin
+export const DEFAULT_MAX_HANDS = 40; // safety cap - a real game of 100 rarely needs this many
 
-const { values: options } = parseArgs({
-  options: {
-    'strategy-a': { type: 'string' },
-    'strategy-b': { type: 'string' },
-    target: { type: 'string', default: '100' }, // standard Gin: first to 100
-    'max-hands': { type: 'string', default: '40' }, // safety cap - a real game of 100 rarely needs this many
-    port: { type: 'string', default: '8240' },
-    'peer-port': { type: 'string', default: '9001' },
-  },
-});
+/**
+ * Asked to stop (SIGINT) mid-match - thrown AFTER a clean shutdown, so
+ * a caller never has to tell "stopped on purpose" from "really failed"
+ * by string-matching an error message. A library never calls
+ * `process.exit()` itself (`tools/ginMatch.mjs`'s own job); this is how
+ * it hands the "the user asked to stop" fact back up instead.
+ */
+export class Interrupted extends Error {}
 
-function fail(message) {
-  process.stderr.write(`gin-match: ${message}\n`);
-  process.exit(2);
-}
-
-if (!options['strategy-a'] || !options['strategy-b']) fail('pass both strategies: --strategy-a <name> --strategy-b <name>');
-
-const note = (line) => process.stderr.write(`gin-match: ${line}\n`);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function killBot(pid, signal) {
@@ -71,16 +63,38 @@ function isAlive(pid) {
   try { process.kill(pid, 0); return true; } catch { return false; }
 }
 
+/**
+ * A strategy spec is either a plain registry name (string) or an
+ * EVOLVED VARIANT - `{ name, base, params }`, a name with no entry
+ * anywhere, carried to its own bot process via `GIN_VARIANT`
+ * (`tools/gin/strategyKinds.mjs`'s own doc comment has the full
+ * reasoning). Normalized once here so the rest of this file only ever
+ * deals in plain name strings - `tools/gin/evolve.mjs` is the only
+ * caller that ever passes the object form.
+ */
+function resolveSpec(spec) {
+  if (typeof spec === 'string') return { name: spec, env: undefined };
+  // `name` rides along in the JSON too, not just the CLI's own
+  // `--strategy` flag - `tools/gin/adapter.mjs`'s `strategies()` needs
+  // it to register the ONE extra entry a variant run needs, since it
+  // is called with no arguments at all (no other way for it to know
+  // which name this run is even asking about).
+  return { name: spec.name, env: { GIN_VARIANT: JSON.stringify({ name: spec.name, base: spec.base, params: spec.params ?? {} }) } };
+}
+
 /** Starts one real `jevPlayer.mjs` process, detached (same reasoning as
  *  `jevTable.mjs`'s own `spawnBot`: Ctrl-C here must not hard-kill it
  *  before it can leave gracefully). */
-function spawnBot({ strategy, seat, code, baseUrl, deckId, maxHands }) {
+function spawnBot({ spec, seat, code, baseUrl, deckId, maxHands }) {
+  const { name, env } = resolveSpec(spec);
   const flags = [
-    '--game', 'gin', '--strategy', strategy, '--code', code, '--url', baseUrl, '--deck', deckId,
+    '--game', 'gin', '--strategy', name, '--code', code, '--url', baseUrl, '--deck', deckId,
     '--hands', String(maxHands), '--first', seat === 0 ? 'bot' : 'opponent',
   ];
-  const child = spawn(process.execPath, [JEV_PLAYER, ...flags], { stdio: 'inherit', detached: true });
-  return { strategy, child, exited: new Promise((resolve) => child.once('exit', resolve)) };
+  const child = spawn(process.execPath, [JEV_PLAYER, ...flags], {
+    stdio: 'inherit', detached: true, env: env ? { ...process.env, ...env } : process.env,
+  });
+  return { name, child, exited: new Promise((resolve) => child.once('exit', resolve)) };
 }
 
 async function shutdown(resources) {
@@ -106,12 +120,13 @@ async function shutdown(resources) {
 /**
  * Waits for the next knock/gin talk entry (`GinBot`'s own
  * `announcementFor`, D121/D142) past `since` entries already seen, then
- * reads both final hands off the table. Resolves `null` on timeout -
- * the caller decides whether that is a real hang.
+ * reads both final hands off the table. Resolves `null` on timeout OR
+ * on `signal.interrupted` going true - the caller distinguishes them.
  */
-async function waitForHandOver(host, since) {
+async function waitForHandOver(host, since, signal) {
   const deadline = Date.now() + HAND_TIMEOUT_MS;
   for (;;) {
+    if (signal.interrupted) return null;
     const talk = await host.talk();
     const entry = talk.slice(since).find((each) => each.data?.declare === 'knock' || each.data?.declare === 'gin');
     if (entry) return entry;
@@ -120,72 +135,96 @@ async function waitForHandOver(host, since) {
   }
 }
 
-const resources = { host: null, closeTable: null, closeBrowser: null, closeServer: null, closePeerServer: null, bots: [] };
-const stop = once(() => shutdown(resources));
-process.on('SIGINT', async () => { note('asked to stop.'); await stop(); process.exit(130); });
+/**
+ * Plays one full, real Gin game between `strategyA` and `strategyB` to
+ * `target` points, over a fresh table/browser/peer-server this function
+ * owns start to finish - always torn down, win or throw.
+ * @param {{ strategyA: string|{name:string,base:string,params?:object},
+ *   strategyB: string|{name:string,base:string,params?:object}, target?: number,
+ *   maxHands?: number, port: number, peerPort: number, note?: (line: string) => void }} options
+ *   A strategy is a plain registry name, or an evolved VARIANT spec
+ *   (`{name, base, params}` - `resolveSpec`'s own doc comment).
+ * @returns {Promise<{ strategyA: string, strategyB: string, hands: number,
+ *   totals: Record<string,number>, winner: string, winnerId: string }>}
+ */
+export async function playMatch({ strategyA: specA, strategyB: specB, target = DEFAULT_TARGET, maxHands = DEFAULT_MAX_HANDS, port, peerPort, note = () => {} }) {
+  const strategyA = resolveSpec(specA).name;
+  const strategyB = resolveSpec(specB).name;
+  const resources = { host: null, closeTable: null, closeBrowser: null, closeServer: null, closePeerServer: null, bots: [] };
+  const stop = once(() => shutdown(resources));
+  // Registered per-call (not module-level) so a TOURNAMENT running many
+  // matches in one process still gets exactly one listener live at a
+  // time, for whichever match is actually in flight - the `finally`
+  // below always removes it, success or failure, so it never piles up
+  // across matches. Sets a flag `waitForHandOver`'s own poll loop
+  // checks, rather than exiting the process directly - a library never
+  // owns that decision (`tools/ginMatch.mjs`'s job); `Interrupted`
+  // thrown below is how "the user asked to stop" reaches the caller.
+  const signal = { interrupted: false };
+  const onSigint = () => { note('asked to stop.'); signal.interrupted = true; };
+  process.on('SIGINT', onSigint);
+  try {
+    const server = await startStaticServer(port);
+    resources.closeServer = server.close;
+    const browser = await launchChromium({ handleSIGINT: false });
+    resources.closeBrowser = browser.close.bind(browser);
 
-try {
-  const server = await startStaticServer(Number(options.port));
-  resources.closeServer = server.close;
-  const browser = await launchChromium({ handleSIGINT: false });
-  resources.closeBrowser = browser.close.bind(browser);
+    const peerServer = await startLocalPeerServer(peerPort);
+    resources.closePeerServer = peerServer.close;
+    const baseUrl = server.baseUrl + peerServer.queryString;
 
-  const peerServer = await startLocalPeerServer(Number(options['peer-port']));
-  resources.closePeerServer = peerServer.close;
-  const baseUrl = server.baseUrl + peerServer.queryString;
+    const hosted = await hostTable({ browser, baseUrl, preset: 'Gin Rummy', spectate: true, realBroker: true });
+    resources.host = hosted.host;
+    resources.closeTable = hosted.close;
+    note(`table ${hosted.code} - ${strategyA} vs ${strategyB}, first to ${target}`);
 
-  const hosted = await hostTable({ browser, baseUrl, preset: 'Gin Rummy', spectate: true, realBroker: true });
-  resources.host = hosted.host;
-  resources.closeTable = hosted.close;
-  note(`table ${hosted.code} - ${options['strategy-a']} vs ${options['strategy-b']}, first to ${options.target}`);
+    const startView = await hosted.host.view();
+    const deckId = startView.piles.find((pile) => pile.kind === 'deck').id;
+    resources.bots = [specA, specB].map((spec, seat) =>
+      spawnBot({ spec, seat, code: hosted.code, baseUrl, deckId, maxHands }));
 
-  const startView = await hosted.host.view();
-  const deckId = startView.piles.find((pile) => pile.kind === 'deck').id;
-  const maxHands = Number(options['max-hands']);
-  resources.bots = [options['strategy-a'], options['strategy-b']].map((strategy, seat) =>
-    spawnBot({ strategy, seat, code: hosted.code, baseUrl, deckId, maxHands }));
+    await hosted.host.waitForView((view, count) => view.players.filter((player) => player.role === 'player').length >= count,
+      2, { timeout: SEAT_TIMEOUT_MS });
+    await sleep(DEAL_SEED_MS); // D158 - see jevTable.mjs's own identical wait
+    const seatedView = await hosted.host.view();
+    const seated = seatedView.players.filter((player) => player.role === 'player');
+    note(`seated: ${seated.map((player) => player.name).join(' vs ')}`);
 
-  await hosted.host.waitForView((view, count) => view.players.filter((player) => player.role === 'player').length >= count,
-    2, { timeout: SEAT_TIMEOUT_MS });
-  await sleep(DEAL_SEED_MS); // D158 - see jevTable.mjs's own identical wait
-  const seatedView = await hosted.host.view();
-  const seated = seatedView.players.filter((player) => player.role === 'player');
-  note(`seated: ${seated.map((player) => player.name).join(' vs ')}`);
+    const { machine } = loadScoring(SCORING_FILE, { library: ginScoreLibrary({ log: note }) });
+    const scorer = createActor(machine, { input: { target } });
+    scorer.start();
 
-  const { machine } = loadScoring(SCORING_FILE, { library: ginScoreLibrary({ log: note }) });
-  const scorer = createActor(machine, { input: { target: Number(options.target) } });
-  scorer.start();
+    await hosted.host.act({ type: 'DEAL', cardsPerPlayer: CARDS_PER_PLAYER, pileId: deckId });
+    let talkSeen = 0;
+    let handNumber = 0;
+    for (;;) {
+      const entry = await waitForHandOver(hosted.host, talkSeen, signal);
+      if (signal.interrupted) throw new Interrupted('asked to stop mid-match');
+      if (!entry) throw new Error(`no hand concluded within ${HAND_TIMEOUT_MS / 1000}s - a real hang, not patience`);
+      handNumber += 1;
+      const view = await hosted.host.view();
+      const talk = await hosted.host.talk();
+      talkSeen = talk.length;
+      const knockerId = entry.from;
+      const opponent = seated.find((player) => player.id !== knockerId);
+      const handOf = (playerId) => view.piles.find((pile) => pile.kind === 'hand' && pile.ownerId === playerId).cards;
+      scorer.send({
+        type: 'HAND_OVER', knockerId, opponentId: opponent.id, outcome: entry.data.declare,
+        knockerHand: handOf(knockerId), opponentHand: handOf(opponent.id),
+      });
+      await waitFor(scorer, (snapshot) => snapshot.value === 'waiting_for_hand' || snapshot.status === 'done');
+      if (scorer.getSnapshot().status === 'done') break;
+      if (handNumber >= maxHands) throw new Error(`hit the ${maxHands}-hand safety cap before either player reached ${target} - raise maxHands`);
+      await hosted.host.act({ type: 'RESHUFFLE_DEAL', pileId: deckId, cardsPerPlayer: CARDS_PER_PLAYER });
+    }
 
-  await hosted.host.act({ type: 'DEAL', cardsPerPlayer: CARDS_PER_PLAYER, pileId: deckId });
-  let talkSeen = 0;
-  let handNumber = 0;
-  for (;;) {
-    const entry = await waitForHandOver(hosted.host, talkSeen);
-    if (!entry) throw new Error(`no hand concluded within ${HAND_TIMEOUT_MS / 1000}s - a real hang, not patience`);
-    handNumber += 1;
-    const view = await hosted.host.view();
-    const talk = await hosted.host.talk();
-    talkSeen = talk.length;
-    const knockerId = entry.from;
-    const opponent = seated.find((player) => player.id !== knockerId);
-    const handOf = (playerId) => view.piles.find((pile) => pile.kind === 'hand' && pile.ownerId === playerId).cards;
-    scorer.send({
-      type: 'HAND_OVER', knockerId, opponentId: opponent.id, outcome: entry.data.declare,
-      knockerHand: handOf(knockerId), opponentHand: handOf(opponent.id),
-    });
-    await waitFor(scorer, (snapshot) => snapshot.value === 'waiting_for_hand' || snapshot.status === 'done');
-    if (scorer.getSnapshot().status === 'done') break;
-    if (handNumber >= maxHands) throw new Error(`hit the ${maxHands}-hand safety cap before either player reached ${options.target} - raise --max-hands`);
-    await hosted.host.act({ type: 'RESHUFFLE_DEAL', pileId: deckId, cardsPerPlayer: CARDS_PER_PLAYER });
+    const totals = scorer.getSnapshot().context.totals;
+    const [winnerId, winnerPoints] = Object.entries(totals).toSorted((a, b) => b[1] - a[1])[0];
+    const winnerName = seated.find((player) => player.id === winnerId)?.name ?? winnerId;
+    note(`${winnerName} wins, ${winnerPoints} to ${Object.values(totals).toSorted((a, b) => b - a)[1] ?? 0}, in ${handNumber} hand(s).`);
+    return { strategyA, strategyB, hands: handNumber, totals, winner: winnerName, winnerId };
+  } finally {
+    process.off('SIGINT', onSigint);
+    await stop();
   }
-
-  const totals = scorer.getSnapshot().context.totals;
-  const [winnerId, winnerPoints] = Object.entries(totals).toSorted((a, b) => b[1] - a[1])[0];
-  const winnerName = seated.find((player) => player.id === winnerId)?.name ?? winnerId;
-  process.stdout.write(`${JSON.stringify({ strategyA: options['strategy-a'], strategyB: options['strategy-b'], hands: handNumber, totals, winner: winnerName })}\n`);
-  note(`${winnerName} wins, ${winnerPoints} to ${Object.values(totals).toSorted((a, b) => b - a)[1] ?? 0}, in ${handNumber} hand(s).`);
-  await stop();
-} catch (error) {
-  await stop();
-  fail(error.message);
 }

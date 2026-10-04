@@ -212,6 +212,40 @@ export const defensive = () => ({
 export const STRATEGIES = Object.fromEntries([knockEarly(), ginHunter(), equilibrium(), defensive()].map((strategy) => [strategy.name, strategy]));
 
 /**
+ * The factory behind each named base strategy, by name - NOT a
+ * replacement for `STRATEGIES` above (every existing reader of that
+ * registry expects already-built, default-param objects; changing its
+ * shape would ripple through code that has nothing to do with
+ * evolution). This is the one extra thing evolution needs: a way to
+ * build the SAME strategy with DIFFERENT numeric knobs, each exposed as
+ * a bounded `{min, max, default}` range a mutation can start from and
+ * safely stay inside - `default` repeats each factory's own parameter
+ * default above (explicit, not reflected out of the function signature
+ * - this project's own preference for visible over clever) -
+ * `tools/gin/evolve.mjs`'s own job, not this file's.
+ */
+export const STRATEGY_FACTORIES = {
+  'knock-early': { factory: knockEarly, params: { minGain: { min: 1, max: 10, default: 5 } } },
+  'gin-hunter': {
+    factory: ginHunter,
+    params: {
+      chaseChance: { min: 0.05, max: 0.6, default: 0.25 },
+      draws: { min: 1, max: 6, default: 3, integer: true },
+      minThreat: { min: 1, max: 4, default: 3 },
+    },
+  },
+  equilibrium: {
+    factory: equilibrium,
+    params: {
+      minThreat: { min: 1, max: 4, default: 3 },
+      weight: { min: 1, max: 20, default: 8 },
+      minGain: { min: 1, max: 10, default: 5 },
+    },
+  },
+  defensive: { factory: defensive, params: {} }, // no tunable knobs - a crossover's rule-list donor only
+};
+
+/**
  * Runs the strategy's rules for this phase in order; the first that fires decides.
  * @param {GinStrategy} strategy
  * @param {DecisionContext} context

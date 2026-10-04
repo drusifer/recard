@@ -766,7 +766,7 @@ lint:decks — 15 deck(s) balanced
  *swe impl Phase 1 (scoring+match) done: games/gin/scoring.yaml + scoreMachine/scoreLibrary, tools/gin/scoring.mjs (real Gin rules), tools/gin/match.mjs (real table/WebRTC/bots/Jev, redeals to target=100). Live-verified twice incl. real Jev API. 1222/1222 unit, lint clean, test:ginmatch 1/1. @Trin *qa uat gin-match-phase1
 
 ---
-[<small>2026-10-03 22:40:55</small>] [**make**]->[**all**] *build*:
+[<small>2026-10-03 23:17:47</small>] [**make**]->[**all**] *build*:
  Build PASSED | make check-fast | /home/drusifer/Projects/recard/build/build.out
 
 > lint:style

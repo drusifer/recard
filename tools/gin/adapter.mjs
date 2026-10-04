@@ -44,7 +44,22 @@ export function ginSeat({ peer, strategy, judge = null, name, firstPlayer = 'bot
 export const adapter = {
   game: 'gin',
 
-  strategies: () => Object.fromEntries(allStrategyNames().map((name) => [name, resolveStrategy(name)])),
+  // `jev/runner.mjs` (game-agnostic) validates `--strategy` against
+  // exactly the keys this returns, before anything else runs - so an
+  // evolved VARIANT (tools/gin/evolve.mjs, D1??), which by design has
+  // no entry in `allStrategyNames()`, needs its own one-off key added
+  // here too, or a perfectly real `GIN_VARIANT` run gets refused as
+  // "unknown strategy" before `resolveStrategy` ever gets a chance to
+  // resolve it. Gin-specific on purpose - the generic runner stays
+  // completely unaware this mechanism exists.
+  strategies: () => {
+    const known = Object.fromEntries(allStrategyNames().map((name) => [name, resolveStrategy(name)]));
+    if (process.env.GIN_VARIANT) {
+      const { name } = JSON.parse(process.env.GIN_VARIANT);
+      known[name] = resolveStrategy(name);
+    }
+    return known;
+  },
 
   checkOptions(options) {
     if (!['bot', 'opponent'].includes(options.first)) throw new UsageError(`FIRST must be "bot" or "opponent", not "${options.first}"`);

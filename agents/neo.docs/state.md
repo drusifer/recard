@@ -1731,3 +1731,117 @@ in-process N times without N child-process CLI invocations). Phase 3:
 evolution (mutate/recombine/select, 10-generation cap per direct user
 confirmation, real games so costed - needs a real decision on hands/
 games per generation given cost). Not started.
+
+## Sprint: Gin bench/tournament/evolution, Phase 2+3 (2026-10-03)
+
+**Real bug found and fixed mid-build**: `tests/ginMatch.browser.mjs`'s
+own `context.after()` did `match.kill('SIGKILL')` on timeout - but the
+local PeerServer `playMatch` starts is a plain (non-detached) CHILD of
+`match`, so SIGKILLing `match` by pid alone never reaches it (only
+`-pid`/the process group would). Found live: 3 orphaned `peerjs`
+processes squatting on the test's own PEER_PORT from an earlier timed-
+out run, failing every run after with "peerjs never reported ready"
+until killed by hand. Fixed: SIGINT first (match.mjs's own graceful
+`playMatch` cleanup), SIGKILL only as a fallback, plus a defense-in-
+depth sweep of any peerjs still on that port - same escalation
+discipline `jevTable.mjs`'s own shutdown already uses. Also lowered the
+test's own TARGET/MAX_HANDS (knock-early vs itself produces small,
+evenly-spread margins - genuinely needed 4+ real hands and still
+hadn't crossed TARGET=20 past 180s; TARGET=10/MAX_HANDS=6 finishes in
+~17s reliably now).
+
+**Refactor**: split `tools/gin/match.mjs` into a pure library
+(`playMatch`) + thin CLI (`tools/ginMatch.mjs`) - same shape
+`jevPlayer.mjs`/`jev/runner.mjs` already use. `playMatch` never calls
+`process.exit()` itself (library discipline, eslint-enforced); SIGINT
+sets a flag `waitForHandOver`'s poll loop checks and throws
+`Interrupted` after its own clean shutdown - the CLI is the only place
+that turns that into exit code 130.
+
+**Phase 2 - Tournament** (`tools/gin/tournament.mjs` + `tools/
+ginTournament.mjs`): round-robin over a roster, N real games/pairing,
+leaderboard by win rate. `playMatch` injected (tests run in ms, no
+browser). 7 unit tests.
+
+**Phase 3 - Evolution** (`tools/gin/evolve.mjs` + `tools/ginEvolve.mjs`):
+mutate bounded numeric thresholds (new `STRATEGY_FACTORIES` registry in
+`strategies.mjs` - NOT a replacement for the existing `STRATEGIES`
+registry, which several other files already depend on as plain built
+objects), recombine one survivor's rule list with another's params
+(crossover), elitism (top `keepTop` carry forward unmutated), 10-
+generation hard cap (direct user confirmation, refused above that).
+Seeded PRNG (mulberry32) for end-to-end determinism.
+
+**Real architecture gap found and closed**: a mutated/recombined
+variant has NO entry in any static registry, but a spawned bot
+(`jevPlayer.mjs`) is a SEPARATE PROCESS that only ever gets a NAME on
+its own `--strategy` flag - no path existed for it to construct a
+variant's real params. Fixed with `GIN_VARIANT` (JSON `{base,params}`,
+set on that ONE bot's own spawn `env`, never process-wide):
+`strategyKinds.mjs`'s `resolveStrategy` falls back to it only when a
+name matches neither real registry - an ordinary run never touches it,
+and a real registry hit is always checked first (can't be shadowed).
+
+**Real bug found and fixed via TDD, pre-live-verification**: the
+variant-name counter was module-level mutable state - two separate
+`runEvolution({seed: 42})` calls in the SAME process produced DIFFERENT
+names for structurally-identical individuals (the deterministic-seed
+test caught this immediately). Fixed: the counter is created fresh
+inside each `runEvolution` call and threaded through as a plain
+argument, never module state.
+
+10 unit tests for evolve.mjs's own mutation/crossover/selection/cap
+logic (deterministic, no browser).
+
+Verified: 1248/1248 unit, lint:js/lint:style clean, live-verified
+`ginMatch.mjs`'s refactor end to end again post-split. Live-verifying
+the `GIN_VARIANT` cross-process plumbing now (2-base, 2-generation,
+low-target real run) - see Next Steps for the result once it lands.
+
+## Next Steps
+Once the live GIN_VARIANT check confirms clean: commit Phase 2+3,
+update docs/GIN_STRATEGY.md with the bench/evolution section (US-125
+retro flagged this gap already), consider whether the champion's
+params should be offered as a copy-pasteable new STRATEGIES entry
+automatically vs. just printed (currently just printed - a person
+decides whether to keep it).
+
+## Sprint: Gin bench/tournament/evolution - Phase 2+3 DONE, live-verified (2026-10-03)
+
+The `GIN_VARIANT` cross-process gap (see above) needed a SECOND fix
+beyond `strategyKinds.mjs`: `jev/runner.mjs` (game-agnostic, correctly
+so) validates `--strategy` against `adapter.strategies()`'s own PRE-
+ENUMERATED map before anything else runs - a variant has no entry
+there either, by design, so the real first live attempt failed with
+"unknown gin strategy" before `resolveStrategy` ever got a chance.
+Fixed in `tools/gin/adapter.mjs` specifically (adds the ONE variant
+name from `GIN_VARIANT`, when set, to its own returned map) - the
+generic runner stays completely unaware this mechanism exists. New
+test: `tests/ginAdapter.test.js`.
+
+**Live-verified end to end, for real, after both fixes**: `bobp make
+gin-evolve BASES=knock-early,gin-hunter GENERATIONS=2 GAMES=1
+TARGET=10` - real table, real local WebRTC, real bot processes, real
+Jev (`"model":"jev-1.13.0"` in the log) for the gin-hunter side.
+Generation 1: gin-hunter beat knock-early. Generation 2's roster
+correctly showed elitism (gin-hunter-gen0-2 carried forward, same
+name) plus a freshly mutated child (gin-hunter-gen1-3, new
+chaseChance/draws/minThreat) - the mutated child then WON its game
+against its own parent, and was correctly reported as champion. Clean
+shutdown, no leftover processes, confirmed via `ps`.
+
+Also added `docs/GIN_STRATEGY.md` §9 (bench/tournament/evolution) -
+closes the standing backlog gap ("GIN_STRATEGY.md still documents only
+the rule catalogue").
+
+Final verification: 1250/1250 unit, lint:js/lint:style/lint:decks
+clean, `make check-fast` PASSED.
+
+## Next Steps
+Sprint done for now. Explicitly NOT built (out of scope, not asked
+for): evolving the question-file strategies (jev-balanced/jev-cagey)
+themselves - only the 4 rule-list strategies' numeric knobs are
+evolvable (STRATEGY_FACTORIES only covers those). If that's wanted
+later, the same GIN_VARIANT pattern would need a question-file
+equivalent (e.g. evolving `floor`/wording), a separate, real piece of
+new scope - flag before starting it, not assume it is wanted.

@@ -18,6 +18,7 @@ judgments; the rules pick the move. A bot joins a table you host with
 6. [Edge cases](#6-edge-cases)
 7. [Example evaluations (live Jev)](#7-example-evaluations-live-jev)
 8. [Running a bot](#8-running-a-bot)
+9. [Bench, tournament, and evolution](#9-bench-tournament-and-evolution)
 
 ---
 
@@ -180,3 +181,60 @@ bobp make jev-player GAME=gin STRATEGY=equilibrium CODE=<table code> FIRST=bot H
 - Strategies that use Jev need `TYPESAFE_API_KEY`. If it's missing,
   you get a clear error that names the variable. Tests never call Jev;
   they inject a fake judge.
+
+## 9. Bench, tournament, and evolution
+
+Direct user request ("set up multiple jev gin strategies, have them
+compete, and evolve the best players") - answers the standing backlog
+item ("tune the question files against played hands... needs a
+bench"). Real table, real local WebRTC (D172), real bot processes,
+real Jev where a strategy uses one - the same path a person hosting a
+table gets, driven unattended. Nothing here is a simulation.
+
+**A single scored game** (`tools/ginMatch.mjs`, `tools/gin/match.mjs`
+the library): two named strategies play to a target (standard Gin:
+100), redealing between hands. Scoring is `games/gin/scoring.yaml` -
+its OWN statechart, not a function: `measuring` (melds + lay-off -
+`cards.mjs`'s real search algorithm, the one part that stays code) ->
+`checking_gin` (gin can never be undercut - checked structurally
+first) -> `gin` | `checking_undercut` -> `undercut` | `knock` (each its
+own award action, `tools/gin/scoreLibrary.mjs`) -> `tallying` -> loops
+back or ends. No Jev anywhere in scoring - pure rules.
+
+```bash
+bobp make gin-match A=knock-early B=jev-balanced [TARGET=100] [MAX_HANDS=40]
+```
+
+**A tournament** (`tools/ginTournament.mjs`): every pairing in a roster
+plays real games, round-robin, a leaderboard by win rate. Defaults to
+the four free rule-list strategies (no Jev, no API cost); name any
+`jev-*` player in `ROSTER` to opt that cost in explicitly.
+
+```bash
+bobp make gin-tournament ROSTER=knock-early,gin-hunter,equilibrium,defensive GAMES=2
+```
+
+**Evolution** (`tools/ginEvolve.mjs`): real, capped generations (10
+max, direct user confirmation - refused above that). Each base
+strategy's own tunable numeric knobs (`STRATEGY_FACTORIES` in
+`strategies.mjs` - e.g. `gin-hunter`'s `chaseChance`/`draws`/
+`minThreat`) get mutated by a small bounded step each generation;
+crossover recombines one survivor's rule list with a different
+survivor's params; the top performers carry forward unchanged
+(elitism). Seeded (mulberry32) end to end, so the same seed reproduces
+the exact same generations, names included. A generated variant has no
+entry in any static registry - it reaches its own real bot process via
+`GIN_VARIANT` (an env var set on that ONE spawn, JSON `{name, base,
+params}`), which `tools/gin/strategyKinds.mjs` and `tools/gin/
+adapter.mjs` both resolve; an ordinary run never touches this
+mechanism, and a real registry name always wins if there's ever a
+collision.
+
+```bash
+bobp make gin-evolve BASES=knock-early,gin-hunter,equilibrium GENERATIONS=5
+```
+
+Prints each generation's leaderboard as it completes, then the final
+champion's exact params - copy-pasteable into a new named entry in
+`tools/gin/strategies.mjs`'s own `STRATEGIES` registry if you want to
+keep it (not automatic - a person decides).
