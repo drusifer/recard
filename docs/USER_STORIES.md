@@ -4833,3 +4833,121 @@ card-content authoring for a new pile beyond picking its kind.
 **Flagged:** backlog item "Builder screen" scoped 2026-09-30 per direct
 user description: "we are actually quite close to a game builder
 already... just need an add menu to add new zones and piles."
+
+### US-150: Invite a game master to the table from table talk
+
+**As** a player who runs a Jev game master on a box of their own (a Pi
+with `dist/jev/`, D174), **I want** to bring it to whatever table I'm at
+by typing `/invite <name>` in table talk, **so that** the box can sit
+there running and I never have to SSH in with a fresh table code for each
+game.
+
+Today `jev-game-master` needs `--code <TABLE CODE>` at startup and joins
+exactly that one table: it can't hear a table it isn't already at.
+
+**AC:**
+1. `jev-game-master --name <name>` with NO `--code` starts in
+   **listening** mode: it holds a PeerJS address derived from `<name>`
+   on the same broker tables use, and prints that it is waiting for
+   invites under that name. `--code` keeps working exactly as today.
+2. At any table, typing `/invite <name>` in table talk (the same slash
+   form as `/roll`) brings that game master to the table. It joins as a
+   spectator, announces itself the way it does today (`jev-ready`), and
+   "Add Jev bot" appears for the game on the table. No table code is
+   typed anywhere.
+3. The invite's outcome is visible to everyone at the table in talk:
+   either the game master's own arrival, or a line saying no game master
+   named `<name>` answered. An invite never fails silently, and never
+   leaves the table waiting with no end.
+4. One listening game master serves invites from several tables over
+   time: it can be at more than one table at once, each with its own
+   bots, and `quit` at one table never affects another. It keeps
+   listening after leaving a table.
+5. Only someone who knows the name can summon it: there is no listing of
+   game masters, and an invite for a name nobody holds behaves exactly
+   like AC3's "no answer".
+6. `dist/jev/README.md` documents listening mode and `/invite`. Covered
+   by `bobp make check` plus a live test: a listening game master is
+   invited from a real table by name, a bot is added through it, and an
+   invite for an unknown name reports no answer.
+
+**Out of scope:** a lobby or any discovery of game masters or tables;
+access control beyond knowing the name (no passwords or allow-lists);
+LAN-only signaling (D172's local PeerServer); a button or other new UI
+for inviting (table talk only, by direct user choice); auto-starting the
+game master as a service on the Pi (systemd etc., a separate Tank task).
+
+**Flagged:** user decisions 2026-10-06 via question: named address over
+one fixed address or LAN-only (the public broker is global, and Jev bots
+spend the runner's TYPESAFE key); table talk over a button. Cypher's
+call: `/invite` with a slash rather than bare `invite`, matching the
+only existing talk command (`/roll`) so ordinary chat containing the
+word "invite" never summons anything.
+
+**Smith Gate 1 (2026-10-06): APPROVED with conditions** (each is an AC):
+- C1 (visibility of system status): `/invite patch` posts an immediate
+  "inviting patch..." line to talk. Launching a headless browser and
+  joining takes seconds, and without an acknowledgement the inviter
+  can't tell a slow join from a typo or an ignored command.
+- C2 (time bound for AC3): "no answer" is reported within a fixed,
+  stated bound (Morpheus picks the number, documented in the README),
+  not "eventually".
+- C3 (error recovery): a bare `/invite` gets a usage line, never a silent
+  no-op. Names match case-insensitively (`/invite Patch` reaches
+  `--name patch`): a name you said aloud shouldn't fail on capitalisation.
+- C4 (error prevention): starting a second listener under a name already
+  held exits at startup with a clear "name taken" message, so a
+  collision never shows up later as invites going to someone else's box.
+- Anyone at the table may invite, the same as anyone may already ask for
+  a bot (D82-D85 permissive table). Stated so it isn't host-gated by accident.
+
+
+---
+
+## Sprint: Game master over the internet via TURN (2026-10-07) - Tier 2, combined story + architecture
+
+Context: the game master runs in k3s (pi-patch, namespace `recard`) with
+egress to the public internet + DNS only. `/invite homer` registered on
+the broker but the DataConnection never opened: a LAN browser offers only
+mDNS host candidates and the router won't hairpin, and an internet player
+behind CGNAT/symmetric NAT has no guaranteed path either. Architecture:
+D176.
+
+### US-151: The game master relays its WebRTC through Cloudflare TURN
+
+**As** someone running the game master in a locked-down pod, **I want**
+its connections relayed through Cloudflare Realtime TURN, **so that** an
+`/invite` works from my LAN and from players across the internet, without
+opening anything inbound to my home network.
+
+**AC:**
+1. With `CLOUDFLARE_TURN_KEY_ID` and `CLOUDFLARE_TURN_KEY_API_TOKEN` set,
+   the game master mints short-lived ICE credentials from Cloudflare at
+   startup and says so on stderr. Bad credentials fail at startup with
+   Cloudflare's answer, not later as a silent never-arrived invite.
+   Only one of the two set is a startup error naming the missing one.
+2. Every headless page it opens (the listener, each table it joins, each
+   bot it adds) uses those servers with `iceTransportPolicy: 'relay'`.
+3. Credentials are refreshed before their TTL runs out; tables joined
+   and bots added after a refresh get the fresh set, and the long-lived
+   listener picks it up for later invites. A failed refresh keeps the
+   current set and retries.
+4. Neither variable set = exactly today's behaviour (no relay, no
+   Cloudflare call), so local tests are unaffected.
+5. Players' browsers are unchanged.
+6. `dist/jev/README.md`'s Container section documents both variables.
+
+### US-152: The harness static server serves only the repo
+
+**As** the person exposing port 8230 from the pod, **I want** the static
+server to refuse paths outside the app's root, **so that** safety
+doesn't depend on pi-patch's nginx.
+
+**AC:**
+1. A request whose decoded path resolves outside the repo root (`..`,
+   `%2e%2e`, `%2f`) gets 404 and no file contents.
+2. A malformed percent-encoding gets 400 instead of crashing the server.
+3. Ordinary app files are served exactly as before.
+
+**Done when:** `make test-jev-game-master` and `make test-gmlisten` pass,
+then `make export-jev-image` produces a new `dist/recard-jev-<ver>.tar`.

@@ -56,6 +56,10 @@ import './components/TableTalk.js';
 import './components/AddBot.js';
 import './components/ThoughtBubble.js';
 import { createTalkLog, makeTalkMessage, hostLine } from './tableTalk.js';
+import {
+  parseInvite, runInvite, hasArrived, inviteStatusText, gameMasterAddress,
+  STATUS_KIND, INVITE_ANSWER_MS, INVITE_ARRIVAL_MS,
+} from './gameMasterInvite.js';
 import { botOffers, spawnResult, spawnRequestLine } from './botOffers.js';
 import { decisionsBySpeaker } from './botThoughts.js';
 import { colorForPlayer } from './playerColors.js';
@@ -476,6 +480,9 @@ globalThis.__recardHarness = {
   // schedule (unchanged) compressed, instead of waiting out a real ~51s
   // budget for real. `clock` is `{ setTimeout, clearTimeout }`.
   setReconnectClock: (clock) => { reconnectClock = clock; },
+  // US-150: shortens the invite bounds so a live test never waits out
+  // the real 15s/90s. `{ answerMs, arrivalMs }`.
+  setInviteTimings: (timings) => { inviteTimings = { ...inviteTimings, ...timings }; },
   // A live test's way to make a host really disappear: destroys this
   // page's own PeerJS peer outright (`session.close()`), which tears
   // down every connection under it - the same "host really gone" a
@@ -508,6 +515,35 @@ function publishTalk(speakerKey, message) {
     const peerId = peerFor(player.id, peerToKey);
     if (peerId) session.sendTo(peerId, { type: 'talk', entry });
   }
+  const invite = parseInvite(line.text);
+  if (invite) inviteGameMaster(speakerKey, invite);
+}
+
+let inviteTimings = { answerMs: INVITE_ANSWER_MS, arrivalMs: INVITE_ARRIVAL_MS };
+
+/**
+ * US-150/D175: host only - "/invite <name>" dials that game master with
+ * this table's code, and every step of it is a talk line everyone sees,
+ * said under the inviter's name the way a "/roll" result is.
+ */
+function inviteGameMaster(speakerKey, invite) {
+  const postStatus = (status, text) => publishTalk(speakerKey, { type: 'talk', text, data: { kind: STATUS_KIND, name: invite.name ?? null, status } });
+  if (invite.usage) {
+    postStatus('usage', invite.usage);
+    return;
+  }
+  const { name } = invite;
+  let acceptedAt = 0;
+  runInvite({
+    post: (status) => {
+      postStatus(status, inviteStatusText(status, name));
+      if (status === 'accepted') acceptedAt = talkLog.entries().at(-1)?.seq ?? 0;
+    },
+    dial: (answerMs) => session.inviteGameMaster(gameMasterAddress(name), answerMs),
+    arrived: () => hasArrived(talkLog.entries(), name, acceptedAt),
+    timings: inviteTimings,
+    clock: globalThis,
+  });
 }
 
 /**

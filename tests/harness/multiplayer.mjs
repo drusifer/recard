@@ -15,11 +15,16 @@ import path from 'node:path';
 import { URL, fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { startLocalPeerServer } from '../../tools/localPeerServer.mjs';
+import { peerOptionsFromSearch, withPeerConfig } from '../../src/peerOptions.js';
+import { sharedTurnRelay } from '../../tools/turnRelay.mjs';
+import { CLIENT_SESSION_STORAGE } from '../../src/identity.js';
+import { gameMasterAddress, INVITE_MESSAGE, ACCEPTED_MESSAGE } from '../../src/gameMasterInvite.js';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webp': 'image/webp', '.svg': 'image/svg+xml' };
 const SYSTEM_CHROMIUM_PATHS = ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'];
 const JOIN_TIMEOUT_MS = 20_000;
+const JOIN_ATTEMPTS = 3;
 const VIEW_TIMEOUT_MS = 15_000;
 const LOCAL_PEER_PORT = 9000;
 
@@ -62,27 +67,39 @@ export async function closeLocalPeerServer() {
 }
 
 /**
- * Serves the repo root statically on `port`; resolves `{ baseUrl, close() }`.
+ * Serves the repo root statically on `port` (0 = any free port);
+ * resolves `{ baseUrl, close() }`. US-152: a pod exposes this, so a path
+ * that resolves outside the root is a 404 and a malformed `%` a 400.
  */
 export async function startStaticServer(port) {
   const server = http.createServer(async (request, response) => {
-    const pathname = decodeURIComponent(request.url.split('?', 1)[0]);
+    const answer = (status, body) => {
+      response.writeHead(status);
+      response.end(body);
+    };
+    let pathname;
+    try {
+      pathname = decodeURIComponent(request.url.split('?', 1)[0]);
+    } catch {
+      return answer(400, 'bad request');
+    }
     // Resolve to the real file BEFORE reading its extension: `extname('/')`
     // is empty, and typing the root as octet-stream makes the browser
     // DOWNLOAD index.html instead of rendering it.
-    const filePath = path.join(ROOT, pathname === '/' ? 'index.html' : pathname);
+    const filePath = path.resolve(ROOT, '.' + (pathname === '/' ? '/index.html' : pathname));
+    const inside = path.relative(ROOT, filePath);
+    if (inside === '..' || inside.startsWith(`..${path.sep}`) || path.isAbsolute(inside)) return answer(404, 'not found');
     try {
       const body = await readFile(filePath);
       response.writeHead(200, { 'Content-Type': MIME[path.extname(filePath)] ?? 'application/octet-stream' });
       response.end(body);
     } catch {
-      response.writeHead(404);
-      response.end('not found');
+      answer(404, 'not found');
     }
   });
   await new Promise((resolve) => server.listen(port, resolve));
   return {
-    baseUrl: `http://localhost:${port}`,
+    baseUrl: `http://localhost:${server.address().port}`,
     close: () => new Promise((resolve) => server.close(resolve)),
   };
 }
@@ -257,8 +274,75 @@ async function openPeer(browser, baseUrl, { realBroker = false } = {}) {
   const context = await browser.newContext();
   const page = await context.newPage();
   const url = realBroker ? baseUrl : baseUrl + (await ensureLocalPeerServer()).queryString;
-  await page.goto(url);
+  // US-151/D176: relayed through Cloudflare TURN when this process's env
+  // asks for it; otherwise the URL is exactly as before.
+  const relay = await sharedTurnRelay();
+  await page.goto(withPeerConfig(url, relay?.config()));
   return { peer: new HarnessPeer(page), context };
+}
+
+/**
+ * US-150/D175: holds a listening game master's PeerJS address in a page
+ * of its own (the app page already loads `window.Peer`) and hands each
+ * invite's table code to `onInvite`, answering "accepted" once it
+ * returns. Rejects with `{ type: 'unavailable-id' }` (PeerJS's own) when
+ * the address is already held. Drops from the broker are reconnected,
+ * so a long-running listener outlives them. `relay` defaults to this
+ * process's own (`sharedTurnRelay`); its refreshes reach the page.
+ * Resolves `{ iceConfig(), close() }` (`iceConfig` is what PeerJS will
+ * build the next connection from).
+ */
+export async function listenAsGameMaster({ browser, baseUrl, name, onInvite, relay }) {
+  const { peer, context } = await openPeer(browser, baseUrl, { realBroker: true });
+  await peer.page.exposeFunction('__recardGameMasterInvite', onInvite);
+  // Everything the page needs is worked out here and passed in, not
+  // imported inside the page - so this file's import graph (what
+  // `make dist` packages, D174) is exactly what Node itself runs.
+  const settings = {
+    address: gameMasterAddress(name),
+    options: peerOptionsFromSearch(new URL(peer.page.url()).search),
+    invite: INVITE_MESSAGE,
+    accepted: ACCEPTED_MESSAGE,
+  };
+  // The Peer stays in the page; Node keeps a handle to it (for TURN
+  // refreshes, below) rather than publishing it on the page's global.
+  const held = await peer.page.evaluateHandle(({ address, options, invite, accepted }) => {
+    const listening = new globalThis.Peer(address, options);
+    listening.on('disconnected', () => { if (!listening.destroyed) listening.reconnect(); });
+    listening.on('connection', (conn) => conn.on('data', async (message) => {
+      if (message?.kind !== invite || typeof message.code !== 'string') return;
+      await globalThis.__recardGameMasterInvite(message.code);
+      conn.send({ kind: accepted });
+    }));
+    const ready = new Promise((resolve) => {
+      listening.on('open', () => resolve(null));
+      listening.on('error', (error) => resolve({ type: error.type, message: String(error.message) }));
+    });
+    return { listening, ready };
+  }, settings);
+  const failure = await held.evaluate(({ ready }) => ready);
+  if (failure) {
+    await context.close();
+    throw Object.assign(new Error(failure.message), { type: failure.type });
+  }
+  // US-151/D176: this page lives for days, past any one set of TURN
+  // credentials. PeerJS builds each new RTCPeerConnection from
+  // `peer.options.config`, so a refreshed set written there is what the
+  // next invite's connection uses.
+  const stopRefresh = (relay ?? await sharedTurnRelay())?.onRefresh(async (config) => {
+    try {
+      await held.evaluate(({ listening }, fresh) => { listening.options.config = fresh; }, config);
+    } catch {
+      // The page closed under a refresh: nothing left to update.
+    }
+  });
+  return {
+    iceConfig: () => held.evaluate(({ listening }) => listening.options.config),
+    close: () => {
+      stopRefresh?.();
+      return context.close();
+    },
+  };
 }
 
 /**
@@ -280,18 +364,40 @@ export async function hostTable({ browser, baseUrl, preset, spectate, realBroker
  * browser context, so its own player identity. `baseUrl` serves the app
  * the guest runs; the host can be anywhere the PeerJS broker reaches (a
  * table someone else is hosting). Resolves `{ peer, close() }` once the
- * join is sent; the host decides when it is seated.
+ * host has SEATED it (as a player, or as a spectator when it asked to
+ * watch or the game is full).
+ *
+ * US-150: a headless join occasionally never gets seated (found live:
+ * about 3 runs in 7 with five browsers joining on one box), and a bot
+ * can't press Join again the way a person would. So each attempt gets
+ * JOIN_TIMEOUT_MS, and up to JOIN_ATTEMPTS are made. A retry reloads
+ * the SAME context: the player key in its storage is kept, so the host
+ * reunites it with whatever seat a half-finished attempt got (US-38),
+ * rather than leaving a ghost holding one. Only the remembered session
+ * is cleared, so the reload shows the join form instead of auto-rejoining.
  */
 export async function joinTable({ browser, baseUrl, code, name, role, realBroker }) {
   const { peer, context } = await openPeer(browser, baseUrl, { realBroker });
-  await peer.page.click('#show-join');
-  await peer.page.fill('#join-name', name);
-  await peer.page.fill('#join-code', code);
-  // US-124: what this joiner ASKS to be. Omitted, the select keeps its
-  // default ('player'), so every existing caller is unchanged.
-  if (role) await peer.page.selectOption('#join-role', role);
-  await peer.page.click('#join-btn');
-  return { peer, close: () => context.close() };
+  for (let attempt = 1; ; attempt += 1) {
+    await peer.page.click('#show-join');
+    await peer.page.fill('#join-name', name);
+    await peer.page.fill('#join-code', code);
+    // US-124: what this joiner ASKS to be. Omitted, the select keeps its
+    // default ('player').
+    if (role) await peer.page.selectOption('#join-role', role);
+    await peer.page.click('#join-btn');
+    try {
+      await peer.waitForSeat({ timeout: JOIN_TIMEOUT_MS });
+      return { peer, close: () => context.close() };
+    } catch (error) {
+      if (attempt === JOIN_ATTEMPTS) {
+        await context.close();
+        throw new Error(`not seated at ${code} after ${JOIN_ATTEMPTS} tries of ${JOIN_TIMEOUT_MS / 1000}s - is the table open, and hosted from the same Recard version?`, { cause: error });
+      }
+      await peer.page.evaluate((key) => localStorage.removeItem(key), CLIENT_SESSION_STORAGE);
+      await peer.page.reload();
+    }
+  }
 }
 
 /**

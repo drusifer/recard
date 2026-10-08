@@ -777,3 +777,102 @@ This file contains critical lessons and rules derived from past errors, technica
   registered *before* the triggering click is required any time new code
   reaches a `globalThis.confirm`/`alert` (see also `newGame.browser.mjs`,
   `rtgPlaythrough.browser.mjs`).
+
+## Sprint "Gin bench/tournament/evolution" (2026-10-03/04): real scoring, match, tournament, evolution
+
+Direct user correction mid-sprint: a REAL scored game between two strategies
+over the real harness/API, not a headless simulator with a fake judge -
+"put two players in a game, have them play through, and then score the game
+play when they are finished." Shipped: `games/gin/scoring.yaml` (scoring as
+named XState states, mirroring `turn.yaml`'s own split - see this file's
+earlier polymorphism entries for the same discipline applied to UI), a real
+`tools/gin/match.mjs` (real table, real local-signaling WebRTC (D172), real
+bot processes, redeals between hands), `tools/gin/tournament.mjs`
+(round-robin), `tools/gin/evolve.mjs` (mutate/recombine/select, hard
+10-generation cap per direct user confirmation, seeded PRNG for
+determinism). Full detail: `agents/neo.docs/state.md` ("Sprint: Gin
+bench/tournament/evolution" entries).
+
+- **A process-spawn boundary can silently outrun every static name
+  registry.** `evolve.mjs` can mint a mutated/recombined strategy variant
+  that exists only as in-memory params - but a bot runs as a SEPARATE
+  process (`jevPlayer.mjs`) that only ever receives a NAME on its own CLI
+  flag, with no path to reconstruct those params. Two registries had to
+  learn about it, not one: `strategyKinds.mjs`'s `resolveStrategy` (via a
+  `GIN_VARIANT` JSON env var, set on that one bot's own spawn, checked only
+  as a last-resort fallback after both real registries) AND
+  `jev/runner.mjs`'s own pre-flight `--strategy` validation against
+  `adapter.strategies()`'s PRE-ENUMERATED map, which rejected the variant
+  as "unknown gin strategy" before `resolveStrategy` ever ran. Fixed in
+  `tools/gin/adapter.mjs` alone (adds the one `GIN_VARIANT` name to its own
+  map) - the game-agnostic runner stays unaware this mechanism exists.
+  Worth checking BOTH ends (name mint + name validate) any time a dynamic
+  value needs to cross a process-spawn boundary that was built assuming a
+  closed, static set of names.
+- **Module-level mutable "just a counter" state breaks determinism across
+  repeated calls in the same process - caught by the determinism test
+  itself, before it ever reached live verification.** `evolve.mjs`'s
+  variant-name counter lived at module scope; two separate
+  `runEvolution({seed: 42})` calls in the same process produced DIFFERENT
+  names for structurally-identical individuals, because the counter never
+  reset between calls. Fixed by creating the counter fresh inside each
+  `runEvolution` call and threading it through as a plain argument. A
+  seeded-PRNG determinism test is only as deterministic as every piece of
+  state it touches - not just the PRNG itself.
+- **A test's own cleanup can orphan a GRANDCHILD process.**
+  `tests/ginMatch.browser.mjs`'s `after()` SIGKILLed `match` by pid on
+  timeout, but the local PeerServer `playMatch` starts is a plain
+  (non-detached) CHILD of `match`, not of the test - SIGKILLing the parent
+  alone never reaches it. Found live: 3 orphaned `peerjs` processes
+  squatting on the test's own port from an earlier timed-out run, failing
+  every subsequent run with "peerjs never reported ready" until killed by
+  hand. Fixed with the same graceful-first escalation `jevTable.mjs`
+  already used elsewhere (SIGINT for `playMatch`'s own cleanup, SIGKILL
+  only as fallback) plus a defense-in-depth sweep of anything still on
+  that port - killing a pid is not killing its process tree.
+- Also fixed, per Neo's own sprint-close summary (full repro not re-dug
+  here - see `agents/CHAT.md` 2026-10-03T23:18 if more detail is ever
+  needed): a `gin-never-undercut` strategy edge case in the scoring
+  comparison.
+
+## 2026-10-06: Jev dist package (D174) + game master invite (US-150, D175)
+
+- **A packaging guard earns its keep on the next feature.** D174's unit
+  test re-bundles the packaged entry points. One sprint later it caught
+  `import('/src/...')` written inside a `page.evaluate` callback: code that
+  runs in the browser but sits in a Node file, so esbuild treated it as a
+  Node import. The fix was to compute the values in Node and pass them in,
+  not to exclude `/src/*` from the bundle check, which would also hide a
+  real missing file later.
+- **Reuse an existing mode as a child process to get isolation for free.**
+  A listening game master serves several tables by starting its own
+  `--code` mode once per table. A `quit` at one table can't reach another
+  because they are separate processes, and the tested `--code` path didn't
+  change at all.
+- **More concurrent headless browsers expose rare join failures.** Five
+  Chromium peers joining on one Pi left one join unseated about 3 runs in
+  7. The existing suites had never run that many at once. A bot can't
+  press Join again the way a person can, so `joinTable` now retries
+  (3 x 20s) and keeps the same player key so the host reunites any
+  half-taken seat. The root cause is still open (BACKLOG).
+- **A test run killed mid-suite skips its `after()` and orphans the local
+  PeerServer**, which then holds port 9000 and makes the NEXT suite fail
+  with "peerjs never reported ready". Before reading a browser-suite
+  failure as a regression, check for orphaned `peerjs` processes, then
+  confirm on a clean HEAD worktree. That is how `test-harness-mcp`'s 9
+  failures were shown to predate US-150.
+
+
+## 2026-10-07 - TURN relay sprint (US-151/152, D176)
+
+- **A traversal test must be able to reach a real file.** The first
+  `staticServer.test.js` cut used `../..` twice; from a repo 4 levels deep
+  that resolves to a non-existent path, so it 404'd with OR without the
+  guard and the mutation check passed silently. Climb past `/` (path
+  resolution clamps there) to a file that always exists (`/etc/passwd`).
+- **Reach page objects through a JSHandle, not a page global.** Lint
+  (`no-global-object-property-assignment`) pushed the listener's Peer onto
+  `page.evaluateHandle` returning `{ listening, ready }`; later evaluates
+  take the handle. No hidden page state, no race on `open`.
+- PeerJS builds every RTCPeerConnection from `peer.options.config`
+  (Negotiator), so writing it in place updates a long-lived peer.

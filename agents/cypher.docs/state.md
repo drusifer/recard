@@ -1,5 +1,24 @@
 # Agent State
 
+## Current Task (2026-10-07) - TURN relay sprint (US-151/152): DONE
+
+US-151/152 written + launched. Backlog: live verification in pi-patch with a real TURN key; refresh for in-table pages past 24h is out of scope.
+
+## Next Steps
+None queued; await user (commit, then rebuild image for a clean tag).
+
+---
+
+## Current Task (2026-10-06, sprint close)
+US-150 LAUNCHED 2026-10-06 (*pm launch posted). Retro items in docs/BACKLOG.md. Uncommitted - user's call.
+
+## Current Task (2026-10-06) - US-150 written, at Smith Gate 1
+
+`/sprint game master table discovery (ask to join in table talk)`. US-150 in docs/USER_STORIES.md:
+listening `jev-game-master --name <n>` (no --code) + `/invite <n>` in table talk. User picked named
+address + table talk via AskUserQuestion; Cypher chose the slash form (/roll precedent). Next: Smith
+gate -> Morpheus arch -> Smith gate -> Mouse. Launch (Step 10) is Cypher's at sprint close.
+
 ## Current Task (2026-09-29) - Cold-start note for /clear. Tree clean, HEAD 9472e39 on dev+main.
 
 Big arc since 2026-09-26, all Tier 2, all shipped/pushed/gated (bobp make check + live browser

@@ -1,5 +1,24 @@
 # Agent State
 
+## Current Task (2026-10-07) - TURN relay sprint (US-151/152): DONE
+
+D176 recorded (TURN relay per process from env; peerConfig URL param; listener refresh into peer.options.config; static server containment). Lint moved listener to JSHandle - better than D176 wording; Oracle to amend.
+
+## Next Steps
+None queued; await user (commit, then rebuild image for a clean tag).
+
+---
+
+## Current Task (2026-10-06, sprint close)
+US-150 all phases reviewed. D175 + 2 amendments (join retry; no in-page /src imports). Revisit retry if mDNS cause confirmed.
+
+## Current Task (2026-10-06) - US-150 arch D175 written, at Smith Gate 2
+
+D175: recard-gm-<name> PeerJS address; listener page + child process per table (existing --code
+mode, shared --url); host dials via session.inviteGameMaster; statuses inviting/accepted/
+no-answer(15s)/never-arrived(90s)/usage via data kind 'gm-invite-status'; shared pure module
+src/gameMasterInvite.js. Next: review Mouse's phase plan, then per-phase code review.
+
 ## Current Task (2026-09-26) - US-133 / D160 ui.js cluster 1 (`<action-menu>`) REVIEWED, NOT COMMITTED
 
 Done: src/components/ActionMenu.js, src/menuPosition.js, ui.js menus now plumbing, main.js imports the

@@ -21,7 +21,6 @@ import { pendingSpawnRequests, pendingQuits, spawnRefusal, readyAnnouncement } f
 const SPAWN_POLL_MS = 1000;
 const RUNNER = fileURLToPath(new URL('../jevPlayer.mjs', import.meta.url));
 const LOG_ROOT = fileURLToPath(new URL('../../build', import.meta.url));
-const SEAT_TIMEOUT_MS = 60_000;
 
 /**
  * A problem with how the player was started, not with the game: the CLI
@@ -166,11 +165,6 @@ export async function run(adapter, options) {
     // (plain, or carrying `--local-peer`'s query string from `jevTable.
     // mjs`/a human's own local setup), never in this call's own default.
     const { peer } = await joinTable({ browser, baseUrl, code: options.code, name, realBroker: true });
-    try {
-      await peer.waitForSeat({ timeout: SEAT_TIMEOUT_MS });
-    } catch (error) {
-      throw new Error(`not seated within ${SEAT_TIMEOUT_MS / 1000}s - is table ${options.code} open, and hosted from the same Recard version?`, { cause: error });
-    }
     // US-124/US-125: a full or already-started table seats a newcomer as
     // a SPECTATOR, which is never dealt in. Say so instead of waiting
     // forever for a deal that cannot come.

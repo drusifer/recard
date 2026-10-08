@@ -1,5 +1,17 @@
 # Agent State
 
+## Current Task (2026-10-07) - TURN relay sprint (US-151/152): DONE
+
+US-151/152 gate: make check, test-gmlisten (3), test-jev-game-master (5) green. Mutations: containment guard (4 fail), listener config write (1 fail), refresh notify (1 fail). Gap: no live Cloudflare test - needs real key.
+
+## Next Steps
+None queued; await user (commit, then rebuild image for a clean tag).
+
+---
+
+## Current Task (2026-10-06, sprint close)
+US-150 UAT all 4 phases passed. Open: harness-mcp fails 9/13 at HEAD too (pre-existing); US-150 regression gate incomplete (BACKLOG).
+
 ## Current Task (2026-09-25) - US-130 UAT PASSED: check clean, test-jevtable 8/8 (1.1-2.1s), regressions clean, mutation caught
 
 check exit 0. test-jevtable 8 consecutive green after an intermittent red (which was a REAL bug:

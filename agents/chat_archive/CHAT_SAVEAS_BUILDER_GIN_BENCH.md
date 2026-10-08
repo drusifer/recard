@@ -1,0 +1,755 @@
+# CHAT_SAVEAS_BUILDER_GIN_BENCH — Sprint Archive
+
+## Summary
+
+Smith's live UX gate APPROVED US-148/149 (SaveAs inline naming + Builder menu, no defects, incl. AC4's from-scratch Blank preset). Oracle groomed docs: ARCHITECTURE.md module map gained ~20 undocumented tools/gin/* entries (bench/tournament/evolution + older US-120 files), README doc index refreshed, lessons.md gained the Gin-bench sprint's bugs. Mouse closed both sprints in task.md, incl. backfilling the Gin bench sprint (D172/173) which had never been entered at all - disclosed one gap: that sprint never had a Trin/Morpheus gate, flagged for the user's call.
+
+---
+[<small>2026-09-29 22:29:34</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+10:29PM INF no leaks found
+10:29PM INF 1 commits scanned.
+10:29PM INF scanned ~20984 bytes (20.98 KB) in 258ms
+10:29PM INF no leaks found
+
+---
+[<small>2026-09-29 22:45:18</small>] [**Cypher**]->[**Smith**] *pm story*:
+ US-145 (Flip control redesign) in docs/USER_STORIES.md. User's own design answers up front: all 3 directions (Column/Row/Fan) everywhere - a real behavior change from today's 2-option toggle; mini card-stack preview illustrations, not glyphs; same gear-menu slot, no new popover. AC reuses changePileType's existing buildEnumActionMenu control rather than a new widget. @Smith *user review US-145
+
+---
+[<small>2026-09-29 22:45:30</small>] [**Smith**]->[**Morpheus**] *user approve*:
+ *user approve US-145 with 1 condition: AC2's preview icon must sit ALONSIDE the Column/Row/Fan text label, never replace it - same 'colour/shape is decoration, text is the real signal' rule this project already applies to deck-choice colour dots (WCAG 1.4.1). A 3-icon-only menu with no words is a guessing game the first time you see it. Otherwise clean: reuses a proven control (changePileType's disclosure), testable AC, gating unchanged. @Morpheus *lead arch sprint
+
+---
+[<small>2026-09-29 22:46:40</small>] [**Morpheus**]->[**Smith**] *lead handoff*:
+ D167: SET_STACK_DIRECTION replaces FLIP_STACK outright (same shape as ADJUST_PILE_SPREAD->SET_STACK_SPREAD). flipStack becomes enum:true, reuses changePileType's buildEnumActionMenu unchanged. New: optional choice.preview factory alongside the label (your WCAG condition). Found+fixed: openStackActionMenu never called the shared buildSpecialActionControl - duplicated its range branch, why enum never worked as a stack action. Full text docs/DECISIONS.md D167.
+
+---
+[<small>2026-09-29 22:46:46</small>] [**Smith**]->[**Mouse**] *user approve*:
+ *user approve D167. Reusing changePileType's proven control is the right call - no new interaction pattern to learn. WCAG condition met by design (preview is a factory ALONGSIDE the label, never replacing it). One nit for Neo, non-blocking: Column/Row/Fan reads clearer than Vertical/Horizontal/Fan for someone who's never seen this menu - keep those labels. @Mouse *sm plan sprint
+
+---
+[<small>2026-09-29 22:47:16</small>] [**Mouse**]->[**Morpheus**] *sm handoff*:
+ Sprint plan for US-145 in task.md: 2 phases. 1 reducer+registry shape change (SET_STACK_DIRECTION, flippedDirection deleted, enum:true spec), 2 UI wiring (buildEnumActionMenu preview support, openStackActionMenu's real gap fix, preview builder+CSS). @Morpheus *lead review sprint plan
+
+---
+[<small>2026-09-29 22:47:16</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ *lead review sprint plan: APPROVED. Order is right - the reducer/action shape must exist before the UI can dispatch it. Phase 2 note for Neo: fixing openStackActionMenu's missed buildSpecialActionControl call is itself worth a mutation-proof (revert it, confirm flipStack's menu breaks) since it's the thing that makes this story possible at all. @Neo *swe impl phase-1
+
+---
+[<small>2026-09-29 22:52:36</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+10:52PM INF no leaks found
+10:52PM INF 1 commits scanned.
+10:52PM INF scanned ~20082 bytes (20.08 KB) in 253ms
+10:52PM INF no leaks found
+
+---
+[<small>2026-09-29 22:53:17</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 1 complete (US-145/D167): SET_STACK_DIRECTION replaces FLIP_STACK (explicit target, not a toggle); Stack.flippedDirection() deleted; Pile.js's flipStack registry entry threads value->direction (performStackAction already supported it, no new plumbing); pileActions.js flipStack gains enum:true. Tests rewritten. check clean, 315 unit green. Expected: test-ui's flipStack click test is red until Phase 2 wires the UI - the plan's own phase split, not a regression.
+
+---
+[<small>2026-09-29 22:55:48</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+10:55PM INF no leaks found
+10:55PM INF 1 commits scanned.
+10:55PM INF scanned ~21107 bytes (21.11 KB) in 257ms
+10:55PM INF no leaks found
+
+---
+[<small>2026-09-29 22:55:55</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 1 PASSED. check clean, 315 unit tests. Mutation-proved the direction-validation guard: removing it fails 'rejects a direction that is not vertical/horizontal/fan' (285 pass/1 fail), confirming it's load-bearing not decorative. Verified AC3 (explicit set, no toggle math left anywhere) and AC6's throw-on-unknown-pile/stack parity with SET_STACK_SPREAD. Known red (expected, not a regression): test-ui's old flipStack click test, until Phase 2 wires the enum UI. @Morpheus *lead review phase-1
+
+---
+[<small>2026-09-29 22:56:00</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 1 review PASSED. The reducer-shape swap is exactly D167's plan: SET_STACK_DIRECTION takes an explicit target, validated against Stackable.js's own exported constants (never a magic string), and flippedDirection()'s deletion leaves no dead code behind. @Neo *swe impl phase-2
+
+---
+[<small>2026-09-29 23:11:25</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-zonepanel | /home/drusifer/Projects/recard/build/build.out
+✔ with drop callbacks the body ends in a drop gutter (7.886328ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1409.502082
+
+---
+[<small>2026-09-29 23:11:54</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 2 complete (US-145/D167, last phase): buildEnumActionMenu gains choice.preview (alongside label, Smith's condition); openStackActionMenu now calls the shared buildSpecialActionControl instead of duplicating its range branch. REAL BUG found live: action-menu's document-click-close caught the enum summary's native toggle (no stopPropagation), closing the popup on the click meant to open Flip. Fixed + mutation-proved. test-ui 21/21 (3x clean), rtg/headeractions/zonepanel green.
+
+---
+[<small>2026-09-29 23:12:00</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 2 PASSED (both phases done). check clean; test-ui 21/21 (3x stress), rtg 16/16, headeractions 9/9, zonepanel 6/6. Verified AC1 (3 choices, aria-current), AC2 (preview alongside label - dedicated test asserts the text is still there, not just the icon), AC3 (no-op on current choice, inherited from changePileType's own proven behavior). Independently reproduced Neo's summary/stopPropagation bug before seeing the fix, by disabling it and watching the exact same symptom. @Morpheus *lead review phase-2
+
+---
+[<small>2026-09-29 23:12:06</small>] [**Morpheus**]->[**Oracle**] *lead handoff*:
+ All phases reviewed, PASSED. US-145/D167 held up exactly as designed - reusing changePileType's proven control cost zero new interaction code, and the ONE real gap (action-menu's document-click-close vs a native <details> toggle) was found by actually running it, not left for a live bug report later. @Oracle *ora groom
+
+---
+[<small>2026-09-29 23:12:30</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-story-numbers | /home/drusifer/Projects/recard/build/build.out
+node tools/checkStoryNumbers.mjs
+Checked 105 story headings in docs/USER_STORIES.md.
+No duplicate story numbers. Clean.
+
+---
+[<small>2026-09-29 23:12:36</small>] [**Oracle**]->[**Smith**] *ora handoff*:
+ Docs groomed: BACKLOG.md's Flip item marked SHIPPED. 1 lesson recorded: a proven control reused inside a NEW container (a popup with its own close-on-click-anywhere listener) still needs an actual run, not just trust from where it worked before - that's exactly what found the summary/stopPropagation gap. check-decisions/check-story-numbers clean.
+
+---
+[<small>2026-09-29 23:23:25</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-ui | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12372.929184
+
+---
+[<small>2026-09-29 23:23:59</small>] [**Smith**]->[**Trin**] *user bug*:
+ *user test US-145: found a real bug BEFORE approving - looked at the actual menu (my own standing rule: never just read a test report), and Flip's 3 choices rendered completely INVISIBLE. All 21 test-ui tests were green throughout, including the brand-new Flip ones - the outer popup's overflow:hidden was clipping the nested dropdown, and neither count()/textContent() nor Playwright's own click actionability checks notice an ancestor's overflow clip. @Trin *qa reject - real defect, not my approval yet.
+
+---
+[<small>2026-09-29 23:24:04</small>] [**Trin**]->[**Neo**] *qa reject*:
+ Confirmed via elementFromPoint hit-test (real occlusion check, not DOM presence) - none of Flip's 3 rows were actually painted at their own screen position. @Neo *swe fix invisible-flip-menu
+
+---
+[<small>2026-09-29 23:24:18</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Fixed: outer <action-menu> reuses .pile-action-menu's own classname for its shell, including overflow:hidden meant to clip a plain row's corners - the enum's nested dropdown must render below that box, so it got clipped to nothing. Scoped .stack-action-menu{overflow:visible} override; added an elementFromPoint hit-test to the test (proves real paint, not just DOM presence). Mutation-proved both the CSS fix and the new check separately. check clean, test-ui 21/21 (3x stress-clean). @Trin *qa uat retry
+
+---
+[<small>2026-09-29 23:24:23</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT PASSED. Screenshotted the live menu myself (Column/Row/Fan, each with a small preview icon, checkmark on the current choice) - matches what Smith described wanting, not just green tests this time. @Morpheus *lead review the fix
+
+---
+[<small>2026-09-29 23:24:30</small>] [**Morpheus**]->[**Oracle**] *lead handoff*:
+ Fix reviewed, PASSED. Scoped override (.stack-action-menu only) is the right call over widening .pile-action-menu's own overflow - keeps the card-context-menu's tight rounded-corner clipping intact. The elementFromPoint test is a good general-purpose addition too - worth remembering for any future popup-in-a-popup reuse. @Oracle *ora groom
+
+---
+[<small>2026-09-29 23:24:56</small>] [**Oracle**]->[**Smith**] *ora handoff*:
+ Docs re-groomed: lessons.md expanded with the real finding - a green test-ui suite (21/21, incl. new Flip tests) coexisted with a completely invisible menu, because neither count()/textContent() nor Playwright's actionability checks notice an ancestor's overflow clip. Only Smith's own 'always look' rule caught it. elementFromPoint hit-testing is now the documented pattern for popup-in-popup reuse. @Smith *user test US-145 retry
+
+---
+[<small>2026-09-29 23:25:03</small>] [**Smith**]->[**all**] *user approve*:
+ *user test US-145: PASSED for real this time - re-looked at the live menu after the overflow fix, Column/Row/Fan all render with their previews, current choice checked. @all *sprint retro
+
+---
+[<small>2026-09-29 23:25:10</small>] [**Neo**]->[**Cypher**] *retro*:
+ Neo retro: reusing a proven control (changePileType's enum menu) in a new container cost 2 real integration bugs, not 0 - reuse isn't free just because the reused thing was already correct in its OWN context. Both were found by running it, one by a test, one only by looking. Tech debt: none added; SET_STACK_DIRECTION/flippedDirection's deletion left no dead code.
+
+---
+[<small>2026-09-29 23:25:17</small>] [**Trin**]->[**Cypher**] *retro*:
+ Trin retro: the real miss is mine, not just found by me - I approved Phase 2 UAT while the menu was genuinely invisible, because every check I ran (count/textContent) reads the DOM, not the screen. Added elementFromPoint hit-testing as the fix for the test suite itself, not just the bug. Suite health: 3 unit + rewrote 1 browser test + added 1 new one, zero flakes across 3 stress runs.
+
+---
+[<small>2026-09-29 23:25:24</small>] [**Morpheus**]->[**Cypher**] *retro*:
+ Morpheus retro: D167 held architecturally (the reducer shape, the control choice, the registry plumbing all worked first try) - both real defects were in the INTEGRATION of a proven piece into a new context, not in anything this sprint designed from scratch. Worth generalizing: 'this control works elsewhere' is not evidence it works HERE - the container matters as much as the control.
+
+---
+[<small>2026-09-29 23:25:30</small>] [**Oracle**]->[**Cypher**] *retro*:
+ Oracle retro: D167 recorded with the rejected alternative (a bespoke radio component). Gap NOT left this time: both live-found bugs got their own lesson entries same sprint, with enough detail (root cause, why tests missed it, the fix pattern) to actually change future behavior, not just log that something broke.
+
+---
+[<small>2026-09-29 23:25:37</small>] [**Mouse**]->[**Cypher**] *retro*:
+ Mouse retro: 2 phases as planned, but a real fix loop happened AFTER the plan said done - Smith's own re-test caught what Trin's UAT missed, and the Anti-Loop Protocol never had to engage (one loop, resolved). Sizing was right; the miss wasn't phase size, it was verification depth.
+
+---
+[<small>2026-09-29 23:25:43</small>] [**Smith**]->[**Cypher**] *retro*:
+ Smith retro: the gate earned its keep in the most literal way possible - approving on green tests alone would have shipped a completely invisible control. 'Always look' isn't ceremony, it's the only check in this whole pipeline that actually sees what a person sees. Standing ask unchanged: keep it that way.
+
+---
+[<small>2026-09-29 23:25:57</small>] [**Cypher**]->[**all**] *pm launch*:
+ *pm launch US-145. Flip is now a 3-way Column/Row/Fan choice with preview icons (D167), reusing changePileType's proven disclosure control. 2 real integration bugs found+fixed live: a document-click-close listener eating the control's own toggle click, and an inherited overflow:hidden making the menu invisible while every test stayed green - only Smith's own 'look, don't read a report' rule caught the second. check clean; test-ui 21/21 (3x clean). 2 lessons + 1 queued nit to BACKLOG.md. Sprint complete.
+
+---
+[<small>2026-09-30 00:03:07</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-rtg | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12125.035158
+
+---
+[<small>2026-09-30 00:04:40</small>] [**Neo**]->[**Cypher**] *swe nit*:
+ *nit stack-gear repositioned top-right -> top-left, direct user request. .stack-gear's right:-0.3rem -> left:-0.3rem; top edge (-0.6rem) unchanged, so the battlefield row's own top-padding reservation needed no change. Verified geometrically (gear's left edge flush with the stack's own) + test-ui/test-rtg green (neither test asserts a side). check clean.
+
+---
+[<small>2026-09-30 00:06:12</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+12:06AM INF no leaks found
+12:06AM INF 1 commits scanned.
+12:06AM INF scanned ~56240 bytes (56.24 KB) in 267ms
+12:06AM INF no leaks found
+
+---
+[<small>2026-09-30 00:43:25</small>] [**Cypher**]->[**Smith**] *pm story*:
+ US-146 (remote-cursor redesign) in docs/USER_STORIES.md. User's own verification answer: no live human session - a dedicated harness test player (not Jev/AI), driven programmatically to hover a pile, two of them through real WebRTC. Scoped to piles only (zones have no stable DOM id today). @Smith *user review US-146
+
+---
+[<small>2026-09-30 00:43:36</small>] [**Smith**]->[**Morpheus**] *user approve*:
+ *user approve US-146 with 1 condition: the glide transition must be quick (150-250ms), not showy - this is positional feedback during a live drag, not a spectacle; a slow glide would visibly lag behind where the other player actually is. Two accepted trade-offs worth naming, not defects: cursor disappears over empty table/unrendered piles (intentional - nothing correct to glide to), and exact WITHIN-pile position is gone (that's the whole point of the redesign). @Morpheus *lead arch sprint
+
+---
+[<small>2026-09-30 00:44:33</small>] [**Morpheus**]->[**Smith**] *lead handoff*:
+ D168: sender detects the pile under the pointer (elementFromPoint+closest), broadcasts pileId on change only, not raw x/y. Receiver resolves against its OWN DOM and reuses the ALREADY-EXISTING .remote-cursor CSS transition (was 0.08s smoothing for jittery coords, now 0.2s ease-out per your condition - same plumbing, no new animation code). No pileId hides the cursor. Verification: HarnessPeer gains hoverPile(pileId) - real mouse.move, two real peers prove it cross-client. Full text docs/DECISIONS.md D168.
+
+---
+[<small>2026-09-30 00:44:39</small>] [**Smith**]->[**Mouse**] *user approve*:
+ *user approve D168. Reusing the existing transition rather than inventing new animation is exactly right - it's the same mechanism, just pointed at a better target. 0.2s ease-out reads as arriving, not sliding - good call on the easing too, I only asked for the duration. @Mouse *sm plan sprint
+
+---
+[<small>2026-09-30 00:45:01</small>] [**Mouse**]->[**Morpheus**] *sm handoff*:
+ Sprint plan for US-146 in task.md: 2 phases. 1 protocol+rendering change (main.js/ui.js/style.css), 2 harness hoverPile() + real cross-client browser test. @Morpheus *lead review sprint plan
+
+---
+[<small>2026-09-30 00:45:01</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ *lead review sprint plan: APPROVED. Order is right - can't write a real cross-client test against a mechanism that doesn't exist yet. @Neo *swe impl phase-1
+
+---
+[<small>2026-09-30 00:48:12</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-ui | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12198.227307
+
+---
+[<small>2026-09-30 00:48:25</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 1 complete (US-146/D168): sender broadcasts pileId (elementFromPoint+closest, on change only) instead of raw x/y; receiver resolves against its OWN DOM, no back-compat left anywhere (confirmed - grepped for old x/y refs, none). ui.js's updateRemoteCursor now takes the target pile element and computes its own center. CSS transition 0.08s->0.2s ease-out. check clean; multiplayer 5/5, test-ui 21/21 green.
+
+---
+[<small>2026-09-30 00:48:37</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 1 PASSED (code-review level - real cross-client proof is Phase 2's own job, not duplicated here). check clean; multiplayer/test-ui green, no regression. Verified: lastHoveredPileId resets on pointerup (a same-pile re-hover after a gesture gap still sends), CSS.escape used on both the querySelector lookups (pile ids come from data attributes, not user text, but the pattern matches every other id-lookup in this file). @Morpheus *lead review phase-1
+
+---
+[<small>2026-09-30 00:48:43</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ Phase 1 review PASSED. D168 held exactly: no coordinate math survives anywhere, the receiver's own DOM is the only source of truth for where a pile actually sits on ITS screen. @Neo *swe impl phase-2
+
+---
+[<small>2026-09-30 00:55:16</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-multiplayer | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4646.241224
+
+---
+[<small>2026-09-30 00:55:59</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 2 complete (US-146/D168, last phase): HarnessPeer.pointerDown/hoverPile/pointerUp - real mouse events, not synthetic dispatch. New tests/remoteCursor.browser.mjs: 2 tests, two real peers over real WebRTC, no human watching. Mutation-proved (force pileId null -> both tests fail correctly) AND visually confirmed via screenshot (host's labeled cursor lands exactly on the guest's OWN deck panel, not a mirrored coordinate). check clean; test-remotecursor 2/2 (3x clean), multiplayer 5/5.
+
+---
+[<small>2026-09-30 00:56:06</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT phase 2 PASSED (both phases done). check clean; remotecursor 2/2 (3x stress), multiplayer 5/5. Verified AC4 (real harness player, real mouse events, not dispatch), AC3 (moving off-pile removes the cursor, own test), AC5 (no old test existed to rewrite - confirmed via grep before this sprint, so nothing was silently left behind). Also independently re-ran the mutation myself before trusting Neo's claim. @Morpheus *lead review phase-2
+
+---
+[<small>2026-09-30 00:56:14</small>] [**Morpheus**]->[**Oracle**] *lead handoff*:
+ All phases reviewed, PASSED. D168's own bet paid off - reusing the existing transition plumbing meant the only new code was detection (sender) and resolution (receiver), nothing new to animate. The harness test player is a real, reusable pattern now (pointerDown/hoverPile/pointerUp) for any future live-interaction redesign that used to need a human watching. @Oracle *ora groom
+
+---
+[<small>2026-09-30 00:57:01</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-story-numbers | /home/drusifer/Projects/recard/build/build.out
+node tools/checkStoryNumbers.mjs
+Checked 106 story headings in docs/USER_STORIES.md.
+No duplicate story numbers. Clean.
+
+---
+[<small>2026-09-30 00:57:08</small>] [**Oracle**]->[**Smith**] *ora handoff*:
+ Docs groomed: ARCHITECTURE.md's stale 'motion messages aren't asserted yet' corrected for cursor (still true for card-drag). BACKLOG.md's Remote-cursor item + its harness-follow-up sub-item marked shipped. 1 lesson: the harness test player broke a false binary ('live human' vs 'ship unverified') that had blocked this item since 2026-09-16 - worth reaching for before accepting either extreme next time. check-decisions/check-story-numbers clean.
+
+---
+[<small>2026-09-30 00:57:15</small>] [**Smith**]->[**all**] *user approve*:
+ *user test US-146: PASSED. Looked at the actual result (screenshot, not a report): the guest's screen shows the host's labeled cursor dot landing squarely on the guest's OWN Deck panel, in the guest's own layout - not a mirrored coordinate. The 0.2s glide reads as arriving, matches my Gate 1 ask. No rough edges found. @all *sprint retro
+
+---
+[<small>2026-09-30 00:57:22</small>] [**Neo**]->[**Cypher**] *retro*:
+ Neo retro: the real design insight was checking WHAT already existed before building anything - the .remote-cursor transition, the pile's own data-pile-id, performStackAction's value-threading (last sprint) - three separate 'already there' discoveries across two sprints now. Tech debt: none added; card-drag motion sync remains the one gap this pattern hasn't reached yet (filed).
+
+---
+[<small>2026-09-30 00:57:28</small>] [**Trin**]->[**Cypher**] *retro*:
+ Trin retro: this feature had ZERO test coverage since US-22 (2026-08-ish) and now has 2 real cross-client tests plus a reusable harness capability. Both mutation-proved AND visually confirmed - belt and suspenders after last sprint's invisible-menu miss taught that green alone isn't enough. Suite health: 3 new harness methods, 2 new tests, zero flakes across 3 runs.
+
+---
+[<small>2026-09-30 00:57:34</small>] [**Morpheus**]->[**Cypher**] *retro*:
+ Morpheus retro: D168 is the cleanest kind of fix - replacing a wrong abstraction (screen fraction) with a right one (pile id) cost LESS code than the thing it replaced, not more. The harness test player is the bigger win long-term: it turns 'needs a human' from a hard blocker into a design question (can this be driven programmatically?) for every future live-interaction item in the backlog.
+
+---
+[<small>2026-09-30 00:57:40</small>] [**Oracle**]->[**Cypher**] *retro*:
+ Oracle retro: D168 recorded with the rejected alternative (patch the symptom, keep raw coordinates). ARCHITECTURE.md's own drift caught again this sprint (stale 'motion not asserted' line) - worth a standing habit of checking that file whenever a sprint touches something it describes, not just when grooming notices.
+
+---
+[<small>2026-09-30 00:57:46</small>] [**Mouse**]->[**Cypher**] *retro*:
+ Mouse retro: 2 phases, no re-planning, no fix loops - the smoothest sprint of the three run today. Sizing was right because the plan followed the architecture's own dependency order exactly (mechanism before proof), same pattern as the last two sprints.
+
+---
+[<small>2026-09-30 00:57:52</small>] [**Smith**]->[**Cypher**] *retro*:
+ Smith retro: the user's own answer ('use a jav player or two') is the real UX lesson here, not mine - a standing blocker got unstuck by the person who owns the product reframing the QUESTION, not by me pushing harder on either of the two options it was stuck between. Worth remembering: a blocked backlog item may need a better question, not a decision.
+
+---
+[<small>2026-09-30 00:57:58</small>] [**Cypher**]->[**all**] *pm launch*:
+ *pm launch US-146. Remote cursor now glides onto the pile it enters (pileId broadcast, resolved against each viewer's own DOM) instead of mirroring raw screen coordinates - a standing D13 limitation, finally fixed by D68's own already-correct pattern. Verified your way: a new harness test player (pointerDown/hoverPile/pointerUp, real mouse events) drove two real peers, no live session needed. Visually confirmed + mutation-proved. check clean; remotecursor 2/2 (3x clean), multiplayer 5/5. Sprint complete.
+
+---
+[<small>2026-09-30 15:07:18</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-story-numbers | /home/drusifer/Projects/recard/build/build.out
+node tools/checkStoryNumbers.mjs
+Checked 107 story headings in docs/USER_STORIES.md.
+No duplicate story numbers. Clean.
+
+---
+[<small>2026-09-30 15:07:50</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ US-147/D169: renamed stack 'direction' to 'style' (no back-compat). New JUMBLE style - tokens default to a disordered pile. 3 real bugs found generalizing it: jumble's offset was signed (landed behind the origin, overlapping content above); Stack.extent() took the LAST item (wrong for scatter, now MAX); --raise-base only painted under .fan-row (tokens hit this exact gap once before via an old patch, now fixed properly). Also fixed a fragile test-helper click. check clean, all suites green.
+
+---
+[<small>2026-09-30 15:07:57</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ UAT PASSED. Screenshotted the live result (not just green tests): a Chips & Tokens table shows tokens genuinely scattered and tilted, not a neat pile. Independently confirmed each of the 3 bug fixes via mutation - stashed the whole diff against clean dev and re-ran the exact failing tests, confirmed they fail on baseline too where relevant, confirmed they pass only with each fix present. check clean; rtg 16/16 (3x stress), full suite + every other browser suite green.
+
+---
+[<small>2026-09-30 15:08:11</small>] [**Morpheus**]->[**Smith**] *lead handoff*:
+ Review PASSED. Every fix generalized, none patched around: unsigned offsets fix any future style's scatter needs, not just jumble; extent()'s MAX is correct for all four styles; --raise-base's universal consumption is what D129 always meant by 'a stack layout like any other' - fan was accidentally special-cased. Deleting the old token-specific CSS hack outright, not leaving it beside the real mechanism, is exactly right. @Smith *user test - tokens' default look changed
+
+---
+[<small>2026-09-30 15:08:19</small>] [**Smith**]->[**all**] *user approve*:
+ *user test PASSED. Looked at the actual table: a fresh Chips & Tokens supply reads as a genuine disordered heap - scattered position AND tilt, not a neat stack with a count badge. Matches 'keeps the stackables in a disordered pile' literally, no manual spread adjustment needed to see it. Flip's menu correctly offers Jumble as a 4th choice with its own preview icon, same treatment as the other three.
+
+---
+[<small>2026-09-30 15:10:19</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+gitleaks git --no-banner --redact --pre-commit .
+3:10PM INF 1 commits scanned.
+3:10PM INF scanned ~49870 bytes (49.87 KB) in 262ms
+3:10PM INF no leaks found
+
+---
+[<small>2026-09-30 20:06:44</small>] [**Cypher**]->[**User**] *pm handoff*:
+ Prep for /clear: tree clean, HEAD 4cd8326 on dev+main, no stray processes. This session shipped 4 sprints: US-144/D166 (host-setup split), US-145/D167 (Flip redesign), US-146/D168 (remote-cursor redesign), US-147/D169 (stack direction->style + Jumble). All committed+pushed. Full cold-start notes in agents/cypher.docs/state.md and agents/neo.docs/state.md.
+
+---
+[<small>2026-09-30 20:11:25</small>] [**Cypher**]->[**User**] *pm ask*:
+ *pm ask what's in the backlog? - summarized docs/BACKLOG.md Product + Technical/testing sections for the user; nothing started, no state change.
+
+---
+[<small>2026-09-30 20:19:26</small>] [**Cypher**]->[**all**] *pm decision*:
+ 4 backlog Qs answered by user: (1) RtG quit-grace cut-off -> accept, no change. (2) SIGTERM ~11s shutdown -> shorten further (Neo to pick numbers). (3) SaveAs window.prompt() -> scoped as US-148. (4) Builder screen -> scoped as US-149 (add-zone/add-pile menu). Full text: docs/BACKLOG.md, docs/USER_STORIES.md.
+
+---
+[<small>2026-09-30 20:20:18</small>] [**Cypher**]->[**Morpheus**] *pm plan sprint*:
+ *pm plan sprint: US-148 (SaveAs naming UI) + US-149 (Builder menu: add zone/pile). Both pickable directly, no open design question - Tier 2 fast-track (AGENTS.md rule 10): combining story+arch in one turn with Morpheus. @Morpheus *lead arch sprint
+
+---
+[<small>2026-09-30 20:21:36</small>] [**Morpheus**]->[**Smith**] *lead handoff*:
+ *lead arch sprint: D170 (US-148) SaveAs naming reuses header-actions's own inline-rename pattern (Enter/Escape/blur), not a new dialog. D171 (US-149) ADD_ZONE/ADD_PILE reuse ensureZoneRecord + the existing kind->class pile registry (D56) - no new builder-mode screen, replicated like any other action. Full text: docs/DECISIONS.md. @Smith *user feedback US-148/149 arch
+
+---
+[<small>2026-09-30 20:21:51</small>] [**Smith**]->[**Mouse**] *user approve*:
+ *user approve. D170/171 both sound: reuse over invention, no new idioms. One nuance for Neo: US-148's 'Save Layout As' is a BUTTON today, not an existing label - the inline-input reveal needs a sensible trigger point (e.g. input replaces/appears beside the button on click), not literally double-click like the zone/pile rename. @Mouse *sm plan sprint
+
+---
+[<small>2026-09-30 20:22:09</small>] [**Mouse**]->[**Neo**] *sm handoff*:
+ *sm plan sprint: 2 phases in task.md. Phase 1 US-148 (SaveAs inline naming, 1 task). Phase 2 US-149 (ADD_ZONE+ADD_PILE reducer actions + menu wiring + live test, 3 tasks). Tier 2 fast-track - handing straight to Neo per AGENTS.md rule 10.2. @Neo *swe impl phase-1
+
+---
+[<small>2026-09-30 20:28:43</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+8:28PM INF no leaks found
+8:28PM INF 1 commits scanned.
+8:28PM INF scanned ~18105 bytes (18.10 KB) in 257ms
+8:28PM INF no leaks found
+
+---
+[<small>2026-09-30 20:28:49</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 1 (US-148) impl complete. layoutSave.js performSaveLayoutAs: button swaps for an inline input (Enter/Escape/blank-reverts, D170's reuse of header-actions's rename idiom), no more globalThis.prompt(). New tests/layoutSave.browser.mjs (3 tests), mutation-proved (git-stash baseline fails all 3, exact symptom: input never appears). check clean. @Trin *qa uat phase-1
+
+---
+[<small>2026-09-30 20:29:05</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat phase-1 PASSED. AC1-3 covered: button->input swap (not double-click, matches Smith's condition), Enter commits+saves under typed name, Escape/blank revert with zero dialog reached (asserted via page.on('dialog') never firing). AC2 (alert/confirm unchanged) verified: save-success alert still fires on a real commit. check clean, mutation-proved by Neo (git-stash baseline, all 3 fail with exact symptom). @Morpheus *lead review phase-1
+
+---
+[<small>2026-09-30 20:29:10</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ *lead review phase-1 PASSED. Matches D170 exactly: button-as-trigger (not a fake double-click label), same commit/cancel idiom as header-actions, no new dialog component. Scope held - alert/confirm untouched. @Neo *swe impl phase-2
+
+---
+[<small>2026-09-30 20:33:09</small>] [**Neo**]->[**all**] *swe decision*:
+ Found live (D171 corrected): CREATE_ZONE/CREATE_PILE already exist in state.js, fully unit-tested, replicated like any action - ONLY their UI entry point was ever removed (main.js's own standing comment says so). US-149 is UI-only: no new reducer action, no new replication test (would duplicate existing coverage - prune not pad). docs/DECISIONS.md D171, USER_STORIES.md, task.md updated to match. Proceeding with Neo *swe impl phase-2 (UI-only now).
+
+---
+[<small>2026-09-30 20:40:45</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-buildermenu | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5720.29908
+
+---
+[<small>2026-09-30 20:40:51</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ Phase 2 (US-149) impl complete. UI-only, as D171's correction found: performCreateZone/performCreatePile (tableActions.js) are plain dispatchOrAlert calls onto the ALREADY-EXISTING CREATE_ZONE/CREATE_PILE. New src/builderMenu.js wires #add-zone-btn/#add-pile-btn (inline kind+zone <select> forms, same button-swap idiom as US-148). New tests/builderMenu.browser.mjs (3 tests), mutation-proved (baseline has no #add-zone-btn at all - exact symptom). check clean. @Trin *qa uat phase-2
+
+---
+[<small>2026-09-30 20:41:00</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat phase-2 PASSED. AC1/AC2 covered (kind picker for Add Zone; kind+zone picker for Add Pile, only shared zones offered). AC3 (replication) correctly NOT re-tested - CREATE_ZONE/CREATE_PILE are generic reducer actions, D13 replication is proven once for all actions, re-asserting per-action would be redundant. AC4 (works preset-agnostic) holds - neither action reads selectedPreset. check clean, mutation-proved by Neo. @Morpheus *lead review phase-2
+
+---
+[<small>2026-09-30 20:41:06</small>] [**Morpheus**]->[**Oracle**] *lead handoff*:
+ *lead review phase-2 PASSED. Clean minimal fix: reused CREATE_ZONE/CREATE_PILE outright instead of inventing ADD_ZONE/ADD_PILE once the live check found them already there - correctly not routed through the Pile/Zone descriptor registries (D165), since there's no instance yet to ask. All phases reviewed. @Oracle *ora groom
+
+---
+[<small>2026-09-30 20:42:01</small>] [**Oracle**]->[**Smith**] *ora handoff*:
+ *ora groom: docs/ARCHITECTURE.md module map +builderMenu.js entry; docs/BACKLOG.md both US-148/149 backlog entries marked SHIPPED (were SCOPED). No decision-log drift to backfill - D170/171 posted live as made. @Smith *user test US-148/149
+
+---
+[<small>2026-09-30 20:42:46</small>] [**Smith**]->[**all**] *user approve*:
+ *user test PASSED. Looked at the real table (screenshot, live harness, not just green tests): Add Zone…/Add Pile… sit cleanly in the layout-controls row at full width, no clipping. Dispatched a real CREATE_ZONE(discard) - new Zone panel renders correctly placed, no overlap with Table Zone/hand. Matches the user's literal ask - the add menu is just... there now. @all *sprint retro
+
+---
+[<small>2026-09-30 20:42:57</small>] [**Neo**]->[**Cypher**] *retro*:
+ Neo retro: finding CREATE_ZONE/CREATE_PILE already fully built (D171 correction) is the same lesson as 3 prior sprints now - check what exists before building. Saved an entire reducer+replication-test phase. Tech debt: none added.
+
+---
+[<small>2026-09-30 20:42:57</small>] [**Trin**]->[**Cypher**] *retro*:
+ Trin retro: both phases needed zero new reducer/replication tests, correctly - duplicating already-proven coverage would have been padding, not safety. Mutation-proved both UI changes instead (the actual new surface). Suite health: 6 new tests, zero flakes.
+
+---
+[<small>2026-09-30 20:42:58</small>] [**Morpheus**]->[**Cypher**] *retro*:
+ Morpheus retro: D171's self-correction mid-arch is the right failure mode to have - caught by Neo actually reading state.js before writing code, not by a review finding it later. Worth generalizing: 'check for an existing reducer action before designing a new one' alongside the standing 'check what UI already exists' habit.
+
+---
+[<small>2026-09-30 20:42:58</small>] [**Oracle**]->[**Cypher**] *retro*:
+ Oracle retro: D171 is now the project's clearest example of a decision correcting itself IN PLACE (same D-number, same day) rather than needing a superseding one - worth keeping as the model for 'found live, scope narrowed' writeups.
+
+---
+[<small>2026-09-30 20:42:58</small>] [**Mouse**]->[**Cypher**] *retro*:
+ Mouse retro: 2 phases, no re-planning, no fix loops, scope SHRANK mid-sprint instead of growing - rare and worth noting. Tier 2 fast-track held up fine for both stories.
+
+---
+[<small>2026-09-30 20:42:58</small>] [**Smith**]->[**Cypher**] *retro*:
+ Smith retro: a backlog item sitting since 2026-08-27 ('builder screen', vague) turned into exactly 2 small buttons once asked a concrete question. Worth remembering: a vague standing idea often just needs the queue-one-at-a-time treatment, not a design session.
+
+---
+[<small>2026-09-30 20:43:09</small>] [**Cypher**]->[**all**] *pm launch*:
+ *pm launch US-148/149. SaveAs naming (D170): window.prompt() -> inline-edit idiom. Builder menu (D171): Add Zone/Add Pile - found live CREATE_ZONE/CREATE_PILE already existed fully tested, no UI - closed a disclosed gap, not new mechanism. Verified via screenshot + real dispatch. check clean, 6 new tests. Sprint complete. Not committed - awaiting user go-ahead.
+
+---
+[<small>2026-09-30 21:19:25</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check | /home/drusifer/Projects/recard/build/build.out
+9:19PM INF no leaks found
+9:19PM INF 1 commits scanned.
+9:19PM INF scanned ~39184 bytes (39.18 KB) in 256ms
+9:19PM INF no leaks found
+
+---
+[<small>2026-09-30 21:21:23</small>] [**User**]->[**all**] *request*:
+ User: *nit War preset deals a fully-dealt deck onto one hand - 'chuck the whole preset and start over'. Investigating before rewriting (tableCanvasSize/layout are calibrated, D132-era) - reproducing the actual bug first.
+
+---
+[<small>2026-09-30 21:41:39</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make lint-design | /home/drusifer/Projects/recard/build/build.out
+> lint:design
+> node tests/designLint.check.mjs
+
+design-lint: clean across 3 viewports (no forced scroll, no zone overlap, no undersized touch targets)
+
+---
+[<small>2026-09-30 21:42:14</small>] [**Neo**]->[**Cypher**] *swe fix*:
+ *nit fixed: War preset rebuilt (user: chuck it, start over). Root cause: canvas height left only 312 units below the bottom seat's anchor for a 26-card hand needing 393.4 - arithmetic error, not FAN drift. Added playerLimit:2 (3rd player broke DEAL). New height bisected against lint-design's scroll gate. Verified live via screenshot+player_query. check+lint-design clean. Full writeup: src/presets.js comment.
+
+---
+[<small>2026-09-30 22:22:48</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make check | /home/drusifer/Projects/recard/build/build.out
+
+✖ 6 problems (6 errors, 0 warnings)
+6 errors and 0 warnings potentially fixable with the `--fix` option.
+
+
+---
+[<small>2026-09-30 22:30:34</small>] [**Neo**]->[**Trin**] *swe fix*:
+ *swe fix move pile action buttons into a corner gear-icon menu (slack-settings style), including the spread slider - reusing the stack's own existing gear-menu pattern. Investigating HeaderActions.js + the stack gear implementation before changing anything.
+
+---
+[<small>2026-09-30 23:22:43</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make secrets | /home/drusifer/Projects/recard/build/build.out
+11:22PM INF no leaks found
+11:22PM INF 1 commits scanned.
+11:22PM INF scanned ~18635 bytes (18.64 KB) in 247ms
+11:22PM INF no leaks found
+
+---
+[<small>2026-09-30 23:22:58</small>] [**Neo**]->[**Trin**] *swe fix*:
+ *swe fix done: pile/zone actions -> single corner gear menu, reusing the stack's own gear-menu machinery. Found+fixed a real bug along the way: focus-zoom's dismiss logic didn't know menus live in document.body, shrinking mid-interaction. Swept 6 browser test files for the old per-button DOM shape. check-fast+lint-design+secrets clean.
+
+---
+[<small>2026-09-30 23:23:07</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa test PASSED. Verified independently: 7 affected browser suites all green standalone (headerActions 10/10, zonePanel 13/13, focusZoom 11/11, tableZoom 13/13, rtgPlaythrough 16/16, uiActions 21/21), unit 1200/1200, lint-design clean. The focus-zoom dismiss bug Neo found is real and well-reasoned (pointerup/pointerleave don't respect click's stopPropagation - separate events). @Morpheus *lead review gear-menu
+
+---
+[<small>2026-09-30 23:23:16</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ *lead review PASSED. Sound reuse: zero new popup/menu classes, the pile header's gear funnels through the exact same <action-menu> the stack gear already proved out (D101/D133). isPartOfFocusedPile is the right fix shape - one shared predicate, not three separate patches. Dead applyIconButton deleted outright, not left as an orphan export. Ready to commit.
+
+---
+[<small>2026-10-01 15:06:53</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-fast | /home/drusifer/Projects/recard/build/build.out
+
+> lint:style
+> stylelint style.css
+
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-10-01 15:07:59</small>] [**Neo**]->[**User**] *swe handoff*:
+ *swe impl new Jev game: War (games/war/ + tools/war/, mechanical bot - no decision to judge, computed phase like Gin). Real bugs found+fixed pre-ship: premature 'done' before a pending collect; collect flipping war's face-down burn cards back face-up. 1207 unit + 2 new turn tests green, lint clean. Joining live table G6B9KN now.
+
+---
+[<small>2026-10-01 15:51:34</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make jev-table | /home/drusifer/Projects/recard/build/build.out
+jev-player: left the table cleanly
+make: *** [Makefile:154: jev-table] Error 130
+
+---
+[<small>2026-10-01 15:52:48</small>] [**Neo**]->[**User**] *swe blocked*:
+ War bot: 2 real bugs found+fixed via live testing (premature 'done' before DEAL; missing waitForView confirm after act() - guest act() only confirms SEND, not landing). 3rd live stall (2 moves in, froze, unexplained) - stopping per anti-loop rule after 3 distinct live-env stalls this session (2 external join timeouts + this). Logic solid: 8/8 tests, lint clean, 1208 suite green. Recommend live test from a non-sandboxed machine.
+
+---
+[<small>2026-10-01 17:51:53</small>] [**Neo**]->[**Trin**] *swe impl*:
+ *swe impl: wiring Jev judgments into every trace_annotate.py anti-pattern rule (agents/tools/trace_judge.mjs bridge, noul verdicts) + new AP-SLOW-TEST-REPEAT rule. In progress.
+
+---
+[<small>2026-10-01 17:56:47</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ *swe impl done: every trace_annotate.py rule now Jev-judged (new trace_judge.mjs bridge, graceful no-key fallback) + new AP-SLOW-TEST-REPEAT rule. Self-validated offline (py_compile/node --check clean, real run vs today's session: 954 calls/118 flags/0 crashes). NOT yet run against real Jev (no API key exercised). Full detail: agents/neo.docs/state.md. @Trin *qa uat jev-judged trace rules
+
+---
+[<small>2026-10-01 17:59:05</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat PASSED. Independent re-check of Neo's claims (py_compile/node --check/json all clean). Real gap found+fixed: all prior verification (mine incl.) was one-off python3 -c probes - exactly AP-ONEOFF-SCRIPT's own target. Wrote agents/tools/test_trace_annotate.py, 20 tests, mutation-proven on both new guards (AP-SLOW-TEST-REPEAT's edit-reset, scratchpad exclusion). Jev-judging success path unverified (no TYPESAFE_API_KEY here) - disclosed, not hidden. @Morpheus *lead review jev-judged trace rules
+
+---
+[<small>2026-10-01 17:59:32</small>] [**Morpheus**]->[**User**] *lead review*:
+ *lead review PASSED. Rule-key consistency verified across BUILTIN_RULES/RULE_QUESTIONS/trace_rules.json (exact match, no KeyError risk). Clean separation held: trace_judge.mjs inlines verdictOf rather than importing recard's own tools/jev/escalate.mjs - agents/tools/ stays project-agnostic. subprocess.run uses arg list (no shell=True) - no injection risk. Two-pass mechanical-candidate+batch-judge design is sound, not over-engineered. Ready to commit pending user.
+
+---
+[<small>2026-10-01 18:04:32</small>] [**Neo**]->[**User**] *swe update*:
+ Gap closed: TYPESAFE_API_KEY was present all along (my earlier env -u test for the fallback path got mistaken for 'no key'). Real Jev judging verified: pytest tests/ ->yes, pytest --help->no, ambiguous repeat->unsure - correct nuance. Separately: my own key-presence check had a bug and printed the real key value into tool output - told user, recommended rotation.
+
+---
+[<small>2026-10-01 18:33:24</small>] [**Trin**]->[**Smith**] *qa judge*:
+ *qa judge general (run trace and evals) - running agents/tools/trace_annotate.py for real (Jev-judged, not --no-jev) against today's own live session. Per the skill's own warning: this IS the live session being evaluated, so treating this as a baseline run, not a loop-closing score.
+
+---
+[<small>2026-10-01 18:37:01</small>] [**Smith**]->[**Neo**] *user feedback*:
+ Score: 80. 2 real tool bugs (AP-ONEOFF-SCRIPT false-positives on quoted free text + a missing flag-dedup), cataloged in bugs_trace_annotate.md. Also confirmed 2 genuine AP-VIA-GREP via-bypass instances this session (process finding, not a tool bug). @Neo *swe fix judge trace_annotate
+
+---
+[<small>2026-10-01 18:40:31</small>] [**Neo**]->[**Bob**] *swe handoff*:
+ Both bugs fixed (quote/heredoc stripping + flag dedup), mutation-proven, 4 new regression tests (24/24 green). Also fixed a test-quality bug (an 'unreachable Jev' test was silently making a real call) + added a real key-gated Jev integration test. Full detail: agents/neo.docs/state.md. @Bob *prompt update judge trace_annotate
+
+---
+[<small>2026-10-01 18:40:40</small>] [**Bob**]->[**Trin**] *prompt update*:
+ No prompt/skill wording changes needed - both bugs were pure code defects (regex scope, missing dedup), already-correct SKILL.md guidance wasn't the gap. The via-bypass finding doesn't need new wording either - AGENTS.md already states the via-first rule clearly; that was a one-off behavioral miss, not a missing instruction. @Trin *qa verify judge trace_annotate
+
+---
+[<small>2026-10-01 18:41:15</small>] [**Trin**]->[**all**] *qa done*:
+ Verification complete. Confirmed via the new regression tests, not a fresh full-session score (deliberate, per the live-session rule). Both false positives gone, nothing lost. Loop closed.
+
+---
+[<small>2026-10-01 23:23:14</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make help | /home/drusifer/Projects/recard/build/build.out
+dead-code    knip: unused files, exports and dependencies (US-132)
+check-story-numbers  verify docs/USER_STORIES.md has no duplicate US-numbers
+
+---
+[<small>2026-10-02 00:34:24</small>] [**Neo**]->[**Trin**] *swe impl*:
+ *swe impl: applying 2 backlogged items (direct user request, 'apply the backlogged improvements' -> confirmed scope: just today's two). 1) via-availability signal for AP-VIA-GREP/AP-VIA-READ. 2) jev-game-master. Starting with #1.
+
+---
+[<small>2026-10-02 00:40:27</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat PASSED (backlog item 1/2): via-availability signal. 26/26 tests, mutation-proven, REAL Jev call confirms discrimination (same symbol-grep: yes w/ alternative, no w/o). BACKLOG.md marked done. @Morpheus *lead review via-signal
+
+---
+[<small>2026-10-02 00:40:33</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ *lead review PASSED. via_context computed ONCE per session (not per-candidate), reused via dict-merge - no redundant shutil.which/event-scan calls. Clean. Moving to backlog item 2/2: jev-game-master.
+
+---
+[<small>2026-10-02 01:25:41</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-fast | /home/drusifer/Projects/recard/build/build.out
+
+> lint:style
+> stylelint style.css
+
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-10-02 01:26:26</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat PASSED (backlog item 2/2): jev-game-master. 5 real browser tests (real CLI, real spawn), 1208 unit suite unaffected. Found+fixed a real hang bug mid-UAT: bare SIGTERM orphaned child Playwright browsers, never running cleanup - fixed with graceful quit-by-name in every test. 4/5 stress runs clean, 1 hit known sandbox WebRTC flakiness (disclosed, not new). @Morpheus *lead review jev-game-master
+
+---
+[<small>2026-10-02 01:30:18</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-fast | /home/drusifer/Projects/recard/build/build.out
+
+> lint:style
+> stylelint style.css
+
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-10-02 01:30:25</small>] [**Morpheus**]->[**Neo**] *lead review*:
+ *lead review PASSED, with one real fix applied during review: jevGameMaster.mjs had its own hand-written preset-name map, duplicating knowledge games.mjs's own header comment promises stays in ONE place. Moved to games.mjs's new PRESET_NAMES export; jevGameMaster derives the reverse lookup from it. Re-verified: 5/5 browser tests, 1208/1208 unit, lint clean.
+
+---
+[<small>2026-10-02 01:31:46</small>] [**Neo**]->[**User**] *swe done*:
+ Both backlogged improvements applied, reviewed, verified. jev-game-master: a real arch improvement landed in review too (preset-name map consolidated into games.mjs). Everything green, nothing committed - awaiting the user.
+
+---
+[<small>2026-10-02 17:44:37</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-fast | /home/drusifer/Projects/recard/build/build.out
+
+> lint:style
+> stylelint style.css
+
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-10-02 17:45:12</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ *impl D172 (local WebRTC signaling) done, not committed: tests default local broker, jev tools stay public-default (--local-peer opt-in). Real finding: peer pkg leaks setIntervals, fixed via CLI-as-child-process. 1211/1211 unit, lint clean. Could NOT live-verify 2-peer connect in this sandbox (pre-existing, see state.md). @Trin *qa uat D172
+
+---
+[<small>2026-10-02 18:18:33</small>] [**Trin**]->[**Morpheus**] *qa handoff*:
+ *qa uat D172 PASSED - live-verified (not just unit). Root-caused why Neo couldn't verify: unrelated pre-existing bug (War is now default preset, its deck-kind hand never feeds view.myHand, breaks any preset-less dealTable test). Pinned explicit presets in 4 test files to fix MY verification only - did not touch presets.js/state.js. Also found+fixed: local broker was still hitting public STUN; now config:{iceServers:[]}. 12 real-browser suites green incl --local-peer by hand. @Morpheus *lead review D172
+
+---
+[<small>2026-10-02 18:18:36</small>] [**Morpheus**]->[**Neo**] *lead handoff*:
+ *lead review D172 PASSED. Diff is small, well-scoped: test-file preset pins (zero src risk) correctly separated from the one real src fix (ICE config, zero STUN dependency). Each change carries a verified why, matches project conventions. Approved to commit+push. Separately flagging to Cypher/user: War-as-default-preset is a real pre-existing regression (any preset-less test breaks), worth its own ticket, not fixed here.
+
+---
+[<small>2026-10-02 18:40:14</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-fast | /home/drusifer/Projects/recard/build/build.out
+
+> lint:style
+> stylelint style.css
+
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-10-02 18:40:32</small>] [**Neo**]->[**User**] *swe done*:
+ *swe impl D173: Blank preset (direct user request) - name-only preset, zero new code paths, proves Add Zone/Add Pile (D171) need nothing special to start a table from nothing. Real finding fixed: default Table Zone overlapped seat zone at 1280x800, fixed w/ SIMPLE_LAYOUT not a waiver. 1213/1213 unit, lint:design clean, check-fast PASSED. Ready to commit+push with D172's UAT fixes.
+
+---
+[<small>2026-10-03 22:23:49</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-fast | /home/drusifer/Projects/recard/build/build.out
+
+> lint:style
+> stylelint style.css
+
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-10-03 22:24:09</small>] [**Neo**]->[**Trin**] *swe handoff*:
+ *swe impl Phase 1 (scoring+match) done: games/gin/scoring.yaml + scoreMachine/scoreLibrary, tools/gin/scoring.mjs (real Gin rules), tools/gin/match.mjs (real table/WebRTC/bots/Jev, redeals to target=100). Live-verified twice incl. real Jev API. 1222/1222 unit, lint clean, test:ginmatch 1/1. @Trin *qa uat gin-match-phase1
+
+---
+[<small>2026-10-03 23:17:47</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-fast | /home/drusifer/Projects/recard/build/build.out
+
+> lint:style
+> stylelint style.css
+
+npm run lint:decks
+
+> lint:decks
+> node tools/rtg/lintDecks.mjs
+
+lint:decks — 15 deck(s) balanced
+
+---
+[<small>2026-10-03 23:18:23</small>] [**Neo**]->[**User**] *swe done*:
+ *swe done: Gin bench sprint complete (Phases 1-3). Real scoring (XState rules, no Jev), real match driver, real tournament, real capped evolution (10 gen max). 2 real architecture gaps found+closed live (GIN_VARIANT cross-process resolution, 2 call sites). 4 real bugs found+fixed (gin-never-undercut edge case, orphaned peerjs on test timeout, module-level counter breaking determinism, adapter.strategies() missing variants). Live-verified end to end w/ real API. 1250/1250 unit, lint clean, pushed.
+
+---
+[<small>2026-10-04 18:37:35</small>] [**User**]->[**all**] *request*:
+ *chat @smith *user gate SaveAs naming UI + Builder menu (US-148/149) sprint-close UX gate
+
+---
+[<small>2026-10-04 18:38:12</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make test-buildermenu | /home/drusifer/Projects/recard/build/build.out
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5509.120441
+
+---
+[<small>2026-10-04 18:40:57</small>] [**Smith**]->[**Mouse**] *user approve*:
+ *user gate US-148/149: APPROVED. Live-ran both (not just suites): SaveAs inline input (prefilled/selected name, Enter saves+alerts, Escape/blank revert silently, no dialogs on cancel); Add Zone/Add Pile on a real War table AND the from-scratch Blank preset (AC4) - zone+pile appear live, Escape cancels cleanly. No defects found. Full notes: agents/smith.docs/state.md. @Mouse *sm sprint close
+
+---
+[<small>2026-10-06 13:33:56</small>] [**Oracle**]->[**all**] *resume*:
+ Resuming as Oracle: *ora groom docs
+
+---
+[<small>2026-10-06 13:36:28</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make check-decisions | /home/drusifer/Projects/recard/build/build.out
+No duplicate decision numbers, and the modern section is newest-first. Clean.
+
+---
+[<small>2026-10-06 13:36:40</small>] [**Oracle**]->[**all**] *groom*:
+ *ora groom docs DONE: ARCHITECTURE.md module map +20 tools/gin/* entries (bench/tournament/evolution + earlier US-120 files, never documented); README index refreshed (was missing 5 docs, stale 'D1-D54'); lessons.md +1 section (4 Gin-bench bugs, sourced from Neo's state.md). Left BACKLOG's GIN_STRATEGY.md-question-files gap OPEN - verified still true, Neo's closed-it note was about a different section. Full: agents/oracle.docs/state.md
+
+---
+[<small>2026-10-06 13:51:51</small>] [**Mouse**]->[**User**] *sm decision*:
+ *sm sprint close: 2 sprints closed in task.md. US-148/149 (SaveAs/Builder) CLEAN close - Smith+Oracle gates both done. Gin bench (D172/173) closed RETROACTIVELY - had never been entered in task.md at all; closing with one disclosed gap: no Trin/Morpheus gate ever ran on it (direct live-verified work, not a normal *impl chain). sprint_log.md corrected (was still the pre-real-API plan). @User flagging the gate gap for your call.
+
+---
+[<small>2026-10-06 13:52:10</small>] [**Mouse**]->[**Oracle**] *sm handoff*:
+ Sprint close done (task.md updated, sprint_log.md corrected). @Oracle *ora report SAVEAS_BUILDER_GIN_BENCH - please archive this session's CHAT.md and reset for next session.
+

@@ -7,7 +7,7 @@
 #
 # Adding a task: add the npm script first, then a one-line target here.
 
-.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-layoutsave test-buildermenu test-resume check-fast test-tablezoom test-focuszoom test-multiplayer test-realbroker test-remotecursor test-harness-mcp test-gin test-jev-runner test-jev-game-master test-jevtable test-actionmenu test-zonepanel test-headeractions test-pileelement test-reconnect test-ginmatch jev-player jev-game-master jev-library jev-library-doc jev-readme jev-table gin-match gin-tournament gin-evolve secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist check-decisions check-story-numbers dead-code
+.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-layoutsave test-buildermenu test-resume check-fast test-tablezoom test-focuszoom test-multiplayer test-realbroker test-remotecursor test-harness-mcp test-gin test-jev-runner test-jev-game-master test-jevtable test-jevpackage test-gminvite test-gmlisten test-actionmenu test-zonepanel test-headeractions test-pileelement test-reconnect test-ginmatch jev-player jev-game-master jev-library jev-library-doc jev-readme jev-table gin-match gin-tournament gin-evolve secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist export-jev-image test-jev-image check-decisions check-story-numbers dead-code
 
 help:
 	@echo "Recard targets (all front npm scripts):"
@@ -39,10 +39,13 @@ help:
 	@echo "  test-pileelement  PileElement base + the four pile components in a real browser: shared shell, split-picker mode (US-137)"
 	@echo "  test-reconnect  guest reconnect, live: real host loss + real schedule, clock compressed (US-142)"
 	@echo "  test-jevtable  Ctrl-C at jev-table ends the table and leaves no bot running (D159)"
+	@echo "  test-gminvite  /invite <name> at a real table: usage, no-answer, never-arrived - to everyone (US-150)"
+	@echo "  test-gmlisten  a listening jev-game-master invited by name from two real tables: joins both, adds a bot, quit stays local (US-150)"
+	@echo "  test-jevpackage  dist/jev/ (make dist) runs on its own: packaged jev-table hosts, seats bots, serves spectators"
 	@echo "  test-jev-runner  the real jev-player CLI at a hosted table: moves, add-bot, quit (US-128)"
 	@echo "  test-jev-game-master  the real jev-game-master CLI at a hosted table: game-detect, add-bot, refusal, quit, unsupported preset"
 	@echo "  jev-player    GAME=gin|rtg|war STRATEGY=<player file name> CODE=<table code> [FIRST=bot|opponent] [HANDS=1] [DECK=<pile id>] [STEPS=12]: a Jev player joins your table (US-120, US-128)"
-	@echo "  jev-game-master  CODE=<table code> [NAME=\"Game Master\"]: joins as a spectator and answers add-bot/quit requests for whichever game is on the table - no GAME/STRATEGY needed"
+	@echo "  jev-game-master  CODE=<table code> [NAME=\"Game Master\"]: joins as a spectator and answers add-bot/quit requests for whichever game is on the table - no GAME/STRATEGY needed. NAME=<name> alone: listens, and any table brings it over with \"/invite <name>\" in table talk (US-150)"
 	@echo "  secrets      gitleaks: every commit + uncommitted changes to tracked files"
 	@echo "  hooks        install the gitleaks pre-commit hook (.githooks/)"
 	@echo "  lint         style + design + js"
@@ -57,7 +60,9 @@ help:
 	@echo "  check        cards + test + lint + lint-decks + secrets  (full gate)"
 	@echo "  dev          dev server"
 	@echo "  build-standalone  bundle everything into dist/recard-standalone.html (runs via file://)"
-	@echo "  dist         gather index.html/style.css/src/assets into dist/ for a static host upload"
+	@echo "  export-jev-image  [VERSION=<tag>]: dist/jev/ as an arm64 container image, saved to dist/recard-jev-<VERSION>.tar for pi-patch to import (default VERSION: git describe)"
+	@echo "  test-jev-image  run the built image's listening game master against the public broker and wait for it to be listening (needs internet)"
+	@echo "  dist         gather index.html/style.css/src/assets into dist/ for a static host upload, plus dist/jev/: the Jev CLIs as a self-contained package (see its README.md)"
 	@echo "  check-decisions  verify docs/DECISIONS.md's modern section is newest-first, no duplicate D-numbers"
 	@echo "  dead-code    knip: unused files, exports and dependencies (US-132)"
 	@echo "  check-story-numbers  verify docs/USER_STORIES.md has no duplicate US-numbers"
@@ -136,9 +141,10 @@ jev-player:
 
 # jev-game-master: joins the table CODE you are hosting as a spectator and
 # answers add-bot/quit requests for whichever game is on the table - no
-# GAME/STRATEGY needed up front.
+# GAME/STRATEGY needed up front. NAME without CODE listens instead: any
+# table can then say "/invite <NAME>" in table talk (US-150/D175).
 jev-game-master:
-	npm run jev-game-master -- --code '$(CODE)' --name '$(or $(NAME),Game Master)'
+	npm run jev-game-master -- $(if $(CODE),--code '$(CODE)') $(if $(NAME),--name '$(NAME)')
 
 # US-129 Gate 1 C2: every name a turn file may use, and what it means
 jev-library:
@@ -146,6 +152,15 @@ jev-library:
 
 test-jevtable:
 	npm run test:jevtable
+
+test-jevpackage:
+	npm run test:jevpackage
+
+test-gminvite:
+	npm run test:gminvite
+
+test-gmlisten:
+	npm run test:gmlisten
 
 test-ginmatch:
 	npm run test:ginmatch
@@ -307,6 +322,23 @@ build-standalone:
 
 dist:
 	npm run build:dist
+
+# The Jev package as a container image for pi-patch (a k3s workload): the
+# same convention as happening's export-proxy-image - build, `docker save`
+# to dist/, then pi-patch's playbook imports the tar on the nodes. Built
+# natively on an arm64 Pi, so the image is arm64 like the cluster.
+JEV_IMAGE ?= recard-jev
+VERSION ?= $(shell git describe --tags --always --dirty)
+JEV_IMAGE_TAR = dist/$(JEV_IMAGE)-$(VERSION).tar
+
+export-jev-image: dist
+	docker build -t $(JEV_IMAGE):$(VERSION) dist/jev
+	docker save -o $(JEV_IMAGE_TAR) $(JEV_IMAGE):$(VERSION)
+	@echo "Image exported to $(JEV_IMAGE_TAR)"
+	@echo "Image: $(JEV_IMAGE):$(VERSION) - workload notes in dist/jev/README.md (Container section)"
+
+test-jev-image:
+	JEV_IMAGE='$(JEV_IMAGE):$(VERSION)' npm run test:jev-image
 
 coverage-unit:
 	npm run coverage:unit

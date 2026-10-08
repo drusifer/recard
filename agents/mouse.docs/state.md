@@ -1,6 +1,68 @@
 # Agent State
 
-## Current Task (2026-09-29) - D165/US-143 pile/zone dispatch cluster DONE, not yet committed at save time
+## Current Task (2026-10-07) - TURN relay sprint (US-151/152): DONE
+
+TURN sprint planned+closed in task.md (3 phases, all ticked, uncommitted). Tar: dist/recard-jev-36810d8-dirty.tar (same tag as before - rebuild after commit).
+
+## Next Steps
+None queued; await user (commit, then rebuild image for a clean tag).
+
+---
+
+## Current Task (2026-10-06, sprint close)
+US-150 sprint CLOSED in task.md, gate gap disclosed (test-motion + gmlisten repeats not run; harness-mcp pre-existing failure).
+
+## Current Task (2026-10-06) - US-150 sprint planned (task.md, 4 phases)
+P1 pure module, P2 host side, P3 listener, P4 docs. Track progress in task.md only.
+
+## Current Task (2026-10-06) - Sprint close x2 + session exit prep
+
+Two sprints closed in `task.md` (both had their implementation done already; this was
+the formal close):
+
+1. **SaveAs naming UI + Builder menu (US-148/149, D170/171)** - clean close. Smith's
+   gate (2026-10-04, this session) APPROVED with no defects (live-ran both on a real
+   War table and the from-scratch Blank preset, AC4). Oracle groomed docs same session.
+   task.md's Sprint close checklist now fully checked.
+2. **Gin strategy bench/tournament/evolution (D172/173, 2026-10-03/04)** - closed
+   RETROACTIVELY. Real gap found while closing: this sprint shipped (commits `a6a5895`
+   through `fb12be4`) and was never once entered in `task.md` - it started from a direct
+   mid-session user request, not sprint planning, so Mouse never wrote it down. Backfilled
+   the full phase record into task.md from `agents/neo.docs/state.md`'s own sprint
+   entries. **Disclosed gap, not silently absorbed**: no Trin or Morpheus gate ever ran on
+   it - it was direct, live-verified-by-Neo-himself work, not a normal `*impl` chain.
+   Flagged in both task.md and the chat decision broadcast for the user's call, not
+   assumed acceptable after the fact.
+
+Also corrected `agents/mouse.docs/sprint_log.md`: its only entry was still the
+PRE-SPRINT plan for the Gin bench work (fakeJudge.mjs, seeded hands, tools/ginBench.mjs)
+- superseded mid-sprint by the user's own real-API/real-harness correction and never
+updated after. Rewrote with the actual outcome, kept the original plan below it
+struck-through-in-spirit as the plan-vs-actual record, and added the SaveAs/Builder
+sprint's own close entry (sprint_log.md had never recorded that one either - gated
+sprints' outcomes weren't reliably reaching this file).
+
+**Session exit prep** (user asked to "close the sprint and prep for exit"): sprint
+closes done above; next is handing to Oracle for `*ora report` to archive this session's
+CHAT.md under a moniker and reset it, so the next cold-start isn't reading a chat log
+spanning multiple unrelated sprints. NOT done yet as of this save - see Next Steps.
+No git commit made - every edit this session is working-tree only; the user has not
+asked for a commit (project convention: commit only on explicit ask).
+
+## Next Steps
+1. @Oracle `*ora report <moniker>` to archive agents/CHAT.md (suggest moniker
+   `SAVEAS_BUILDER_GIN_BENCH` - covers both sprints closed this session) and reset it.
+2. Surface to the user: working tree has uncommitted doc/state changes across README.md,
+   docs/ARCHITECTURE.md, agents/oracle.docs/{state,lessons}.md, agents/smith.docs/state.md,
+   agents/mouse.docs/{state,sprint_log}.md, task.md, agents/CHAT.md(+diagram) - ask
+   whether to commit before ending the session.
+3. The Gin-bench gate gap above is still open for the user to rule on - not Mouse's
+   call to resolve unilaterally (retroactively run Trin/Morpheus now? accept as-is?
+   note as a one-off exception?).
+
+---
+
+## Previous - (2026-09-29) - D165/US-143 pile/zone dispatch cluster DONE, not yet committed at save time
 
 main.js's dispatch cluster (paused at D161) landed as src/tableActions.js + Pile/Zone class registries,
 through 3 rounds of user review: io-injected -> pure {action,guard} descriptors (tableActions.js's

@@ -40,7 +40,7 @@ one to host a table, one to join with the code/link the host shows.
 
 ```
 npm test            # unit tests (deck, state, protocol) - node:test, no framework
-npm run lint         # stylelint + design-lint + eslint - the merge gate
+npm run lint         # stylelint + design-lint + eslint (part of make check)
 npm run lint:style    # stylelint only, fast
 npm run lint:design   # design-lint only - renders the real app and checks
                        # for forced page scroll, overlapping zones, and
@@ -53,12 +53,14 @@ Builds run through `make`, which fronts the npm scripts and captures
 output rather than flooding the terminal:
 
 ```
-make check          # the gate: compile card content + unit tests + deck balance + secret scan
+make check          # the gate: compile card content + unit tests + lint + deck balance + secret scan
+make check-fast     # check without the browser lint and secret scan - for iterating
 make secrets        # gitleaks: all history + uncommitted tracked changes
 make hooks          # once per clone: gitleaks pre-commit hook (.githooks/)
 make jev-player GAME=gin STRATEGY=equilibrium CODE=<code>  # a Jev player joins your table
+make jev-game-master NAME=patch  # a game master listens; any table says "/invite patch"
 make test           # unit tests only
-make lint           # style + design + js (see the known-baseline note below)
+make lint           # style + design + js
 make lint-decks     # Recard the Gathering deck balance
 make cards          # compile content/rtg/*.yaml -> src/decks/rtg/catalog.js
 make art-gen        # paint card art (slow, quota-limited, resumable)
@@ -66,9 +68,30 @@ make art            # pack generated art -> assets/cards/rtg/*.webp
 make help           # list every target
 ```
 
-`make check` deliberately excludes `lint`, which carries a known
-non-zero baseline (below) and so can never exit 0; run it separately and
-compare against that baseline.
+### Deploying
+
+`make dist` writes everything a deploy needs to `dist/`:
+
+```
+dist/index.html, style.css, src/, assets/   the static site - upload to any static host
+dist/recard-standalone.html                 one file that runs from file://
+dist/jev/                                   the Jev bots and game master as a Node package
+                                            (see dist/jev/README.md, from tools/jevPackage.README.md)
+```
+
+```
+make export-jev-image   # dist/jev/ as an arm64 container image -> dist/recard-jev-<VERSION>.tar
+make test-jev-image     # run that image's listening game master and stop it cleanly (needs internet)
+```
+
+`make dist` empties `dist/` first, which deletes an exported image tar
+too; `export-jev-image` runs `dist` itself, so export last.
+
+The image tar is what `../pi-patch` (the k3s cluster) imports as a
+workload. The README's "Container" section lists what the workload needs
+(D174), including the optional Cloudflare TURN relay
+(`CLOUDFLARE_TURN_KEY_ID` / `CLOUDFLARE_TURN_KEY_API_TOKEN`, D176) for a
+pod that can't reach players directly.
 
 ### Card content and art (Recard the Gathering)
 
@@ -106,17 +129,6 @@ Backends live in a registry (`tools/imagegen/backends.mjs`) — `codex`
 and `agy` today, one entry each. It is resumable, treats quota
 exhaustion as terminal rather than retrying it, and validates output by
 image dimensions rather than byte size.
-
-**`lint:design` currently reports 3 known violations** — desktop-width
-zone-overlap cases, disclosed and tracked rather than silently accepted;
-see `docs/ARCHITECTURE.md` D24 and `docs/USER_STORIES.md` Backlog. Wired
-in as blocking rather than left silent so the count can't quietly grow
-while it's unfixed.
-
-**`lint:js` likewise reports 7 known `sonarjs/cognitive-complexity`
-findings**, all pre-existing and backlogged. Both baselines are the
-reason `make check` excludes `lint`: a gate that can never go green
-stops being a gate.
 
 `npm run lint:design` needs a Chromium build Playwright can launch —
 either run `npx playwright install chromium` once, or have a system
@@ -192,8 +204,14 @@ Full rationale: `docs/ARCHITECTURE.md`.
 
 - [`docs/PRD.md`](docs/PRD.md) — product vision, scope, feasibility flags
 - [`docs/USER_STORIES.md`](docs/USER_STORIES.md) — user stories + acceptance criteria
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — technical design (D1-D54), testing strategy
-- [`docs/DECISIONS.md`](docs/DECISIONS.md) — decision log with context/consequences
-- [`docs/GIN_STRATEGY.md`](docs/GIN_STRATEGY.md) — Gin Rummy bot strategies: research, typed rule catalog, live Jev examples (US-120)
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — present-state technical design + module map, testing strategy
+- [`docs/DECISIONS.md`](docs/DECISIONS.md) — the full, continuously-numbered decision log (D1 onward), newest-first
+- [`docs/DOMAIN_MODEL.md`](docs/DOMAIN_MODEL.md) — the Pileable/Pile/Zone class hierarchies
+- [`docs/UI_ARCHITECTURE.md`](docs/UI_ARCHITECTURE.md) — Web Component UI layer
+- [`docs/RTG_DESIGN.md`](docs/RTG_DESIGN.md) — Recard the Gathering: design, mana/cost rules
+- [`docs/GIN_STRATEGY.md`](docs/GIN_STRATEGY.md) — Gin Rummy bot strategies: typed rule catalog, scoring, match/tournament/evolution bench, live Jev examples (US-120, Gin bench sprint)
+- [`docs/JEV_LIBRARY.md`](docs/JEV_LIBRARY.md) — the Jev player-file/strategy library reference
+- [`tools/jevPackage.README.md`](tools/jevPackage.README.md) — running the Jev bots/game master on a box or as a container (ships as `dist/jev/README.md`)
+- [`docs/BACKLOG.md`](docs/BACKLOG.md) — deferred/non-blocking findings not yet scoped into a story
 - [`task.md`](task.md) — sprint task board
 - `agents/` — Bob Protocol persona docs, state, and team chat log (`agents/CHAT.md`)

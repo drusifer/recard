@@ -1,6 +1,111 @@
 # Agent State
 
-## Current Task (2026-09-25) - US-130 groomed: ARCHITECTURE map (+5 files), D159 (root cause + 2nd-order bugs), 5 lessons
+## Current Task (2026-10-07) - *ora groom docs + prep for clear: DONE
+
+TURN sprint docs groomed: ARCHITECTURE.md module map (tools/turnRelay.mjs, jevGameMaster relay note), README Deploying names the TURN env vars, DECISIONS.md topical index gained D176. Chat archived to agents/chat_archive/CHAT_TURN_RELAY.md; CHAT.md reset.
+
+## Next Steps
+None for Oracle. User's open call: commit, then `bobp make export-jev-image` for a clean tag (current tar reuses 36810d8-dirty). Then wire the Secret + NetworkPolicy egress in pi-patch and live-test /invite.
+
+---
+
+## Current Task (2026-10-07) - TURN relay sprint (US-151/152): DONE
+
+TURN sprint groomed: lessons.md 2026-10-07 section; D176 note on JSHandle. Chat not archived (small sprint).
+
+## Next Steps
+None queued; await user (commit, then rebuild image for a clean tag).
+
+---
+
+## Current Task (2026-10-07) - *ora groom docs + exit prep: DONE
+
+- README.md: removed the stale "make check excludes lint / known lint baselines" claims
+  (cleared in dd67b83; check includes lint, design-lint is clean); added check-fast,
+  `make jev-game-master NAME=`, and a "Deploying" section (dist/ contents, dist/jev/,
+  export-jev-image/test-jev-image, pi-patch, "make dist wipes the tar - export last");
+  doc index links tools/jevPackage.README.md.
+- tools/jevPackage.README.md: corrected the port note - EVERY mode serves the app on 8230
+  (the listener starts the static server too), not only jev-table.
+- No orphan/misplaced docs found. Root .md files (AGENT/AGENTS/CHATGPT/GEMINI) are
+  harness entry points - left in place. Chat not archived (only a few messages since
+  the US-150 report reset it).
+- Next session: nothing pending for Oracle. Uncommitted tree is the user's call.
+
+## Current Task (2026-10-06, sprint close)
+US-150 groomed: BACKLOG +4, lessons.md 2026-10-06 section, chat archived agents/chat_archive/CHAT_JEV_DIST_GM_INVITE.md; CHAT.md reset.
+
+## Current Task (2026-10-06) - *ora report SAVEAS_BUILDER_GIN_BENCH: session archived, CHAT.md reset
+
+Final step of this session's sprint close/exit prep (Mouse handed off after closing both
+sprints in task.md). Ran `bobp chat-report --moniker SAVEAS_BUILDER_GIN_BENCH --summary
+"..."` - archived the full session CHAT.md + CHAT.diagram.md to
+`agents/chat_archive/CHAT_SAVEAS_BUILDER_GIN_BENCH.{md,diagram.md}`, reset `agents/
+CHAT.md` to a pointer header. Covers: Smith's US-148/149 live gate (APPROVED), this
+session's own `*ora groom docs` pass, and Mouse's sprint-close work (incl. backfilling
+the never-entered Gin bench sprint into task.md).
+
+Posted the resume pointer below as the first entry in the freshly-reset CHAT.md so a
+cold start isn't staring at an empty file with no idea what just happened.
+
+## Next Steps
+None queued for Oracle. Session exit prep is otherwise Mouse's/the user's: working tree
+still has uncommitted changes across ~9 files (see `agents/mouse.docs/state.md` Next
+Steps #2) - not committed, per standing "commit only on explicit ask."
+
+---
+
+## Previous - (2026-10-06) - *ora groom docs: module map + README index + lessons, 3 files
+
+Triggered directly (`/oracle groom docs`), not sprint-close. Found the repo's root/
+docs/agents layout already clean (no misplaced .md, no orphans) - all the real rot was
+STALE CONTENT, not bad placement:
+
+1. **`docs/ARCHITECTURE.md` module map missing ~20 `tools/gin/*` entries** - both the
+   Gin bench sprint's new files (scoring.mjs/scoreMachine.mjs/scoreLibrary.mjs/match.mjs/
+   tournament.mjs/evolve.mjs + their 3 CLI wrappers, 2026-10-03/04) AND older US-120
+   files that had apparently never been added (cards.mjs/rules.mjs/judgments.mjs/
+   observe.mjs/strategies.mjs/exampleStates.mjs/examples.mjs). Added all of them, one
+   line each, same style as the existing map.
+2. **README.md's Documentation index** only listed 5 of 10 `docs/*.md` files
+   (missing BACKLOG/DOMAIN_MODEL/JEV_LIBRARY/RTG_DESIGN/UI_ARCHITECTURE entirely) and
+   described ARCHITECTURE.md as "(D1-D54)" - stale by ~120 decisions (actual latest:
+   D173). Rewrote the whole index; dropped the D-number from the description specifically
+   BECAUSE it will drift again otherwise - DECISIONS.md's own file already says "highest
+   number is current," redundant to also pin a number in README.
+3. **`agents/oracle.docs/lessons.md`** had NO entry at all for the Gin bench sprint
+   (2026-10-03/04, Neo, 4 real bugs + 1 real architecture gap). Added one dated section,
+   sourced from `agents/neo.docs/state.md`'s own "Sprint: Gin bench/tournament/evolution"
+   entries (full repro detail lives there, not duplicated here) plus Neo's CHAT.md
+   sprint-close line for the one bug (`gin-never-undercut`) whose repro I couldn't find
+   written down anywhere.
+
+**Checked, NOT changed - a real finding, not an edit**: Neo's own Phase 2+3 note claims
+"closes the standing backlog gap (GIN_STRATEGY.md still documents only the rule
+catalogue)". I read both docs/BACKLOG.md's actual wording and docs/GIN_STRATEGY.md's
+actual contents before touching anything: the BACKLOG item is specifically about
+*question-file strategies and the fixed state schema* being undocumented, and the new
+§9 Neo added is about the bench/tournament/evolution tooling - a different thing.
+`jev-balanced`/`jev-cagey`/`playState.mjs`'s schema are still nowhere in GIN_STRATEGY.md.
+Left the BACKLOG item open rather than mark it SHIPPED on an imprecise handoff note -
+flagged the discrepancy in the groom's own chat post rather than silently either
+following or ignoring it.
+
+Verified clean after edits: `bobp make check-decisions` (172 headings, no dupes, modern
+section newest-first - I didn't touch DECISIONS.md itself, ran it as a gate sanity check
+anyway since ARCHITECTURE.md cross-references it). `git diff --stat`: 6 files, all
+intentional (README.md, docs/ARCHITECTURE.md, agents/oracle.docs/lessons.md +
+agents/smith.docs/state.md/CHAT.md/CHAT.diagram.md from Smith's prior gate this session).
+
+## Next Steps
+None queued. BACKLOG's GIN_STRATEGY.md-question-files gap is still open and accurately
+described - not mine to close without someone writing that content. If Mouse's sprint
+close (pending from Smith's US-148/149 gate handoff) surfaces a chat-report moniker,
+that's the next Oracle trigger (`*ora report <moniker>`), not this groom.
+
+---
+
+## Previous - (2026-09-25) - US-130 groomed: ARCHITECTURE map (+5 files), D159 (root cause + 2nd-order bugs), 5 lessons
 
 Not done: CHAT.md archive (uncommitted edits from other sessions in that file; a chat-report
 resets it - do not do it mid-flight). docs/JEV_LIBRARY.md untouched (table files are not library names).

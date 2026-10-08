@@ -138,7 +138,20 @@ tools/jevGameMaster.mjs  the `make jev-game-master` CLI: joins as a spectator,
                           detects the game from the table's own preset name
                           (`view.gameConfig.presetName`), and answers add-bot/
                           quit table talk for it - the same `serveSpawnRequests`
-                          every seated Jev player already runs, standing alone
+                          every seated Jev player already runs, standing alone.
+                          `--name` without `--code` LISTENS (US-150/D175): holds
+                          recard-gm-<name> on the broker; each "/invite <name>"
+                          from a table starts a `--code` child for that table.
+                          With CLOUDFLARE_TURN_KEY_ID/_API_TOKEN set, all its
+                          WebRTC is relayed (US-151/D176)
+tools/turnRelay.mjs      Cloudflare Realtime TURN credentials from env, refreshed
+                          at 80% of a 24 h TTL; the harness's `openPeer` passes
+                          them to each page as `peerConfig` (src/peerOptions.js),
+                          relay-only (D176). Unset env = no relay
+tools/buildDistribution.mjs  `make dist`: the static site, the file:// bundle, and
+                          dist/jev/ - the Jev CLIs as a self-contained Node package,
+                          files+deps picked from esbuild's import graph (D174);
+                          its README is tools/jevPackage.README.md
 tools/jev/               everything a Jev player needs that is not a game
 tools/jev/runner.mjs     join, refuse a spectator seat, announce jev-ready,
                           serve add-bot + quit ALWAYS, play the seat (D153)
@@ -175,6 +188,30 @@ tools/gin/playState.mjs  projects the replicated view into the fixed state
 tools/gin/strategyFile.mjs  a Gin player file as a read + move strategy
 tools/gin/jevStrategy.mjs  Gin's read + move, mapped onto jev/decide.mjs
 tools/gin/strategyKinds.mjs  one lookup: D137 rule list or player file
+tools/gin/cards.mjs      pure card core: deadwood-minimising melds, lay-offs (US-120/D137)
+tools/gin/rules.mjs      pure typed condition set over a GinObservation (US-120/D137)
+tools/gin/judgments.mjs  the Jev requests a strategy can ask (opponent read, US-120/D137)
+tools/gin/observe.mjs    successive views -> a public-information Gin observation
+tools/gin/strategies.mjs ordered, typed rule-list strategies; first match decides
+tools/gin/exampleStates.mjs  representative states for docs/GIN_STRATEGY.md's table
+tools/gin/examples.mjs   CLI: prints every example state's evaluation as JSON
+games/gin/scoring.yaml   named scoring states: undercut? gin? which bonus? -
+                          decisions, not buried in a function
+tools/gin/scoring.mjs    pure hand MEASUREMENT only (deadwood numbers); real meld
+                          search stays code, scoring DECISIONS live in scoring.yaml
+tools/gin/scoreMachine.mjs  compiles games/gin/scoring.yaml into a running machine -
+                          scoring's sibling of tools/jev/machine.mjs, not a reuse
+tools/gin/scoreLibrary.mjs  scoring.yaml's named guards/actions; gin_measure is the
+                          only one touching real card logic
+tools/gin/match.mjs      a full REAL two-strategy Gin game to a score target - real
+                          browsers/PeerJS/bots over local signaling (D172), not headless
+tools/gin/tournament.mjs round-robin over a strategy roster, serial (one table at a
+                          time); CLI is tools/ginTournament.mjs
+tools/gin/evolve.mjs     evolves a strategy roster over capped (10) generations;
+                          fitness = a real tournament.mjs run; CLI is tools/ginEvolve.mjs
+tools/ginMatch.mjs       CLI for tools/gin/match.mjs
+tools/ginTournament.mjs  CLI for tools/gin/tournament.mjs
+tools/ginEvolve.mjs      CLI for tools/gin/evolve.mjs
 tools/rtg/adapter.mjs    RtG: players from files, STEPS/DECK, rtgSeat()
 tools/rtg/library.mjs    RtG's hooks (project, options, propose, act) and
                           names (heard_attack, hear_attackers)
@@ -220,6 +257,8 @@ src/focusZoom.js         pure clamp math for the focus-zoom overlay
 src/cardMotion.js        pure travel math + the FLIP/glow players (US-123)
 src/playerColors.js      pure: a person's seat index -> their colour (US-123)
 src/botOffers.js         pure: which Jev players are offering bots (US-122)
+src/gameMasterInvite.js  pure, shared with tools/: "/invite <name>" parsing, a game
+                          master's address, status text, the invite flow (D175)
 src/botThoughts.js       pure: a bot's decisions, filtered out of table talk
 src/tableZoom.js         pure math for the table-zoom wheel, drag-to-pan, pinch
 src/qrcode.js            vendored QR renderer (no runtime network call)

@@ -1,5 +1,71 @@
 # Agent State
 
+## Current Task (2026-10-07) - TURN relay sprint (US-151/152): DONE
+
+Approved US-151/152 + D176 with C1-C3 (no token echo, half-set env names missing var, README egress). All met. No hands-on test: needs a Cloudflare key in the pod.
+
+## Next Steps
+None queued; await user (commit, then rebuild image for a clean tag).
+
+---
+
+## Current Task (2026-10-06, sprint close)
+US-150 close-out APPROVED from live-suite evidence (no hands-on session, gate skipped by user). Backlogged: table-voice status lines.
+
+## Current Task (2026-10-06, later) - D175 Gate 2 APPROVED (wording condition)
+Next: sprint-close live test of US-150.
+
+## Current Task (2026-10-06) - US-150 Gate 1 APPROVED w/ conditions C1-C4
+
+Conditions recorded in docs/USER_STORIES.md under US-150. Next for Smith: Gate 2 on Morpheus's
+arch (check C1-C4 are designed in, and the no-answer bound is a real number), then the close-out
+live test (invite by name from a real table, add a bot, unknown name reports no answer).
+
+## Current Task (2026-10-04) - US-148/149 sprint-close gate: APPROVED, no defects
+
+Both already green on `test-layoutsave`/`test-buildermenu` (3/3 each) before I touched
+anything; ran the REAL app live anyway (Playwright, ad-hoc scratchpad driver, nothing
+left in repo) per standing practice - trusting green suites alone already burned us once
+(stackable gate, "numbers agreed while the screen was wrong").
+
+**US-148 SaveAs inline naming**: clicked Save As… - button swaps for a text input
+prefilled+selected with the current preset name (`header-actions` rename idiom, matches
+AC1/D170). Enter commits -> real `globalThis.alert('Layout saved as "..."')` fired with
+my typed name. Escape with text typed -> button restored, ZERO dialogs fired (verified via
+page.on('dialog') listener, not just visual). Blank name on Enter -> same silent revert,
+no dialog. All 3 AC2 behaviors confirmed live, not just at the reducer level.
+
+**US-149 Builder menu**: tested on TWO tables - a real War table (preset) and the
+from-scratch **Blank** preset (AC4's explicit requirement - "not only as an addition to
+an existing preset"). Both: Add Zone… swaps for a kind <select> (14 real PILE_TYPES,
+`hand` correctly excluded) + Create/Cancel; clicking Create added a real new zone panel
+to the live DOM (zone count 2->3 on War, 2->3 on Blank). Add Pile… adds a kind+target-zone
+picker (target list correctly scoped to `type:'shared'` zones only); Create added a real
+pile inside the chosen zone. Escape on either form fully reverts (button restored, no
+zone/pile created) - verified by DOM count, not just a screenshot. AC3 (replication) not
+re-tested per the story's own note - D13's general path already covers it.
+
+**One real thing I had to work around, not a defect of these stories**: reaching the live
+table at all (where `#layout-controls` lives) requires clicking Deal & Start even on the
+Blank preset with `cardsPerPlayer: 0` - the "Host a table" lobby screen is a separate
+state from the table view. Pre-existing behavior, nothing to do with US-148/149, not
+filed.
+
+**Non-blocking observation, not filed**: auto-labels for new zones/piles are generic and
+incrementing ("ZONE", "PILE", "PILE 2", "DECK 2") - fine per AC (no naming UI asked for),
+each panel still shows its own kind/contents so recognition-over-recall still holds, but
+would get harder to scan past a handful of adds. Not a story defect; a future "rename this
+zone/pile" story's problem if it ever gets asked for.
+
+**Verdict posted**: `*user approve`, handed to Mouse for sprint close. No `*user bug`
+filed - nothing to route through Trin this gate.
+
+## Next Steps
+None open on US-148/149. If Mouse's sprint close surfaces a next phase/sprint, resume
+there - otherwise await next `@Smith` invocation.
+
+---
+
 ## Current Task (2026-09-25) - US-130 user test PASSED (ran both real flows after the shutdown refactor)
 
 Gin: full hand to a natural knock, launcher exit 0, 'every bot finished on its own'.

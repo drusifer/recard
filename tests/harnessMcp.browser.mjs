@@ -52,7 +52,8 @@ test('lists the harness tools', async () => {
 });
 
 test('game_start stands up a named multi-player table', async () => {
-  const { data } = await call('game_start', { players: 2, cardsPerPlayer: 3 });
+  const { result, data } = await call('game_start', { players: 2, cardsPerPlayer: 3 });
+  assert.ok(data, `game_start failed: ${result.content?.[0]?.text}`);
   assert.deepEqual(data.players, ['host', 'guest1']);
   assert.match(data.code, /^[A-Z2-9]{6}$/);
 

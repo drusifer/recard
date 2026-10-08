@@ -12,6 +12,7 @@
 
 import { createTrafficLog } from './trafficLog.js';
 import { peerOptionsFromSearch } from './peerOptions.js';
+import { INVITE_MESSAGE, ACCEPTED_MESSAGE } from './gameMasterInvite.js';
 
 const PeerCtor = () => globalThis.Peer;
 // `undefined` (location unavailable, e.g. node:test) or no `peerHost`
@@ -50,6 +51,10 @@ export class Session {
   @type {Promise<string>} resolves with this peer's own id once ready
   */
   readyPromise;
+  /**
+  @type {string|null} this peer's own PeerJS id - for a host, the table code
+  */
+  selfId = null;
   /**
   @type {Map<string, {id: string, name: string, connection: DataConnection}>}
   */
@@ -230,6 +235,43 @@ export class Session {
    */
   closePeer(peerId) {
     this.peers.get(peerId)?.conn?.close();
+  }
+
+  /**
+   * Host only (US-150/D175): dial a listening game master at `address`
+   * and hand it this table's code. Resolves `'accepted'` once it says it
+   * is coming, or `'no-answer'` when nobody holds that address (PeerJS's
+   * `peer-unavailable`) or nothing answers within `answerMs`. Never
+   * rejects: an invite always ends in one of the two.
+   * @param {string} address
+   * @param {number} answerMs
+   * @returns {Promise<'accepted'|'no-answer'>}
+   */
+  inviteGameMaster(address, answerMs) {
+    return new Promise((resolve) => {
+      const conn = this.peer.connect(address);
+      let timer;
+      const onPeerError = (error) => {
+        if (error?.type === 'peer-unavailable' && String(error.message).includes(address)) finish('no-answer');
+      };
+      const finish = (answer) => {
+        clearTimeout(timer);
+        this.peer.off('error', onPeerError);
+        conn.close();
+        resolve(answer);
+      };
+      timer = setTimeout(() => finish('no-answer'), answerMs);
+      this.peer.on('error', onPeerError);
+      conn.on('open', () => {
+        const message = { kind: INVITE_MESSAGE, code: this.selfId };
+        this.traffic.record('out', address, message);
+        conn.send(message);
+      });
+      conn.on('data', (message) => {
+        this.traffic.record('in', address, message);
+        if (message?.kind === ACCEPTED_MESSAGE) finish('accepted');
+      });
+    });
   }
 
   /**

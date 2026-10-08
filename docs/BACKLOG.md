@@ -155,6 +155,27 @@ or a live-verification session) versus being pickable directly.
 
 ## Technical / testing
 
+- **Invite status lines read as the inviter speaking** (Smith, US-150
+  close): "Guest: inviting patch..." uses the same attribution as a
+  `/roll` result. A table-voice speaker for host-generated lines would
+  read better, for both `/invite` and `/roll`.
+
+- **`test-harness-mcp` fails 9 of 13 at HEAD** (found 2026-10-06, US-150
+  close): `game_start` times out in its createTable, and every later test
+  in the file cascades from it. Reproduced identically on a clean HEAD
+  worktree (36810d8), so it predates US-150. Each run also leaves an
+  orphaned `peerjs` on port 9000 that breaks the next browser suite until
+  killed. Needs a root cause; it was green when US-119 shipped.
+- **Root cause of headless joins that never get seated** (US-150, D175):
+  about 3 runs in 7 with five headless browsers joining on one box.
+  `joinTable` now retries (3 x 20s), which hides it from every caller. Lead
+  suspect: Chromium's mDNS host candidates over loopback. Worth confirming
+  by toggling Chromium's mDNS feature in a test run.
+- **US-150 regression gate not completed** (user's call 2026-10-06): the
+  join-retry change touches every join. 11 join-using suites passed before
+  the run was stopped; `test-motion` and the repeat runs of `test-gmlisten`
+  were not run. Run them before the next release.
+
 - **`read()`/`patch()` cross-module-boundary helper is duplicated twice**
   (Morpheus, US-144 retro, 2026-09-29): `layoutSave.js`'s `read()`-only
   shape and `hostSetup.js`'s `read()`+`patch()` pair solve the same

@@ -37,7 +37,7 @@ is single-bucketed just to keep the list tidy.
 
 **Foundational stack** — static site, PeerJS/WebRTC, star topology,
 message classes, join flow, persistence, identity/reconnection
-D1: static site, no build step · D2: PeerJS + public broker · D3: star topology, host-authoritative · D4: two message classes · D5: join flow · D6: no persistence/reconnect (v1) · D13: live cursor / lift cue extends the motion channel · D26: host-only persistence snapshot · D27: `playerKey` is the identity · D30: `expectedPlayers` host-local trigger · D31: D26 reversed — hands ARE persisted · D32: reconnection is client retry · D33: wait list computed from snapshot · D100: returning identity trusted unconditionally · D172: local WebRTC signaling path, public broker still the jev-tool default
+D1: static site, no build step · D2: PeerJS + public broker · D3: star topology, host-authoritative · D4: two message classes · D5: join flow · D6: no persistence/reconnect (v1) · D13: live cursor / lift cue extends the motion channel · D26: host-only persistence snapshot · D27: `playerKey` is the identity · D30: `expectedPlayers` host-local trigger · D31: D26 reversed — hands ARE persisted · D32: reconnection is client retry · D33: wait list computed from snapshot · D100: returning identity trusted unconditionally · D172: local WebRTC signaling path, public broker still the jev-tool default · D176: game master relays WebRTC through Cloudflare TURN, minted per process from env
 
 **Privacy & visibility model** — redaction introduced, then
 progressively removed (a theme specifically because it reverses itself)
@@ -67,6 +67,188 @@ D20: desktop table width, pure CSS breakpoints · D24: Zone room grows at deskto
 
 **Testing & tooling**
 D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rules disabled post-autofix · D60: `tests/e2e.smoke.mjs` removed · D96: universal DnD guarantee, structural test (also drag-and-drop — see above) · D134: `lint:design` sweeps every preset, not just the default (also camera/view — see above) · D135: multi-player test harness — real peers driven over the real protocol, one `submitAction` funnel · D136: harness MCP server — agents drive a live table; read-only WebRTC traffic log · D137: Gin Rummy bots — typed rules in code, Jev opponent inference, one bot core behind runner + MCP · D138: table talk — host-ordered `talk` message, not game state · D139: lint:design fills Gin's Table pile with a hand's discards (also layout — see above) · D140: gitleaks — `make secrets` in `make check`, versioned pre-commit hook
+
+---
+
+### D176. The game master relays WebRTC through Cloudflare TURN, minted per process from env
+
+**Decided (Morpheus, 2026-10-07, US-151/152).** Pod side only; the
+browser app reads one more optional URL parameter and nothing else.
+
+- **Minting.** `tools/turnRelay.mjs` (pure apart from an injected
+  `fetch`/timers): `turnKeyFromEnv(env)` -> `null` when neither
+  `CLOUDFLARE_TURN_KEY_ID` nor `CLOUDFLARE_TURN_KEY_API_TOKEN` is set,
+  throws when only one is. `mintIceServers` POSTs
+  `https://rtc.live.cloudflare.com/v1/turn/keys/<id>/credentials/generate-ice-servers`
+  with `Authorization: Bearer <token>` and `{ ttl: 86400 }`, and drops
+  `:53` URLs (Cloudflare's own docs: browsers block port 53 and time out
+  on it). `startTurnRelay` refreshes at 80% of the TTL; a failed refresh
+  keeps the old set and retries in 60 s. Timers are `unref`'d.
+- **Per process, not passed down.** `sharedTurnRelay()` is a lazy
+  per-process singleton read from `process.env`. Children (one per
+  invite) and bots (`spawnRunner`) inherit the env and mint their own
+  fresh set when they start, so "children get the fresh set" needs no
+  credential plumbing over argv. Rejected: the listener passing its set
+  on argv/env - it would hand a child credentials that are already
+  partly spent, and puts secrets in `ps` output.
+- **Into the page via the URL.** `openPeer` asks the shared relay for its
+  current config and adds `peerConfig=<JSON RTCConfiguration>` to the
+  page URL (pure `peerPageUrl`); `peerOptionsFromSearch` turns it into
+  PeerJS `config`. Same channel as the existing local-broker parameters
+  (D172), so `session.js` is untouched. Share links carry only the table
+  code, so the credentials never reach a player. Rejected: an
+  `addInitScript` global - a second, hidden input the app would have to
+  know about.
+- **The listener lives for days**, so on each refresh the harness writes
+  the new config into the listening page's `peer.options.config`, which
+  is where PeerJS's Negotiator reads it for every new RTCPeerConnection.
+  A table page keeps the set it opened with (a table is far shorter than
+  the 24 h TTL).
+  *Amended in build:* Node holds the listener through a JSHandle
+  (`evaluateHandle` -> `{ listening, ready }`) rather than a page
+  global; refreshes and the test's `iceConfig()` evaluate on that handle.
+- **No relay = no change.** Unset env -> no Cloudflare call, URL and
+  PeerJS options byte-for-byte as before.
+- **Static server containment (US-152).** `startStaticServer` resolves the
+  decoded path under ROOT and 404s anything whose relative path escapes
+  it; decoding moves inside the `try` and a malformed `%` answers 400
+  (it was an unhandled rejection). `baseUrl` uses the bound port, so a
+  test can listen on port 0.
+
+---
+
+### D175. A listening game master holds a PeerJS address derived from its name; the host dials it on `/invite`
+
+**Decided (Morpheus, 2026-10-06, US-150).** A table code is already the
+host's PeerJS id, so a game master gets one the same way. Nothing new is
+added to the network: no relay, no registry, no lobby.
+
+- **Address.** `gameMasterAddress(name)` = `recard-gm-<name, lowercased>`.
+  A name is 1-32 of `[a-z0-9-]` after lowercasing (PeerJS id rules), which
+  covers C3's case-insensitivity. It lives in one pure module,
+  `src/gameMasterInvite.js`, imported by both the browser app and the
+  Node CLI, so the two sides can't drift. The module also holds
+  `parseInvite(text)` (`{ name }` | `{ usage }` | `null`), the wire
+  message kinds, and both time bounds.
+- **Listener.** `jev-game-master --name <n>` with no `--code` opens ONE
+  headless page from its own static server (the app page already loads
+  `window.Peer`) and runs `new Peer(gameMasterAddress(n), options)` in
+  it, with `page.exposeFunction` relaying each invite to Node. A PeerJS
+  `unavailable-id` error exits 2 with "name taken" (C4). `disconnected`
+  from the broker -> `peer.reconnect()`, so a long-running Pi survives
+  broker drops. With neither `--code` nor `--name`, it exits with usage
+  for both modes (`--name` defaults to "Game Master" only in `--code` mode).
+- **One table = one child process.** An accepted invite spawns the
+  EXISTING `--code` mode (`jevGameMaster.mjs --code <c> --name <n>
+  --url <listener's baseUrl>`), the same pattern `runner.mjs`'s
+  `spawnRunner` already uses for bots. AC4's isolation (several tables,
+  `quit` local to one) comes from process boundaries rather than new
+  code, and the `--code` path stays byte-for-byte what is already tested.
+  `--url` shares the listener's static server, so children don't fight
+  over port 8230.
+- **Who dials: the host.** Talk lines from guests already pass through
+  the host (D138), and the host is the one peer that always knows the
+  code (its own id). In `publishTalk`, a `parseInvite` hit makes the host
+  post the typed line, then a status line (`data: { kind:
+  'gm-invite-status', name, status }`). `session.inviteGameMaster(address,
+  code)` handles the wire: it opens a DataConnection, sends
+  `{ kind: 'gm-invite', code }`, resolves `'accepted'` on
+  `{ kind: 'gm-invite-accepted' }`, and resolves `'no-answer'` on
+  `peer-unavailable` or after `INVITE_ANSWER_MS`. It belongs in session.js
+  because only session.js/protocol.js touch PeerJS (ARCHITECTURE).
+- **Statuses** (each a host-posted talk line, so every viewer sees it):
+  `inviting` immediately (C1); `accepted` ("patch is on its way");
+  `no-answer` after **`INVITE_ANSWER_MS` = 15 s** (C2); `never-arrived` if
+  no `jev-ready` from a player of that name lands within
+  **`INVITE_ARRIVAL_MS` = 90 s** of acceptance (the child's join, 3 tries
+  of 20 s, plus a headless browser starting on a Pi). Arrival is the
+  game master's existing `jev-ready` line, with nothing new to announce;
+  `usage` for a bare `/invite` (C3). Anyone may invite (Gate 1).
+
+**Rejected:**
+- The listener joining tables in its OWN page (one browser, many
+  tables). The app page is a single-table client, so it would need a
+  multi-session refactor, and `quit` isolation would be new code rather
+  than free.
+- A Node-side PeerJS/WebRTC stack (`wrtc`, etc.): a native dependency on
+  a Pi, and a second WebRTC implementation beside the browser's.
+- The INVITER dialing: a guest would first have to learn the table code,
+  and two clients could dial for the same line.
+- Broker `listAllPeers` discovery: disabled on the public PeerJS cloud,
+  and AC5 forbids listing anyway.
+
+**Headless joins retry (found during build, user's call 2026-10-06).**
+The live listener test failed about 3 runs in 7: with five headless
+browsers joining on one box, one join was occasionally never seated (once
+a bot, once a game-master child). The invite path itself never failed.
+The harness `joinTable`, which every bot, game master and test uses, now
+gives each attempt 20 s and makes up to 3. A retry reloads the same
+browser context, so the player key is kept and the host reunites it with
+any half-taken seat (US-38) instead of leaving a ghost. **Rejected:**
+chasing the root cause first (lead suspect: Chromium's mDNS host
+candidates over loopback; slow to confirm, and it would only explain the
+test box, not a Pi on the public broker), and shrinking the test to
+fewer browsers (hides it). Root cause still unknown.
+
+**Smith Gate 2 (2026-10-06): APPROVED** - C1-C4 are each designed in. One
+wording condition: the `no-answer` and `never-arrived` lines name the
+likely cause and the next step, because an error message should say how
+to recover. `no-answer`: "no game master named patch answered - is it
+running with --name patch?". `never-arrived`: "patch accepted but never
+joined - is it running the same Recard version as this table?".
+
+---
+
+### D174. `make dist` also packages the Jev CLIs as `dist/jev/`, a self-contained Node package
+
+**Decided (Tank, 2026-10-06, direct user request: run the Jev process on
+a Pi to play against bots or spectate them):** `tools/buildDistribution.mjs`
+now writes `dist/jev/` next to the static site: `jev-table`, `jev-player`
+and `jev-game-master`, everything they import, `games/`, the app the
+bots' headless browsers load, a generated `package.json` (runtime deps
+only, at the repo's own pins) and a README. On the box: `npm run setup`,
+then `npm run jev-table -- --game gin` (spectate on `:8230`) or
+`npm run jev-game-master -- --code <CODE>` (play).
+
+**The package mirrors the repo layout instead of being a bundle.** The
+CLIs find the app, `games/`, the PeerJS bin and each other by paths
+relative to their own files (`new URL('../..', import.meta.url)`), so an
+esbuild bundle would break all of them, and Playwright can't be bundled
+anyway. **Rejected:** shipping the whole repo (lint/test tooling, art
+pipeline, ~all devDeps) and a hand-kept file list. Instead esbuild's
+import graph (metafile, packages external) picks the source files and
+the packages, so a new import is picked up with no list to update. The
+one hand-listed dependency is `peer`, which is started as a process, not
+imported.
+
+**Guarded by:** `tests/buildDistribution.test.js` (re-bundling the
+PACKAGED entry points fails on any missing local import; deps exactly
+the runtime set) and `make test-jevpackage` (the packaged jev-table
+hosts a real table, seats two real bots, serves the app on its port, and
+Ctrl-C ends it; dropping `games/` from the package fails it, as checked
+by mutation).
+
+**Amendment (Tank, 2026-10-07): the package also ships as a container
+image for pi-patch.** The user deploys it as a workload in `../pi-patch`
+(a k3s cluster), not as files copied to a host. `make export-jev-image`
+follows that repo's existing convention (happening's
+`export-proxy-image`): build an image from `dist/jev/` (the
+`tools/jevPackage.Dockerfile` it now contains), `docker save` it to
+`dist/recard-jev-<VERSION>.tar`, and pi-patch's playbook imports the tar
+on the nodes. The image is node:24-bookworm-slim plus `tini` (PID 1:
+passes on SIGTERM and reaps Chromium's processes) and Playwright's own
+headless Chromium (driver and browser versions always match). It runs as
+`node`, and its default command is a listening game master named
+`$GM_NAME`. Package deps are now pinned to the exact installed versions
+rather than the repo's ranges, so an image gets what was tested. The
+listener exits 143 on SIGTERM and passes it on to every table it is at.
+`make test-jev-image` runs the image's default command against the
+public broker and checks that `docker stop` ends it cleanly.
+**Rejected:** apt's Chromium (smaller, but its version drifts from
+Playwright's driver); shipping the folder and running `npm install` on
+the nodes (not declarative; every pod start would depend on the
+registry); a registry push (pi-patch imports tars, so no registry
+exists to push to).
 
 ---
 

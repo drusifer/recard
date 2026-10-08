@@ -1,5 +1,37 @@
 # Agent State
 
+## Current Task (2026-10-07) - TURN relay sprint (US-151/152): DONE
+
+US-151/152 TURN sprint built: tools/turnRelay.mjs (+11 tests), peerOptions peerConfig/withPeerConfig, harness openPeer + listener refresh via JSHandle, jevGameMaster announceRelay, static server containment. Next: nothing; untested against real Cloudflare (no creds here).
+
+## Next Steps
+None queued; await user (commit, then rebuild image for a clean tag).
+
+---
+
+## Current Task (2026-10-06, sprint close)
+US-150 DONE (sprint launched). Join flake handled by joinTable retry per user; root cause open in BACKLOG. Ignore the 'chasing' block below.
+
+## Current Task (2026-10-06) - US-150 sprint, phase 4 done, chasing an intermittent live failure
+
+Phases 1-4 of US-150 (D175) implemented; task.md ticked; `make check` clean (1259 unit).
+OPEN: `make test-gmlisten` is INTERMITTENT (3 pass / 2 fail so far). The failure is always the
+same step: the bot spawned through the invited game master at table A says "joining <code>"
+and is never seated within 60s (its jsonl log isn't even created). Ruled out: leftover
+processes, memory, STUN (local ICE has no servers). Added host-side roster+traffic to that
+step's failure message; looping the test into scratchpad/gmlisten-N.out to catch it.
+Also fixed: the test's cleanup now SIGINTs the listener first (it forwards to its --code
+children) so a failure no longer orphans children and hangs the file. Anti-loop: this is
+attempt 1 at a root cause; no retry-padding the timeout.
+UPDATE: caught failure #3 (scratchpad/gmlisten-2.out): this time one of the TWO game-master
+children (joining 2 tables at once) never seated. So the class is 'a headless peer's join to
+a table sometimes never seats', not the invite path. ESCALATED to user (blocked post in CHAT).
+USER CHOSE: retry joins. Done: harness joinTable now waits for a seat, 3 x 20s, retry = reload
+same context (player key kept, remembered session cleared); runner/GM's own 60s seat waits
+removed; recorded in D175. Gate run in background (all join-using suites + gmlisten x5,
+outputs in scratchpad/gate-*.out). Still to run: test-motion. Then Trin/Morpheus phase-4 +
+sprint close (Oracle groom, Smith live test, retro, Cypher launch).
+
 ## Current Task (2026-10-02) - Applied both items logged during `*judge general` (direct user request, "apply the backlogged improvements")
 
 **1. via-availability signal for `AP-VIA-GREP`/`AP-VIA-READ`** (`agents/tools/trace_annotate.py`):

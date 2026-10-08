@@ -2018,7 +2018,7 @@ the NEXT sprint, Gin only.
 - [x] T2.2 A loader that validates a file on load: every `{path}`
       reference resolves against the schema, and no instruction
       contains a literal card name or number
-- [ ] T2.3 Tests incl. the guard above (a strategy with "5 of hearts"
+- [x] T2.3 Tests incl. the guard above (a strategy with "5 of hearts"
       in an instruction is rejected)
 
 ## Phase 3 — The runner
@@ -2497,5 +2497,139 @@ fully tested, with NO ui entry point - this phase is UI-only, no reducer/replica
       mutation-proved (git-stash baseline, no #add-zone-btn exists at all)
 - [x] gate: bobp make check; test-buildermenu 3/3 green
 
-Sprint close: Oracle groom (docs/ARCHITECTURE.md module map +
-docs/BACKLOG.md both entries marked SHIPPED) - Smith user-test next.
+Sprint close:
+- [x] Oracle groom (docs/ARCHITECTURE.md module map; docs/BACKLOG.md both entries
+      already marked SHIPPED at scoping time)
+- [x] Smith user-test (2026-10-04): APPROVED, no defects. Live-ran both on a real War
+      table AND the from-scratch Blank preset (AC4) - SaveAs prefill/Enter/Escape/blank
+      all correct, zero stray dialogs; Add Zone/Add Pile create real panels, Escape
+      cancels cleanly. Full notes: agents/smith.docs/state.md.
+
+**SPRINT CLOSED (2026-10-06).**
+
+# Sprint: Gin strategy bench, tournament, and evolution (D172/D173) — 2026-10-03/04 — Tier 2
+
+Not pre-planned in this file - started from direct user request mid-session ("put two
+players in a game, have them play through, then score the game play when they are
+finished... see if we can make scoring logic out of our XState yaml logic
+orchestrations... add a new yaml for scoring"), then corrected mid-sprint from the
+originally-sketched headless/fake-judge approach (see agents/mouse.docs/sprint_log.md's
+superseded pre-sprint plan) to the REAL harness/API end to end. Recorded here
+retroactively at sprint close - task.md is the single source of truth and this sprint
+had never been entered.
+
+Phase 1a — Scoring as a statechart (not a function)
+- [x] games/gin/scoring.yaml: waiting_for_hand -> scoring -> tallying -> waiting_for_hand
+      or finished, named guards/actions (tools/gin/scoreLibrary.mjs), compiled by
+      tools/gin/scoreMachine.mjs (NOT a reuse of jev/machine.mjs's turn compiler - no
+      seated bot, no leave-safety concept for a whole-game running total)
+- [x] tools/gin/scoring.mjs: scoreHand() measurement only, built on cards.mjs's existing
+      bestMelds/layoffs/cardValue - no new card logic
+- [x] tests/ginScoreMachine.test.js loads the REAL yaml file; 1222/1222 unit, lint clean
+
+Phase 1b — The real match driver
+- [x] tools/gin/match.mjs: a full real two-strategy game to a score target (100,
+      confirmed), real table/local-WebRTC (D172)/bot processes, redeals between hands,
+      feeds each hand's result into scoring.yaml's machine
+- [x] Live-verified TWICE for real: knock-early vs knock-early (free), jev-balanced vs
+      knock-early (real TypeSafe API, confirmed in logs) - both correct accumulation,
+      correct game-over, clean process teardown
+- [x] tests/ginMatch.browser.mjs (permanent regression test); test:ginmatch 1/1
+
+Phase 2 — Tournament
+- [x] tools/gin/tournament.mjs: round-robin over a roster, N real games/pairing,
+      leaderboard by win rate; playMatch injected so tests run in ms (no browser); 7 tests
+
+Phase 3 — Evolution
+- [x] tools/gin/evolve.mjs: mutate bounded numeric thresholds + recombine rule
+      lists/params (STRATEGY_FACTORIES, new registry alongside the existing STRATEGIES -
+      not a replacement), elitism, 10-generation hard cap (direct user confirmation),
+      seeded PRNG determinism; 10 tests
+- [x] Real architecture gap found+closed: a mutated/recombined variant has no static
+      registry entry, but a spawned bot is a separate process addressed only by name -
+      fixed via GIN_VARIANT env (strategyKinds.mjs fallback + adapter.mjs's
+      pre-enumerated map, the second fix jev/runner.mjs's validation needed)
+- [x] Real bug found+fixed (TDD, pre-live): variant-name counter was module-level
+      mutable state, breaking cross-call determinism - moved to a threaded argument
+- [x] Real bug found+fixed: test cleanup SIGKILLed match.mjs by pid only, orphaning its
+      non-detached child peerjs process on timeout - fixed with graceful-first
+      (SIGINT-then-SIGKILL) escalation + a defense-in-depth port sweep
+- [x] Live-verified end to end post-fix: bobp make gin-evolve BASES=knock-early,gin-hunter
+      GENERATIONS=2 GAMES=1 TARGET=10 - real elitism + a mutated child correctly beating
+      its own parent, clean shutdown confirmed via ps
+- [x] docs/GIN_STRATEGY.md §9 added (bench/tournament/evolution)
+
+Sprint close:
+- [x] Oracle groom (2026-10-06): docs/ARCHITECTURE.md module map gained ~20 tools/gin/*
+      entries that had never been added (this sprint's files AND older US-120 files);
+      lessons.md gained a dated section for the 3 real bugs/gaps above. Checked, left
+      OPEN: docs/BACKLOG.md's "GIN_STRATEGY.md undocuments question-file strategies/
+      state schema" item - verified still true, unrelated to the new §9.
+- [ ] No Trin/Morpheus/Smith gate run on this sprint - Tier 2 fast-track was not
+      explicitly invoked and this sprint ran outside the normal *impl chain (direct,
+      live-verified-by-Neo-himself work). Flagging rather than silently treating it as
+      equivalent to a gated sprint; the user's call whether that's acceptable
+      after the fact.
+
+**SPRINT CLOSED (2026-10-06), with the one gate gap above disclosed.**
+
+## Sprint: game master invite (US-150, D175) - SHIPPED 2026-10-06
+
+Tier 1 (new protocol + UX). Story: docs/USER_STORIES.md US-150 (+ Smith C1-C4).
+Arch: docs/DECISIONS.md D175 (+ Gate 2 wording condition).
+
+### Phase 1 - shared pure module
+- [x] T1.1 `src/gameMasterInvite.js`: `gameMasterAddress(name)`, name validation
+      (`[a-z0-9-]{1,32}` after lowercasing), `parseInvite(text)` -> `{name}|{usage}|null`,
+      message kinds, `INVITE_ANSWER_MS`=15000, `INVITE_ARRIVAL_MS`=90000,
+      `inviteStatusText(status, name)` (Gate 2 wording). TDD: `tests/gameMasterInvite.test.js`.
+
+### Phase 2 - host side: /invite dials and reports
+- [x] T2.1 `session.inviteGameMaster(address, code)` -> 'accepted' | 'no-answer'
+      (peer-unavailable or 15s).
+- [x] T2.2 `publishTalk` (host): parseInvite hit -> typed line + `inviting` / `usage`
+      status; then `accepted` / `no-answer`; arrival watch -> `never-arrived` at 90s
+      unless a `jev-ready` from that name lands.
+- [x] T2.3 live test: `/invite` for an unknown name posts inviting then no-answer;
+      bare `/invite` posts usage. (Bound overridable for the test, same idea as D164's
+      reconnect clock - never a real 15s wait.)
+
+### Phase 3 - listening game master
+- [x] T3.1 `jevGameMaster.mjs` listening mode (`--name`, no `--code`): one page holding
+      the address, invite -> accept + spawn the existing `--code` mode with `--url`;
+      `unavailable-id` -> exit 2 "name taken"; broker reconnect; neither flag -> usage.
+- [x] T3.2 live test: listener invited by name from a real table (mixed case) arrives,
+      a bot is added through it; a second listener under the same name exits "name taken".
+
+### Phase 4 - docs + package
+- [x] T4.1 `tools/jevPackage.README.md`: listening mode, `/invite`, both bounds;
+      `docs/ARCHITECTURE.md` module map; Makefile `jev-game-master` help (CODE optional
+      when NAME given). `test-jevpackage` still green.
+
+### Sprint close
+- [x] Join retry (user's call): harness `joinTable` 3 x 20s, same player key (D175 amendment)
+- [x] Oracle groom: BACKLOG +4, lessons.md +4, chat archived as CHAT_JEV_DIST_GM_INVITE
+- [x] Smith: APPROVED from live-suite evidence (no separate hands-on session)
+- [x] Retro posted by all personas; Cypher launch
+- [ ] Regression gate NOT completed (user skipped it mid-run): 11 join-using suites
+      green; `test-motion` and repeat `test-gmlisten` runs not done. `test-harness-mcp`
+      fails 9/13, identically at HEAD (pre-existing, BACKLOG).
+
+**SPRINT CLOSED (2026-10-06), with the gate gap above disclosed.**
+
+## Sprint: Game master over the internet via TURN (2026-10-07) - Tier 2 - SHIPPED 2026-10-07 (uncommitted)
+
+Stories US-151/152, architecture D176. Done when test-jev-game-master +
+test-gmlisten pass and export-jev-image writes a new tar.
+
+### Phase 1 - Relay core (pure, unit TDD)
+- [x] T1.1 `tools/turnRelay.mjs` + `tests/turnRelay.test.js`: env gating, mint request/normalize/:53 filter, refresh at 80% TTL, failed refresh keeps set + retries
+- [x] T1.2 `src/peerOptions.js`: `peerConfig` param; `peerPageUrl` in the harness; round-trip unit test
+
+### Phase 2 - Wiring + containment
+- [x] T2.1 harness `openPeer` uses `sharedTurnRelay`; listener page updated on refresh (browser test in gameMasterListen); jevGameMaster startup line
+- [x] T2.2 `startStaticServer` containment + 400 on bad `%` + bound-port baseUrl (`tests/staticServer.test.js`)
+- [x] T2.3 `tools/jevPackage.README.md` Container section: the two env vars + egress
+
+### Phase 3 - Gate
+- [x] T3.1 `bobp make check`, `test-jev-game-master`, `test-gmlisten`, then `export-jev-image`
