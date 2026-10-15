@@ -7,7 +7,7 @@
 #
 # Adding a task: add the npm script first, then a one-line target here.
 
-.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-layoutsave test-buildermenu test-resume check-fast test-tablezoom test-focuszoom test-multiplayer test-realbroker test-remotecursor test-harness-mcp test-gin test-jev-runner test-jev-game-master test-jevtable test-jevpackage test-gminvite test-gmlisten test-actionmenu test-zonepanel test-headeractions test-pileelement test-reconnect test-ginmatch jev-player jev-game-master jev-library jev-library-doc jev-readme jev-table gin-match gin-tournament gin-evolve secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist export-jev-image test-jev-image check-decisions check-story-numbers dead-code
+.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-layoutsave test-buildermenu test-resume check-fast test-tablezoom test-focuszoom test-multiplayer test-realbroker test-remotecursor test-harness-mcp test-gin test-jev-runner test-jev-game-master test-jevtable test-jevpackage test-gminvite test-gmlisten test-spectator test-actionmenu test-zonepanel test-headeractions test-pileelement test-reconnect test-ginmatch jev-player jev-game-master jev-library jev-library-doc jev-readme jev-table gin-match gin-tournament gin-evolve secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist export-jev-image test-jev-image check-decisions check-story-numbers dead-code
 
 help:
 	@echo "Recard targets (all front npm scripts):"
@@ -41,6 +41,7 @@ help:
 	@echo "  test-jevtable  Ctrl-C at jev-table ends the table and leaves no bot running (D159)"
 	@echo "  test-gminvite  /invite <name> at a real table: usage, no-answer, never-arrived - to everyone (US-150)"
 	@echo "  test-gmlisten  a listening jev-game-master invited by name from two real tables: joins both, adds a bot, quit stays local (US-150)"
+	@echo "  test-spectator  watch-on-join, a full table seats a spectator with the reason, spectating host (US-124/US-153)"
 	@echo "  test-jevpackage  dist/jev/ (make dist) runs on its own: packaged jev-table hosts, seats bots, serves spectators"
 	@echo "  test-jev-runner  the real jev-player CLI at a hosted table: moves, add-bot, quit (US-128)"
 	@echo "  test-jev-game-master  the real jev-game-master CLI at a hosted table: game-detect, add-bot, refusal, quit, unsupported preset"
@@ -161,6 +162,9 @@ test-gminvite:
 
 test-gmlisten:
 	npm run test:gmlisten
+
+test-spectator:
+	npm run test:spectator
 
 test-ginmatch:
 	npm run test:ginmatch

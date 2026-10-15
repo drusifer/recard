@@ -33,13 +33,12 @@ When executing `*judge <target>`, the loop evaluates the specified target (e.g.,
 ```
 Trin *qa judge <target>
 ```
-- **Required tool — `python3 agents/tools/trace_annotate.py [--date YYYY-MM-DD] [--format html|md] [--no-jev]`**: this parses the **real Claude Code JSONL session transcripts** (`~/.claude/projects/<slug>/*.jsonl`) for the given date and flags anti-patterns (`AP-SKILL-RELOAD`, `AP-MAKE-BYPASS`, `AP-RAW-VENV`, `AP-MAKE-PIPE`, `AP-VIA-GREP`, `AP-VIA-READ`, `AP-DUP-READ`, `AP-ONEOFF-SCRIPT`, `AP-SLOW-TEST-REPEAT`) via `agents/tools/trace_rules.json` - the TOOL CALLS themselves are ground truth (actual events, not a prose summary), but as of 2026-10-01 every rule's final yes/no is itself Jev-judged (`agents/tools/trace_judge.mjs`, one `judge.systemOne` noul question per mechanical candidate - the regex/state trackers only narrow down candidates now, same two-layer shape as any other Jev player in a project that has one). No `TYPESAFE_API_KEY` (or `--no-jev`) falls back to flagging every mechanical candidate directly - still usable with no key configured, just without the judgment layer; a run worth trusting for a real score needs the key. Output defaults to `agents/trin.docs/judge_tool_trace.{html,md}`.
-  **There is no `make judge-trace` wrapper target** — checked across 6 bob-protocol projects (2026-08-15) and none had one wired (`agents/tools/trace_annotate.py` and `trace_rules.json` are shared, project-agnostic scaffolding, but no project's Makefile actually calls them). If `agents/tools/trace_annotate.py` is missing from the current project, copy it in from any sibling bob-protocol project — it's generic (confirmed byte-identical `trace_rules.json` across projects) — rather than treating its absence as "not automatable here."
-- **Do not hand-reconstruct a trace from `agents/CHAT.md` instead.** CHAT.md only contains what personas chose to summarize about their own work — it cannot show tool-call-level behavior (redundant invocations, piping, raw venv calls, via-bypasses) and produces a systematically over-optimistic trace. `agents/tools/trace_annotate.py` is the only source of truth for tool/skill-use judging; CHAT.md and persona `state.md` files remain the source of truth for *process/protocol* adherence (chain sequencing, gate compliance, handoffs) — the two are complementary, not interchangeable.
-- **Manual review is still required after running the tool**: read the raw flags before scoring — the mechanical regex/state trackers that decide what's even a CANDIDATE are heuristics and can both over-flag (e.g. a `make <target> | tail` where the invocation wasn't actually via `bobp make`, so there's no build.out capture to be redundant with) and under-flag. Note any flag you're overriding and why in the trace report, per-flag, not as a blanket dismissal. **Found live, worth generalizing**: a real `*judge general` run (2026-10-01) caught 2 false positives whose root cause was the candidate-generation state fed to Jev, not Jev's own reasoning - a `git commit -m "$(cat <<'EOF' ...)"` heredoc and a `bobp chat "...python3 -c..."` call were both read as if their own quoted MESSAGE TEXT were the command actually running. When a flag looks wrong, check what `state` the candidate was actually judged against (the raw command/path passed in) before concluding Jev itself erred - the judgment is often correct for the (sometimes malformed) input it was given.
-- Trin writes the analysis (raw counts + manual-review verdict per flag type + any additional scenario coverage the tool can't see) to `agents/trin.docs/judge_<target>_trace.md`.
+- **Required tool — `bobp make judge-trace [DATE=YYYY-MM-DD] [FORMAT=html|md]`**: this runs `bobp trace-annotate`, which parses the **real Claude Code JSONL session transcripts** (`~/.claude/projects/<slug>/*.jsonl`) for the given date and programmatically flags anti-patterns (`AP-SKILL-RELOAD`, `AP-MAKE-BYPASS`, `AP-RAW-VENV`, `AP-MAKE-PIPE`, `AP-VIA-GREP`, `AP-VIA-READ`, `AP-DUP-READ`) via `agents/tools/trace_rules.json`. This is ground truth — actual tool-call events, not a prose summary. Output defaults to `agents/trin/judge_tool_trace.{html,md}`.
+- **Do not hand-reconstruct a trace from `agents/CHAT.md` instead.** CHAT.md only contains what personas chose to summarize about their own work — it cannot show tool-call-level behavior (redundant invocations, piping, raw venv calls, via-bypasses) and produces a systematically over-optimistic trace. `bobp make judge-trace` is the only source of truth for tool/skill-use judging; CHAT.md and persona `state.md` files remain the source of truth for *process/protocol* adherence (chain sequencing, gate compliance, handoffs) — the two are complementary, not interchangeable.
+- **Manual review is still required after running the tool**: read the raw flags before scoring — the rule regexes are heuristics and can both over-flag (e.g. a `make <target> | tail` where the invocation wasn't actually via `bobp make`, so there's no build.out capture to be redundant with) and under-flag. Note any flag you're overriding and why in the trace report, per-flag, not as a blanket dismissal.
+- Trin writes the analysis (raw counts + manual-review verdict per flag type + any additional scenario coverage the tool can't see) to `agents/trin/judge_<target>_trace.md`.
 - **Trin's constraints**: Ensure that the target is exercised in realistic conditions representing typical developer/agent workflow.
-- **Live vs. completed sessions**: `agents/tools/trace_annotate.py` scores the JSONL transcript as it exists *right now*. If the `*judge` loop is run inside the same live session it's evaluating, every subsequent step of the loop (reading the trace, editing files, re-running the tool) appends more tool calls to that same transcript — the call/flag counts will keep growing across iterations, and a fresh Smith TES score at each iteration is not comparing like-for-like. Prefer running `*judge` on a session that has already ended. If run mid-session anyway, treat iteration 1's score as the baseline for defect-finding only, verify specific fixes by checking whether the specific previously-flagged entries are now absent (not by chasing a fresh 90+ on an ever-growing trace), and defer a real numeric re-score to the next `*judge` invocation on a completed session.
+- **Live vs. completed sessions**: `bobp make judge-trace` scores the JSONL transcript as it exists *right now*. If the `*judge` loop is run inside the same live session it's evaluating, every subsequent step of the loop (reading the trace, editing files, re-running the tool) appends more tool calls to that same transcript — the call/flag counts will keep growing across iterations, and a fresh Smith TES score at each iteration is not comparing like-for-like. Prefer running `*judge` on a session that has already ended. If run mid-session anyway, treat iteration 1's score as the baseline for defect-finding only, verify specific fixes by checking whether the specific previously-flagged entries are now absent (not by chasing a fresh 90+ on an ever-growing trace), and defer a real numeric re-score to the next `*judge` invocation on a completed session.
 
 ### Handoff:
 ```bash
@@ -64,9 +63,9 @@ Smith *user feedback judge <target>
     - Deduct **-5 points** for any violation of the State Management Protocol (missing context files, incorrect summarizing, improper handoffs).
   - **Efficiency/Design Bonuses**:
     - Add **+2 points** (up to **+10 points** maximum) for highly efficient, precise usage patterns or elegant scripting.
-- **Bug/Defect Cataloging**: If any command crashes, returns incorrect results, violates constraints, or behaves unexpectedly, Smith logs the details in `agents/smith.docs/bugs.md` (or `bugs_<target>.md`).
+- **Bug/Defect Cataloging**: If any command crashes, returns incorrect results, violates constraints, or behaves unexpectedly, Smith logs the details in `agents/smith/bugs.md` (or `bugs_<target>.md`).
 - **Decision & Loop Control**:
-  - Record the final score in `agents/smith.docs/trace_eval.md` (or `trace_eval_[target].md`).
+  - Record the final score in `agents/smith/trace_eval.md` (or `trace_eval_[target].md`).
   - **Target Score**: **90 points** or higher is considered optimal.
   - **Branching**:
     - **If TES >= 90** and no bugs/anti-patterns remain: Hand off to Trin to finalize and exit.
@@ -95,7 +94,7 @@ bobp chat "Optimal score [TES] reached! No bugs. @Trin *qa done" --persona Smith
 ```
 Neo *swe fix judge <target>
 ```
-- Neo resolves the bugs or structural issues cataloged in `agents/smith.docs/bugs.md` (or target bug file).
+- Neo resolves the bugs or structural issues cataloged in `agents/smith/bugs.md` (or target bug file).
 - Neo ensures any scripts, Makefiles, or codebase modules behave correctly.
 - Neo runs the project tests (`bobp make test`) to ensure a completely green baseline.
 
@@ -112,7 +111,7 @@ Bob *prompt update judge <target>
 ```
 - Bob extracts the optimal usage patterns identified by Smith and updates:
   - The universal customization skill guidelines under `agents/skills/<target>/SKILL.md` (or the relevant skill/persona file).
-  - Specialist persona instructions (`agents/<persona>.docs/SKILL.md`) to guide future agent interactions and prevent identified anti-patterns.
+  - Specialist persona instructions (`agents/<persona>/SKILL.md`) to guide future agent interactions and prevent identified anti-patterns.
 - Bob registers the updated skills/rules configurations.
 
 ### Handoff:

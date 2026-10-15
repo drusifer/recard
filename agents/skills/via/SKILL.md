@@ -45,7 +45,7 @@ via -mg 'DatabaseStore.connect' -tf -Q --via calls -mg '*' -tf
 
 ## 3. Section-Scoped Reads for Large, Growing Markdown Docs
 
-Files that accumulate dated entries over a project's life (`agents/oracle.docs/lessons.md`, `agents/oracle.docs/memory.md`, `docs/ARCH.md`) get progressively more expensive to read in full on every entry. `via` indexes markdown headers (`-tH`), so you can locate a named section without reading or grepping the whole file:
+Files that accumulate dated entries over a project's life (`agents/oracle/lessons.md`, `agents/oracle/memory.md`, `docs/ARCH.md`) get progressively more expensive to read in full on every entry. `via` indexes markdown headers (`-tH`), so you can locate a named section without reading or grepping the whole file:
 
 ```bash
 via -mg '*SectionName*' -tH        # returns: header:<file>:<start>-<end>:... — the header's own line range

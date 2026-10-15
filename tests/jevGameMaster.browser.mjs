@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { fileURLToPath, URL } from 'node:url';
-import { launchChromium, startStaticServer, hostTable, localPeerServer, closeLocalPeerServer } from './harness/multiplayer.mjs';
+import { launchChromium, startStaticServer, hostTable, joinTable, dealTable, localPeerServer, closeLocalPeerServer } from './harness/multiplayer.mjs';
 
 const PORT = 8224; // not 8211-8223 (other browser test files / the MCP server / jevRunner's own)
 const CLI = fileURLToPath(new URL('../tools/jevGameMaster.mjs', import.meta.url));
@@ -121,6 +121,49 @@ test('answers a real "add a bot" request by spawning the real jevPlayer CLI, whi
   // answers its own quit requests (same mechanism this whole file tests),
   // so ask it, and the game-master itself, to leave the same way a person would.
   await quit(host, master, 'mechanical');
+  await quit(host, master, 'Game Master');
+  await master.exited;
+});
+
+// US-153: table talk (so "Add Jev bot") only exists once the cards are
+// out, so a bot added from it ALWAYS arrives after the deal. With a seat
+// free it has to be seated, dealt the same hand, and play.
+test('a bot added after the deal, at a table with a free seat, is dealt in and plays', async () => {
+  const { host, code } = await hostFor('War');
+  await dealTable(host, [], { players: 1, cardsPerPlayer: 26 });
+  const master = await startMaster(code);
+  await heard(host, (entry) => entry.data?.kind === 'jev-ready', 'jev-ready announcement', master);
+
+  const requestId = randomUUID();
+  await host.say('add a War bot', { kind: 'spawn-bot', requestId, game: 'war', strategy: 'mechanical' });
+  await heard(host, (entry) => entry.data?.kind === 'jev-ready' && entry.name === 'mechanical', 'the late bot\'s own jev-ready', master);
+
+  // Seated as a player, dealt War's 26 from what the deck had left, and
+  // playing: its first flip takes one of those 26 off its pile.
+  await host.waitForView(() => {
+    const view = globalThis.__recardHarness.view();
+    const bot = view.players.find((p) => p.name === 'mechanical');
+    const pile = view.piles.find((p) => p.ownerId === bot?.id);
+    const count = pile?.count ?? pile?.cards.length ?? 0;
+    return bot?.role === 'player' && count > 0 && count < 26;
+  }, undefined, { timeout: WAIT_MS });
+
+  await quit(host, master, 'mechanical');
+  await quit(host, master, 'Game Master');
+  await master.exited;
+});
+
+test('a bot that finds every seat taken says so in table talk, then leaves', async () => {
+  const { host, code } = await hostFor('War');
+  const guest = await joinTable({ browser: fixture.browser, baseUrl: fixture.server.baseUrl, code, name: 'Bob' });
+  fixture.closers.push(guest.close);
+  const master = await startMaster(code);
+  await heard(host, (entry) => entry.data?.kind === 'jev-ready', 'jev-ready announcement', master);
+
+  await host.say('add a War bot', { kind: 'spawn-bot', requestId: randomUUID(), game: 'war', strategy: 'mechanical' });
+  const refusal = await heard(host, (entry) => entry.data?.kind === 'bot-refused' && entry.name === 'mechanical', 'the bot\'s refusal', master);
+  assert.match(refusal.text, /every seat is taken/);
+
   await quit(host, master, 'Game Master');
   await master.exited;
 });

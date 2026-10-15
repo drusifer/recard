@@ -70,6 +70,35 @@ D37: `design-lint` is a phase gate · D58: ESLint adopted · D59: two ESLint rul
 
 ---
 
+### D177. A free seat is a free seat: a mid-game arrival is seated and dealt the last hand (supersedes D141's "started = spectator")
+
+**Decided (Morpheus, 2026-10-08, US-153; user's preferred fix).** D141
+forced a spectator on two conditions, full OR started. "Started" made
+every bot added from table talk a spectator, because talk only exists
+after the deal. Only "full" remains.
+
+- `state.dealtThisGame` is gone, replaced by `state.lastDeal`
+  (`{ pileId, cardsPerPlayer }` | `null`): set by a fresh `DEAL` and by
+  `RESHUFFLE_DEAL`, left alone by `DEAL_MORE`, cleared by `RESET`/New
+  Game. JOIN of a NEW seated player calls `dealLateArrival`: ensure their
+  player pile (honouring `playerPileKind`), move `min(cardsPerPlayer,
+  pile size)` cards off the top of that pile. Cards are conserved; no
+  one else is touched.
+- A short pile deals what it has rather than seating a spectator - the
+  user's rule was "only a genuinely full table seats spectators", and a
+  short hand is visible and fixable at the table.
+- The view no longer carries `dealtThisGame`; the forced-spectator banner
+  has one reason left ("The game is full (N players)").
+- The bot runner posts `{ kind: 'bot-refused', reason: 'table-full' }`
+  to talk before exiting, so a refusal reaches the person who asked.
+
+**Rejected:** the user's fallback (no auto-deal, talk before the deal) -
+it changes how every table starts to fix one path; keeping
+`dealtThisGame` alongside `lastDeal` - a field nothing reads (no
+back-compat shims).
+
+---
+
 ### D176. The game master relays WebRTC through Cloudflare TURN, minted per process from env
 
 **Decided (Morpheus, 2026-10-07, US-151/152).** Pod side only; the

@@ -10,11 +10,11 @@ The following applies to all BOB Protocol Agents regardles of persona.
 **ENTRY:**
 When Initializing as a persona:
 1. Read `agents/CHAT.md` - Understand team context (last 10-20 messages)
-2. Load `agents/[persona].docs/state.md` - Your accumulated knowledge, active work, and resume plan
+2. Load `agents/[persona]/state.md` - Your accumulated knowledge, active work, and resume plan
 
 **WORK:**
 5. Execute assigned tasks and complete steps
-6. Summarize work in `agents/[persona].docs/<TASKNAME>_Summary_<YYYY-mm-ddTHH:MM>.md`
+6. Summarize work in `agents/[persona]/<TASKNAME>_Summary_<YYYY-mm-ddTHH:MM>.md`
 7. Post updates to `agents/CHAT.md` using `agents/templates/_template_CHAT.md`
 
 **EXIT (Before Switching - MANDATORY):**
@@ -28,16 +28,16 @@ When acting as a specific persona, **load their specific instructions** from the
 
 | Persona | Role | Instruction File |
 |---------|------|------------------|
-| **Bob** | Prompt Engineer | `agents/bob.docs/SKILL.md` |
-| **Cypher** | Product Manager | `agents/cypher.docs/SKILL.md` |
-| **Morpheus** | Tech Lead | `agents/morpheus.docs/SKILL.md` |
-| **Neo** | Software Engineer | `agents/neo.docs/SKILL.md` |
-| **Oracle** | Knowledge Officer | `agents/oracle.docs/SKILL.md` |
-| **Trin** | QA Guardian | `agents/trin.docs/SKILL.md` |
-| **Mouse** | Scrum Master | `agents/mouse.docs/SKILL.md` |
+| **Bob** | Prompt Engineer | `agents/bob/SKILL.md` |
+| **Cypher** | Product Manager | `agents/cypher/SKILL.md` |
+| **Morpheus** | Tech Lead | `agents/morpheus/SKILL.md` |
+| **Neo** | Software Engineer | `agents/neo/SKILL.md` |
+| **Oracle** | Knowledge Officer | `agents/oracle/SKILL.md` |
+| **Trin** | QA Guardian | `agents/trin/SKILL.md` |
+| **Mouse** | Scrum Master | `agents/mouse/SKILL.md` |
 
 ## Global Agent Standards
-- **Working Memory**: Use `agents/[persona].docs/` for detailed reports and summaries
+- **Working Memory**: Use `agents/[persona]/` for detailed reports and summaries
 - **Oracle Protocol**: Consult Oracle before major product decisions
 - **Command Syntax**: Use your persona's command prefix (see your `SKILL.md`)
 - **Use Templates**: See `agents/templates/*.md`

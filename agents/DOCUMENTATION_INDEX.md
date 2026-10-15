@@ -14,7 +14,7 @@ Type `*help` for complete command reference with examples.
 - **[STARTUP.md](../STARTUP.md)** - LLM startup instructions
 - **[README.md](../README.md)** - Project overview and team reference
 - **[SHORTHAND_GUIDE.md](../SHORTHAND_GUIDE.md)** - Complete trigger/command reference
-- **[HELP.md](bob.docs/HELP.md)** - Quick reference for all 8 personas and commands
+- **[HELP.md](bob/HELP.md)** - Quick reference for all 8 personas and commands
 
 ### Tools
 - **`bobp` CLI** - Agent tooling subcommands (`bobp chat`, `bobp make`, `bobp setup-agent-links`, …); run `bobp --help` for the full list
@@ -27,21 +27,21 @@ Type `*help` for complete command reference with examples.
 
 | Persona | Role | SKILL.md | Prefix |
 |---------|------|----------|--------|
-| Bob | Prompt Engineering Expert | [bob.docs/SKILL.md](bob.docs/SKILL.md) | `*new` / `*reprompt` / `*learn` |
-| Cypher | Product Manager | [cypher.docs/SKILL.md](cypher.docs/SKILL.md) | `*pm` |
-| Morpheus | Tech Lead / Architect | [morpheus.docs/SKILL.md](morpheus.docs/SKILL.md) | `*lead` |
-| Neo | Senior Software Engineer | [neo.docs/SKILL.md](neo.docs/SKILL.md) | `*swe` |
-| Oracle | Knowledge Officer | [oracle.docs/SKILL.md](oracle.docs/SKILL.md) | `*ora` |
-| Trin | QA / Guardian | [trin.docs/SKILL.md](trin.docs/SKILL.md) | `*qa` |
-| Mouse | Scrum Master | [mouse.docs/SKILL.md](mouse.docs/SKILL.md) | `*sm` |
-| Smith | Expert User & UX Advocate | [smith.docs/SKILL.md](smith.docs/SKILL.md) | `*user` |
+| Bob | Prompt Engineering Expert | [bob/SKILL.md](bob/SKILL.md) | `*new` / `*reprompt` / `*learn` |
+| Cypher | Product Manager | [cypher/SKILL.md](cypher/SKILL.md) | `*pm` |
+| Morpheus | Tech Lead / Architect | [morpheus/SKILL.md](morpheus/SKILL.md) | `*lead` |
+| Neo | Senior Software Engineer | [neo/SKILL.md](neo/SKILL.md) | `*swe` |
+| Oracle | Knowledge Officer | [oracle/SKILL.md](oracle/SKILL.md) | `*ora` |
+| Trin | QA / Guardian | [trin/SKILL.md](trin/SKILL.md) | `*qa` |
+| Mouse | Scrum Master | [mouse/SKILL.md](mouse/SKILL.md) | `*sm` |
+| Smith | Expert User & UX Advocate | [smith/SKILL.md](smith/SKILL.md) | `*user` |
 
 ---
 
 ## Team Communication
 
 - **[CHAT.md](CHAT.md)** - Team communication log (append-only)
-- Each persona maintains state in their `.docs/` folder:
+- Each persona maintains state in their `<name>/` folder:
   - `state.md` - Working memory: Context, Current Task, and Next Steps sections
 
 ---
@@ -87,10 +87,10 @@ Files prefixed with `.archive_` are historical and no longer active:
 - Archived: `.archive_*.md`
 
 ### Structure
-- All persona docs in `agents/[persona].docs/`
+- All persona docs in `agents/[persona]/`
 - All MCP tool docs in `agents/tools/`
 - Team communication in `agents/CHAT.md`
-- Primary references in `agents/bob.docs/`
+- Primary references in `agents/bob/`
 
 ### Maintenance
 - Update `*help` when adding commands
@@ -116,4 +116,4 @@ Files prefixed with `.archive_` are historical and no longer active:
 
 ---
 
-**For Help:** Type `*help` or read `agents/bob.docs/HELP.md`
+**For Help:** Type `*help` or read `agents/bob/HELP.md`

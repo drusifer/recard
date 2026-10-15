@@ -528,10 +528,11 @@ export function createInitialState(deckConfig = {}, rng = Math.random, gameConfi
     // colour. One stamp, overwritten per action; the FADE is local
     // (a glow is not worth a broadcast to end).
     lastTouch: { by: null, pileableIds: [], seq: 0 },
-    // D141 (US-124): "the game has started" for seating purposes -
-    // set by a deal, cleared by RESET/New Game. Someone arriving
-    // mid-game spectates even when a seat is free.
-    dealtThisGame: false,
+    // US-153: the last real deal's `{ pileId, cardsPerPlayer }` - set by
+    // DEAL/RESHUFFLE_DEAL, cleared by RESET/New Game - so someone who
+    // takes a free seat mid-game is dealt the same hand from the same
+    // deck (`dealLateArrival`). `null` = nothing dealt this game.
+    lastDeal: null,
     scores: {},
     // Set once, by the first JOIN (below) - the host always joins its own
     // table before a share code exists for anyone else to reach it (D3),
@@ -708,6 +709,26 @@ function ensureHandPile(piles, playerId, alreadyKind) {
   const canonicalId = handPileId(playerId);
   const id = piles.some((p) => p.id === canonicalId) ? randomPileId() : canonicalId;
   return [...piles, makePile('hand', { id, name: 'Hand', ownerId: playerId })];
+}
+
+/**
+ * US-153: a player taking a free seat after the deal gets the last
+ * deal's hand size from the deck it was dealt from - or whatever that
+ * deck still has, if less. Nobody else's cards move.
+ */
+function dealLateArrival(state, playerId) {
+  const { pileId, cardsPerPlayer = 0 } = state.lastDeal ?? {};
+  const pile = state.piles.find((p) => p.id === pileId);
+  if (!pile || cardsPerPlayer === 0) return state;
+  const share = Math.min(cardsPerPlayer, pile.cards.length);
+  const playerPileKind = state.gameConfig?.playerPileKind;
+  const piles = ensureHandPile(state.piles, playerId, playerPileKind).map((p) => {
+    if (p.id === pileId) return withCards(p, p.cards.slice(share));
+    const isTheirs = p.ownerId === playerId && (p.kind === 'hand' || (playerPileKind && p.kind === playerPileKind));
+    if (!isTheirs) return p;
+    return withCards(p, [...p.cards, ...pile.cards.slice(0, share).map((card) => toHandCard(card, playerId))]);
+  });
+  return { ...state, piles: applyPlayerPileKind(piles, state.gameConfig) };
 }
 
 /**
@@ -937,12 +958,14 @@ const ACTIONS = {
     const existing = state.players.find((p) => p.id === action.playerId);
     const seatLimit = state.gameConfig?.playerLimit;
     const seatsTaken = state.players.filter((p) => p.role !== 'spectator' && p.id !== action.playerId).length;
-    const isTableClosed = (seatLimit !== undefined && seatsTaken >= seatLimit) || state.dealtThisGame === true;
-    // A rejoining person keeps whatever they already were - a full or
-    // started table must never demote someone who already has a seat.
+    // US-153: only a FULL table turns a newcomer into a spectator; one
+    // arriving after the deal with a seat free is dealt in below.
+    const isTableFull = seatLimit !== undefined && seatsTaken >= seatLimit;
+    // A rejoining person keeps whatever they already were - a full table
+    // must never demote someone who already has a seat.
     const isSpectator = existing
       ? existing.role === 'spectator'
-      : action.role === 'spectator' || isTableClosed;
+      : action.role === 'spectator' || isTableFull;
     const perPlayerPiles = alreadyJoined || isSpectator
       ? []
       : (state.gameConfig?.piles ?? [])
@@ -963,7 +986,7 @@ const ACTIONS = {
               return applyDeclaration(pile, declaration, action.rng ?? Math.random);
             });
           });
-    return {
+    const joined = {
       ...state,
       hostId: state.hostId ?? action.playerId,
       players: [
@@ -980,6 +1003,7 @@ const ACTIONS = {
         : ensureZoneRecord(state.zones, playerZoneId(action.playerId), null, action.playerId, 'perPlayer'),
       scores: isSpectator ? state.scores : { [action.playerId]: 0, ...state.scores },
     };
+    return alreadyJoined || isSpectator ? joined : dealLateArrival(joined, action.playerId);
   },
 
   SET_CONNECTION(state, action) {
@@ -1052,14 +1076,12 @@ const ACTIONS = {
       const newCards = dealt[index].map((card) => toHandCard(card, p.ownerId));
       return withCards(p, [...(isFresh ? [] : p.cards), ...newCards]);
     });
-    // A deal of ZERO cards is a table being SET UP, not a game starting
-    // - found by running it live (US-125): the harness stands a table up
-    // that way, and treating it as started silently demoted the next
-    // joiner to spectator, so a bot joining to play was never dealt in.
+    // US-153: DEAL_MORE tops everyone up; it is not a new hand size for
+    // a late arrival, so only a fresh deal is remembered.
     return {
       ...state,
       piles: applyPlayerPileKind(piles, state.gameConfig),
-      dealtThisGame: state.dealtThisGame || action.cardsPerPlayer > 0,
+      lastDeal: isFresh ? { pileId: action.pileId, cardsPerPlayer: action.cardsPerPlayer } : state.lastDeal,
     };
   },
 
@@ -1628,7 +1650,11 @@ const ACTIONS = {
       const newCards = dealt[index].map((card) => toHandCard(card, p.ownerId));
       return withCards(p, [...p.cards, ...newCards]);
     });
-    return { ...state, piles: applyPlayerPileKind(piles, state.gameConfig) };
+    return {
+      ...state,
+      piles: applyPlayerPileKind(piles, state.gameConfig),
+      lastDeal: { pileId: action.pileId, cardsPerPlayer: action.cardsPerPlayer ?? 0 },
+    };
   },
 
   /**
@@ -2141,10 +2167,9 @@ const ACTIONS = {
     const declaredDeckLists = declaredCardDeckDeclarations(state.gameConfig.piles ?? []);
     return {
       ...state,
-      // D141: a reset starts the game over, so the table takes seats
-      // again - someone who was forced to spectate mid-game can sit
-      // down for the next one.
-      dealtThisGame: false,
+      // A reset starts the game over: nothing is dealt yet, so a joiner
+      // is not dealt in until the next deal (US-153).
+      lastDeal: null,
       piles: [
         // Hand piles are dropped outright rather than emptied, so
         // `handsOf()` is `{}` again exactly as pre-D23 `hands: {}` was.
@@ -2451,10 +2476,6 @@ export function viewFor(state, playerId) {
     // D144 (US-123): the same touch on every screen - each client
     // animates and glows from this, nothing about motion is messaged.
     lastTouch: state.lastTouch ?? { by: null, pileableIds: [], seq: 0 },
-    // D141: with `gameConfig.playerLimit` below, this is everything a
-    // guest needs to say WHY it was seated as a spectator (full vs
-    // already started) - no message carries the reason.
-    dealtThisGame: state.dealtThisGame === true,
     // D55/D90: the real Zone registry (`{id, name, ownerId}`). Used to be
     // named `zoneRecords` specifically to avoid colliding with a `zones`
     // field that was actually an array of PILE views (the exact

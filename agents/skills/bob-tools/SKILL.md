@@ -32,7 +32,7 @@ TLDR:
 - Inspect `build/build.out` only when the tail or exit code is not enough.
 - Keep chat messages under 256 characters. For longer status, write a Markdown summary file and chat the path plus a short summary.
 - Consecutive `bobp make` build-status messages replace the previous build entry instead of appending, so routine build/test runs do not fill `agents/CHAT.md`.
-- Run `bobp setup-agent-links` after changing `agents/skills/*/SKILL.md`, adding a new persona docs folder, or installing BobProtocol into another project.
+- Run `bobp setup-agent-links` after changing `agents/skills/*/SKILL.md`, adding a new persona folder (`agents/<name>/`), or installing BobProtocol into another project.
 - Run teardown with `--dry-run` first. It removes only symlinks that point back into the current project and leaves Codex `.system` skills untouched.
 
 ## bobp chat
@@ -90,12 +90,14 @@ Run this from the project root after setup or skill changes:
 bobp setup-agent-links
 ```
 
+It first converts an older project to the current layout: persona folders with the old `.docs`-suffixed names are renamed to `agents/<name>/` and the path references in the project's agent docs are updated to match (chat logs are left as history). `bobp update` runs the same conversion before refreshing files.
+
 It discovers:
-- personas from `agents/*.docs/SKILL.md`
+- personas from `agents/<name>/SKILL.md` (any folder directly under `agents/` that holds a `SKILL.md`)
 - shared skills from `agents/skills/*/SKILL.md`
 
 It creates:
-- `.claude/skills/<name>` links for Claude-style skill discovery
+- `.claude/skills/<name>` links for Claude-style skill discovery, one per persona and shared skill. If `.claude/skills` is itself a symlink into `agents/` (e.g. `-> agents/skills`), it is replaced with a real directory first so persona links never land inside `agents/`
 - `$CODEX_HOME/skills/<name>` links so Codex loads BobProtocol skills on startup
 - root instruction links: `AGENTS.md`, `GEMINI.md`, `CHATGPT.md`, `.cursorrules`, `.github/copilot-instructions.md`
 - via MCP integration by running `via install mcp` when `via` is installed, then hardening `.mcp.json` with `HOME=<project-root>` and `--no-web`

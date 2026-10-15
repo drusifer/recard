@@ -3787,22 +3787,68 @@ test('US-124: joining a full table seats you as a spectator, whatever you asked 
   assert.deepEqual(state.players.map((p) => p.role), ['player', 'player', 'spectator']);
 });
 
-test('US-124: joining after the deal seats you as a spectator even with a seat free', () => {
+// US-153 (supersedes D141's "started = spectator"): a late arrival at a
+// table with a free seat is seated AND dealt in - otherwise a bot added
+// from table talk, which only exists once the cards are out, could never play.
+test('US-153: joining after the deal with a seat free seats you and deals you the last deal\'s hand from its deck', () => {
   let state = withPlayers(createInitialState({}, () => 0.5, { playerLimit: 4 }), ['alice', 'bob']);
-  assert.equal(state.dealtThisGame, false);
   state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 5 });
-  assert.equal(state.dealtThisGame, true);
+  const before = state;
   state = withPlayers(state, ['carol']);
-  assert.equal(state.players.find((p) => p.id === 'carol').role, 'spectator');
+  assert.equal(state.players.find((p) => p.id === 'carol').role, 'player');
+  assert.equal(handOf(state, 'carol').length, 5);
+  assert.equal(deckOf(state).length, 52 - 15);
+  assert.ok(state.zones.some((z) => z.ownerId === 'carol'), 'a seat zone');
+  assert.equal(state.scores.carol, 0);
+  assert.equal(handOf(state, 'alice').length, 5, 'nobody else is re-dealt');
+  assertCardsConserved(before, state);
 });
 
-test('US-124: RESET clears dealtThisGame, so the next joiner can take a seat again', () => {
+test('US-153: a late arrival is dealt into the preset\'s own player pile kind', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5, { playerPileKind: 'deck', playerLimit: 2 }), ['p1']);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 26 });
+  state = withPlayers(state, ['p2']);
+  const p2Pile = state.piles.find((p) => p.ownerId === 'p2');
+  assert.equal(p2Pile.kind, 'deck');
+  assert.equal(p2Pile.cards.length, 26);
+  assert.equal(deckOf(state).length, 0);
+});
+
+test('US-153: a deck with fewer cards left than a hand deals the late arrival what it has', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['alice', 'bob']);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 25 });
+  state = withPlayers(state, ['carol']);
+  assert.equal(state.players.find((p) => p.id === 'carol').role, 'player');
+  assert.equal(handOf(state, 'carol').length, 2);
+  assert.equal(deckOf(state).length, 0);
+});
+
+test('US-153: the last deal is what counts - RESHUFFLE_DEAL\'s hand size, not DEAL_MORE\'s extra', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['alice']);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 5 });
+  state = reduce(state, { type: 'DEAL_MORE', pileId: 'deck', cardsPerPlayer: 2 });
+  assert.equal(handOf(withPlayers(state, ['bob']), 'bob').length, 5);
+  state = reduce(state, { type: 'RESHUFFLE_DEAL', pileId: 'deck', cardsPerPlayer: 3, rng: () => 0.5 });
+  assert.equal(handOf(withPlayers(state, ['bob']), 'bob').length, 3);
+});
+
+test('US-153: a rejoining player is not dealt again, and a late spectator is not dealt at all', () => {
+  let state = withPlayers(createInitialState({}, () => 0.5), ['alice', 'bob']);
+  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 5 });
+  state = withPlayers(state, ['alice']);
+  assert.equal(handOf(state, 'alice').length, 5);
+  state = withSpectator(state, 'sam');
+  assert.equal(state.piles.some((p) => p.ownerId === 'sam'), false);
+  assert.equal(deckOf(state).length, 52 - 10);
+});
+
+test('US-153: after RESET a joiner is seated but not dealt - the next game has not been dealt yet', () => {
   let state = withPlayers(createInitialState({}, () => 0.5, { playerLimit: 4 }), ['alice']);
   state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 5 });
   state = reduce(state, { type: 'RESET' });
-  assert.equal(state.dealtThisGame, false);
   state = withPlayers(state, ['bob']);
   assert.equal(state.players.find((p) => p.id === 'bob').role, 'player');
+  assert.deepEqual(handOf(state, 'bob'), []);
 });
 
 test('US-124: a preset with no playerLimit never forces a spectator on capacity', () => {
@@ -3817,12 +3863,10 @@ test('US-124: a rejoining player keeps their seat, and a full table does not dem
   assert.equal(state.players.filter((p) => p.role === 'player').length, 2);
 });
 
-test('US-124: the view carries the seat limit and dealtThisGame, so a guest can say WHY it is spectating', () => {
+test('US-124: the view carries the seat limit, so a forced spectator can say the game is full', () => {
   let state = withPlayers(createInitialState({}, () => 0.5, { playerLimit: 2 }), ['alice', 'bob']);
   state = withPlayers(state, ['carol']);
-  const view = viewFor(state, 'carol');
-  assert.equal(view.gameConfig.playerLimit, 2);
-  assert.equal(view.dealtThisGame, false);
+  assert.equal(viewFor(state, 'carol').gameConfig.playerLimit, 2);
 });
 
 // ---- US-123 / D144: who touched what, stamped once per action ----
@@ -3882,20 +3926,12 @@ test('US-123: rearranging a pile in place is a touch - the cards that changed po
   assert.deepEqual(sorted.lastTouch.pileableIds.toSorted(), ['a', 'c']);
 });
 
-test('US-124: dealing NO cards does not start the game - a table being set up still seats people', () => {
+test('US-153: a table set up with a zero-card deal seats the next joiner with nothing dealt', () => {
   // Found by running it live (US-125): the harness stands a table up
-  // with `cardsPerPlayer: 0`, which marked the game as started and
-  // silently demoted the next joiner - a bot - to spectator, so it was
-  // never dealt in and simply waited forever.
+  // with `cardsPerPlayer: 0` before the bots arrive.
   let state = withPlayers(createInitialState({}, () => 0.5, { playerLimit: 4 }), ['alice']);
   state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 0 });
-  assert.equal(state.dealtThisGame, false, 'nothing was dealt, so nothing started');
   state = withPlayers(state, ['bob']);
   assert.equal(state.players.find((p) => p.id === 'bob').role, 'player');
-});
-
-test('US-124: a real deal still starts the game', () => {
-  let state = withPlayers(createInitialState({}, () => 0.5, { playerLimit: 4 }), ['alice']);
-  state = reduce(state, { type: 'DEAL', pileId: 'deck', cardsPerPlayer: 7 });
-  assert.equal(state.dealtThisGame, true);
+  assert.deepEqual(handOf(state, 'bob'), []);
 });

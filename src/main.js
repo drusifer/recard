@@ -1244,10 +1244,10 @@ function noticeNewGameIfPresetChanged(view) {
 
 /**
  * US-124 (Smith Gate 1 condition 2): someone who asked to PLAY and was
- * seated as a spectator has to be told, in words, which limit they hit
- * - a silent role change reads as the app being broken. Both reasons
- * are derivable from the view the guest already has (D141), so nothing
- * on the wire carries this. Said once: the view re-renders constantly,
+ * seated as a spectator has to be told why - a silent role change reads
+ * as the app being broken. Since US-153 the only reason is a full table
+ * (a free seat mid-game is dealt in), derivable from the view the guest
+ * already has, so nothing on the wire carries this. Said once: the view re-renders constantly,
  * and repeating the banner would bury whatever else happens next.
  */
 function noticeForcedSpectator(view) {
@@ -1257,9 +1257,7 @@ function noticeForcedSpectator(view) {
   isForcedSpectatorNoticed = true;
   const limit = view.gameConfig?.playerLimit;
   const players = limit ? ` (${limit} players)` : '';
-  const message = view.dealtThisGame
-    ? "The game has already started \u{2014} you've joined as a spectator."
-    : `The game is full${players} \u{2014} you've joined as a spectator.`;
+  const message = `The game is full${players} \u{2014} you've joined as a spectator.`;
   renderBanner(bannerElement, message, { tone: 'info' });
 }
 

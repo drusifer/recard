@@ -90,3 +90,52 @@ Agents **must** use this for every message posted to CHAT.md:
 ---
 [<small>2026-10-07 20:04:39</small>] [**Oracle**]->[**User**] *ora handoff*:
  Groomed + archived (CHAT_TURN_RELAY). Docs: module map gains tools/turnRelay.mjs, README Deploying names the TURN vars, D176 in the topical index. States saved. Open for user: commit -> re-export image for a clean tag; pi-patch Secret + egress; live /invite test. @User ready to clear.
+
+---
+[<small>2026-10-07 20:13:46</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make export-jev-image | /home/drusifer/Projects/recard/build/build.out
+Writing manifest to image destination
+Image exported to dist/recard-jev-e388ebf.tar
+Image: recard-jev:e388ebf - workload notes in dist/jev/README.md (Container section)
+
+---
+[<small>2026-10-08 17:54:12</small>] [**User**]->[**all**] *request*:
+ *fix late-arriving bot can never play: JOIN closes the table once dealtThisGame (src/state.js isTableClosed) even with a free seat; want late arrival seated + dealt last DEAL's cardsPerPlayer; spectator bot's refusal posted to talk. Done: gm tests cover add-bot-after-deal at a free seat, bot dealt in and plays; export-jev-image.
+
+---
+[<small>2026-10-08 18:23:19</small>] [**make**]->[**all**] *build*:
+ Build PASSED | make export-jev-image | /home/drusifer/Projects/recard/build/build.out
+Image exported to dist/recard-jev-e388ebf-dirty.tar
+Image: recard-jev:e388ebf-dirty - workload notes in dist/jev/README.md (Container section)
+
+---
+[<small>2026-10-08 18:23:36</small>] [**Neo**]->[**all**] *swe handoff*:
+ *fix US-153 done (TDD): JOIN seats a newcomer as spectator only when FULL; a new seated player after a deal gets lastDeal.cardsPerPlayer (or what the pile has) from lastDeal.pileId via dealLateArrival, honouring playerPileKind. dealtThisGame replaced by lastDeal (set by DEAL/RESHUFFLE_DEAL, not DEAL_MORE; cleared by RESET). Banner: full only. Runner posts bot-refused to talk. @Trin *qa uat
+
+---
+[<small>2026-10-08 18:23:36</small>] [**Trin**]->[**all**] *qa handoff*:
+ UAT PASS: make check clean (state tests: 6 new US-153, 2 D141 'started' tests pruned); test-jev-game-master 7/7 incl. 2 new live tests; test-spectator 3/3 (new make target); test-gmlisten 3/3. Mutations: no late deal -> live test fails; no bot-refused say -> refusal test fails (needed --test-force-exit: a failing live test hangs on its orphan bot). @Morpheus *lead review
+
+---
+[<small>2026-10-08 18:23:36</small>] [**Morpheus**]->[**all**] *lead decision*:
+ D177 recorded: only a FULL table forces a spectator; a mid-game free seat is seated + dealt the last hand. Chose seat-and-deal over the user's fallback (talk before deal, no auto-deal) - changes every table start to fix one path. Short pile deals what it has, not spectator (user: only a genuinely full table). Dropped dealtThisGame entirely (no shim). Full: docs/DECISIONS.md D177. Review PASS.
+
+---
+[<small>2026-10-08 18:23:36</small>] [**Tank**]->[**all**] *devops handoff*:
+ Image re-exported: dist/recard-jev-e388ebf-dirty.tar (uncommitted tree - commit + re-export for a clean tag). Nothing infra-side changed.
+
+---
+[<small>2026-10-15 13:48:23</small>] [**User**]->[**all**] *request*:
+ /bob-protocol init
+
+---
+[<small>2026-10-15 13:48:32</small>] [**Mouse**]->[**User**] *resume*:
+ Init/resume: last work was US-153 (late arrival seated + dealt, D177), all gates green, image re-exported as dist/recard-jev-e388ebf-dirty.tar. Nothing queued. Open for user: commit US-153 + bobp upgrade (agents/<name>.docs -> agents/<name>/), re-export for a clean tag, live /invite + Add Jev bot on a dealt Gin table. Pre-existing: test-harness-mcp failing at HEAD (backlogged).
+
+---
+[<small>2026-10-15 13:49:59</small>] [**User**]->[**all**] *request*:
+ close and commit the sprint
+
+---
+[<small>2026-10-15 13:50:32</small>] [**Mouse**]->[**User**] *sm close*:
+ US-153 (D177) closed in task.md; TURN sprint header fixed to committed e388ebf. Committing US-153 + the bobp folder move. Leaving .mcp.json/.gitignore unstaged: the upgrade re-added a machine-local via server, against our harness-only .mcp.json decision.

@@ -27,7 +27,7 @@ before(async () => {
   fixture.hosted = await hostTable({ browser: fixture.browser, baseUrl: fixture.server.baseUrl, preset: 'Gin Rummy', spectate: true });
   fixture.closers.push(fixture.hosted.close);
   // Both bots take their seats BEFORE the deal - a Gin table seats two,
-  // and anyone arriving after the deal is a spectator by design (US-124).
+  // so the deal covers both of them at once.
   for (const name of ['equilibrium', 'defensive']) {
     const joined = await joinTable({ browser: fixture.browser, baseUrl: fixture.server.baseUrl, code: fixture.hosted.code, name });
     fixture.closers.push(joined.close);

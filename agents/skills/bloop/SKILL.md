@@ -1,7 +1,7 @@
 ---
 name: bloop
-description: Top-level workflow loops (Bob Loops) that chain multiple personas autonomously. Use *fix, *nit, *review, *impl, *qa, or *plan sprint instead of manually invoking each persona in sequence.
-triggers: ["*fix", "*nit", "*review", "*impl", "*qa", "*plan sprint", "*deploy"]
+description: Top-level workflow loops (Bob Loops) that chain multiple personas autonomously. Use *fix, *review, *impl, *qa, or *plan sprint instead of manually invoking each persona in sequence.
+triggers: ["*fix", "*review", "*impl", "*qa", "*plan sprint", "*deploy"]
 requires: ["bob-protocol", "chat", "make"]
 ---
 
@@ -47,26 +47,6 @@ Chain: Neo → Trin → Morpheus
 
 ---
 
-### `*nit <thing>`
-**Nit loop** — abbreviated `*fix` for a small, targeted adjustment (a tweak, not a bug hunt). Two-persona chain, not three: no Morpheus review step, so it stays fast enough to run several times in a row for iterative back-and-forth adjustments — while still posting every step to CHAT.md, same as any other loop, so incremental tweaks stay in the record rather than happening off-log in a single freeform turn.
-
-```
-Chain: Neo → Trin
-```
-
-| Step | Persona | Action |
-|------|---------|--------|
-| 1 | Neo | Make the targeted change: `*swe fix <thing>` |
-| 2 | Trin | Targeted check, not a full UAT/e2e pass: `*qa test <thing>` |
-
-- If Trin's check fails → back to Neo (`*swe fix`), then Trin re-checks - same abbreviated two-step, no automatic escalation to `*fix`'s Morpheus step
-- Anti-loop still applies (bob-protocol): if Neo fails twice on the SAME nit → Oracle consult required before a third attempt
-- Use `*fix` instead when the change needs architecture sign-off, touches more than one area, or Trin's targeted check surfaces something that looks bigger than the nit itself
-
-**Example:** `*nit tighten the card fan overlap by 5%`
-
----
-
 ### `*impl <phase>`
 **Implementation loop** — implement, test, and review a feature or sprint phase.
 
@@ -76,7 +56,7 @@ Chain: Neo → Trin → Morpheus → [Tank if deploy in scope] → [Smith if UX/
 
 | Step | Persona | Action |
 |------|---------|--------|
-| 0 | (bloop) | If `<phase>` is "next phase": read `agents/mouse.docs/state.md` (Current Task section) and echo "Resolved: next phase = Phase N. Proceeding." before starting chain |
+| 0 | (bloop) | If `<phase>` is "next phase": read `agents/mouse/state.md` (Current Task section) and echo "Resolved: next phase = Phase N. Proceeding." before starting chain |
 | 1 | Neo | TDD implementation: `*swe impl <phase>` |
 | 2 | Trin | UAT — run tests, verify acceptance criteria: `*qa uat <phase>` (unit + integration only; E2E requires a separate `@Trin *qa e2e` invocation) |
 | 3 | Morpheus | Code review — quality and architecture: `*lead review <phase>` |
@@ -132,20 +112,21 @@ Chain: Morpheus → Trin (optional)
 **Sprint planning loop** — full planning sequence from stories through phase breakdown.
 
 ```
-Chain: Cypher → [Smith gate] → Morpheus → [Smith gate] → Mouse → Morpheus review → [Tank if deploy in scope]
+Chain: [SDLC gate] → Cypher → [Smith gate] → Morpheus → [Smith gate] → Mouse → Morpheus review → [Tank if deploy or build-env in scope]
 ```
 
 | Step | Persona | Action | Gate |
 |------|---------|--------|------|
+| 0 | (starter) | **SDLC gate**: confirm `docs/SDLC.md` exists. Missing → `@Tank *devops sdlc` and stop until Tank confirms it is written. | Blocker |
 | 1 | Cypher | Write stories + acceptance criteria: `*pm plan sprint` | Smith review |
 | 1a | Smith | `*user review <stories>` → `*user approve` or `*user reject` | Must approve |
 | 2 | Morpheus | Architecture decisions: `*lead arch sprint` | Smith review |
 | 2a | Smith | `*user feedback <arch>` → `*user approve` or `*user reject` | Must approve |
 | 3 | Mouse | Break into short phases (1-3 tasks each): `*sm plan sprint` | Morpheus review |
 | 3a | Morpheus | Review sprint plan vs. architecture: `*lead review sprint plan` | |
-| 3b | Tank | **DevOps planning gate** (if sprint includes deployment, env, or infra work): `*devops infra <sprint>` — Tank reviews sprint for infra impact, adds any deployment tasks to the plan, and confirms pipeline readiness. Skip if sprint is app-only. | |
+| 3b | Tank | **DevOps planning gate** (if sprint includes deployment, env, infra, or build-environment work — a new language, package manager, runtime version, or dependency mechanism): `*devops infra <sprint>` — Tank reviews sprint for infra impact, adds deployment tasks (sequenced last) and build-environment tasks (sequenced as Phase 0, before Neo) to the plan, and confirms pipeline readiness. Skip if neither applies. | |
 
-**Gates are hard stops** — Smith must explicitly `*user approve` before the chain continues. Tank's 3b step is required (not optional) whenever Cypher's stories include env var changes, new services, or deployment work.
+**Gates are hard stops** — Smith must explicitly `*user approve` before the chain continues. Step 0 is a hard stop too: no stories are written until `docs/SDLC.md` exists. Tank's 3b step is required (not optional) whenever Cypher's stories include env var changes, new services, or deployment work, or Morpheus's architecture changes the build environment. Sprint close adds Tank's `*devops sdlc-check` before Oracle's groom (see the `sprint` skill, Step 6a).
 
 **Example:** `*plan sprint`
 

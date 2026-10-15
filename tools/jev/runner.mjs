@@ -165,11 +165,12 @@ export async function run(adapter, options) {
     // (plain, or carrying `--local-peer`'s query string from `jevTable.
     // mjs`/a human's own local setup), never in this call's own default.
     const { peer } = await joinTable({ browser, baseUrl, code: options.code, name, realBroker: true });
-    // US-124/US-125: a full or already-started table seats a newcomer as
-    // a SPECTATOR, which is never dealt in. Say so instead of waiting
-    // forever for a deal that cannot come.
+    // US-124/US-153: only a FULL table seats a newcomer as a SPECTATOR,
+    // which is never dealt in. Say so - at the table too, where whoever
+    // asked for the bot is looking, not only in this process's own log.
     if (await peer.myRole() === 'spectator') {
-      throw new UsageError(`seated as a SPECTATOR at table ${options.code}, so I will never be dealt in - the game is full or already under way. Start a fresh game, or host a table with a free seat.`);
+      await peer.say(`I can't play here - every seat is taken, so I was seated as a spectator. Leaving.`, { kind: 'bot-refused', reason: 'table-full' });
+      throw new UsageError(`seated as a SPECTATOR at table ${options.code}, so I will never be dealt in - every seat is taken. Start a fresh game, or host a table with a free seat.`);
     }
     // US-122: announce what this player can deal in, so the table can
     // offer "Add Jev bot" at all (D143) - every strategy it can start.

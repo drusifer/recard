@@ -2617,7 +2617,7 @@ Arch: docs/DECISIONS.md D175 (+ Gate 2 wording condition).
 
 **SPRINT CLOSED (2026-10-06), with the gate gap above disclosed.**
 
-## Sprint: Game master over the internet via TURN (2026-10-07) - Tier 2 - SHIPPED 2026-10-07 (uncommitted)
+## Sprint: Game master over the internet via TURN (2026-10-07) - Tier 2 - SHIPPED 2026-10-07 (committed e388ebf)
 
 Stories US-151/152, architecture D176. Done when test-jev-game-master +
 test-gmlisten pass and export-jev-image writes a new tar.
@@ -2633,3 +2633,21 @@ test-gmlisten pass and export-jev-image writes a new tar.
 
 ### Phase 3 - Gate
 - [x] T3.1 `bobp make check`, `test-jev-game-master`, `test-gmlisten`, then `export-jev-image`
+
+## Fix: late arrival dealt in (US-153, D177) - 2026-10-08 - *fix - CLOSED 2026-10-15
+
+A bot added after the deal could never play: JOIN closed the table once dealt, even with
+a free seat. Done when the gm tests cover add-bot-after-deal at a free seat (bot dealt
+in and plays) and export-jev-image writes a new tar.
+
+- [x] `src/state.js`: only a FULL table seats a spectator; a mid-game seated newcomer
+      gets `lastDeal.cardsPerPlayer` (or what the pile has) via `dealLateArrival`.
+      `dealtThisGame` replaced by `lastDeal` (no shim). TDD: 6 new state tests, 2 D141
+      "started" tests pruned.
+- [x] `tools/jev/runner.mjs`: a spectator bot's refusal is posted to table talk.
+- [x] Live: `test-jev-game-master` 7/7 (2 new), new `make test-spectator` 3/3,
+      `test-gmlisten` 3/3; `make check` clean. Both new guards mutation-checked.
+- [x] Morpheus review PASS, D177 recorded; image re-exported.
+
+**CLOSED (2026-10-15).** No Smith gate (bug fix, no new UX). Re-export the image after
+this commit for a clean tag.

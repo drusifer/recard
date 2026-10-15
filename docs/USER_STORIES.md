@@ -4951,3 +4951,31 @@ doesn't depend on pi-patch's nginx.
 
 **Done when:** `make test-jev-game-master` and `make test-gmlisten` pass,
 then `make export-jev-image` produces a new `dist/recard-jev-<ver>.tar`.
+
+---
+
+## Sprint: A bot added mid-game gets the free seat (2026-10-08) - *fix
+
+### US-153: A late arrival at a free seat is dealt in
+
+**As** a player at a table with a free seat, **I want** a Jev bot I add
+from table talk to sit down and play, **so that** `/invite <gm>` ->
+"Add Jev bot" actually gets me an opponent. Table talk only appears once
+the cards are dealt, so such a bot always arrives after the deal, and
+D141 made every after-the-deal arrival a spectator - so it never could.
+
+**AC:**
+1. Someone who joins after the deal, asking to play, while a seat is free
+   (`seats taken < playerLimit`, or no limit) gets a real seat (seat zone,
+   per-player piles, score) and is dealt the last deal's `cardsPerPlayer`
+   from the pile that deal used - or what that pile still has, if fewer.
+   Nobody else's cards move.
+2. "Last deal" is a fresh `DEAL` or `RESHUFFLE_DEAL`; `DEAL_MORE` tops
+   everyone up and doesn't change it. After `RESET`/New Game nothing is
+   dealt, so a joiner is seated with no cards until the next deal.
+3. Only a full table seats a newcomer as a spectator; a rejoining person
+   keeps their old role and is not dealt again.
+4. A bot seated as a spectator says so in table talk (`bot-refused`) and
+   leaves, rather than going silent after "it is joining now".
+5. Covered by `make test-jev-game-master`: a bot added after the deal at a
+   free seat is dealt in and plays; a bot at a full table posts its refusal.
