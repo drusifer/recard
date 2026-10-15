@@ -1,5 +1,15 @@
 # Agent State
 
+## Current Task (2026-10-15) - Name for the generalized Jev/XState tool: DONE
+Picked Understudy (Morpheus + Smith concurred); owner created ../understudy. Sprint 1
+stories drafted THERE (docs/sprints/USER_STORIES_SPRINT1.md); further understudy product
+work happens in that repo's own agents/.
+
+## Next Steps
+None in recard.
+
+---
+
 ## Current Task (2026-10-07) - TURN relay sprint (US-151/152): DONE
 
 US-151/152 written + launched. Backlog: live verification in pi-patch with a real TURN key; refresh for in-table pages past 24h is out of scope.

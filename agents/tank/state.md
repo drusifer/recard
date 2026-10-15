@@ -1,5 +1,16 @@
 # Tank State
 
+## Current Task (2026-10-15) - MCP: both servers run: DONE
+Committed .mcp.json stays recard-harness only; reverted the bobp upgrade's via entry +
+.mcp.json line in .gitignore. via registered with `claude mcp add-json via --scope local`
+(pipx venv via-index); .via/mcp.json path updated to via-index. Watch for a future bobp
+upgrade re-adding via to .mcp.json.
+
+## Next Steps
+Still open: `bobp make export-jev-image` for a clean d817d3c+ tag (not run).
+
+---
+
 ## Current Task (2026-10-08) - *fix US-153 late arrival dealt in: DONE
 
 Exported dist/recard-jev-e388ebf-dirty.tar with US-153. Needs commit + re-export for a clean tag.

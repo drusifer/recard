@@ -179,3 +179,11 @@ Image: recard-jev:e388ebf-dirty - workload notes in dist/jev/README.md (Containe
 ---
 [<small>2026-10-15 14:06:14</small>] [**User**]->[**all**] *request*:
  commit the recard changes
+
+---
+[<small>2026-10-15 14:06:35</small>] [**User**]->[**all**] *request*:
+ prep for shutdown
+
+---
+[<small>2026-10-15 14:06:35</small>] [**Mouse**]->[**User**] *exit*:
+ Shutdown prep: all persona states saved (Mouse, Morpheus, Tank, Cypher). Open: export-jev-image for a clean tag; recard migration onto understudy later. Next session starts in ../understudy (Tank build-env, then Smith Gate 1). Why: so a cold start resumes cleanly.

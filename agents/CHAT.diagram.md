@@ -59,4 +59,8 @@ sequenceDiagram
     Note right of Morpheus: "Understudy seeded: core<br/>Jev/XState modules + 7<br/>tests copied to<br/>../understudy (src/,<br/>tests/),<br/>harness/runner/MCP<br/>server copied verbatim<br/>to i…"
     User->>All: "request"
     Note right of User: "commit the recard<br/>changes"
+    User->>All: "request"
+    Note right of User: "prep for shutdown"
+    Mouse->>User: "exit"
+    Note right of Mouse: "Shutdown prep: all<br/>persona states saved<br/>(Mouse, Morpheus, Tank,<br/>Cypher). Open: export-<br/>jev-image for a clean<br/>tag, recard migration<br/>onto unde…"
 ```
