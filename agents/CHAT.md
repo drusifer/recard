@@ -139,3 +139,43 @@ Image: recard-jev:e388ebf-dirty - workload notes in dist/jev/README.md (Containe
 ---
 [<small>2026-10-15 13:50:32</small>] [**Mouse**]->[**User**] *sm close*:
  US-153 (D177) closed in task.md; TURN sprint header fixed to committed e388ebf. Committing US-153 + the bobp folder move. Leaving .mcp.json/.gitignore unstaged: the upgrade re-added a machine-local via server, against our harness-only .mcp.json decision.
+
+---
+[<small>2026-10-15 13:51:59</small>] [**Tank**]->[**User**] *devops*:
+ MCP: both servers run. Committed .mcp.json stays recard-harness only (reverted the bobp upgrade's via entry + .gitignore line); via registered at Claude Code local scope (via-index venv), .via/mcp.json path updated. Tree clean.
+
+---
+[<small>2026-10-15 13:53:33</small>] [**User**]->[**all**] *request*:
+ all we're Going to generalize the Jev and XState harness to use as a standalone automation tool. What would be a good name for this new tool. Help me pick one and I'll set up the repo.
+
+---
+[<small>2026-10-15 13:54:02</small>] [**Cypher**]->[**all**] *pm name*:
+ Naming: the tool is a stand-in actor - a statechart is the script (XState rules), Jev makes the judgment calls the script can't, the harness gives it hands (headless pages, MCP). Name should say 'plays a part for a human', not 'cards'. Shortlist: Understudy, Statehand, Kibitzer, Cuecard. Pick: Understudy. Why: it's exactly the job and reads well in a sentence ('run an understudy on the checkout flow').
+
+---
+[<small>2026-10-15 13:54:02</small>] [**Morpheus**]->[**Cypher**] *lead review*:
+ Arch angle: whatever the name, keep it off game words - pitboss/croupier/dealer tie it back to recard. npm: bare understudy/standin/pitboss/croupier taken; statehand, kibitzer, cuecard, understudy-ai free. A scoped @drusifer/understudy sidesteps it. Why: the repo must not need a rename when the first non-game user arrives.
+
+---
+[<small>2026-10-15 13:54:02</small>] [**Smith**]->[**User**] *user review*:
+ CLI usability: 'understudy' is 10 chars to type; ship a short bin alias (us? no - collides in shells' head). Suggest bin 'ustudy' or just tab-complete. Statehand is shorter to say but needs explaining every time; Understudy explains itself. Approve Understudy. Why: self-explaining names cut onboarding.
+
+---
+[<small>2026-10-15 14:00:14</small>] [**User**]->[**all**] *request*:
+ repo is ready ../understudy
+
+---
+[<small>2026-10-15 14:01:04</small>] [**Morpheus**]->[**User**] *lead arch*:
+ Understudy extraction map: agents/morpheus/understudy_extraction_map.md. 6 modules move as-is (escalate, decide, strategyFile, machine, seat, shutdown); library/runner/table/harness/MCP generalize around an app-adapter contract (today welded in as window.__recardHarness + PeerJS setup); game content stays as recard's adapter. Why: the adapter seam is what makes it 'not cards'. 3 open questions for @User.
+
+---
+[<small>2026-10-15 14:02:22</small>] [**Morpheus**]->[**Cypher**] *handoff*:
+ User decided: web + CLI/HTTP targets (adapter contract transport-neutral, prove it with 2 demo adapters), recard consumes via git dependency on tags, Jev required (unit tests double the judge at the SDK seam). Recorded in the map. Why: these fix the adapter contract's shape before any code moves. @Cypher *pm story for Understudy sprint 1 in ../understudy.
+
+---
+[<small>2026-10-15 14:05:13</small>] [**Morpheus**]->[**User**] *handoff*:
+ Understudy seeded: core Jev/XState modules + 7 tests copied to ../understudy (src/, tests/), harness/runner/MCP server copied verbatim to its seed/ for generalizing, map + draft sprint 1 stories in its docs/. Nothing removed from recard. Why: owner continues in a new session from ../understudy.
+
+---
+[<small>2026-10-15 14:06:14</small>] [**User**]->[**all**] *request*:
+ commit the recard changes

@@ -1,3 +1,23 @@
+# Morpheus State
+
+## Current Task (2026-10-15) - Understudy extraction map: DRAFTED
+
+User is generalizing the Jev + XState harness into a standalone tool, named Understudy
+(repo ../understudy, fresh BOB scaffold, no code yet). Map:
+agents/morpheus/understudy_extraction_map.md - 6 files move as-is (escalate, decide,
+strategyFile, machine, seat, shutdown), 7 generalize (library, table, runner,
+multiplayer harness split, MCP server split, tableFile->scenario file, maybe
+turnRelay), game content stays in recard as its adapter.
+
+## Next Steps
+User decided: web + CLI/HTTP targets (transport-neutral adapter, 2 demo adapters),
+git dependency, Jev required. Recorded in the map. Files copied into ../understudy
+(src/, tests/, seed/recard/, docs/EXTRACTION_MAP.md, draft sprint 1 stories). Work now
+continues in ../understudy in a new session; nothing deleted in recard (recard migration =
+a later sprint, onto a tagged understudy git dependency).
+
+---
+
 # Agent State
 
 ## Current Task (2026-10-08) - *fix US-153 late arrival dealt in: DONE
