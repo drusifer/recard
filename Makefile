@@ -7,7 +7,7 @@
 #
 # Adding a task: add the npm script first, then a one-line target here.
 
-.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-layoutsave test-buildermenu test-resume check-fast test-tablezoom test-focuszoom test-multiplayer test-realbroker test-remotecursor test-harness-mcp test-gin test-jev-runner test-jev-game-master test-jevtable test-jevpackage test-gminvite test-gmlisten test-spectator test-actionmenu test-zonepanel test-headeractions test-pileelement test-reconnect test-ginmatch jev-player jev-game-master jev-library jev-library-doc jev-readme jev-table gin-match gin-tournament gin-evolve secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist export-jev-image test-jev-image check-decisions check-story-numbers dead-code
+.PHONY: help test test-ui test-rtg test-hostsetup test-newgame test-layoutsave test-buildermenu test-resume check-fast test-tablezoom test-focuszoom test-multiplayer test-realbroker test-remotecursor test-harness-mcp test-gin test-jev-runner test-jev-game-master test-jevtable test-jevpackage test-gminvite test-gmlisten test-spectator test-actionmenu test-zonepanel test-headeractions test-pileelement test-reconnect test-ginmatch jev-player jev-game-master jev-library jev-library-doc jev-readme jev-table gin-match gin-tournament gin-evolve secrets hooks lint lint-js lint-style lint-design lint-decks lint-fix cards art art-gen art-install art-jobs art-review art-verify check dev coverage-unit coverage-unit-deep test-audit connectome build-standalone dist export-jev-image test-jev-image check-decisions check-story-numbers dead-code
 
 help:
 	@echo "Recard targets (all front npm scripts):"
@@ -56,8 +56,11 @@ help:
 	@echo "  lint-decks   RtG deck balance (size/copies/lands/curve/colour)"
 	@echo "  lint-fix     autofix style + js"
 	@echo "  cards        compile content/rtg YAML -> src/decks/rtg/cards.json"
-	@echo "  art-gen      paint card art via the codex CLI (~50 min, resumable)"
-	@echo "  art          pack generated art into assets/cards/rtg/*.webp"
+	@echo "  art-install  pip-install artai (../artai or ARTAI_SRC=) into .venv"
+	@echo "  art-gen      paint card art with artai + codex (~50 min, resumable)"
+	@echo "  art          pack masters into assets/cards/rtg/*.webp (artai pack)"
+	@echo "  art-review   HTML contact sheet of the card art (artai review)"
+	@echo "  art-verify   check every card has art of the right size (artai verify)"
 	@echo "  check        cards + test + lint + lint-decks + secrets  (full gate)"
 	@echo "  dev          dev server"
 	@echo "  build-standalone  bundle everything into dist/recard-standalone.html (runs via file://)"
@@ -253,23 +256,39 @@ lint-fix:
 cards:
 	npm run cards:build
 
-# Two steps, because generating the art is expensive (~50 min for the
-# full set, and quota-limited) while packing it is cheap and repeatable.
-# Both run through the generic `imagegen` tool (tools/imagegen), which is
-# not Recard-specific - it takes any manifest of id/prompt pairs.
-#   make art-gen  paint every card via the `codex` CLI -> build/rtg-art-raw
-#   make art      downscale those masters into assets/cards/rtg/*.webp
-# The masters stay out of the repo; only the 512px WebP ships.
-art-gen:
-	npm run cards:jobs > /tmp/rtg-art-jobs.tsv
-	node tools/imagegen/cli.mjs gen \
-	  --manifest /tmp/rtg-art-jobs.tsv \
-	  --out build/rtg-art-raw \
-	  --backend codex --parallel 4 \
-	  --style "high fantasy oil painting, Magic-the-Gathering card art, no text, no borders, no watermark"
+# Card art is made with artai (https://github.com/drusifer/artai), pip-installed
+# into this repo's .venv from a sibling checkout (ARTAI_SRC, default ../artai).
+# Two steps, because generating art is expensive (~50 min for the full set,
+# quota-limited and resumable) while packing it is cheap and repeatable:
+#   make art-gen  paint each card's prompt via codex -> build/rtg-art/masters
+#   make art      pack those masters into assets/cards/rtg/*.webp
+# Masters stay out of the repo (build/ is gitignored); only the 512px WebP ships.
+ARTAI_SRC ?= ../artai
+ARTAI     := .venv/bin/artai
+RTG_JOBS  := build/rtg-art/rtg.tsv
+RTG_ART   := --work build/rtg-art --out assets/cards/rtg
+RTG_STYLE := high fantasy oil painting, Magic-the-Gathering card art, no text, no borders, no watermark
 
-art:
-	npm run cards:art
+art-install:
+	@test -d "$(ARTAI_SRC)" || { echo "artai not found at $(ARTAI_SRC) - clone it there or run: make art-install ARTAI_SRC=<path>"; exit 1; }
+	test -x .venv/bin/python || python3 -m venv .venv
+	.venv/bin/pip install -q -e "$(ARTAI_SRC)"
+
+art-jobs:
+	@mkdir -p build/rtg-art
+	npm run --silent cards:jobs > $(RTG_JOBS)
+
+art-gen: art-install art-jobs
+	$(ARTAI) generate $(RTG_JOBS) $(RTG_ART) --backend codex --parallel 4 --retries 1 --style "$(RTG_STYLE)"
+
+art: art-install art-jobs
+	$(ARTAI) pack $(RTG_JOBS) $(RTG_ART) --size 512 --quality 82
+
+art-review: art-install art-jobs
+	$(ARTAI) review $(RTG_JOBS) $(RTG_ART) --style "$(RTG_STYLE)"
+
+art-verify: art-install art-jobs
+	$(ARTAI) verify $(RTG_JOBS) $(RTG_ART)
 
 # The pre-handoff gate: everything that MUST be green. Deliberately does
 # NOT include `lint` - this repo carries a known, accepted lint baseline

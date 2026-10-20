@@ -100,7 +100,7 @@ builder.
 
 ```
 content/rtg/**.yaml  ->  make cards  ->  src/decks/rtg/catalog.js
-                     ->  make art-gen ->  build/rtg-art-raw/*.png   (gitignored masters)
+                     ->  make art-gen ->  build/rtg-art/masters/*.png (gitignored masters)
                      ->  make art     ->  assets/cards/rtg/*.webp   (committed, ~50 KB each)
 ```
 
@@ -114,21 +114,24 @@ re-running the same command after it resets picks up exactly where it
 stopped. A card with no art yet renders a colour-keyed fallback panel
 rather than a broken image, so a partial set is still fully playable.
 
-### `tools/imagegen` — generating image sets from prompts
+### Card art is made with artai
 
-The art pipeline is a general tool, not a Recard one. Give it a manifest
-of `<id>` + `<prompt>` pairs and it paints each one:
+The art targets run [artai](https://github.com/drusifer/artai), a shared
+manifest-driven image tool, pip-installed into this repo's `.venv` from a
+sibling checkout. Clone it next to recard (`../artai`) or point at it with
+`ARTAI_SRC=<path>`; `make art-install` (run automatically by the art
+targets) creates `.venv` if needed and runs `pip install -e ../artai`.
 
 ```
-node tools/imagegen/cli.mjs gen  --manifest jobs.tsv --out build/raw \
-     --backend codex --parallel 4 --style "oil painting, no text"
-node tools/imagegen/cli.mjs pack --in build/raw --out assets/img --size 512
+make art-gen      # artai generate: paint missing masters with codex (resumable)
+make art          # artai pack: masters -> assets/cards/rtg/*.webp (512px, q82)
+make art-review   # artai review: HTML contact sheet in build/rtg-art/review/
+make art-verify   # artai verify: every card has art of the right size
 ```
 
-Backends live in a registry (`tools/imagegen/backends.mjs`) — `codex`
-and `agy` today, one entry each. It is resumable, treats quota
-exhaustion as terminal rather than retrying it, and validates output by
-image dimensions rather than byte size.
+The job list (`build/rtg-art/rtg.tsv`) is regenerated from the catalog by
+`npm run cards:jobs` each time. artai's options, providers and exit codes:
+its `docs/USAGE.md`.
 
 `npm run lint:design` needs a Chromium build Playwright can launch —
 either run `npx playwright install chromium` once, or have a system

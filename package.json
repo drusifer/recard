@@ -43,7 +43,6 @@
     "build:dist": "node tools/buildDistribution.mjs",
     "cards:build": "node tools/rtg/compile.mjs",
     "cards:jobs": "node tools/rtg/genArtJobs.mjs",
-    "cards:art": "node tools/imagegen/cli.mjs pack --in build/rtg-art-raw --out assets/cards/rtg",
     "lint": "npm run lint:style && npm run lint:design && npm run lint:js",
     "lint:style": "stylelint style.css",
     "lint:style:fix": "stylelint style.css --fix",

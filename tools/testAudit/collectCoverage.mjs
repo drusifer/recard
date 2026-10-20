@@ -91,8 +91,7 @@ function statementTotals(coverageJson) {
 function runOne(testFile) {
   const slug = testFile.replace(/\.test\.js$/, '');
   const c8Directory = mkdtempSync(path.join(tmpdir(), `c8-${slug}-`));
-  // PATH-resolved local dev tooling exception already established in
-  // tools/imagegen/*.mjs, not a user-facing surface.
+  // PATH-resolved local dev tooling, not a user-facing surface.
   // eslint-disable-next-line sonarjs/no-os-command-from-path
   const result = spawnSync('npx',
     ['c8',

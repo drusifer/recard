@@ -565,8 +565,7 @@ Phase 96 (reserved bug-fix) went unused for the first time in 4 sprints
 rather than surfacing at close.
 
 **2. Art pipeline replacement.** Procedural SVG -> real generated
-illustration for all 132 cards, plus a branded card back and a reusable
-`tools/imagegen`. Commit `6721b5c`. Details in neo/state.md.
+illustration for all 132 cards, plus a branded card back. Commit `6721b5c`. Details in neo/state.md.
 
 **Process note worth carrying:** almost every defect this session was
 invisible to code review and only surfaced by measuring - CSS

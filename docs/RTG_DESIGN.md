@@ -35,7 +35,7 @@ content/rtg/**.yaml         authored card + deck data (source of truth)
 src/decks/rtg/catalog.js    committed ES module, imported by the app AND every tool
    │  make art-gen          paint each card's `art:` prompt (codex)
    ▼
-build/rtg-art-raw/*.png     full-size masters — gitignored, NOT shipped
+build/rtg-art/masters/*.png full-size masters — gitignored, NOT shipped
    │  make art              downscale, aspect preserved
    ▼
 assets/cards/rtg/*.webp     committed card art, ~50 KB each
@@ -45,11 +45,11 @@ Masters stay out of the repo: 132 full-size PNGs would add ~230 MB for
 images that render 70px wide. Re-packing them is cheap; regenerating is
 not, which is why the two steps are separate targets.
 
-Generation runs through **`tools/imagegen`**, a general tool that takes
-any manifest of id/prompt pairs — not a Recard-specific script. It is
-resumable (art generation is quota-limited, and re-running is the
-recovery procedure) and treats quota exhaustion as terminal rather than
-retrying it.
+Generation runs through **artai** (sibling repo, pip-installed into
+`.venv` by `make art-install`), a general tool that takes any manifest of
+id/prompt pairs — not a Recard-specific script. It is resumable (art
+generation is quota-limited, and re-running is the recovery procedure)
+and treats quota exhaustion as terminal rather than retrying it.
 
 ### The `art:` field
 
@@ -127,7 +127,7 @@ moves to `StandardCardFace` unchanged.
 - **US-76** — Deck balance linter (`make lint-decks`)
 - **US-77** — Mono-color card pools + 5 balanced mono decks
 - **US-78** — Guild gold cards, dual lands + 10 balanced guild decks
-- **US-79** — Card-art generation pipeline (`tools/imagegen`)
+- **US-79** — Card-art generation pipeline (now provided by artai)
 - **US-80** — `CARD_FACES` registry + RtG card face + inspect overlay
 - **US-81** — `rtg` deck type
 - **US-82** — Battlefield / Exile / Stack pile kinds
