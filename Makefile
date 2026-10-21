@@ -57,7 +57,7 @@ help:
 	@echo "  lint-fix     autofix style + js"
 	@echo "  cards        compile content/rtg YAML -> src/decks/rtg/cards.json"
 	@echo "  art-install  pip-install artai (../artai or ARTAI_SRC=) into .venv"
-	@echo "  art-gen      paint card art with artai + codex (~50 min, resumable)"
+	@echo "  art-gen      paint missing card art with artai + codex (FORCE=1 redoes existing)"
 	@echo "  art          pack masters into assets/cards/rtg/*.webp (artai pack)"
 	@echo "  art-review   HTML contact sheet of the card art (artai review)"
 	@echo "  art-verify   check every card has art of the right size (artai verify)"
@@ -260,8 +260,10 @@ cards:
 # into this repo's .venv from a sibling checkout (ARTAI_SRC, default ../artai).
 # Two steps, because generating art is expensive (~50 min for the full set,
 # quota-limited and resumable) while packing it is cheap and repeatable:
-#   make art-gen  paint each card's prompt via codex -> build/rtg-art/masters
-#   make art      pack those masters into assets/cards/rtg/*.webp
+#   make art-gen  paint cards that have no art yet via codex -> build/rtg-art/masters
+#   make art      pack new/changed masters into assets/cards/rtg/*.webp
+# Existing art is never redone unless you add FORCE=1 (art-gen archives the old
+# files to build/rtg-art/rejected/ first; combine with ARGS="--ids rtg-b-001").
 # Masters stay out of the repo (build/ is gitignored); only the 512px WebP ships.
 ARTAI_SRC ?= ../artai
 ARTAI     := .venv/bin/artai
@@ -279,10 +281,10 @@ art-jobs:
 	npm run --silent cards:jobs > $(RTG_JOBS)
 
 art-gen: art-install art-jobs
-	$(ARTAI) generate $(RTG_JOBS) $(RTG_ART) --backend codex --parallel 4 --retries 1 --style "$(RTG_STYLE)"
+	$(ARTAI) generate $(RTG_JOBS) $(RTG_ART) --backend codex --parallel 4 --retries 1 --style "$(RTG_STYLE)" $(if $(FORCE),--force) $(ARGS)
 
 art: art-install art-jobs
-	$(ARTAI) pack $(RTG_JOBS) $(RTG_ART) --size 512 --quality 82
+	$(ARTAI) pack $(RTG_JOBS) $(RTG_ART) --size 512 --quality 82 $(if $(FORCE),--force)
 
 art-review: art-install art-jobs
 	$(ARTAI) review $(RTG_JOBS) $(RTG_ART) --style "$(RTG_STYLE)"

@@ -123,7 +123,7 @@ sibling checkout. Clone it next to recard (`../artai`) or point at it with
 targets) creates `.venv` if needed and runs `pip install -e ../artai`.
 
 ```
-make art-gen      # artai generate: paint missing masters with codex (resumable)
+make art-gen      # artai generate: paint cards with no art yet (codex, resumable; FORCE=1 redoes)
 make art          # artai pack: masters -> assets/cards/rtg/*.webp (512px, q82)
 make art-review   # artai review: HTML contact sheet in build/rtg-art/review/
 make art-verify   # artai verify: every card has art of the right size
