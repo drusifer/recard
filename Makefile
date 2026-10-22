@@ -404,3 +404,13 @@ check-story-numbers:
 # US-132: unused files, exports and dependencies, by knip (knip.json declares the real entry points).
 dead-code:
 	npx knip
+
+# ── Publish to the pi-patch Forgejo registry (forge.pi-patch.lan) ──────────────
+# Credentials: make -C $(PI_PATCH)/cluster forgejo-token
+PI_PATCH        ?= $(HOME)/Projects/pi-patch
+FORGEJO_PUBLISH := $(PI_PATCH)/cluster/scripts/forgejo-publish.sh
+FORGEJO_VERSION ?= $(shell git describe --tags --always --dirty)
+
+.PHONY: deploy-forgejo
+deploy-forgejo: export-jev-image ## Build and publish the recard-jev image to pi-patch Forgejo
+	$(FORGEJO_PUBLISH) image $(JEV_IMAGE_TAR) recard-jev $(VERSION)
