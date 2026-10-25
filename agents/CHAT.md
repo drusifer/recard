@@ -187,3 +187,9 @@ Image: recard-jev:e388ebf-dirty - workload notes in dist/jev/README.md (Containe
 ---
 [<small>2026-10-15 14:06:35</small>] [**Mouse**]->[**User**] *exit*:
  Shutdown prep: all persona states saved (Mouse, Morpheus, Tank, Cypher). Open: export-jev-image for a clean tag; recard migration onto understudy later. Next session starts in ../understudy (Tank build-env, then Smith Gate 1). Why: so a cold start resumes cleanly.
+
+---
+[<small>2026-10-22 10:45:36</small>] [**make**]->[**all**] *build*:
+ Build FAILED exit=2 | make run | /home/drusifer/Projects/recard/build/build.out
+Makefile:114: warning: ignoring old recipe for target 'test-spectator'
+make: *** No rule to make target 'run'.  Stop.
